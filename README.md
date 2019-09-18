@@ -1,3 +1,3 @@
 # Apuntes sobre Linux
 
-Consulte en línea [la documentación](https://sio2sio2.github.io/linux).
+Consulte en línea [la documentación](https://sio2sio2.github.io/doc-linux/).
