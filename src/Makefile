@@ -6,7 +6,6 @@ SPHINXOPTS    =
 SPHINXBUILD   = sphinx-build
 SOURCEDIR     = source
 BUILDDIR      = build
-DESTDIR       = ../docs
 PKGDIR		  = ..
 
 # Put it first so that "make" without argument is like "make help".
@@ -17,9 +16,6 @@ help:
 
 html:
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
-	@rm -rf "${DESTDIR}"
-	@mv "$(BUILDDIR)/html" "${DESTDIR}"
-	@test -f "${DESTDIR}/.nojekyll" || touch "${DESTDIR}/.nojekyll"
 
 pkg:
 	@echo -n "Creando paquete de copia en el directorio padre... "
