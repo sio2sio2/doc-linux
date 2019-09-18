@@ -1,0 +1,237 @@
+Servidor de ficheros
+********************
+Comenzaremos por preparar el servidor con los ficheros necesarios para la
+descarga. Lo más aconsejable es montar tanto un servidor |TFTP| para descargar
+el |NBP| como un servidor |HTTP| para descargar el resto.
+
+.. _pxe-ficheros:
+
+Estructura
+==========
+La estructura de ficheros en nuestro disco será esta:
+
+.. code-block:: none
+
+   +-- /srv/tftp
+          |
+          +--- bios
+          |     |
+          |     +--- lpxelinux.0
+          |     +--- syslinux
+          |     |       |
+          |     |       +--- ldlinux.c32
+          |     |       +--- pxechn.c32
+          |     |       +--- menu.c32
+          |     |       +--- reboot.c32
+          |     |       +--- ... otros módulos ...
+          |     |
+          |     +--- pxelinux.cfg
+          |             |
+          |             +--- default
+          |
+          +--- ssoo
+          |     |
+          |     + memtest86+.bin
+          |     + slitaz
+          |     |   |
+          |     |   +--- bzImage
+          |     |   +--- rootfs.gz
+          |     |
+          |     + ... un directorio por cada sistema arrancable ...
+          |
+          |
+          +--- cfg
+          |     |
+          |     +--- boot.php
+          |
+          +--- efi32  (misma estructura que bios)
+          +--- efi64  (misma estrctura que bios)
+
+Esto es:
+
+* Un directorio :file:`/srv/tftp` que compartiremos mediante los servicios
+  |TFTP| y |HTTP|.
+* Un subdirectio :file:`bios` en el que se almacenarán todos los ficheros
+  que necesite :file:`syslinux` para hacer su labor. Estos ficheros son los
+  apropiados cuando tenemos una |BIOS| y no una |UEFI|.
+* Los subdirectorios :file:`efi32` y :file:`efi64` contienen las versiones
+  correspondientes de los ficheros de :program:`syslinux`. Téngase en cuenta
+  que en estos dos casos el |NBP| no se llama :program:`lpxelinux.0` sino
+  :program:`syslinux.efi`.
+* Un subdirectorio llamado :file:`cfg` que contendrá los ficheros de
+  configuración de :program:`syslinux` que permitirán la selección del sistema.
+
+Los ficheros podemos obtenerlos de los siguientes paquetes:
+
+**syslinux-common**
+   Contiene los módulos de :program:`syslinux` necesarios incluidos en los
+   subdirectorios :file:`bios`, :file:`efi32` y :file:`efi64`.
+
+**pxelinux**
+   Contiene el ejecutable :program:`lpxelinux.0` del subdirectorio :file:`bios`.
+
+**syslinux-efi**
+   Contiene los ejecutables :program:`syslinux.efi` de los subdirectorios
+   :file:`efi32` y :file:`efi64`.
+
+**memtest86+**
+   Contiene el ejecutable :program:`memtest86+.bin`.
+
+En consecuencia::
+
+   # apt install syslinux-{common,efi} pxelinux memtest86+
+
+Para crear la estructura de directorios podemos ejecutar::
+
+   # mkdir -p /srv/tftp/{{bios,efi32,efi64}/{syslinux,pxelinux.cfg},ssoo,cfg}
+
+Para incluir los ficheros que proporcionan estos paquetes en nuestra estructura,
+basta con hacer enlaces simbólicos. Por ejemplo::
+
+   # ln -s /usr/lib/PXELINUX/lpxelinux.0 /srv/tftp/bios/
+
+Nuestra estrategia para las descargas es la siguiente:
+
+#. El cliente |PXE| descargará por |TFTP| el |NBP| correspondiente
+   (:program:`lpxelinux.0` en arquitecturas con |BIOS|).
+
+#. El |NBP| ya es capaz de descargar por |HTTP|, pero ello exige que definamos la
+   opción |DHCP| **210**. Sin embargo, queremos usar una estrategia universal y en
+   :ref:`el tercer escenario <pxe-dhcp-separados>` podría ocurrir que no seamos
+   capaces, así que lo que hacemos es dejar que el |NBP| descargue
+   :file:`ldlinux.c32` y :file:`pxelinux.cfg/default` también por |TFTP|.
+
+.. _pxe-cambio-a-http:
+
+#. El contenido de :file:`pxelinux.cfg/default` será el siguiente:
+
+   .. literalinclude:: files/default.cfg
+
+   La configuración descarga por |TFTP| sin esperas y sin posibilidad de
+   selección el módulo :file:`pxechn.c32` que nos permite cargar un nuevo |NBP|
+   pero con la posibilidad de pasarle un valor que haga las veces de opción
+   |DHCP| **210**. Así que lo usamos y aprovechamos para cambiar el protocolo y
+   empezar a usar |HTTP|.
+
+   .. warning:: Obviamente, habrá que sustituir "*bios*" por "*efi32*" o
+      "*efi64*" en los ficheros de configuración de las arquitecturas
+      respectivas.
+
+#. A partir de ahora los módulos y las configuraciones se descargarán por |HTTP|
+   y ya explicaremos :ref:`al llegar a él <pxe-http>` qué estrategia seguimos.
+
+.. note:: Obviamente, si tenemos posibilidad de configurar el servidor |DHCP|
+   para que envíe la opción, podríamos darle en su configuración como valor 
+   el mismo que hemos declarado en :file:`pxelinux.cfg/default`::
+
+      dhcp-option-force=210,http://192.168.255.1/boot/bios/
+
+   con lo que el proceso de arranque utilizará directamente el servicio |HTTP| y
+   saltará directamente al punto 4., sin llegar a descargar
+   :file:`pxelinux.cfg/default` y, consecuentemente, sin ejecutar por segunda
+   vez :program:`lpxelinux.0`.
+
+.. warning:: Aunque la estructura se ha creado para poder soportar el arranque
+   tanto desde |BIOS| como desde |UEFI| las explicaciones sobre el servicio
+   |PXE| se ceñirán a dar soporte sólo a la primera arquitectura. Ahora bien, al
+   final, como particularidad, se explicará como hacer que el servicio |PXE| sea
+   capaz de :ref:`soportar las tres arquitecturas <pxe-multiarch>`.
+
+.. note:: Si decidimos prescindir de un servidor |HTTP| y realizar todas las
+   descargas |TFTP|, es obvio que :file:`pxelinux.cfg/default` no debe tener el
+   contenido sugerido. En ese caso, bastaría con que tal fichero fuera un enlace
+   simbólico a :file:`/srv/tftp/cfg/default`, que es el nombre que hemos
+   elegido para una :ref:`configuración estática <pxe-http-estatica>`. Y a
+   partir de aquí toda la configuración sería exactamente igual que para ese
+   caso.
+
+.. _pxe-tftp:
+
+|TFTP|
+======
+Habilitar el servicio es sumamente sencillo, si pensamos usar :program:`dnsmasq`
+en el :ref:`primer escenario <pxe-dhcp-solo>` (en el :ref:`segundo
+<pxe-dhcp-juntos>` y :ref:`tercero <pxe-dhcp-separados>` es obligatorio su uso),
+porque incluye un servidor que puede habilitarse, simplemente, con::
+
+   enable-tftp
+   tftp-root=/srv/tftp
+
+En cambio, si :ref:`en el primer escenario usamos el servidor del ISC <pxe-isc>`
+tendremos que instalar un servidor aparte. El más simple es el que proporciona
+`el paquete tftpd <https://packages.debian.org/stable/tftpd>`_, pero tiene dos
+inconvenientes:
+
+* Sólo está preparado para usarse con :program:`inetd`.
+* No soporta descargas de más de 32MB, lo cual es un incoveniente si no pensamos
+  montar un servidor |HTTP|.
+
+.. _atftpd:
+
+Por tanto, instalaremos :program:`atftp`::
+
+   # apt-get --no-install-recommends install atftpd
+
+para cuya configuración basta con editar el fichero de configuración
+:file:`/etc/default/atftpd` y evitar que se use :program:`inetd`::
+
+   USE_INETD=false
+
+Podremos ver, además, que la configuración ya viene preparada para compartir el
+contenido de :file:`/srv/tftp`, que es lo que pretendemos.
+
+.. _pxe-http:
+
+|HTTP|
+======
+.. note:: Utilizaremos :ref:`nginx <n-ginx>` como servidor |HTTP|.
+
+Al tratar los ficheros que serviremos, redefinimos el *directorio de trabajo*
+como::
+
+   http://192.168.255.1/boot/bios/
+
+y esto requiere algunas puntualizaciomes. Mirando la estructura de ficheros,
+está claro que el directorio que queremos hacer accesible a través de |HTTP| es
+:file:`/srv/tftp`. Que este directorio sea accesible mediante la dirección
+:kbd:`http://192.168.255.1/boot/` es, sin embargo, discutible. Una solución
+alternativa sería hacer accesible el directorio a través de la dirección
+:kbd:`http://boot/`, pero tal cosa exigiría configurar un servidor |DNS| que
+permitiera resolver el nombre *boot.aula.ies* a la dirección |IP|.
+
+Seguiremos el camino preestablecido y en las particularidades veremos :ref:`cómo
+rematar la configuración haciendo uso de un nombre <pxe-dns>`. El fichero de
+configuración para :program:`nginx` es el siguiente:
+
+.. literalinclude:: files/nginx-pxe
+   :emphasize-lines: 21
+
+Un vistazo al fichero de configuración descubre nuestra industria: en principio,
+al cargar por segunda vez el |NBP| redefinimos el *directorio de trabajo*
+simplemente para cambiar de protocolo, pero nada más. Por tanto, éste seguirá
+buscando la configuración probando los mismos ficheros. La consecuencia es que
+volveríamos a leer el mismo :file:`pxelinux.cfg/default` y se entraría en un
+bucle infinito. Sin embargo, la línea resaltada captura la petición del fichero
+cuyo nombre coincide con la |MAC| de la tarjeta, que es anterior, y posibilita
+que se ejecute el script de |PHP| :file:`cfg/boot.php` haciéndole accesibles
+a través de los argumentos la propia |MAC| y la arquitectura de arranque. Como
+en el *script* se puede preguntar por la |IP| del cliente, podemos usar estos
+tres datos para particularizar la configuración.
+
+.. _pxe-http-estatica:
+
+Si **no** tenemos propósito de hacer configuraciones dinámicas, podemos simplificar
+un poco:
+
+.. literalinclude:: files/nginx-pxe-estatica
+   :emphasize-lines: 24-26
+
+Por último, quedaría escribir :file:`cfg/boot.php` o :file:`cfg/default`
+según el caso, pero eso lo dejaremos para :ref:`más adelante <pxe-sys-conf>`.
+
+.. |PXE| replace:: :abbr:`PXE (Preboot eXecution Environment)`
+.. |NBP| replace:: :abbr:`NBP (Network Bootstrap Program)`
+.. |BIOS| replace:: :abbr:`BIOS (Basic Input/Output System)`
+.. |TFTP| replace:: :abbr:`TFTP (Trivial FTP)`
+.. |UEFI| replace:: :abbr:`UEFI (Unified Extensible Firmware Interface)`
+.. |PHP| replace:: :abbr:`PHP (PHP Hypertext Preprocessor)`

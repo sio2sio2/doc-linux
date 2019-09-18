@@ -1,0 +1,222 @@
+
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>7.2.2.3.2. Caché de paquetes &#8212; documentación de ServidorLinux - 0.1.0</title>
+    <link rel="stylesheet" href="../../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css" />
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../../" src="../../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../../_static/language_data.js"></script>
+    <script type="text/javascript" src="../../../../_static/translations.js"></script>
+    
+    <link rel="index" title="Índice" href="../../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../../search.html" />
+    <link rel="next" title="7.2.2.3.3. Webmail" href="02.webmail.html" />
+    <link rel="prev" title="7.2.2.3.1. Registros con systemd" href="00.log.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="02.webmail.html" title="7.2.2.3.3. Webmail"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="00.log.html" title="7.2.2.3.1. Registros con systemd"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">documentación de ServidorLinux - 0.1.0</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" >7. Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../index.html" >7.2. Web</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../index.html" >7.2.2. nginx</a> &#187;</li>
+          <li class="nav-item nav-item-4"><a href="index.html" accesskey="U">7.2.2.3. Recetas</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="cache-de-paquetes">
+<span id="nginx-debcache"></span><h1>7.2.2.3.2. Caché de paquetes<a class="headerlink" href="#cache-de-paquetes" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>Cuando se requiere actualizar muchos ordenadores de la red local, la descarga de
+paquetes puedo suponer un gran tráfico de red. Una solución para evitarlo crear
+un repositorio completo, pero por lo general sólo se instalan una ínfima parte
+de los paquetes de la distribución con que descargamos y sincronizamos muchos
+paquetes que no son totalmente inútiles.</p>
+<p>Una solución alternativa es crear un <em>proxy</em><a class="footnote-reference" href="#id2" id="id1">[1]</a> caché para almacenar los
+paquetes de descargados; asi sólo la primera instación requerirá descargarlos de
+internet y las siguientes se limitarán a obtenerlos del <em>proxy</em>.
+<strong class="program">nginx</strong> nos permite hacerlo como por otro lado nos lo permitiría
+<a class="reference internal" href="../../../05.proxies/index.html#squid"><span class="std std-ref">squid</span></a>).</p>
+<p>La idea es modificar el fichero <code class="file docutils literal notranslate"><span class="pre">sources.list</span></code> de manera que las líneas
+que se escriben así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">deb http://ftp.fr.debian.org/debian/ stretch  main</span>
+</pre></div>
+</div>
+<p>pasen a estar escritas así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">deb http://debian-cache.example.net/ftp.fr.debian.org/debian/ stretch  main</span>
+</pre></div>
+</div>
+<p>es decir, la línea es igual pero insertando el nombre de nuestro <em>proxy</em> al
+nombre de la máquina del reposito de <em>debian</em>. De este modo, el gestor de
+paquetes contactará con nuestro <strong class="program">nginx</strong> y éste será capaz de conocer
+cuál es el repositorio y la ruta al recurso, simplemente transformando el primer
+directorio en el nombre del repositorio.</p>
+<p>Para ello lo primero es crear un directorio de almacenamiento para las
+descargas:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkdir -p /var/cache/nginx
+<span class="gp">#</span> chown www-data /var/cache/nginx
+</pre></div>
+</div>
+<p>Y ahora definir cómo es esta caché en <code class="file docutils literal notranslate"><span class="pre">/etc/nginx/conf.d/cache.conf</span></code>:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">proxy_cache_path</span> <span class="s">/var/cache/nginx/debcache</span>
+                 <span class="s">levels=1:2</span>
+                 <span class="s">keys_zone=debcache:8m</span>
+                 <span class="s">max_size=500m</span>
+                 <span class="s">inactive=14d</span>
+                 <span class="s">use_temp_path=off</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>cuyo contenido supone que:</p>
+<ul class="simple">
+<li>Almacenaremos todos los datos en <code class="file docutils literal notranslate"><span class="pre">/var/cache/nginx/debcache</span></code>.</li>
+<li>La caché la podremos referir luego como <em>debcache</em>.</li>
+<li>Dispondrá de un tamaño máximo de 500 MB. Si se supera este tamaño, para
+respetar este límite, se empezarán a eliminar contenidos empezando por
+aquellos cuyo tiempo de acceso es más antiguo.</li>
+<li>Los contenidos permanecerán 14 días almacenados. Superado este tiempo, se
+eliminarán.</li>
+</ul>
+<p>Por último debemos crear el dominio virtual (que hemos llamado
+<em>debian-cache.example.net</em>) con <a class="reference download internal" download="" href="../../../../_downloads/bdc03a9c5d2f8be0d954624c75f58eeb/site-cache"><code class="xref download docutils literal notranslate"><span class="pre">esta</span> <span class="pre">configuracion</span></code></a>:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">server</span> <span class="p">{</span>
+   <span class="kn">listen</span>  <span class="mi">80</span><span class="p">;</span>
+   <span class="kn">server_name</span>   <span class="s">debian-cache.example.net</span><span class="p">;</span>
+   <span class="kn">server_tokens</span> <span class="no">off</span><span class="p">;</span>
+   
+   <span class="kn">location</span> <span class="p">~</span> <span class="sr">^/(?P&lt;servidor&gt;[^/]+).*$</span> <span class="p">{</span>
+      <span class="kn">rewrite</span>  <span class="s">^/[^/]+(.*)</span>$ <span class="nv">$1</span> <span class="s">break</span><span class="p">;</span>
+
+      <span class="kn">proxy_pass</span>  <span class="s">http://</span><span class="nv">$servidor</span><span class="p">;</span>
+      <span class="kn">resolver</span> <span class="mi">8</span><span class="s">.8.8.8</span><span class="p">;</span>  <span class="c1"># U otro servidor DNS más apropiado.</span>
+      <span class="kn">proxy_http_version</span> <span class="mi">1</span><span class="s">.1</span><span class="p">;</span>
+      <span class="kn">proxy_set_header</span> <span class="s">Host</span>      <span class="nv">$servidor</span><span class="p">;</span>
+      <span class="kn">proxy_set_header</span> <span class="s">X-Real-IP</span> <span class="nv">$remote_addr</span><span class="p">;</span>
+
+      <span class="kn">proxy_cache</span> <span class="s">debcache</span><span class="p">;</span>
+      <span class="kn">proxy_cache_valid</span> <span class="s">8h</span><span class="p">;</span>
+      <span class="kn">proxy_cache_valid</span> <span class="mi">404</span> <span class="mi">10m</span><span class="p">;</span>
+      <span class="kn">proxy_cache_use_stale</span> <span class="s">error</span> <span class="s">timeout</span> <span class="s">updating</span> <span class="s">http_500</span> <span class="s">http_502</span> <span class="s">http_503</span> <span class="s">http_504</span><span class="p">;</span>
+      <span class="kn">proxy_cache_lock</span> <span class="no">on</span><span class="p">;</span>
+
+      <span class="kn">location</span> <span class="p">~</span> <span class="sr">\.deb$</span> <span class="p">{</span>
+         <span class="kn">rewrite</span>  <span class="s">^/[^/]+(.*)</span>$ <span class="nv">$1</span> <span class="s">break</span><span class="p">;</span>
+         <span class="kn">proxy_pass</span>  <span class="s">http://</span><span class="nv">$servidor</span><span class="p">;</span>
+
+         <span class="kn">proxy_cache_valid</span> <span class="s">14d</span><span class="p">;</span>
+      <span class="p">}</span>
+   <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Actúa como <em>proxy</em> entre el repositorio de <em>debian</em> y el cliente usando la
+caché. Ahora bien, almacenar durante mucho tiempo la lista de paquetes no
+es muy recomendable, porque si un paquete se actualiza en el repositorio, pero
+nuestra lista no, el cliente intentará obtener una versión antigua del paquete y
+se encontrará con un error <strong>404</strong>. Por ello configuramos del siguiente modo:</p>
+<ul class="simple">
+<li>Los ficheros cacheados que no son paquetes <em>debian</em> se considerarán inválidos
+después de 8 horas, o sea, una jornada de trabajo. Si se detectan muchos
+errores <strong>404</strong> como consecuencia de la desincronización con el repositorio,
+se puede disminuir este tiempo a costa de que sean necesarias más
+actualizaciones remotas de las listas de paquetes el mismo día.</li>
+<li>Los paquetes, en cambio, se consideran válidos durante 14 días. A diferencia
+del caso anterior que un paquete cacheado se vuelva obsoleto, no supone un
+error, ya que el cliente descargará el nuevo paquete. La única desventaja es
+que cachearemos la versión antigua y la nueva y ocuparemos espacio de disco
+innecesariamente.</li>
+</ul>
+<p class="rubric">Notas al pie</p>
+<table class="docutils footnote" frame="void" id="id2" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td>Aunque es mucho mas sencillo, si no necesitamos instalar <strong class="program">nginx</strong> por
+otra razón, usar <a class="reference external" href="https://www.tecmint.com/apt-cache-server-in-ubuntu/">apt-cacher-ng</a>.</td></tr>
+</tbody>
+</table>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="00.log.html"
+                        title="capítulo anterior">7.2.2.3.1. Registros con systemd</a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="02.webmail.html"
+                        title="próximo capítulo">7.2.2.3.3. Webmail</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../../_sources/07.serre/02.web/02.nginx/03.misc/01.dpkg-cache.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Ir a" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="02.webmail.html" title="7.2.2.3.3. Webmail"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="00.log.html" title="7.2.2.3.1. Registros con systemd"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">documentación de ServidorLinux - 0.1.0</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" >7. Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../index.html" >7.2. Web</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../index.html" >7.2.2. nginx</a> &#187;</li>
+          <li class="nav-item nav-item-4"><a href="index.html" >7.2.2.3. Recetas</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor 2016, José Miguel Sánchez Alés.
+      Creado con <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
+    </div>
+  </body>
+</html>

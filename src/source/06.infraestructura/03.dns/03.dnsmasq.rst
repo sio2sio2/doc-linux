@@ -1,0 +1,580 @@
+.. _dnsmasq-dns:
+
+DNS con :program:`dnsmasq`
+**************************
+:program:`dnsmasq` más que un servidor |DNS| es un proxy |DNS| que al responder
+a la petición de un cliente la cachea, a fin de que para la siguiente respuesta
+no sea necesaria la consulta remota. Por este motivo, algunas distribuciones lo
+incluyen en sus instalaciones para equipos de escritorio.
+
+Sin embargo, permite también de forma limitada la definición de registros |DNS|
+por lo que puede usarse como tal, si nuestras pretensiones son modestas. En lo
+referente a este servicio sus limitaciones más evidentes son:
+
+* El tratamiento de varios dominios puede ser confuso y engorroso.
+* Tiene limitado el soporte |DNSSEC|: es capaz de validar registros de
+  servidores externos o no hacerlo y pasar a los clientes el registro de
+  firma (véase `más adelantee <dnsmasq-dnssec>`), pero no puede firmar
+  automáticamente los registros propios, como sí hace :ref:`bind <bind>`.
+
+Para discutir sobre la configuración supongamos que el servidor tiene por
+dirección *192.168.255.1* y que deseamos que nuestra red sea el dominio
+*example.net*.
+
+.. seealso:: Para saber cómo están estructurados los ficheros de configuración,
+   revise lo comentado en :ref:`la configuración para DHCP
+   <dnsmasq-dhcp-confbas>`.
+
+.. _pre-dns:
+
+Preliminares
+============
+
+.. note:: Esta preparación del sistema es aplicable a la instalación de
+   cualquier otro servidor |DNS|.
+
+Principos de funcionamiento
+===========================
+:program:`dnsmasq` por defecto:
+
+#. Levanta el servidor |DNS|, así que éste funcionará a menos que lo
+   deshabilitemos incluyendo la directiva::
+
+      port=0
+
+#. En principio, se usan como servidores de consulta, los servidores incluidos
+   en :file:`/etc/resolv.conf`.
+
+   .. note:: Advierta que por ello la propia máquina en que está instalado
+      :program:`dnsmasq` no puede usarlo como servidor |DNS|, puesto que eso
+      exigiría colocar en tal fichero *127.0.0.1* y el resultado es que
+      :program:`dnsmasq` se preguntaría a sí mismo. Ya veremos como solucionar
+      esto.
+
+#. Hay dos fuentes principales para la definición de registros propios:
+   
+   * Las definiciones hechas en :file:`/etc/hosts`, de modo que si queremos
+     definir un registro de tipo **A**, basta con incluir una línea en este
+     fichero.
+
+   * Si se ha habilitado el servicio |DHCP| y :ref:`se han declarado máquinas
+     con nombre <dnsmasq-host-decl>`, se asignará dinámicamente este nombre en
+     el servicio |DNS|.
+
+En conclusión, que con solo instalar el paquete podremos hacer que el resto de
+máquinas de la red sean capaces de usar ésta cono servidor |DNS|. Además, las
+definiciones que hayamos hecho en :file:`/etc/hosts` también serán resolubles.
+
+Servidores de consulta
+======================
+Puede interesarnos usar otros servidores de consulta distintos a las nombreado
+en :file:`/etc/resolv.conf`. La razón principal puede ser que queramos usar
+:program:`dnsmasq` como el servidor |DNS| para la propia máquina lo que nos
+obligaría a crear así :file:`/etC/resolv.conf`::
+
+   # /etc/resolv.conf
+   domain example.net
+   search exameple.net
+   namserver 127.0.0,1
+
+Si no tocáramos nada más, esto supondría que :program:`dnsmasq` se preguntara a
+sí mismo y acabáramos por no obtener ninguna resolución. Para sustituir la
+lectura de este fichero por la de otro podemos crear un fichero
+:file:`/etc/dnsmasq.d/dns.conf` con la siguiente configuración::
+
+   # /etc/dnsmasq.d/dns.conf
+
+   resolv-file=/etc/resolv.dnsmasq.conf
+
+e incluir dentro del fichero referido por :code:`resolv-file` los servidores de
+consulta::
+
+   # /etc/resolv.dnsmasq.conf
+
+   nameserver 1.1.1.1
+   nameserver 1.0.0.1
+
+Ahora sí podríamos alterar :file:`/etc/resolv.conf` para que incluya como
+servidor de nombres *127.0.0.1*.
+
+Una alternativa a esto es impedir que se lea :file:`/etc/resolv.conf` y definir
+dentro de la propia configuración los servidores de consulta::
+
+   no-resolv
+   server=1.1.1.1
+   server=1.0.0.1
+   server=/google.com/8.8.8.8
+
+en este caso puede usarse la directiva *server* varias veces para definir varios
+servidores de consulta y, además, puede restringirse el servidor de consulta a
+un dominio (o varios) exclusivamente. En el ejemplo, todas las resoluciones se
+hacen con *1.1.1.1* y *1.0.0.1*, excepto los nombres del dominio *google.com*
+para los cuales se usará el servidor *8.8.8.8*.
+
+Definición estática de nombres
+==============================
+Ya se ha dicho que :program:`dnsmasq` comparte las definición incluidas en
+:file:`/etc/hosts`, lo que significa que una definición dentro de ese fichero
+como esta::
+
+   192.168.255.1     ns.example.net    ns
+   192.168.255.5     mail.example.net  mail
+
+provoca que todos las máquinas que usen nuestro servidor sean capaces de hacer
+la resolución directa de tales nombres::
+
+   $ host mail.example.net
+   mail.example.net has address 192.168.255.10
+
+Además, es posible añadir otros ficheros como fuente de registros::
+
+   no-hosts
+   addn-hosts=/etc/hosts.d/example.net
+
+Como puede verse estas definiciones se corresponden, exclusivamente, con
+registros de tipo **A**. Este mismo tipo de registros también puede
+añadirse dentro de la propia configuración con la directiva :code:`host-record`.
+Por ejemplo::
+
+   host-record=mail.example.net,192.168.255.5
+
+.. note:: La diferencia entre añadir directamente la definición en la
+   configuración o usar ficheros aparte (el primer caso) no es sólo de
+   pulcritud: para releer la configuración es necesario reiniciar el servidor
+   mientras que los ficheros aparte de definición de máquinas se releen
+   simplemente con madar una señal *SIGHUP* al servidor (o sea, haciendo un
+   :code:`kill -1`).
+
+Cuando la interfaz posee una |IP| dinámica, es posible también hacer esta
+definición::
+
+   interface-name=ext.example.net,eth0
+
+que calcula la |IP| consultando cuál es la que tiene asignada la interfaz
+suministrada.
+
+Cualquier otro tipo de registro, sólo es posible incluirlo dentro de la
+configuración y no en fichero aparte con la directiva adecuada. Un registro
+**MX** podemos añadirlo así::
+
+   mx-host=example.net,mail.example.net
+
+suponiendo que ya tengamos definida la máquina con nombre *smtp*. También es
+posible definir alias::
+
+   cname=smtp.example.net,mail.example.net
+
+y ahorrarnos el dominio del objetivo (*mail.example.net* en este caso), si
+coincide::
+
+   cname=smtp.example.net,mail
+
+.. seealso:: Para otro tipo de registros, consulte la `página del manual
+   <http://www.thekelleys.org.uk/dnsmasq/docs/dnsmasq-man.html>`_.
+
+Definición de zonas
+===================
+Ya hemos apuntado en el apartado anterior cómo definir máquinas, y éstas se
+pueden definir de una forma anárquica, ya que :program:`dnsmasq` permite asociar
+nombres e |IP| sin importar a que dominio pertenezcan estos nombres. Por
+ejemplo, si en :file:`/etc/hosts` añadimos lo siguiente::
+
+   192.168.255.2     www.facebook.com
+   192.168.255.2     www.twitter.com
+   192.168.255.2     www.instagram.com
+
+los clientes que resuelvan nombres con nuestro servidor obtendrán esa |IP| al
+intentar acceder a cualquiera de esos sitios web. Como se ve, a diferencia de lo
+que hacemos en :program:`bind` no definimos una zona en concreto. Esa es una de
+las virtudes de :program:`dnsmasq` que propicia que se use, por ejemplo, como
+:ref:`sumidero DNS <dnsmasq-bloqueo>`.
+
+Ahora bien, si planteamos dar nombres |DNS| a los ordenadores de una |LAN| y
+usar :program:`dnsmasq` para ello, lo que nos interesa es poder emular la
+filosofía de :program:`bind` y crear zonas. O dicho de otro modo, supongamos que
+con :program:`bind` tenemos esta configuración\ [#]_::
+
+   # /etc/bind9/named.conf.local
+   zone "example.net" {
+      type master;
+      file "db.example.net";
+      forwarders {};
+   }
+
+   # /var/cache/bind/db.example.net
+   # Definición del registro SOA...
+   @        IN    NS       ns
+                  MX       1 mail
+   ns       IN    A        192.168.255.1
+   mail     IN    A        192.168.255.1
+   smtp     IN    CNAME    mail
+   imap     IN    CNMAE    smtp
+
+porque nuestro servidor tiene una red externa a la que accede a través de la
+interfaz *eth0* y otra interna conectada a *eth1* (*192.168.255.1*) y cuya red
+es la *192.168.255.0/24*. Esta red interna es la que se quiere asociar al
+dominio *example.net*.
+
+Sabemos qye una configuración así tiene este efecto::
+
+   $ host -t ns example.net
+   example.net name server ns.example.net
+   $ host ns.example.net
+   ns.example.net has address 192.168.255.1
+   $ host smtp.example.net
+   smtp.example.net is an alias for mail.example.net.
+   mail.example.net has address 192.168.255.1
+
+Para lograr lo propio podemos escribir un fichero
+:file:`/etc/dnsmasq.d/dns.conf` con esta configuración general:
+
+.. code-block:: bash
+
+   # Puede descomentarse para depuración.
+   #log-queries
+
+   no-hosts  # No queremos consultar /etc/hosts (opcional)
+   expand-hosts
+
+y :file:`/etc/dnsmasq.d/example.conf` que defina la zona *example.net*:
+
+.. code-block:: bash
+
+   auth-zone=example.net,eth1
+   auth-server=ns.example.net,eth1
+   domain=example.net,192.168.255.0/24
+
+   addn-hosts=/etc/hosts.d/eth1   # Aquí podemos meter registros A.
+
+   # Registro MX
+   mx-host=example.net,mail.example.net
+
+   # CNAMEs
+   cname=smtp.example.net,mail
+   cname=imap.example.net,mail
+
+Por último podemos crear los registros **A** en :file:`/etc/hosts.d/eth1`::
+
+   192.168.255.1  ns    mail
+
+La justificación de esta configuración es la siguiente:
+
+* En :file:`dns.conf` hemos añadido configuración general relativa al
+  servicio |DNS|, esto es, configuración común a todas las zonas que
+  pretendiéramos definir.
+
+* En :file:`eth1.conf` hemos incluido configuración referente únicamente
+  al dominio *example.net* correspondiente a la interfaz *eth1* y la red
+  *192.168.255.0/24*. Si tuviéramos otros dominios, otras interfaces
+  internas y otras redes, podríamos escribir ficheros con contenido análogo.
+
+* ``expand-hosts`` evita tener que añadir el dominio constantemente en el
+  fichero :file:`/etc/hosts.d/eth1`. Sin la directiva tendríamos que haber
+  escrito::
+
+      192.168.255.1  ns.example.net    mail.example.net
+      
+  Esta directiva, no obstante, sólo añade el dominio en las máquinas declaradas
+  en ficheros *hosts* y no registros incluidos dentro de la propia
+  configuración.
+
+  Por otro lado, para que esta directiva tenga efecto es necesario añadir
+  también la directiva ``domain``, aunque esta está relacionada con el servicio
+  |DHCP|.
+
+* ``auth-zone`` convierte a nuestro servidor :command:`dnsmasq` en el servidor
+  autoritario del dominio *example.net*, lo que implica que jamás se resolverán
+  máquinas de este dominio recurriendo a los servidores externos de internet que
+  hayamos configurado. Dicho de otro modo. *www.example.net* es una máquina que
+  existe en internet. Si no incluimos esta directiva y no definimos nosotros la
+  máquina *www*, :program:`dnsmasq` nos devolverá la |IP| pública asociada a
+  este nombre, porque la consultará al servidor externo. Con la directiva en
+  cambio, devolverá un error de registro no encontrado.
+
+  Hemos añadido, además, la interfaz *eth1*, lo que tiene el efecto de que
+  *dnsmasq* calcule a partir de la configuración de esta interfaz cuál es la red
+  asociada (*192.168.255.0/24*). De hecho, podríamos haber escrito directamente
+  la red. Este segundo parámetro es opcional, pero al incluirlo y relacionar el
+  dominio con la red, :program:`dnsmasq` habilitará la resolución inversa. Por
+  tanto::
+
+      $ host 192.168.255.1
+      1.255.168.192.in-addr.arpa domain name pointer ns.example.net.
+
+* ``auth-server`` es la directiva encargada de definir el registro *NS* de la
+  zona que estamos definiendo. Por tanto, tiene el efecto de generar este
+  registro::
+
+      @     IN    NS    ns.example.net.
+
+  Obviamente este nombre debe tener asociado alguna |IP|.
+
+  .. note:: Cuando queramos definir con :program:`dnsmasq` una zona
+     resoluble desde internet, es necesario incluir obligatoriamente esta
+     directiva. Esta directiva, además, hace que para las peticiones referidas
+     por la interfaz indicada, :program:`dnsmasq` no permita consultas
+     recursivas, esto es, consultas que no pregunten por nombres de la propia
+     zona. Es, pues, bastante probable que se quiera incluir esta directiva
+     cuando la interfaz se trata de una interfaz externa. Para más información,
+     consúltese `esta respuesta en la lista de distribución del programa
+     <http://lists.thekelleys.org.uk/pipermail/dnsmasq-discuss/2015q1/009326.html>`_
+
+* ``addn-hosts`` nos permite indicar cuál será el fichero donde incluyamos los
+  registros **A**.
+
+* El resto del fichero :file:`eth1.conf` define registros de otro tipo: uno
+  **MX** y dos **CNAME**.
+
+.. rubric:: |DHCP|
+
+Como estamos configurando el dominio para una |LAN| y lo hemos asociado a una
+red (*192.168.255.0/24*) es probable que también nos interese ofrecer |DHCP| con
+el propio :program:`dnsmasq.conf`. En ese caso bastaría con incluir un fichero
+:file:`/etc/dnsmasq.d/dhcp.conf` con la siguiente configuración general::
+
+   dhcp-autoritative
+   # log-dhcp           # Descomentarlo en caso de querer depurar.
+
+y dentro de :file:`/etc/dnsmasq.d/example.conf`, añadir al final del archivo la
+configuración que deseemos para |DHCP|::
+
+   dhcp-range=192.168.255.64,192.168.255.127,10m
+
+   # Configuración adicional referente al DHCP
+
+.. rubric:: Vistas
+
+:program:`dnsmasq` dispone de ``localise-queries`` para que el caso de que si
+un mismo nombre está asociado a distintas |IP|, no se devuelvan todas sino que
+se devuelva aquella que pertenece a la red de la interfaz por la que se recibe
+la petición. Sin embargo, la directiva no se lleva bien con ``auth-server``.
+
+Gestión de una zona de internet
+===============================
+Bajo el epígrafe expondremos cuál es una configuración apropiada para la gestión
+de una zona de internet que poseamos, partiendo de las siguientes suposiciones:
+
++ Hemos contratado un |VPS| o un servidor dedicado con una dirección |IP|\ v4,
+  que se encuentra asociada a su interfaz *eth0*.
++ Deseamos gestionar en dicha máquina el subdominio *vps.example.net* para lo
+  cual en la zona *example.net* habrá declarado lo siguiente::
+
+   mi-vps      IN       NS    vps
+                         A    IPv4.DE.MI.VPS 
+
++ No tiene por qué ser así, pero lo habitual es que todos los nombres resuelvan
+  a la |IP| de la máquina, que es la |IP| de la interfaz.
+
+Obsérvese que nuestro servidor gestionará la zona *vps.example.net*, pero en
+absoluto controlamos nuestra |IP| (que, simplemente, nos es concedida por nuestro
+proveedor como parte de su servicio) y mucho menos disponemos de la subred en
+que se incluye nuestra |IP|. En este contexto, es absurdo que nuestro
+:program:`dnsmasq` pretenda encargarse de resolución inversa alguna\ [#]_.
+
+La configuración puede ser esta:
+
+.. code-block:: python
+
+   # /etc/dnsmasq/dns.conf
+   no-resolv
+   server=1.1.1.1
+   server=1.0.0.1
+
+   no-hosts
+
+   auth-zone=vps.example.net
+   auth-server=mi-vps.example.net,eth0
+
+   # Nombres asociados a la propia máquina
+   interface-name=www.vps.example.net,eth0
+   interface-name=mail.vps.example.net,eth0
+
+   # Nombres asociados a otros máquinas
+   addn-hosts=/etc/hosts.d/vps.example.net
+
+   # MX
+   mx-host=vps.example.net,mail.vps.example.net
+
+   # CNAMEs
+   cname=smtp.vps.example.net,mail
+   cname=imap.vps.example.net,mail
+
+que presenta algunas diferencias respecto a la propuesta para la definición de
+una zona:
+
+* No añadimos red o interfaz a la directiva ``auth-zone``, porque no pretendemos
+  realizar ninguna resolución inversa, al no ser dueños de ninguna subred.
+
+* No añadimos la directiva ``domain`` ni ``expand-host`` porque no somos dueños
+  de ninguna subred.
+
+* Aunque la |IP| pública es fija (más nos vale), preferimos  leerla de la
+  interfaz (con ``interface-name``), en vez de incluirla en la configuración
+  (p.e. dentro del fichero :file: `/etc/hosts.d/vps.example.net`).
+
+* El fichero :file: `/etc/hosts.d/vps.example.net` lo creamos por si deseamos
+  proporcionar nombre de nuestra zona a otras máquinas distintas de la de
+  nuestro servidor, por ejemplo, otro |VPS| en el que no disponemos ningún
+  servidor |DNS|, pero en el que configuramos algún servicio para el que
+  queremos asignar un nombre del dominio *vps.example.net*.
+
+Gestión de una zona interna
+===========================
+
+.. todo:: Por escribir
+
+.. _dnsmasq-dnssec:
+
+|DNSSEC|
+========
+:program:`dnsmasq` tiene un soporte parcial para |DNSSEC|, ya que es capaz de
+comprobar la validez de un registro a través de su registro de firma para las
+consultas que haga a los servidores que tenga definidos; pero, sin embargo, no
+es capaz de generar registros automáticos de firma para los registros que el
+mismo gestiona (*example.net* en nuestro ejemplo).
+
+Con respecto a |DNSSEC|, :program:`dnsmasq` puede actuar de tres formas:
+
+#. Sin configuración específica, pasa la respuesta de su servidor de consulta,
+   pero eliminado los datos referentes a |DNSSEC|, por lo que se perderá el bit
+   |AD| y, en consecuencia, el cliente no sabrá si la respuesta está verificada
+   o no.
+
+   .. note:: En este caso, si el servidor de consulta no realiza comprobaciones
+      no se obtendrá error jamás, mientras que se obtendrá un *SERVFAIL* si el
+      servidor realiza comprobaciones y la verificación falla.
+
+#. Si se añade la directiva::
+
+      proxy-dnssec
+
+   se actúa como en el caso anterior, pero se transmite el bit |AD| al cliente,
+   por lo que este podrá saber si se realizó verificación o no.
+
+#. Si se desea que el propio :program:`dnsmasq` se encargue de la verificación,
+   lo cual es útil, si el servidor de consulta no la realiza o no nos fiamos de
+   él, podemos configurar del siguiente modo::
+
+      dnssec
+      dnssec-check-unsigned
+      conf-file=/usr/share/dnsmasq-base/trust-anchors.conf
+
+   .. note:: El fichero contiene los registros |DS| para la zona "." que
+      `publica la IANA <https://data.iana.org/root-anchors/root-anchors.xml>`_.
+
+.. _dnsmasq-bloqueo:
+
+Bloqueo DNS
+===========
+Es habitual que necesitemos evitar el acceso a determinados sitios web. Para
+ello existen proxies web, pero cuando el tráfico es seguro (y esto es ya lo
+más frecuente), la cabecera |HTTP| está cifrada y los proxies se vuelven
+inútiles. Una solución es utilizar un cortafuegos, si el sitio web sólo es
+accesible a través de una |IP|. Pero si el sitio tiene varias |IP|, entonces lo
+aconsejable es hacer este filtrado por nombre. Como el tráfico web está cifrado,
+la única forma de saber que alguien está intentando acceder al sitio, es
+a través de la petición |DNS| que intenta hacer la resolución\ [#]_ previa.
+
+:program:`dnsmasq` puede permitir el bloqueo de estos sitios, haciendo que la
+resolución de las máquinas o los dominios indeseados se haga a una |IP|
+inexistente o a la |IP| de una máquina en la que dispongamos un servidor web que
+devuelva una página con el aviso de prohibición.
+
+Para lograrlo podemos crear un fichero :file:`/etc/dnsmasq.d/filter.conf` con un
+contenido como éste:
+
+.. code-block:: bash
+
+   # /etc/dnsmasq.d/filter.conf
+   address=/facebook.com/0.0.0.0      # No se puede acceder a máquinas del dominio completo
+   addn-hosts=/etc/hosts.banned.conf  # Para incluir máquinas individuales.
+
+Con la configuración anterior, cualquier máquina del dominio *facebook.com* se
+resolverá a *0.0.0.0* con lo que el acceso será imposible y, además, se dispone
+un fichero para incluir direcciones de máquinas individuales. Podemos repetir
+tantas veces como deseemos la opción :kbd:`address`, así que podremos bloquear
+tantos dominios como deseemos.
+
+.. note:: Está técnica recibe el nombre de :dfn:`sumidero de DNS` y es muy
+   empleada para evitar los sitios dedicados a albergar anuncios. Un ejemplo de
+   *software* que se basa en esta técnica y usa al propio :program:`dnsmasq` es
+   `pi-hole <https://pi-hole.net/>`_.
+
+.. _dnsmasq-ddns:
+
+DNS dinámico
+============
+
+.. ver synth-domain
+.. dhcp-fqdn
+
+
+.. warning:: Es importante que definamos dominios para las redes a las
+   que brindemos servicio |DHCP|::
+
+      dhcp-range=192.168.255.128,192.168.255.191,8h
+      domain=aula.ies,192.168.255.0/24
+
+En :program:`dnsmasq`, podemos lograr la inclusión dinámica en su **propio**
+|DNS| de las máquinas que reciben configuración de red, pero un soporte
+personalizado requiere algo de configuración.
+
+En principio, todas las máquinas que tengan asociado un nombre pasan al |DNS|.
+Esto es aplicable a aquellas a las que en la configuración se les haya definido
+un nombre::
+
+   dhcp-host=00:11:22:33:44:55,profesor
+
+pero también a aquellas cuyo cliente envía su propio nombre. Para estas
+segundas, no obtante, podemos evitar la inclusión incluyendo la directiva::
+
+   dhcp-ignore-names
+
+El problema, pues, son aquellas que no se incluyen automáticamente. La razón,
+obviamente, es que :program:`dnsmasq` no tiene nombre para ellas. Para
+resolverlo, :program:`dnsmasq` implementa la directiva ``dhcp-generate-names``
+que asigna como nombre de máquina a aquellas que no lo tienen la dirección |MAC|
+en que se sustituyen los dos puntos por guiones\ [#]_::
+
+   dhcp-generate-names
+
+La desventaja de este método es que no podemos elegir el formato del nombre. Si
+nuestra intención es personalizar el formato, entonces la directiva anterior es
+inútil y no hay más solución que utilizar ``dhcp-script`` que permite definir
+el *script* que se ejecutará cada vez que haya un cambio en las asignaciones
+del |DHCP|. La idea es que este *script* cree el nombre dinámico para las
+máquinas que no disponen de él, según el formato que definamos denhtro de él y
+gestione el contenido de un fichero *hosts*, en donde iremos metiendo y sacando
+equipos según obtengan o revoquen direcciones.
+
+En tal caso para la configuración de :program:`dnsmasq`, podemos crear un
+fichero :file:`/etc/dnsmasq.d/ddns.conf` con el siguiente contenido::
+
+   addn-hosts=/tmp/dynamic.hosts
+   dhcp-scripts=/var/lib/dnsmasq/ddns.sh
+   dhcp-ignore-names  # Opcional
+
+y añadir en su ruta correspondiente el *script* :download:`ddns.sh
+<files/ddns.sh>`.
+
+.. rubric:: Notas al pie
+
+.. [#] También podríamos definir una zona para la resolución inversa.
+
+.. [#] De hecho, si queremos que ls |IP| resuelva a alguno de nuestro nombres
+   (p.e. *mi-vps.example.net*) lo más probable es que necesitemos hablar con el
+   provedor para que realice él el cambio en sus servidores.
+
+.. [#] Obviamente, que se realice una petición |DNS| no implica que el tráfico
+   subsiguiente seá tráfico web, pero lo habitual es que si alguien quiere
+   conectar al dominio `youtube.com <http://www.youtube.com>`_ lo que pretenda es
+   establecer una conexión web.
+
+.. [#] Aunque la página de manual dice que es obligatorio asociar esta directiva
+   a una etiqueta, parece funcionar sin especificar ninguna.
+
+.. |DNSSEC| replace:: :abbr:`DNSSEC (Domain Name System SECurity extensions)`
+.. |LAN| replace:: :abbr:`LAN (Local Area Network)`
+.. |VPS| replace:: :abbr:`VPS (Virtual Private Server)`
+.. |AD| replace:: :abbr:`AD (Authenticated Data)`
+.. |DS| replace:: :abbr:`DS (Delegation Signer)`

@@ -1,0 +1,418 @@
+
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>4.6.4. Certificados de autenticación &#8212; documentación de ServidorLinux - 0.1.0</title>
+    <link rel="stylesheet" href="../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/custom.css" />
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../_static/language_data.js"></script>
+    <script type="text/javascript" src="../../_static/translations.js"></script>
+    
+    <link rel="index" title="Índice" href="../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../search.html" />
+    <link rel="next" title="4.6.5. Túneles" href="03.tuneles.html" />
+    <link rel="prev" title="4.6.1. Instalación" href="01.basico.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="03.tuneles.html" title="4.6.5. Túneles"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="01.basico.html" title="4.6.1. Instalación"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de ServidorLinux - 0.1.0</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >4. Gestión del servidor</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="index.html" accesskey="U">4.6. Administración remota</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="certificados-de-autenticacion">
+<span id="ssh-cert"></span><h1>4.6.4. Certificados de autenticación<a class="headerlink" href="#certificados-de-autenticacion" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>Los certificados digitales permiten tanto identificar al servidor frente al
+cliente, como al revés. En el primer caso, se usan siempre, ya que es la única
+forma que tiene el cliente de identificar al servidor; en el segundo, en cambio,
+el uso es opcional, ya que el cliente puede optar por usar una identificación
+basada en usuario y contraseña. Analicemos por separado ambos casos.</p>
+<div class="section" id="identificacion-del-servidor">
+<h2>4.6.4.1. Identificación del servidor<a class="headerlink" href="#identificacion-del-servidor" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Ya se ha mencionado al anteriormente que para evitar ataques <em>man-in-the-middle</em>
+mediante la suplantación de la identidad del servidor, éste envía al cliente su
+clave pública. En la primera conexión aceptar la clave pública de un servidor es
+un acto de fe, a menos que se haya obtenido esa clave pública de algún modo
+seguro. Sea como sea, el cliente, por su parte, almacena las claves públicas de
+todos los servidores a los que se conecta, de modo que si se produce una segunda
+conexión compara la clave pública que le vuelve a enviar el servidor con la que
+previamente tiene almacenada. En realidad lo que compara es el <em>fingerprint</em> o
+huella dactilar de la clave pública, una sucesión de pares de números
+hexadecimales que se obtiene a partir de dicha: si coinciden, el cliente se
+fiará de que el servidor es quien dice ser; si no coinciden, entonces sospechará
+que hay una suplantación y, o bien avisará (caso de <strong class="program">putty</strong>), o bien,
+se negará en rotundo a conectar hasta que no se elimine del cliente la clave
+pública antigua (caso del cliente de <em>openssh</em>).</p>
+<p>Del párrafo anterior, hay dos ideas que es necesario remarcar y que se
+desglosarán bajo los siguientes epígrafes:</p>
+<ol class="arabic simple">
+<li>El servidor tiene una pareja de claves pública/privada que le sirven para
+identificarse ante el cliente (también sirven para cifrar la clave simétrica,
+pero esto importa poco a los efectos de esta discusión).</li>
+<li>El cliente almacena las claves públicas de los servidores para comprobar las
+identidades de éstos cuando intenta una conexión.</li>
+</ol>
+<div class="section" id="claves-en-el-servidor">
+<h3>4.6.4.1.1. Claves en el servidor<a class="headerlink" href="#claves-en-el-servidor" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Se ha afirmado que el servidor tiene una pareja de claves. Esto no es del todo
+cierto, en realidad, las versiones modernas del servidor <em>openssh</em> tiene varias
+parejas de claves, cada una de cuales usa un algoritmo diferente de cifrado<a class="footnote-reference" href="#id7" id="id1">[1]</a>. Estas claves está almacenadas en el directorio <code class="file docutils literal notranslate"><span class="pre">/etc/ssh</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> ls -1 /etc/ssh/ssh_host_*
+<span class="go">/etc/ssh/ssh_host_ecdsa_key</span>
+<span class="go">/etc/ssh/ssh_host_ecdsa_key.pub</span>
+<span class="go">/etc/ssh/ssh_host_ed25519_key</span>
+<span class="go">/etc/ssh/ssh_host_ed25519_key.pub</span>
+<span class="go">/etc/ssh/ssh_host_rsa_key</span>
+<span class="go">/etc/ssh/ssh_host_rsa_key.pub</span>
+</pre></div>
+</div>
+<p>Los ficheros de extensión <em>.pub</em> son los que almacenan las claves públicas.
+Paralelamente, en el fichero de configuración debe indicarse que estas serán las
+claves de identificación<a class="footnote-reference" href="#id8" id="id2">[2]</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> grep -w HostKey /etc/ssh/sshd_config
+<span class="gp">#</span>HostKey /etc/ssh/ssh_host_rsa_key
+<span class="gp">#</span>HostKey /etc/ssh/ssh_host_ecdsa_key
+<span class="gp">#</span>HostKey /etc/ssh/ssh_host_ed25519_key
+</pre></div>
+</div>
+<p>Cuál de estas parejas se use para la validación depende del cliente: él le
+indicará al servidor por orden que algoritmos prefiere y el servidor usará el
+primero que tenga disponible. Se ha dicho también que en realidad lo que se
+compara es el fingerkey obtenido a partir de la clave pública. De hecho, la
+primera vez que se conecta el cliente al servidor, se encontrará con esto:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">pepe@cliente$</span> ssh usuario@servidor
+<span class="go">The authenticity of host &#39;servidor (192.168.1.11)&#39; can&#39;t be established.</span>
+<span class="go">ECDSA key fingerprint is SHA256:vOef4Mo/0obxdDeS9iNIZ5+kQpMB+krMf9XTedRMUbE.</span>
+<span class="go">Are you sure you want to continue connecting (yes/no)</span>
+</pre></div>
+</div>
+<p>Aceptarlo implicará almacenar en el cliente tal <em>fingerprint</em>. Tal huella
+digital es posible obtenerla manualmente gracias a <strong class="command">ssh-keygen</strong>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> ssh-keygen -l -f /etc/ssh/ssh_host_ecdsa_key.pub
+<span class="go">256 SHA256:vOef4Mo/0obxdDeS9iNIZ5+kQpMB+krMf9XTedRMUbE root@servidor (ECDSA)</span>
+</pre></div>
+</div>
+<p>que obviamente coincide con el <em>fingerprint</em> que observó <em>pepe</em> desde el
+cliente. El primer número (<strong>256</strong>) indica la longitud de la clave.</p>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p>Las claves identifican al servidor, así que es mejor no cambiarlas a
+menos que las sospechemos comprometidas. Si es absolutamente necesario,
+pueden redefinirse así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> ssh-keygen -t ecdsa -f /etc/ssh/ssh_host_ecdsa_key -N <span class="s2">&quot;&quot;</span>
+</pre></div>
+</div>
+<p>que crea una clave <em>ECDSA</em> en el fichero apropiado sin contraseña (esto
+último necesario, porque el servidor debe ser capaz de usarlas sin pedir
+la contraseña a nadie). La orden debería repetirse para todos los algoritmos,
+así que podríamos hacer:</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="k">for</span> algo in rsa ecdsa ed25519<span class="p">;</span> <span class="k">do</span> ssh-keygen -t <span class="nv">$algo</span> -f /etc/ssh/ssh_host_<span class="si">${</span><span class="nv">algo</span><span class="si">}</span>_key -N <span class="s2">&quot;&quot;</span><span class="p">;</span> <span class="k">done</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="claves-en-el-cliente">
+<h3>4.6.4.1.2. Claves en el cliente<a class="headerlink" href="#claves-en-el-cliente" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Como se ha adelantado, los clientes almacenan los <em>fingerprints</em> de las claves
+públicas de los servidores a los que se han conectado previamente dentro del
+fichero <code class="file docutils literal notranslate"><span class="pre">~/.ssh/config</span></code>. Ahora bien:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">pepe@cliente$</span> ssh-keygen -l -f ~/.ssh/known_hosts
+<span class="go">256 SHA256:vOef4Mo/0obxdDeS9iNIZ5+kQpMB+krMf9XTedRMUbE |1|4WnmUKMOBGnrOtOHytjLzB8cKFE=|q7chrsGIIRUBS2S1GlpzA0vDbjo= (ECDSA)</span>
+<span class="go">256 SHA256:vOef4Mo/0obxdDeS9iNIZ5+kQpMB+krMf9XTedRMUbE |1|l4/bYn6a2ImKN27oCuwD3wb9M8o=|b5i6kcIRct1K1U9EBVH4PgfoJJU= (ECDSA)</span>
+</pre></div>
+</div>
+<p>si comprobamos los <em>fingerprints</em> almacenados no seremos capaces de saber a qué
+servidor corresponde tal <em>fingerprint</em>. Esto se hace así, por privacidad, esto
+es, por evitar que otros usuarios sean capaces de conocer a qué servidores nos
+conectamos<a class="footnote-reference" href="#id9" id="id3">[3]</a>. El comportamiento puede modificarse cambiando el valor de la
+directiva <em>HashKnownHosts</em> en la configuración del cliente. Por tanto, si
+añadimos como directiva global a <code class="file docutils literal notranslate"><span class="pre">~/.ssh/config</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">HashKnownHosts no</span>
+</pre></div>
+</div>
+<p>se almacenarán las direcciones en claro:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">pepe@cliente$</span> rm -f ~/.ssh/known_hosts
+<span class="gp">pepe@cliente$</span> ssh usuario@servidor
+
+<span class="go">[...]</span>
+
+<span class="gp">pepe@cliente$</span> ssh-keygen -l -f ~/.ssh/known_hosts
+<span class="go">256 SHA256:vOef4Mo/0obxdDeS9iNIZ5+kQpMB+krMf9XTedRMUbE servidor,192.168.1.11 (ECDSA)</span>
+</pre></div>
+</div>
+<p>A partir de ahora, cada ve que se conecte a <em>servidor</em>, se confirmará que el
+<em>firgenprint</em> de la clave proporcionada por este coincide con la almacena. Si no
+es así, ocurrirá esto:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">pepe@cliente$</span> ssh usuario@servidor
+<span class="go">@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@</span>
+<span class="go">@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @</span>
+<span class="go">@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@</span>
+<span class="go">IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!</span>
+<span class="go">Someone could be eavesdropping on you right now (man-in-the-middle attack)!</span>
+<span class="go">It is also possible that a host key has just been changed.</span>
+<span class="go">The fingerprint for the ECDSA key sent by the remote host is</span>
+<span class="go">SHA256:IWvZBm4stPCufdUlUdUtKGkk7P/nNhDsf1R5XDUANtM.</span>
+<span class="go">Please contact your system administrator.</span>
+<span class="go">Add correct host key in /home/josem/.ssh/known_hosts to get rid of this message.</span>
+<span class="go">Offending ECDSA key in /home/josem/.ssh/known_hosts:1</span>
+<span class="go">  remove with:</span>
+<span class="go">  ssh-keygen -f &quot;/home/josem/.ssh/known_hosts&quot; -R &quot;servidor&quot;</span>
+<span class="go">ECDSA host key for servidor has changed and you have requested strict checking.</span>
+<span class="go">Host key verification failed.</span>
+</pre></div>
+</div>
+<p>Que no coincidan las claves puede suponer una suplantación de identidad… o que
+las claves cambiaron en el servidor por alguna razón. Si la razón es esta
+segunda, la solución está incluida en el mensaje de advertenca, y es borrar el
+<em>fingerprint</em> asociado al servidor:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">pepe@cliente$</span> ssh-keygen -R servidor
+<span class="gp">#</span> Host servidor found: line <span class="m">1</span>
+<span class="go">/home/josem/.ssh/known_hosts updated.</span>
+<span class="go">Original contents retained as /home/josem/.ssh/known_hosts.old</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last"><strong class="program">Putty</strong> también almacena el <em>fingerprint</em> del servidor, pero
+a diferencia de éste, no rechaza la conexión cuando detecta un cambio en la
+clave, sino que advierte del peligro de seguridad y permite aceptar (o no) la
+nueva clave.</p>
+</div>
+</div>
+</div>
+<div class="section" id="identificacion-del-cliente">
+<h2>4.6.4.2. Identificación del cliente<a class="headerlink" href="#identificacion-del-cliente" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Obviamente, nos referimos a su identificación mediante certificado y no
+mediante contraseña. Por supuesto, la identificación exige primero la creación
+de las claves y que el servidor acepte este tipo de identificación:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> grep -w PubkeyAuthentication /etc/ssh/sshd_config
+<span class="gp">#</span>PubkeyAuthentication yes
+</pre></div>
+</div>
+<div class="section" id="cliente-openssh">
+<h3>4.6.4.2.1. Cliente <em>openssh</em><a class="headerlink" href="#cliente-openssh" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>En este caso, laa generación es sencilla. La orden:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> ssh-keygen -t ecdsa -C <span class="s2">&quot;Comentario alusivo a la clave&quot;</span>
+</pre></div>
+</div>
+<p>generará una clave de tipo <em>ECDSA</em> y, como fichero, se escogerá el
+predeterminado para este tipo de clave (<code class="file docutils literal notranslate"><span class="pre">~/.ssh/id_ecdsa</span></code> y
+<code class="file docutils literal notranslate"><span class="pre">~/.ssh/id_ecdsa.pub</span></code>, para la clave pública). Si no se altera la
+configuración, en el momento en que intentemos conectar a cualquier servidor se
+intentará usar esta clave para la autenticación. Tras generar la pareja de
+claves se nos pide una <em>clave de paso</em>, que no es más que una contraseña
+necesaria para poder usar la clave privada. Fijarla obliga a escribir tal
+contraseña antes de usarla y nos asegura ante un hurto de las claves.</p>
+<span class="target" id="ssh-copy-id"></span><p id="index-0">Es obvio, que no basta con generar la clave en el cliente: en el servidor debe
+alojarse la clave pública para que, cuando se produzca la comunicación, pueda
+asegurarse que quien se conecta desde el cliente es el propietario de la clave
+privada correspondiente. Para ello, puede hacerse:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> ssh-copy-id usuario@servidor
+</pre></div>
+</div>
+<p>que subirá la clave<a class="footnote-reference" href="#id10" id="id4">[4]</a> al fichero del servidor que almacena las claves
+públicas (<code class="file docutils literal notranslate"><span class="pre">~./ssh/authorized_keys</span></code>)<a class="footnote-reference" href="#id11" id="id5">[5]</a>. A partir de ahora, al intentar
+ingresar en el servidor, se usará en primer término la identificación mediante
+el certificado y se nos pedirá la clave de paso (ya que hay que usar la clave
+privada) o nada, si no se introdujo contraseña al generar las claves.</p>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p>No obstante, lo anterior, es posible usar claves almacenadas en otros
+ficheros. Por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> ssh-keygen -t edcsa -f .ssh/id_servidor -C <span class="s2">&quot;Clave para &#39;servidor&#39;&quot;</span>
+<span class="gp">$</span> ssh-copy-id -i .ssh/id_servidor usuario@servidor
+<span class="gp">$</span> ssh -i .ssh/id_servidor usuario@servidor
+</pre></div>
+</div>
+<p>e incluso indicar cuál es el nombre de la clave en la configuración:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Host svm</span>
+<span class="go">   Hostname       servidor</span>
+<span class="go">   User           usuario</span>
+<span class="go">   IdentityFile   ~/.ssh/id_%h</span>
+</pre></div>
+</div>
+<p class="last">de manera que cuando conectemos a <em>servidor</em> siempre usemos
+<code class="file docutils literal notranslate"><span class="pre">~/.ssh/id_servidor</span></code><a class="footnote-reference" href="#id12" id="id6">[6]</a>.</p>
+</div>
+</div>
+<div class="section" id="cliente-putty">
+<h3>4.6.4.2.2. Cliente <strong class="program">putty</strong><a class="headerlink" href="#cliente-putty" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Debemos efectuar las mismas acciones que en el caso anterior. El equivalente a
+<strong class="command">ssh-keygen</strong> en la suite de <strong class="program">putty</strong> es <strong class="program">puttygen</strong>:</p>
+<img alt="Captura de puttygen" src="04.servidor/10.ssh/files/putty_gen.jpg" />
+<div class="admonition-todo admonition" id="index-1">
+<p class="first admonition-title">Por hacer</p>
+<p class="last">HACER la captura…</p>
+</div>
+<p>Al generar el par de claves (<code class="docutils literal notranslate"><span class="pre">Generate</span></code>) el programa quedará esperando que
+movamos aletariamente el ratón por encima de la superficie vacía a fin de lograr
+mayor aletoriedad. Al acabar la generación, se podrá escribir un comentario y la
+clave de paso o contraseña de la propia clave. Podemos entonces guardar la clave
+privada (<code class="docutils literal notranslate"><span class="pre">Save</span> <span class="pre">private</span> <span class="pre">key</span></code>), pero la clave pública no es de poca ayuda, puesto
+que no tiene el mismo formato que las claves que genera <em>openssh</em>. Sin embargo,
+la clave pública, tal y como la exige <em>openssh</em>, se muestra en la propia
+pantalla con lo que se puede copiar y pegar en un fichero.</p>
+<p>Dado que ahora no disponemos de <strong class="command">ssh-id-copy</strong>, hay que subir manualmente
+la clave pública al servidor para incluirla en en <code class="file docutils literal notranslate"><span class="pre">~/.ssh/authorized_keys</span></code>.
+Quizás lo más sencillo es abrir una sesión de <strong class="program">putty</strong> y copiar
+contenido de la clave pública directamente sobre el fichero anterior, en vez de
+en un fichero cualquiera del cliente <em>windows</em>.</p>
+<p class="rubric">Notas al pie</p>
+<table class="docutils footnote" frame="void" id="id7" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td>Hasta la versión <em>7.0</em>, también existía una versión <a class="reference external" href="https://es.wikipedia.org/wiki/DSA">DSA</a>, pero acabó por deshabilitarse su uso al
+considerarla débil (véase <a class="reference external" href="http://www.openssh.com/legacy.html">la información relativa</a> par más información).</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id8" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id2">[2]</a></td><td>Las líneas aparecen comentadas, pero recordemos que en este fichero las
+directivas comentadas muestran el valor predeterminado.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id9" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id3">[3]</a></td><td><p class="first">Este comportamiento se deriva de la configuración predeterminada de las
+últimas versiones de debian:</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> grep -w HashKnownHosts /etc/ssh/ssh_config
+<span class="go">    HashKnownHosts yes</span>
+</pre></div>
+</div>
+</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id10" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id4">[4]</a></td><td>No especificamos dónde está la clave (opción <code class="docutils literal notranslate"><span class="pre">-i</span></code>), pero carece de
+relevancia puesto que estamos usando los nombres predeterminados.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id11" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id5">[5]</a></td><td><p class="first">Tal es así, que podríamos haber hecho la subida de forma artesanal:</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> ssh usuario@servidor <span class="s2">&quot;mkdir -p ~/.ssh; cat &gt;&gt; ~/.ssh/authorized_keys&quot;</span> &lt; ~/.ssh/id_ecdsa.pub
+</pre></div>
+</div>
+</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id12" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id6">[6]</a></td><td>Consúltese el apartado <strong>TOKENS</strong> de la página de manual de <em>ssh_config</em>
+para entender por qué <code class="docutils literal notranslate"><span class="pre">%h</span></code> se convierte en el nombre de la máquina remota
+(<em>servidor</em>).</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">4.6.4. Certificados de autenticación</a><ul>
+<li><a class="reference internal" href="#identificacion-del-servidor">4.6.4.1. Identificación del servidor</a><ul>
+<li><a class="reference internal" href="#claves-en-el-servidor">4.6.4.1.1. Claves en el servidor</a></li>
+<li><a class="reference internal" href="#claves-en-el-cliente">4.6.4.1.2. Claves en el cliente</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#identificacion-del-cliente">4.6.4.2. Identificación del cliente</a><ul>
+<li><a class="reference internal" href="#cliente-openssh">4.6.4.2.1. Cliente <em>openssh</em></a></li>
+<li><a class="reference internal" href="#cliente-putty">4.6.4.2.2. Cliente <strong class="program">putty</strong></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="01.basico.html"
+                        title="capítulo anterior">4.6.1. Instalación</a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="03.tuneles.html"
+                        title="próximo capítulo">4.6.5. Túneles</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/04.servidor/10.ssh/02.certificados.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Ir a" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="03.tuneles.html" title="4.6.5. Túneles"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="01.basico.html" title="4.6.1. Instalación"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de ServidorLinux - 0.1.0</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >4. Gestión del servidor</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="index.html" >4.6. Administración remota</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor 2016, José Miguel Sánchez Alés.
+      Creado con <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
+    </div>
+  </body>
+</html>

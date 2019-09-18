@@ -1,0 +1,783 @@
+.. _nbp:
+
+|NBP|
+*****
+El |NBP| es el programa que ejecuta el cliente |PXE| y que permite, a su vez, la
+carga del sistema operativo remoto que acabará ejecutando la maquinas. De hecho,
+la única función del cliente es poder llegar a ejecutar el |NBP| para cederle el
+control. Ya hemos visto que esto exige obtener primero una configuración de red
+y, una vez ya con capacidad para comunicarse, obtener el propio |NBP| para su
+ejecución.
+
+Como el objetivo del arranque por red es llegar a cargar un sistema operativo y
+el |NBP| forma parte de esta tarea, es precisa también estudiar cómo se comporta
+y cómo se configura, ya que en su configuración se expresan las instrucciones
+para la carga de los sistemas operativos remotos disponibles.
+
+Bajo el epígrafe presentaremos dos posibilidades:
+
+#. :ref:`syslinux <syslinux>`, que es más habitual y cuya configuración da mucho
+   juego.
+
+#. :ref:`iPXE <ipxe>`, que es más bien un cliente |PXE| con posibilidades de
+   arrancar directamente un sistema remoto.
+
+La guía está enfocada al uso de :program:`syslinux`, pero se darán algunas
+pautas y consejos sobre |iPXE|.
+
+.. _nbp-carga:
+
+Carga
+=====
+Antes de nada, es preciso aclarar cómo conoce el cliente |PXE| cuál es el |NBP|
+que debe arrancar. El método depende de si la información la ofrece el servidor
+|DHCP| o si lo hace un servidor |PXE| independiente.
+
+|DHCP|
+------
+Los paquetes *DHCPoffer* que envía el cliente al servidor contienen unos campos
+iniciales\ [#]_\ [#]_ entre las cuales está el campo "*siaddr*" que indica la
+|IP| del servidor desde el que descargar el |NBP| y el campo "*file*" que
+permite indicar cuál es el fichero.
+
+.. note:: En el cliente del |ISC| se da valor a estos campos mediante las
+   directivas ``next-server`` y ``filename``.
+
+No obstante lo anterior, existen las opciones 66 (*TFTP server name*) y 67
+(*Bootfile name*) que cumplen esta misma función. El :rfc:`2132` explica cuándo
+deben usarse estas opciones, pero ignoro cuándo se dan tales circunstancias. Lo
+cierto es que, dando valor adecuado sólo a los campos *siaddr* y *file*, los
+clientes |PXE| parecen funcionar bien. Como, por lo general, los clientes |PXE|
+sólo soportan la descarga mediante |TFTP|, no es necesario que en ningún lugar
+se especifique el protocolo\ [#]_ para la descarga.
+
+|PXE|
+-----
+En este caso, la cosa es un poco distinta: es el servicio |PXE| el que informa
+de cuál es servidor y cuál el |NBP| y, como ya se ha explicado, puede incluso
+informar de más de una posibilidad para que el cliente |PXE| construya un menú
+de selección.
+
+.. _ipxe:
+
+|iPXE|
+======
+|iPXE| es, en realidad, un cliente |PXE| *con esteroides*, hasta el
+punto de que puede `cargarse en la memoria flash de una tarjera de red
+<http://ipxe.org/howto/romburning>`_ para que sustituya al cliente que incorpora
+la propia tarjeta. Sólo hay que compilar la imagen adecuada o `escogerla via web
+<https://rom-o-matic.eu/>`_.
+
+Pero a diferencia de un cliente |PXE| normal que se limita a cargar el |NBP| y
+cederle el control, |iPXE| incorpora un sencillo lenguaje de *script* que da más
+posibilidades.
+
+.. rubric:: Ventajas
+
+* Soporta directamente la descarga por |TFTP|, |HTTP| e incluso |FTP|. Los
+  clientes |PXE| sólo soportan |TFTP|.
+
+* `Su lenguaje de script <http://ipxe.org/scripting>`_ incorpora `variables 
+  <http://ipxe.org/cfg>`_ que permiten acceder a la información que envían los
+  servidores |DHCP| y |DNS| al cliente. Esto, unido a la descarga
+  por |HTTP|, posibilita crear arranques con una configuración dinámica basada
+  en el tipo de máquina o la red en la que se encuentra.
+
+  .. note:: Lea :ref:`los consejos <ipxe-consejos>` para más información.
+
+* Permite directamente cargar un sistema operativo (de ahí que lo hayamos
+  incluido dentro de esta categoría de |NBP|)
+
+.. rubric:: Desventajas
+
+* No es el cliente |PXE| que incorporan las tarjetas de red, por lo que hay que
+  buscarse las vueltas para poder usarlo.
+
+* Su lenguaje de *script* no permite la creación de menús de selección, así que
+  en principio sólo posibilitaría el arranque de un sistema operativo, a menos
+  que dispusiéramos de un servidor |PXE| independiente que :ref:`es capaz de
+  enviar un menú de selección <pxe-independiente>`. En cualquier caso, las
+  posibilidades de selección son infinitamente menores a las que ofrece
+  :program:`syslinux`.
+
+Cómo usarlo
+-----------
+Las máquinas virtuales de `qemu <https://www.qemu.org/>`_ usan para su arranque
+por red |iPXE|. Sin embargo, las tarjetas de red reales no lo
+incorporan, así que, si tenemos interés en usarlo, tenemos varias alternativas:
+
+#. La más traumática, flashear la tarjeta de red.
+#. Hacer que el cliente |PXE| original, use como |NBP| una versión de |iPXE|
+   preparada para este fin.
+#. Hacer que el gestor de arranque (:program:`grub` habitualmente) del sistema
+   local incluya una entrada que lance |iPXE|.
+
+Cómo funciona
+-------------
+#. Busca una configuración de red y una de arranque. Para esta segunda, sigue
+   pautas señaladas baja el epígrafe sobre  :ref:`la carga del NBP <nbp-carga>`.
+
+#. Si el fichero de arranque que se le facilita es otro |NBP|
+   (:program:`syslinux`, por ejemplo), entonces cede el control a éste y su uso
+   no tiene ninguna diferencia respecto a un cliente |PXE| normal. Ahora bien,
+   como |iPXE| soporta *scripting*, el fichero puede no ser un |NBP|, sino un
+   *script* para que |iPXE| lo cargue. Por ejemplo::
+
+      #!ipxe
+
+      exit
+
+   cuyo efecto es evidente: salir de |iPXE| lo que provoca que se siga la
+   secuencia de arranque de la |BIOS|. Por supuesto, podemos hacer cosas más
+   complicadas, pero no es nuestro propósito.
+
+   Obsérvese que si usamos un servidor |PXE| podemos enviar varios *scripts*
+   distintos\ [#]_ que hagan distintas cosas (arranque local, reinicio de la
+   máquina, arranque de un sistema de red, abrir una consola de |iPXE|, etc.) y
+   el cliente |PXE| será capaz de presentarnos un menú para que escojamos qué
+   hacer.
+
+#. Una vez que se selecciona un ítem, o se ejecuta directamente si sólo había
+   uno, se descargará el sistema y se ejecutará con lo que finalizará el proceso
+   de arranque.
+
+.. _ipxe-consejos:
+
+Consejos
+--------
+* Como |iPXE| soporta |HTTP| para las descargas, el nombre del fichero enviado
+  al cliente puede ser, por ejemplo::
+
+      http://192.168.255.2/boot/start.ipxe
+
+  lo que provocará que el fichero sea descargado por |HTTP| según tal |URL|.
+
+* Cuando se dispone un servidor |PXE| independiente, éste es el que proporciona
+  la |IP| del servidor de descargas y el nombre de fichero. En principio, |iPXE|
+  facilita las variables :kbd:`${next-server}` y :kbd:`${filename}`, pero los
+  datos proporcionados por el servicio |PXE| estarán accesibles en estas
+  variables, sólo si el servidor |DHCP| envía vacíos los campos *siadd* y
+  *file*, lo cual no tiene por qué haberse producido. De hecho, algunos
+  servidores envían como *siaddr* la propia |IP| del servidor |DHCP| en caso de
+  que no se especifique una en su configuración, por lo que jamás envían vacío
+  este campo.
+
+  Si se quiere acceder a los datos que envía el servidor |PXE|, pueden usarse
+  las variables :kbd:`${pxebs/next-server}` y :kbd:`${pxebs/filename}`. Por ese
+  motivo, la expresión anterior del fichero, habría sido mucho más apropiada
+  haberla hecho así::
+
+      http://${pxebs/next-server}/boot/start.ipxe
+
+* Abrir una *shell* de |iPXE| puede ayudarnos a conocer mejor cómo ha sido el
+  arranque:
+
+  - La orden :command:`config` permite ver los valores de todas las variables
+    definidas:
+
+    .. image:: files/ipxe-config.png
+
+  - La orden :command:`echo` nos da simplemente el valor de una variable, pero
+    :command:`show` puede ayudar a saber de dónde toma tal valor::
+
+      iPXE> echo filename
+      http://${pxebs/next-server}/boot/start.ipxe
+      iPXE> show filename
+      pxebs/filename:string = http://${pxebs/next-server}/boot/start.ipxe
+      iPXE> show next-server
+      net0.dhcp/next-server:ipv4 = 192.168.255.1
+      iPXE> echo ${pxebs/next-server}
+      192.168.255.2
+
+    .. note:: Nótese que con esta indagación conocemos que el valor de
+       :kbd:`${filename}` procede del servidor |PXE|, pero el valor de
+       :kbd:`${next-server}`, no; puesto que el servidor |DHCP| envía el suyo
+       propio.
+
+* Aunque con la orden :command:`config` no aparecen, las opciones de |DHCP|
+  también constituyen variables. Así, por ejemplo, podríamos definir que el
+  *script* cargado fuera este\ [#]_::
+
+      http://${pxebs/next-server}/boot/start.php?mac=${mac}&domain=${15}
+
+  ya que la opción **15** es la que contiene el nombre de dominio. Obsérvese que
+  en este caso, estamos valiéndonos de que la descarga es por |HTTP|, para
+  descargar no un fichero estático, sino para ejecutar un *script* en |PHP| al
+  que alimientamos con la |MAC| del cliente y el dominio al que pertenece.
+
+.. _syslinux:
+
+:program:`syslinux`
+===================
+.. warning:: Si revisamos la `página del proyecto <https://www.syslinux.org>`_,
+   comprobaremos que :program:`syslinux`, propiamente, es un gestor ligero de
+   arranque que cubre arranque local (:program:`syslinux` en sí), arranque con
+   *cdrom* (:program:`isolinux`) y arranque a través de la red
+   (:program:`pxelinux`). Por tanto, deberíamos hablar más bien de
+   :program:`pxelinux`.
+
+Es, sin duda, el |NBP| más utilizado y permite una amplica gama de
+configuraciones.
+
+Estructura
+----------
+El arranque con :program:`syslinux` está constituido por:
+
+* El |NBP|, que dispone de algunas variantes:
+
+  - :file:`pxelinux.0` que sólo soporta descargas a través de |TFTP|.
+  - :file:`gpxelinux.0` que incluye código del `proyecto gPXE
+    <http://etherboot.org/wiki/>`_, lo que le permitía descargar del
+    servidor usando los protocolos |HTTP| o |TFTP|.
+  - :file:`lpxelinux.0` desde las últimas versiones de :program:`syslinux`, que
+    soporta de forma nativa |HTTP| y |FTP| y es recomendable sobre la versión
+    anterior.
+  - :file:`syslinuxx.efi` para sistemas con |UEFI| de 32 *bits* y de 64 *bits*
+    en vez de |BIOS|. Son dos ejecutables distintos uno para un tipo de |UEFI| y
+    otro para la otra, Ambos soportan también descargas |HTTP| y |FTP|.
+
+  Lo cierto es que |HTTP| es bastante más recomendable que |TFTP| e
+  indispensable si se quieren crear configuraciones dinámicas para
+  :program:`syslinux`, de modo que en esta guía usaremos :file:`lpxelinux.0`.
+
+  .. note:: Por supuesto, nos referimos exclusivamente a las variantes de
+     :program:`pxelinux`.
+
+  .. note:: La |UEFI| trae por ahora dos arranque por red: el nativo (para el
+     cual necesitaremos :program:`syslinux.efi`) y uno llamado "*Legacy BIOS
+     mode*" que emula el arranque de la |BIOS| y permite usar
+     :program:`lpxelinux.0`. Más adelante trataremos esto al configurar un
+     :ref:`arranque multiarquitectura <pxe-multiarch>`.
+
+* Una serie de módulos con extensión :file:`.c32`, que permiten a
+  :program:`syslinux` ampliar sus capacidades. Por ejemplo, :file:`reboot.c32`
+  sirve para reiniciar el ordenador. De entre todos, es indispensable
+  :file:`ldlinux.c32` que el |NBP| intentará descargar inmediatamente después de
+  entrar en funcionamiento.
+
+* La configuración que permite establecer cuáles son los sistemas de arranque
+  disponibles. Puede estar cosntituida por un sólo fichero o varios que, al
+  igual que en el caso de los módulos, tendrán que descargarse del servidor de
+  ficheros.
+
+Cómo funciona
+-------------
+Una vez descargado el |NBP| (llamémoslo a partir de ahora :program:`pxelinux`),
+este se procurará una serie de ficheros necesarios para poder realizar su
+función. Los estrictamente necesarios son dos: el módulo :file:`ldlinux.c32` y
+el fichero de configuración.
+
+Antes, no obstante, de discutir sobre cómo los obtiene es necesario aclarar que
+:program:`syslinux` maneja el concepto de :dfn:`directorio de trabajo` (|CWD|),
+que es aquel a partir del cual se construyen las direcciones relativas de los
+ficheros que requieran descarga. Si el servicio se limitó a indicar la dirección
+|IP| del servidor y cuál era el |NBP|, el directorio de trabajo se considerará
+aquel en donde se encontrara situado el |NBP|.
+
+Por ejemplo, supongamos que el servidor |DHCP| envía los siguientes datos:
+
+========== ========================
+Campo       Valor
+========== ========================
+*siaddr*   ``192.168.255.1``
+*filename* :file:`bios/lpxelinux.0`
+========== ========================
+
+En este caso, :command:`pxelinux` (en particular el ejecutable
+:file:`lpxelinux.0`) se descargará por |TFTP| del servidor *192.168.255.1* y su
+ruta dentro del servidor es :file:`bios/lpxelinux.0`. En consecuencia la |URL|
+de descarga es::
+
+   tftp://192.168.255.1/bios/lpxelinux.0
+
+y el |CWD| se definirá como::
+
+   tftp://192.168.255.1/bios/
+
+Ahora bien, :program:`pxelinux` también comprueba el valor de la opción |DHCP|
+**210** y, si existe, toma este valor como |CWD|. Consecuentemente, si se quiere
+usar otro directorio de trabajo (p.e. :file:`http://192.168.255.1/boot/bios/`
+para cambiar de protocolo de descarga) puede configurarse el servidor |DHCP|
+para que envíe esta opción al cliente con el valor desedo.
+
+Establecido el |CWD|, se intentará descargar el módulo :file:`ldlinux.c32` de
+distintas localizaciones en el siguiente orden:
+
+#. :file:`$CWD/ldlinux.c32`
+#. :file:`$CWD/boot/isolinux/ldlinux.c32`
+#. :file:`$CWD/isolinux/ldlinux.c32`
+#. :file:`$CWD/boot/syslinux/ldlinux.c32`
+#. :file:`$CWD/sysisolinux/ldlinux.c32`
+
+Supuesto éxito, entonces se procederá a descargar el fichero de configuración.
+Cuál es puede fijase enviando la opción |DHCP| **209**, cuyo valor yuxtapuesto
+al valor del |CWD| dará la |URL| de tal fichero. Por ejemplo, si esto es lo que
+recibe el cliente:
+
+============== =========================
+Campo           Valor
+============== =========================
+*siaddr*        ``192.168.255.1``
+*filename*      :file:`bios/lpxelinux.0`
+Opción **209**  :file:`config/start.cfg`
+============== =========================
+
+La |URL| del fichero de configuración será::
+
+   tftp://192.168.255.1/bios/config/start.cfg
+
+y de ahí será de donde intente obtenerse la configuración. Si no se envía valor
+para la opción **209**, el |NBP| sigue un algoritmo para localizar un fichero.
+Para ilustrar qué hace tomemos el ejemplo que usa `la propia documentación de
+syslinux
+<https://www.syslinux.org/wiki/index.php?title=PXELINUX#Configuration>`_.
+Suponiendo que que el identificador del cliente sea
+*b8945908-d6a6-41a9-611d-74a6ab80b83d*, la |MAC| de la tarjeta
+*88:99:AA:BB:CC:DD* y la dirección |IP| obtenida *192.168.2.91*,
+:program:`pxelinux` intentara obtener su configuración de distintas
+localizaciones siguiiente este orden:
+
+#. :file:`$CWD/pxelinux.cfg/b8945908-d6a6-41a9-611d-74a6ab80b83d`
+#. :file:`$CWD/pxelinux.cfg/01-88-99-aa-bb-cc-dd`
+#. :file:`$CWD/pxelinux.cfg/C0A8025B`
+#. :file:`$CWD/pxelinux.cfg/C0A8025`
+#. :file:`$CWD/pxelinux.cfg/C0A802`
+#. :file:`$CWD/pxelinux.cfg/C0A80`
+#. :file:`$CWD/pxelinux.cfg/C0A8`
+#. :file:`$CWD/pxelinux.cfg/C0A`
+#. :file:`$CWD/pxelinux.cfg/C0`
+#. :file:`$CWD/pxelinux.cfg/C`
+#. :file:`$CWD/pxelinux.cfg/default`
+
+En principio, estos ficheros son los indispensables para poder funcionar. Ahora
+bien, la propia configuración puede provocar la descarga de otros módulos y
+ficheros de configuración:
+
+* Cuando se invoca un módulo, por ejemplo, con::
+
+   IU menu.c332
+
+  :program:`pxelinux` seguirá la misma estrategia que cuando intentó descargar
+  :file:`ldlinux.c32`.
+
+* CUando se cita otro fichero de configuración, se intentará descargar tomando
+  como base el *directorio de trabajo*.
+
+Si todo ha ido bien, la descarga de los ficheros resultará en la posibilidad de
+que el usuario elija el sistema de red a arrancar entre todos los disponibles
+que declara la configuración de :command:`pxelinux`. Una vez que éste haga su
+selección, el |NBP| cargará el sistema según las instrucciones que recoge el
+propio fichero de configuración.
+
+.. note:: Atender al valor de las opciones |DHCP| **209** y **210** es algo
+   propio de :program:`pxelinux` y no del protocolo |PXE| en general. En
+   consecuencia, los clientes |PXE| no piden esas opciones al servidor y para
+   que éste las entregue al cliente debe forzarse su entrega. :program:`syslinux`
+   permite una alternativa: encapsular el valor de estas opciones dentro de la
+   opción **43**, que sí es requerida por los clientes |PXE|. Se verá al
+   realizar la implementación.
+
+Configuración
+-------------
+La configuración de :program:`syslinux` es extensísima\ [#]_, así que nos limitaremos
+a hacer una guía somera para saber cómo empezar a hincarle el diente.
+
+Un fichero de configuración de :program:`syslinux` consiste básicamente en la
+relación de sistemas disponibles que puede arrancar el usuario, así que la
+estructura general del fichero es la siguiente::
+
+   DIRECTIVAS GLOBALES
+   ...
+
+   LABEL sistema1
+      DIRECTIVAS PARA EL SISTEMA 1
+      ...
+
+   LABEL sistema2
+      DIRECTIVAS PARA EL SISTEMA 1
+      ...
+      
+Sin menú
+''''''''
+Por ejemplo, usemos con apenas variaciones el fichero de configuración con que
+remataremos el estudio::
+
+
+   # Estas son las directivas globales y esto, en concreto,
+   # un comentario porque emnnpieza por almohadilla.
+   PROMPT 1
+   TIMEOUT 100
+   DEFAULT local
+   SAY Arranque por red del dpto. de Informatica
+
+   F1 ../cfg/files/ayuda.txt
+   KBDMAP ../cfg/files/es.ktl
+
+   # Deshabilitadas.
+   #NOCOMPLETE 1
+
+   LABEL slitaz
+      MENU LABEL ^Slitaz
+      KERNEL ../ssoo/slitaz/bzImage
+      APPEND initrd=../ssoo/slitaz/rootfs.gz lang=es_ES kmap=es rw root=/dev/null vga=normal autologin BOOT_IMAGE=../ssoo/slitaz/bzImage
+
+   LABEL memtest
+      MENU LABEL ^Test de memoria
+      LINUX ../ssoo/memtest86+.bin
+
+   LABEL local
+      MENU LABEL Secuencia ^local de arranque
+      LOCALBOOT -1
+
+   LABEL reboot
+      MENU LABEL ^Reiniciar
+      KERNEL reboot.c32 -w
+
+   LABEL apagar
+      MENU LABEL ^Apagar
+      COM32 poweroff.c32
+
+Este fichero mostrará la interfaz de selección más sencilla. Un simple mensaje::
+
+   boot:
+
+que espera que introduzcamos la etiqueta (:kbd:`local`, :kbd:`slitaz`, etc.) o
+la tecla :kbd:`TAB` que muestra las opciones disponibles.
+
+Obsérvese que las directivas (``PROMPT``, ``LABEL``, etc.) las hemos escrito en
+mayúsculas. Pueden escribirse también en minúsculas, ya que :program:`syslinux`
+no atiende a ello, pero escribirlas en mayúscula es una buena forma de
+distinguir la directiva del resto de la línea.
+
+De forma global hemos determinado que:
+
+* Se muestre el *prompt* "``boot:``".
+* El tiempo de temporización sean 10 segundos (*100/10*).
+* Pasado el tiempo, si no ha habido selección, se ejecute el ítem "*local*".
+  En interfaces que presenten menú, es el ítem que aparece resaltado al
+  comienzo.
+* Antes de la línea de "``boot:``", se muestre la frase introducido con ``SAY``.
+  Una alternativa más sofisticada a ésto es la orden ``DISPLAY``, que trataremos
+  :ref:`al describir algunas particularidades <pxe-syslinux-display>`.
+* ``F1`` (y así hasta ``F12``) permiten mostrar ficheros alternativos de ayuda.
+* ``KBDMAP`` permite fijar el mapa de teclado, útil si se desea editar opciones.
+  Hay `una página de la wiki
+  <https://www.syslinux.org/wiki/index.php?title=Directives/kbdmap>`_ que
+  explica cómo generarlos, aunque también podemos optar por copiarlos de algún
+  sistema que ya los tenga creados.
+* Comentada está la opción ``NOCOMPLETE`` que impide que :program:`syslinux`
+  muestre todas las etiquetas disponibles al pulsar :kbd:`TAB`.
+
+Para la definición de cada ítem hemos usado:
+
+* ``LABEL`` que introduce la etiqueta asociada al ítem y es obligatoria.
+* ``MENU LABEL`` es la leyenda que se mostrará en el menú para el ítem, pero no
+  tiene ningún efecto, puesto la interfaz no muestra un menú.
+* La carga efectiva del sistema se hace a través de ``KERNEL`` o una directiva
+  más específica (``LINUX``, ``COM32``, etc.). Hay distintos tipos de sistemas
+  que requieren ser cargados de distinto modo y :program:`syslinux` puede
+  basarse en la extensión del fichero si se usa la directiva genérica
+  ``KERNEL``\ [#]_. A este respecto:
+
+  - La carga de :program:`memtest` presenta un problema: debe cargarse al estilo
+    de los núcleos de linux, pero su extensión :kbd:`.bin` confundiría a
+    ``KERNEL``, así que usamos la directiva específica ``LINUX``.
+
+  - *apagar* y *reboot* muestran cómo es indiferente usar la directiva general o
+    la específica (``COM32`` en este caso), si no hay problemas con la
+    extensión.
+
+  - Se muestra cómo continuar la secuencia de arranque con ``LOCALBOOT``. En
+    algunos sistemas quizás sea necesario sustituir el **-1** por **0** (lo cual
+    podría dar pie a la generación dinámica de este número dependiendo de cuál
+    fuera el cliente que lo requiere).
+
+    También podría optarse por usar el módulo `chain.c32
+    <https://www.syslinux.org/wiki/index.php?title=Comboot/chain.c32>`_ para
+    arrancar el disco duro\ [#]_::
+
+      LABEL local
+         MENU LABEL Disco duro
+         KERNEL chain.c32 hd0 0
+
+* ``APPEND`` permite añadir las opciones de carga que, por otra parte, se pueden
+  incluir en la misma línea ``KERNEL``. En el ejemplo hay entradas que usan
+  ``APPEND``, como *slitaz*, y entradas que incluyen las opciones en el propio
+  ``KERNEL`` como *reboot*. Por supuesto, tal decisión es absolutamente
+  caprichosa y podría haberse hecho perfectamente al revés. 
+
+Una posibilidad muy interesante de la que no hemos hecho uso es la de dividir la
+configuración en distintos ficheros:
+
+.. code-block:: none
+   :emphasize-lines: 9
+
+   PROMPT 1
+   TIMEOUT 100
+   DEFAULT local
+   SAY Arranque por red del dpto. de Informatica
+
+   F1 ../cfg/files/ayuda.txt
+   KBDMAP ../cfg/files/es.ktl
+
+   INCLUDE ../cfg/items.cfg
+
+   # Añadimos una entrada extra que explicaremos a continuación
+   LABEL menu
+      CONFIG ../cfg/menu
+
+Para ello, se usa la directiva ``INCLUDE`` que no hace más que incluir el
+contenido del fichero justamente en el lugar en el que aparece. Por supuesto, en
+:file:`items.cfg` deberíamos ioncluir todas las entradas que relacionamos antes.
+
+Por último, es posible recargar por completo la configuración haciendo uso de la
+directiva ``CONFIG`` que una de las directivas específicas de la familia de
+``KERNEL``. En el ejemplo, la entrada *menu* sustituye la configuración actual
+por una nueva que se haya dentro del fichero homónimo. El contenido de este
+fichero lo describiremos bajo el próximo apartado.
+
+Menú no gráfico
+'''''''''''''''
+La interfaz anterior es muy básica y es la que proporciona :program:`syslinux`,
+si no especificamos interfaz alguna. Para especificarla debe incluirse la
+directiva ``IU`` seguida por el módulo que la desarrolla. :program:`syslinux`
+posee dos:
+
+* `menu.c32 <https://www.syslinux.org/wiki/index.php?title=Comboot/menu.c32>`_,
+  que despliega un menú de texto.
+* :file:`vesamenu.c32`, para menús gráficos. Añade algunas directivas a la
+  interfaz anteriores para embellecerla (imagen de fondo, etc.)
+
+Ilustremos la primera:
+
+.. code-block:: none
+   :emphasize-lines: 1, 5, 6
+
+   UI menu.c32
+   TIMEOUT 100
+   DEFAULT local
+
+   MENU AUTOBOOT Arranque local en # seconds
+   MENU TITLE Sistemas arrancables 
+
+   INCLUDE ../cfg/items.cf
+
+En esta configuración hemos prescindido de ``PROMPT`` que no sirve para nada, y
+hemos añadido dos directivas suficientemente explicativas.
+
+Una opción muy interesante que admite la interfaz de *menú* es incluir la
+directiva::
+
+   MENU SHIFTKEY
+
+que hace que se muestre el menú solo en caso de que estemos pulsando las teclas
+:kbd:`Shift` o :kbd:`Alt`, porque si no es así se ejecuta directamente la
+entrada predeterminada (*local* en nuestro ejemplo).
+
+En cuanto a las entradas debemos asegurarnos de que contienen la directiva
+``MENU LABEL``. En la leyenda que acompaña a esta directiva, opcionalmente, se
+puede incluir un "^" antes de una de las letras. Al pulsar sobre tal letra,
+iremos directamente la opción. Es por ello que en cada entrada debemos elegir
+una letra distinta para este cometido.
+
+Ahora bien, las entradas admiten más juego que en el caso anterior. Por ejemplo:
+
+.. code-block:: none
+   :emphasize-lines: 4-
+
+   LABEL local
+      MENU LABEL Secuencia ^local de arranque
+      LOCALBOOT -1
+      MENU PASSWD $1$.x/EOPp0$qmj9Xt.3kfF6a0ulTEb1Q/
+      TEXT HELP
+         Prueba el siguiente dispositivo de la secuencia
+         de arranque predefinida en la BIOS.
+      ENDTEXT
+
+Hemos hecho dos añadidos:
+
+* Hemos asegurado la entrada con contraseña, de manera que sólo podrá
+  seleccionarse si se conoce ésta. La contraseña puede escribirse en claro (muy
+  mala idea) o cifrada con una función de *hash*. Lo más sencillo es usar
+  |SHA|-1 como en el ejemplo de arriba en que la contraseña es "1234". Para
+  crearla basta con::
+
+      $ echo -n "contraseña_secreta" | openssl passwd -1 -stdin
+
+* Hemos añadido un párrafo que explica qué implica la selección de la entrada.
+  Aparece, fuera del menú, en la parte inferior de la pantalla.
+
+Otro añadido interesante (en conjunción con alguna otra posibilidad que veremos
+más adelante) es sangrar la opción para que aparezca más a la derecha (el número
+indica el ancho del sangrado)::
+
+   MENU INDENT 1
+
+Otra posibilidad es crear entradas no seleccionables que pero que ayudan a
+componer mejor el texto. Por ejemplo:
+
+.. code-block:: none
+   :emphasize-lines: 1-3, 7, 13, 16
+
+   LABEL -
+      MENU LABEL Sistemas remotos
+      MENU DISABLE
+
+   LABEL slitaz
+      MENU LABEL ^Slitaz
+      MENU INDENT 1
+      KERNEL ../ssoo/slitaz/bzImage
+      APPEND initrd=../ssoo/slitaz/rootfs.gz lang=es_ES kmap=es rw root=/dev/null vga=normal autologin BOOT_IMAGE=../ssoo/slitaz/bzImage
+
+   LABEL memtest
+      MENU LABEL ^Test de memoria
+      MENU INDENT 1
+      LINUX ../ssoo/memtest86+.bin
+
+   MENU SEPARATOR
+
+   LABEL local
+      MENU LABEL Secuencia ^local de arranque
+      LOCALBOOT -1
+
+   LABEL reboot
+      MENU LABEL ^Reiniciar
+      KERNEL reboot.c32 -w
+
+   LABEL apagar
+      MENU LABEL ^Apagar
+      COM32 poweroff.c32
+
+Lo cual genera lo siguiente:
+
+.. image:: files/menu-disable.png
+
+Como puede verse, hemos añadido ``MENU SEPARATOR`` que, simplemente deja en
+blanco un línea y ayuda a hacer más legible el menú,
+
+Una alternativa a esta organización es crear un submenú con :kbd:`MENU BEGIN ...
+MENU END`:
+
+.. code-block:: none
+   :emphasize-lines: 1, 13, 18-20, 22
+
+   MENU BEGIN remotos
+
+      # El submenú puede tener su propio título
+      MENU TITLE Sistemas arrancables por red
+
+      LABEL slitaz
+         MENU LABEL ^Slitaz
+         KERNEL ../ssoo/slitaz/bzImage
+         APPEND initrd=../ssoo/slitaz/rootfs.gz lang=es_ES kmap=es rw root=/dev/null vga=normal autologin BOOT_IMAGE=../ssoo/slitaz/bzImage
+
+      LABEL memtest
+         MENU LABEL ^Test de memoria
+         MENU DEFAULT
+         LINUX ../ssoo/memtest86+.bin
+
+      MENU SEPARATOR
+
+      LABEL -
+         MENU LABEL ^Volver al menú principal...
+         MENU EXIT
+
+   MENU END
+
+   MENU SEPARATOR
+
+   LABEL local
+      MENU LABEL Secuencia ^local de arranque
+      LOCALBOOT -1
+
+   LABEL reboot
+      MENU LABEL ^Reiniciar
+      KERNEL reboot.c32 -w
+
+   LABEL apagar
+      MENU LABEL ^Apagar
+      COM32 poweroff.c32
+
+.. warning:: Los ficheros de configuración deben estar codificados
+   en `cp850 <https://es.wikipedia.org/wiki/P%C3%A1gina_de_c%C3%B3digos_850>`_
+   para que los caracteres aceptuados puedan verse sin problemas. Lo más
+   probable, sin embargo, es que nuestro editor los escriba en UTF-8. Para
+   hacer la conversión, puede usarse :command:`iconv`::
+
+      # iconv -f utf8 -t cp850 cfg/items.cfg.utf8 > cfg/items.cfg
+
+En este caso, hay dos pantallas de menú: el *principal*:
+
+.. image:: files/menu-principal.png
+
+y el *secundario* con las dos entradas de sistemas remotas y una adicional para
+volver al menú anterior, y en la que la opción inicialmente marcada es la de
+:program:`memtest`, pues lo hemos indicado con ``MENU DEFAULT``:
+
+.. image:: files/menu-secundario.png
+
+.. note:: :program:`syslinux` salta las líneas que es incapaz de entender. Esto
+   posibilita que podamos escribir un mismo :file:`items.cfg` para ambas
+   versiones. De hecho, en el :file:`items.cfg` original incluímos de primeras
+   una directva (``MENU LABEL``) sin sentido para la interfaz sin menús.
+
+Menú gráfico
+''''''''''''
+Este menú, disponible gracias a :file:`vesamenu.c32`, funciona exactamente igual
+al anterior, pero añade la posibilidad de cambiar colores, añádir fondos de
+pantalla, etc. que hacen mucho más vistoso su aspecto. En la página del proyecto
+dedicada a `los menús <https://www.syslinux.org/wiki/index.php?title=Menu>`_
+pueden leerse cuáles son estas directivas (``MENU BACKGROUND``, ``MENU COLOR``,
+etc.). No trataremos aquí cómo hacer estos cambios cosméticos. Para conocer
+rápidamente cómo montarnos una interfaz atractiva lo más rápido es descargar una
+imagen de alguna distribución que la use\ [#]_ y curiosear su ficheros.
+
+.. rubric:: Notas al pie
+
+.. [#] Véase el :rfc:`2131` para más información.
+
+.. [#] No hay que confundir estos campos con las opciones numeradas (referidas
+   en el :rfc:`2132`) del |DHCP|. De hecho, el último de los campos se llama
+   *options* y es en él en donde se incluyen todas las opciones. El :rfc:`2131`
+   incluye un dibujo muy revelador.
+
+.. [#] |iPXE| ya veremos que permite otros protocolos como |HTTP|. En su caso,
+   se puede especificar el protocolo, inclyendo la *URL* completa en el campo
+   *file*. Eso sí, siempre que tal *URL* no supere los 128 caracteres.
+
+.. [#] Ya veremos que con :ref:`dnsmasq <dnsmasq>` se hace así::
+
+      pxe-server=x86PC,"Arranque local",local.ipxe
+      pxe-server=x86PC,"Slitaz por red",slitaz.ipxe
+      pxe-server=x86PC,"Shell de iPXE",shell.ipxe
+      pxe-server=x86PC,"Reiniciar",reboot.ipxe
+
+   Como vemos, cada ítem carga un *script* distinto.
+
+.. [#] Es cierto que para el nombre de dominio, no es necesario recurrir al
+   número de opción, ya que |iPXE| le dedica la variable :kbd:`${domain}`.
+
+.. [#] Unas buenas páginas de referencia son `èsta
+   <https://www.syslinux.org/wiki/index.php?title=SYSLINUX>`_ y `esta otra
+   <https://www.syslinux.org/wiki/index.php?title=Config>`_, ambas
+   pertenecientes a la *wiki* del proyecto.
+
+.. [#] Véase la explicación sobre `esta directiva en la wiki
+   <https://www.syslinux.org/wiki/index.php?title=SYSLINUX#KERNEL_file>`_.
+
+.. [#] La entrada no es equivalente: la otra continuaba la secuencia de
+   arranque, cuyo siguiente dispositivo podía ser otro (el *cdrom* por ejemplo)
+
+.. [#] Por ejemplo, la estupenda `slax <http://www.slax.org/>`_.
+
+.. |PXE| replace:: :abbr:`PXE (Preboot eXecution Environment)`
+.. |NBP| replace:: :abbr:`NBP (Network Bootstrap Program)`
+.. |iPXE| replace:: :program:`iPXE`
+.. |TFTP| replace:: :abbr:`TFTP (Trivial FTP)`
+.. |ISC| replace:: :abbr:`ISC (Internet Systems Consortium)`
+.. |BIOS| replace:: :abbr:`BIOS (Basic Input/Output System)`
+.. |PHP| replace:: :abbr:`PHP (PHP Hypertext Preprocessor)`
+.. |URL| replace:: :abbr:`URL (Uniform Resource Locator)`
+.. |UEFI| replace:: :abbr:`UEFI (Unified Extensible Firmware Interface)`
+.. |CWD| replace:: :abbr:`CWD (Current Working Directory)`
+.. |SHA| replace:: :abbr:`SHA (Secure Hash Algorithm)`

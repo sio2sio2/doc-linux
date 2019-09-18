@@ -1,0 +1,200 @@
+Herramientas de búsqueda
+========================
+
+Trataremos aquí programas que permitan buscar dentro de un texto. Para los
+programas que buscan ficheros en directorios consulte el :ref:`apartado
+correspondiente <fic-dir>`.
+
+.. _grep:
+.. index:: grep
+
+:command:`grep`
+   Devuelve las líneas del flujo de caracteres que contienen el patrón
+   expresado por la *regex* que se le suministre::
+
+      grep [<opciones>] <regex> [fichero1 [fichero2 ...]]
+
+   La expresión regular es conveniente protegerla con comillas simples para
+   impedir que :program:`bash` la interprete. Si no se proporciona ningún
+   fichero, :command:`grep`, como hacen otros programas, espera recibir datos
+   por la entrada estándar.
+
+   Un sencillo ejemplo de uso es el siguiente: los grupos sin miembros
+   (descontando que algún usuario lo tenga como grupo principal), son aquellos
+   cuyo último campo no tiene expresado ningún nombre de usuario, por tanto, la
+   línea que los define acaba en dos puntos::
+
+      $ grep ':$' /etc/group
+
+   O mejor aún, por si existe algún servidor de usuarios::
+
+      $ getent group | grep ':$'
+
+   :command:`grep` dispone de algunas opciones que son bastante útiles:
+
+
+   :kbd:`-E`
+      Interpreta expresiones *ERE* en vez de *BRE*. Conviene usarla, pues son
+      las primeras las que se han estudiado bajo el epígrafe anterior. También
+      es posible usar :command:`egrep`, que es el propio :command:`grep` con
+      esta opción incorporada.
+
+   :kbd:`-P`
+      Interpreta expresiones *PCRE* en vez de *BRE*.
+
+      .. warning:: A pesar de existir un comando :command:`pgrep`, a diferencia
+         de :command:`egrep`, no tiene nada que ver con :command:`grep`.
+
+   :kbd:`--color`
+      Colorea la parte de la línea que concuerda con el patrón expresado por la
+      *regex*::
+
+         $ getent group | egrep --color=auto '^[^:]+'
+
+   :kbd:`-i`
+      No distingue mayúsculas de minúsculas.
+
+   :kbd:`-v`
+      Invierte la selección, es decir, si::
+
+         $ getent group | egrep ':$' 
+
+      nos muestra las líneas que acaban en dos puntos, la expresión::
+
+         $ getent group | egrep -v ':$'
+
+      nos mostrará todas las demás, o sea, las que **no** acaban en dos puntos.
+
+   :kbd:`-x`
+      Fuerza a que el patrón debe coincidir con la línea entera. Por ejemplo::
+
+         $ egrep 'a' fichero
+
+      muestra las líneas que contienen «*a*». Sin embargo::
+
+         $ egrep -x 'a' fichero
+
+      mostrará las líneas constituidas únicamente por una «*a*». Dicho en otras
+      palabras es como si siempre añadiéramos al comienzo de nuestro patrón
+      ``^`` y al final ``$``.
+
+   :kbd:`-o`\ [#]_
+      No devuelve la línea completa sino solamente la parte de la línea que
+      coincide con el patrón. Por ejemplo::
+
+         $ getent group | egrep -o '^[^:]+'
+
+      nos devuelve sólo los nombres de todos los grupos definidos en el sistema,
+      puesto que nuestro patrón coincide únicamente con los principios de cada
+      línea hasta el carácter anterior al primer *dos puntos*.
+
+
+.. _wc:
+.. index:: wc
+
+:command:`wc`
+   Cuenta distintas entidades de un flujo de datos::
+
+      wc [<opciones>] [fichero1 [fichero2 ...]]
+
+   Como en el caso de :command:`grep`, si no se proporciona fichero, se tomará
+   el flujo de la entrada estándar.
+
+   Las opciones sirven para indicar qué se quiere contar:
+
+   :kbd:`-w`
+      Cuenta palabras.
+      ::
+
+         $ wc -w <<<"La casa de Ángel"
+         4
+
+   :kbd:`-m`
+      Cuenta caracteres.
+      ::
+
+         $ wc -m <<<"La casa de Ángel"
+         17
+
+      Hay diez y siete caracteres contando con que se añade uno de cambio de
+      línea al final.
+         
+
+   :kbd:`-c`
+      Cuenta *bytes*.
+      ::
+
+         $ wc -m <<<"La casa de Ángel"
+         18
+
+      Hay un *byte* más que caracteres, porque la codificación es UTF-8 y la *a*
+      acentuada necesita dos *bytes*.
+
+   :kbd:`-l`
+      Cuanta el número de líneas:
+      ::
+
+         $ wc -l <<<"La casa de Ángel"
+         1
+
+.. _diff:
+.. index:: diff
+
+:command:`diff`
+   Compara y busca las líneas diferentes entre dos textos. Es útil, por ejemplo,
+   cuando se quiere comprobar qué ha cambiado entre dos versiones de un mismo
+   fichero::
+
+      diff [<opciones>] <ficheroA> <ficheroB>
+
+   Por ejemplo::
+
+      $ cat > fv1.txt <<EOF
+      > Uno
+      > Dos
+      > EOF
+      $ cat > fv2.txt <<EOF
+      > Una
+      > Dos
+      > EOF
+      $ diff fv1.txt fv2.txt
+      1c1
+      < Uno
+      ---
+      > Una
+
+   Hay algunas opciones que permiten alterar su comportamiento. Algunas de las
+   más usadas son:
+
+   ``-b``
+      Al comparar colapsa espacios, de modo que no habría diferencia entre "a b"
+      (un espacio) y "a  b" (dos espacios).
+
+   ``-Z``
+      Se desentiende de los espacios finales de línea.
+
+   ``-B``
+      Se desentiende de los cambios de línea.
+
+   ``-r``
+      Recursivo. Útil cuando se quiere comprobar si los ficheros contenidos en
+      dos directorios son iguales o no.
+
+   ``-u``
+      Genera una salida que se puede usar con el comando :command:`patch` para
+      parchear ficheros de programación::
+
+         $ diff -u old/codigo.c nuevo/codigo.c > codigo.patch
+
+      Si son varios los ficheros modificados, puede usarse junto a ``-r`` para
+      crear un parche común para todas las modificaciones::
+
+         $ diff -uNr old nuevo > apliacion.patch
+
+      La opción ``-N`` se usa para que la ausencia de fichero la considere
+      fichero vacío.
+
+.. rubric:: Notas al pie
+
+.. [#] Esta opción no forma parte del estándar POSIX, de modo que puede no
+   encontrarse en las implementación de :command:`grep` de otros unices.

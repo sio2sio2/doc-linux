@@ -1,0 +1,166 @@
+.. highlight:: nginx
+
+.. _ngx-server:
+
+Dominios virtuales
+==================
+Es común que un mismo servidor *web* sirva páginas cuyo nombre de sitio es
+distinto. Por ejemplo, un sitio puede ser *sitio1.dominio.org* y otro distinto
+*sitio2.dominio.org*. Sin embargo, ambos están alojados en nuestro servidor web.
+
+Para lograr tal, debemos utilizar tres sentencias: server_, listen_ y
+server_name_. Por ejemplo:
+
+.. code-block:: nginx
+   :emphasize-lines: 2-4
+
+   # cat /etc/nginx/sites-available/sitio1
+   server {
+      listen  80;
+      server_name  sitio1.dominio.org;
+
+      try_files $uri $uri/ =404;
+      root /srv/www/sitio1;
+   }
+   # cat /etc/nginx/sites-available/sitio2
+   server {
+      listen  80;
+      server_name  sitio2.dominio.org;
+
+      try_files $uri $uri/ =404;
+      root /srv/www/sitio2;
+   }
+
+Por lo general, cada sentencia ``server`` se corresponde con un dominio virtual
+distinto, y cada dominio se coloca en un fichero distinto. Además, para que
+estén habilitados, los ficheros tienen que estar enlazados en
+:file:`sites-enabled` por lo que es necesario:
+
+.. code-block:: bash
+
+   # cd /etc/nginx/sites-enabled
+   # ln -fs ../sites-available/sitio1
+   # ln -fs ../sites-available/sitio2
+
+server_name
+-----------
+No obstante lo anterior, las cosas pueden complicarse hasta el punto de que
+server_name_ tiene un `apartado dedicado en exclusiva a su explicación
+<http://nginx.org/en/docs/http/server_names.html>`_\ [#]_. De hecho,
+server_name_ no tiene por qué contener un nombre sin más, sino que puede
+contener:
+
+* Un nombre, como :kbd:`sitio1.dominio.org`.
+* Un nombre con comodín al comienzo (p.e. :kbd:`*.dominio.org`) o al final
+  (p.e. :kbd:`www.dominio.*`).
+* Una :ref:`expresión regular <regex>` (con sintaxis |PCRE|), en cuyo caso debe
+  comenzarse la expresión con una virgulilla, como :kbd:`~^www.([^.]+\.[^.]+)$`.
+* Una combinación cualquiera de las tres posibilidades anteriores::
+
+   server_name   dominio.org
+               *.dominio.org;
+
+.. note:: La documentación nos advierte de que el nombre :kbd:`.dominio.org` se
+   trata de forma especial y equivale a la combinación de nombres usada
+   justamente encima de esta nota::
+
+      server_name  .dominio.org;
+
+Las *expresiones regulares*, además de permitir definir patrones bastantes
+complicados de coincidencia, permiten almacenar parte del nombre en una variable
+y usarlo luego en la configuración. Por ejemplo::
+
+   server {
+      listen  80;
+      server_name ~^([^.]+)\..*;
+
+      root /srv/www/$1;
+      try_files $uri $uri/ =404;
+   }
+
+.. warning:: Cuando una *expresión regular* contiene llaves de apertura o
+   cierre, o punto y coma es preciso encerrarla entre comillas dobles.
+
+no sólo eso, sino que se puede usar la :ref:`captura con nombres <regex-pcre>` para
+facilitar la lectura de la configuración::
+
+   server {
+      listen  80;
+      server_name ~^(?P<vhost>[^.]+)\..*;
+
+      root /srv/www/$vhost;
+      try_files $uri $uri/ =404;
+   }
+
+.. note:: Como valor se puede usar también una *ip* o una *ip* con
+   comodín::
+
+      server_name 172.22.0.2 192.168.*;
+
+.. note:: Hay algunas apuntes en la documentación oficial sobre la forma en que
+   :program:`nginx` procesa y compara el campo ``Host:`` con los valores de la
+   directiva y nos explica que, obviamente, es más eficiente la comparación de
+   nombres exactos y luego de nombres con comodines que la comparación con
+   expresiones regulares. Además, nos advierte de que, si a un servidor se
+   accede mayoritariamente con un nombre, es mejor declarar explícitamente ese
+   nombre. Por tanto es mejor desde el punto de vista del rendimiento, esto::
+
+      server_name www.dominio.org  dominio.org *.dominio.org;
+
+   que esto otro::
+
+      server_name .dominio.org;
+
+Selección del dominio virtual
+-----------------------------
+Conocido cómo escribir la directiva server_name_, lo interesante es saber
+cuál es el algoritmo que sigue :program:`nginx` para seleccionar cuál es el
+bloque server_ que usará para responder a una petición. El algoritmo es el
+siguiente:
+
+#. Se seleccionan aquellos bloques cuya directiva listen_ esté en consonancia
+   con la petición.
+#. Para los bloques anteriores, se escoge aquel en que el valor de la directiva
+   server_name_ concuerde con el campo ``Host:`` de la petición
+
+   * Si son varios los bloques, entonces la precedencia en la concordancia con
+     server_name_ es la siguiente:
+
+     #. Nombre exacto.
+     #. Nombre con comodín al principio. Cuanto más largo, más precedente.
+     #. Nombre con comodín al final. Cuanto más largo, más precedente.
+     #. Expresión regular. Si hay concordancia con varias expresiones regulares
+        se coge el bloque server_ concordante que aparece en primer lugar
+        dentro del fichero\ [#f1]_.
+
+   * Si no hay bloque seleccionado por falta de concordancia, se toma aquel que
+     incluya el parámetro ``default_server`` en su sentencia listen_::
+
+         listen  80 default_server;
+
+     y, si ningún bloque tenía una sentencia listen_ que incluyera el
+     parámetro, se toma el primer server_\ [#f1]_\ [#]_.
+
+.. rubric:: Notas al pie
+
+.. [#] También ayuda al entendimiento otro apartado dedicado a `cómo procesa
+   nginx una petición <http://nginx.org/en/docs/http/request_processing.html>`_.
+
+.. [#f1] Los bloques ``server`` se pueden distribuir en distintos ficheros, pero
+   recuérdese que esto es así, proque los ficheros son cargados desde la
+   configuración de :file:`nginx.conf`. Como la carga es según la ordenación
+   alfabética del nombre del fichero, una bloque ``server`` estará antes que
+   otro si el fichero que lo contiene se ordena alfabéticamente antes que el
+   fichero que contiene al otro.
+
+.. [#] Ahora es posible entender por qué pusimos :kbd:`_` como nombre del
+   servidor en la :ref:`configuración básica <nginx-basico>`. Esto no es debido
+   a que ese extravagante nombre sea un comodín. En realidad, es un nombre que
+   nunca coincidirá con el nombre del servidor. Pero como a falta de
+   concordancia, se toma el primer bloque ``server`` y ese es el único,
+   :program:`nginx` lo toma para aplicar su configuración.
+
+.. |PCRE| replace:: :abbr:`PCRE (Perl Compatible Regular Expression)`
+.. _server: http://nginx.org/en/docs/http/ngx_http_core_module.html#server
+.. _server_name: http://nginx.org/en/docs/http/ngx_http_core_module.html#server_name
+.. _listen: http://nginx.org/en/docs/http/ngx_http_core_module.html#listen

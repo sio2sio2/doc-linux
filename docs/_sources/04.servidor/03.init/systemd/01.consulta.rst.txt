@@ -1,0 +1,123 @@
+.. _systemctl:
+
+Consulta
+========
+
+Trataremos aquí el modo en que podemos cónocer con *systemd* el estado de
+nuestros servicios. Tanto esto, como la manipulación se hacen a través del
+:index:`comando <systemctl>` :command:`systemctl`.
+
+Para conocer todas las *unidades* que *systemd* gestiona basta con::
+
+   $ systemctl list-unit-files
+   UNIT FILE                              STATE
+   [...]
+   console-getty.service                  disabled
+   console-shell.service                  disabled
+   container-getty@.service               static
+   cron.service                           enabled 
+   cryptdisks-early.service               masked
+   [...]
+
+La orden muestra el fichero que representa a la unidad y cuál es su estado de
+configuración. Es importante entender que este estado se refiere al modo en que
+se ha configurado la unidad en el sistema y no al estado de funcionamiento, ya
+que una unidad puede haberse habilitado, pero no estar funcionando, porque ha
+fallado. Algunos de los estados posibles son:
+
+*enabled*
+   La unidad se habilitó explícitamente.
+
+*static*
+   La unidad no se puede habilitar o deshabilitar. Hay casos en que no tiene
+   sentido, como por ejemplo, cuando la unidad representa un `runlevel
+   <systemd-runlevels>`.
+
+*disabled*
+   La unidad se encuentra deshabilitada.
+
+*masked*
+   La unidad se encuentra *más que deshabilitada*, para evitar que, aunque por
+   erro se habilite, no pueda arrancarse ni manual ni automáticamente.
+
+El otro concepto que cita sin definir exactamente es el de *unidad*. Hay 12
+tipos de unidades, aunque los dos más habituales son:
+
+*service*
+   Que es una unidad que representa un servicio.
+
+*target*
+   Que representa un conjunto de unidades relacionadas entre sí. La carga de una
+   unidad de este tipo, implica la carga de todas las unidades que *contiene*.
+   Si se quiere conocer qué unidades supone la carga de un target basta con::
+
+      $ systemctl list-dependencies basic.target
+
+   siendo en este caso :kbd:`basic.target` la unidad *target* de la que queremos
+   conocer la información.
+
+Si desea mostrarse en el listado un sólo tipo de unidad, podemos hacer::
+
+   $ systemctl list-unit-files --type=target
+
+En cambio, si nuestra intención es comprobar cuál es el estado de funcionamiento
+de las unidades, entonces debe ejecutarse::
+
+   $ systemctl list-units
+   UNIT                                 LOAD   ACTIVE SUB       DESCRIPTION
+   [...]
+   home.mount                           loaded active mounted   /home
+   [...]
+
+En realidad, si se ejecuta :command:`systemctl` sin argumento alguno se obtiene
+esta misma salida. En la salida podemos comprobar que la unidad se cargó
+(*loaded*) y que está activa (*activa*). Como en el caso anterior, puede
+filtrarse por tipo de unidad (con ``--type``), y también por estado, lo cual es
+bastante util para detectar problemas::
+
+   $ systemctl list-units --state=failed
+
+:kbd:`list-units` no detecta unidades inactivas. Para un listado más completo
+puede añadirse la opción ``--all`` (de hecho, si queremos consultar
+las que están  *inactivas* con ``--state``), no habrá otra manera::
+
+   $ system list-units --state=inactive --all
+
+.. note:: No obstante, a pesar de incluir esta última opción, habrá unidades
+   que sigan sin salir, puesto que :kbd:`list-units` sólo muestra las unidades
+   que *systemd* leído y procesado, porque considera que en algún momento tendrá
+   que usarlas. En esto se diferencia de :kbd:`list-unit-files` que sí las
+   muestra todas.
+
+Hasta hemos visto cómo listar unidades, pero también se puede consultar el
+estado de una unidad en particular::
+
+   $ systemctl status rsyslog.service
+   ● rsyslog.service - System Logging Service
+      Loaded: loaded (/lib/systemd/system/rsyslog.service; enabled)
+      Active: active (running) since sáb 2016-11-26 18:44:36 CET; 2h 40min ago
+        Docs: man:rsyslogd(8)
+              http://www.rsyslog.com/doc/
+    Main PID: 494 (rsyslogd)
+      CGroup: /system.slice/rsyslog.service
+              └─494 /usr/sbin/rsyslogd -n
+
+También se puede preguntar por el estado mediante los argumentos
+:kbd:`is-enabled`, :kbd:`is-active` e :kbd:`is-failed`. Debe tenerse en cuenta
+que el primer argumento, hace referencia a la configuración (como
+:kbd:`list-unit-files`), y los otros dos al estado en sí::
+
+   $ systemctl is-active rsyslog.service
+   active
+
+Debe notarse que la orden devuelve *0* o un valor distinto dependiendo de si la
+respuesta es afirmativa o no.
+
+POr último, puede ser también interesante conocer cuáles han sido los tiempos de
+arranque. El tiempo total puede conocerse con::
+
+   $ systemd-analyze time
+
+Y el tiempo particular de arranque de cada servicio::
+
+   $ systemd-analyze blame

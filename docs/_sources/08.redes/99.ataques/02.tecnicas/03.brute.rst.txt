@@ -1,0 +1,1089 @@
+*******************************
+Ataques contra la autenticación
+*******************************
+Uno de los tipos de ataques más socorridos son aquellos destinados a la
+obtención de una clave acceso a un sistema, que hemos denominado aquí
+:dfn:`ataques contra la autenticación`. De entre ellos, podemos distinguir:
+
+#. El :dfn:`ataque de fuerza bruta`, que se basa en la obtención de una clave
+   mediante la prueba masiva de todas las combinaciones posibles. En la práctica
+   se suelen limitar las combinaciones posibles restringiendo los caracteres
+   posibles o la longitud mínima o máxima de la clave.
+
+#. El :dfn:`ataque de diccionario`, que consiste en reducir las pruebas a las
+   palabras que se encuentran en un diccionario de palabras o a una variación
+   sobre las mismas.
+
+#. El :dfn:`ataque por deducción` que consiste en intentar obtener la contraseña
+   deduciéndola a partir de la información personal que se tiene del usuario
+   (por ejemplo, la información *GECOS* o el propio nombre de cuenta).
+
+#. El :dfn:`ataque por ingeniería social` que consiste en engañar al usuario
+   para que el mismo sea el que proporcione las claves de acceso. Un
+   :ref:`envenenamiento DNS <dns-spoofing>` o un :ref:`envenamuiento ARP
+   <arp-spoofing>` pueden ser parte de un ataque de este tipo.
+
+Estudiaremos en este apartado los tres primeros tipos.
+
+Métodos
+*******
+Para poner en práctica un ataque de estas características debemos distinguir
+entre:
+
+Ataque **local**
+   En este caso disponemos del fichero con la clave ofuscada (mediante una
+   :ref:`función de hash <hash>` generalmente) y el propósito es llegar a
+   conocer cuál es la clave sin ofuscar. La *suite* más socorrida para esta
+   tarea es `john the ripper`_, aunque existen otras como `hashcat
+   <https://hashcat.net/hashcat/>`_.
+
+   Obsérvese que el ataque no se denomina *local* porque se realice contra la
+   propia máquina, sino porque se dispone del fichero de contraseñas (p.e.
+   porque se haya robado de un servidor) y el *software* de averiguación actúa
+   sobre el propio fichero sin necesidad de hacer uso de ningún sistema de
+   autenticación.
+
+Ataque **remoto**
+   Que consiste en la averiguación de la clave intentando autenticaciones
+   sucesivas sobre el servicio remoto, muy comúnmente |SSH| o |SMTP|. Para esta
+   tarea podemos usar una aplicación como THC-Hydra_.
+
+Echaremos un vistazo a cómo se realizan estos ataques para conocer las ténicas y
+ponen en práctica más eficazmente las contramedidas adecuadas.
+
+.. _john:
+
+John the Ripper
+===============
+Hay paquete en *debian* para su instalación::
+
+   # apt install john
+
+.. warning:: `John the Ripper`_ tiene dos versiones: la oficial que es la
+   incluida en la distribución y la `versión Jumbo`_, con ampliaciones de su
+   comunidad de usuarios y que tiene algunos añadidos bastantes interesantes.
+   Para no complicarnos usaremos la versión oficial incluida en el repositorio
+   oficial de *debian*. No obstante, puede instalarse la versión de la comunidad
+   usando los repositorios de `Kali <https://www.kali.org/>`_::
+
+      # cat > /etc/apt/sources.list.d/kali.list 
+      deb http://http.kali.org/kali kali-rolling main contrib non-free
+      # cat > /etc/apt/preferences.d/kali 
+      Explanation: Paquetes de auditoría procedentes de Kali Linux
+      Package: *
+      Pin: release o=Kali
+      Pin-Priority: 50
+      # apt update
+      # apt install -t o=kali john
+
+Además, generaremos un fichero de contraseñas para nuestras pruebas con cuatro
+usuarios::
+
+   $ cat <<EOF > passwords.txt 
+   tester1:$(openssl passwd -1 -salt a secreta)
+   tester2:$(openssl passwd -1 -salt a Secreta2.)
+   tester3:$(openssl passwd -1 -salt a tester3)
+   tester4:$(openssl passwd -1 -salt a Tester4)
+   tester5:$(openssl passwd -1 -salt a 1234)
+   EOF
+
+El programa tiene `cuatro modos
+<https://www.openwall.com/john/doc/MODES.shtml>`_ de funcionamiento:
+
+**single** (ataque *por deducción*)
+   Toma el nombre de usuario y la información *GECOS* como base para intentar
+   averiguar la contraseña. A esta información aplicará las reglas de
+   transformación listadas en la sección ``[List.Rules:Single]`` del fichero de
+   configuración (en principio, :file:`/etc/john/john.conf`).
+
+   En nuestro fichero de contreseñas no disponemos de la información *GECOS*\
+   [#]_, así que sólo será posible usar el nombre de usuario. Es bastante
+   evidente que con este modo podremos obtener las contraseñas de usuarios
+   *tester3* y *tester4*.
+
+**wordlist** (ataque *de diccionario*)
+   Realiza un ataque con el diccionario que proporcionemos. A las palabras del
+   diccionario podremos aplicarles transformaciones (añadir números, signos de
+   puntuación, etc.) a fin de mejorar la efectividad. Estas reglas de
+   transformación se listan en la sección ``[List.Rules:Wordlist]`` del ficheron
+   de configuración.
+
+   Con un diccionario de palabras castellanas podríamos obtener las contraseñas
+   de los otros dos usuarios.
+
+   .. note:: Las dos técnicas **single** y **wordlist** comparten la sintaxis
+      para definbir las reglas de transformación. De hecho, podríamos considerar
+      el ataque **single** como un ataque de diccionario en que, para cada
+      usuario, el diccionario está compuesto únicamente por el nombre de usuario
+      (y la información gecos si la hay).
+
+**incremental** (ataque *de fuerza bruta*)
+   Realiza un ataque de fuerza bruta en sí, aunque estableciendo una serie de
+   reglas (caracteres válidos, longitud mínima, longitud máxima). Podríamos
+   intentar este último ataque para averiguar la contraseña de *tester5*.
+
+**external** (estilo \\"libre\\")
+   Utiliza para la generación de palabras una función escrita en un subconjunto
+   del lenguaje **C**.
+
+Empecemos por aplicar el ataque *single*::
+
+   $ john -single passwords.txt
+   Created directory: /root/.john
+   Loaded 5 password hashes with 2 different salts (md5crypt [MD5 32/64 X2])
+   Press 'q' or Ctrl-C to abort, almost any other key for status
+   tester3          (tester3)
+   Tester4          (tester4)
+   2g 0:00:00:00 100% 4.651g/s 5869p/s 5874c/s 9797C/s tester51901..tester51900
+   Use the "--show" option to display all of the cracked passwords reliably
+   Session completed
+   $ john -show passwords.txt
+   tester3:tester3
+   tester4:Tester4
+
+   2 password hashes cracked, 3 left
+
+Bien, hemos logrado averiguar 2 de las 5 contraseñas: aquellas que eran muy
+semejantes al nombre de usuario. Pasemos a realizar un ataque de diccionario\
+[#]_ y, de paso, hagamos trampa ya que conocemos de antemano las contraseñas.
+Por un lado restringamos mucho el diccionario a unas pocas palabras::
+
+   $ grep secret /usr/share/dict/spanish >> /tmp/words.list
+
+y, por otro, apliquemos unas reglas de transformación bastante simplificadas.
+El modo de crear estas reglas diferenciados, depende de si usamos la versión
+oficial o la *Jumbo*:
+
+**Versión oficial**
+   Las reglas se encuentran definidas en la sección ``[List.Rules:Wordlist]``
+   y no hay forma de definir reglas con otro nombre distinto y aplicarlas. Lo
+   más limpio, en este caso, es crear un fichero alternativo de configuración::
+
+      $ cat > ~/.john/john.conf
+      [List.Rules:Wordlist]
+      :
+      cAz"[0-9][.#_\-]"
+
+   en que se define esta sólo regla.
+
+   .. warning:: Hecho esto, :program:`john` dejará de leer el fichero original
+      :file:`/etc/john/john.conf`, por lo que al acabar este tipo de ataque
+      deberíamos borrar el fichero creado o moverlo a otra ubicación
+
+   Las reglas de transformación posibilidad que para cada palabra, se pruebe:
+
+   * La palabra sin transformar.
+   * La palabra con la primera en mayúscula (*c*) y la adición al final (*Az*) de
+     una cadena compuesta por un número cualquiera y un signo.
+
+   Ahora podemos practicar el ataque de diccionario::
+
+      $ john -wordlist:/tmp/words.list -rules passwords.txt
+      Loaded 5 password hashes with 2 different salts (md5crypt [MD5 32/64 X2])
+      Remaining 3 password hashes with 2 different salts
+      Press 'q' or Ctrl-C to abort, almost any other key for status
+      secreta          (tester1)
+      Secreta2.        (tester2)
+      2g 0:00:00:00 100% 5.405g/s 2216p/s 2708c/s 2713C/s
+      Vicesecretaría..Vicesecretario9
+      Use the "--show" option to display all of the cracked passwords reliably
+      Session completed
+      $ john -show passwords.txt
+      tester1:secreta
+      tester2:Secreta2.
+      tester3:tester3
+      tester4:Tester4
+
+      4 password hashes cracked, 1 left
+
+**Versión Jumbo**
+   En esta versión sí podemos crear nuevas secciones con otras reglas y
+   aplicarlas. Para ello, lo más conveniente es añadir un :code:`.include` al
+   fichero de configuración para que podamos añadir nuestras reglas personales
+   aparte::
+
+      # cat >> /etc/john/john.conf
+
+      .include "~/.john/john-local.conf"
+
+   .. note:: Deje una línea en blanco antes y detrás del :code:`.include`
+
+   Hecho lo cual podemos hacer nuestros añadidos en tal fichero::
+
+      # cat > ~/.john/john-local.conf
+      [List.Rules:MisReglas]
+      :
+      cAz"[0-9][.#_\-]"
+
+   que podemos comprobar que están disponibles obteniendo la lista completa de
+   reglas::
+
+      # john -list=rules | grep -i MisR
+      misreglas
+
+   En este caso, el ataque se hace exactamente igual que en la versión oficial,
+   pero indicando qué conjunto de reglas quieren aplicarse::
+
+      $ john -wordlist:/tmp/words.list -rules:misreglas passwords.txt
+
+.. note:: Tanto para este tipo de ataque como para el siguiente, en el que se
+   generan automáticamente contraseñas, podemos comprobar cuáles son las
+   generadas añadiendo la opción ``-stdout`` y eliminando el fichero objetivo::
+
+      $ john -wordlist:/tmp/words.list -rules -stdout
+      $ john -incremental:Digits -stdout 
+
+Por último, ilustraremos un ataque incremental usando digitos como caracteres
+válidos::
+
+   $ cat >> ~/.john/john.conf
+
+   [Incremental:Digits]
+   File = $JOHN/digits.chr
+   MinLen = 3
+   MaxLen = 10
+   CharCount = 10
+
+En realidad, esta definición (aunque con distinto mínimo y máximo) ya está hecha
+en el fichero de configuración :file:`/etc/john.john.conf`, pero establecerla
+nosotros mismos en nuestro fichero de configuración nos permite echar un vistazo
+a como se construyen estos ataques de fuerza bruta. Además, de no obrar así,
+deberiamos deshacernos de :file:`~/.john/john.conf` ya que su existencia, anula
+la lectura del fichero general. Aplicando este ataque incremental::
+
+   $ john -incremental:Digits passwords.txt
+   Loaded 5 password hashes with 2 different salts (md5crypt [MD5 32/64 X2])
+   Remaining 1 password hash
+   Press 'q' or Ctrl-C to abort, almost any other key for status
+   1234             (tester5)
+   1g 0:00:00:00 5.000g/s 1340p/s 1340c/s 1340C/s 1234..123321
+   Use the "--show" option to display all of the cracked passwords reliably
+   Session completed
+   $ john -show passwords.txt
+   tester1:secreta
+   tester2:Secreta2.
+   tester3:tester3
+   tester4:Tester4
+   tester5:1234
+
+   5 password hashes cracked, 0 left
+
+.. note:: Con la `versión Jumbo`_, el *software* también es capaz de `atacar
+   contraseñas de ficheros rar
+   <https://bytesoverbombs.io/cracking-everything-with-john-the-ripper-d434f0f6dc1c#ba66>`_
+   o claves simétricas de `claves SSH
+   <https://bytesoverbombs.io/cracking-everything-with-john-the-ripper-d434f0f6dc1c#59e5>`_
+   o `certificados en formato PEM
+   <https://www.busindre.com/fuerza_bruta_a_llaves_privadas_pem_ssh_https#john_the_ripper>`_.
+
+.. note:: `John the Ripper`_ puede usarse como herramienta para comprobar la
+   robustez de las contraseñas de nuestros usuarios y enviar un mensaje de
+   correo a aquellos usuarios de los que hayamos sido capaces de averiguar la
+   contraseña. Para ello la *suite* trae un *script* llamado :command:`mailer`
+   que automatiza la tarea.
+
+.. _hydra:
+
+THC-Hydra
+=========
+Cuando no se dispone del fichero de contraseñas, es obvio que el único modo de
+averiguar una, es intentado repetidamente la autenticación hasta dar con una
+pareja usuario/contraseña que permita el acceso. THC-Hydra_ permite automatizar
+los intentos de acceso a `distintos tipos de servidores
+<https://github.com/vanhauser-thc/thc-hydra/blob/master/README.md>`_ (entre
+ellos |FTP|, |IMAP|, *MySQL*, |SMTP| o |SSH|).
+
+A diferencia del caso anterior, el objetivo no es sólo averiguar contraseñas,
+sino también usuarios, por lo que el programa permite tanto facilitar el usuario
+como la contraseña. Por ello:
+
+``-l <usuario>``
+   Permite facilitar el nombre de usuario.
+
+``-L <fichero>``
+   Permite facilitar la lista de usuarios expresada en el fichero indicado (un
+   usuario por línea).
+
+``-p <contraseña>``
+   Permite facilitar una contraseña.
+
+``-P <fichero>``
+   Permite facilitar la lista de contraseñas expresada en el fichero indicado (una
+   contraseña por línea).
+
+``-C <fichero>``
+   Permite facilitar la lista de tuplas usuario/contraseña expresada en el
+   fichero indicado (cada línea debe ser de la forma
+   :code:`usuario:contraseña`).
+
+``-x <min:max:charset>``
+   Genera todas las combinaciones posibles entre una longitud mínima y una
+   longitud máxima de los caracteres definidos con *charset*. En la definición
+   del *charset* "1" representan digitos, "a" letras minúsculas, "A" letras
+   mayúsculas y cualquier otro caracter debe expresarse explícitamente. Por
+   tanto, :code:`-x '4:8:a1.-'` generará todas las claves posibles de entre 4 y
+   8 caracteres que contengan letras minúsculas, números, puntos y guiones.
+
+``-e <nsr>``
+   Permite añadir a las pruebas de contraseña que provequen ``-p``, ``-P`` o
+   ``-x``, la contraseña nula (*n*), la contraseña que coincida con el *login*
+   (*s*) y la contraseña que sea el *login* puesto del revés (*r*). Así, por
+   ejemplo, :code:`-e ns` probaría como contraseña la vacía y el *login*. 
+
+Así pues, ``-p``, ``-P`` y ``-C`` nos permiten realizar ataques de diccionario y
+``-x`` ataques de fuerza bruta con restricciones (equivalentes a los
+incrementales de :ref:`john <john>`).
+
+Si se facilitan varios usuarios y varias contraseñas se probarán todas las
+combinaciones posibles, de modo que para el primer usuarios se prueban todas las
+contraseñas, para el segundo, todas; y así sucesivamente. Si quiere hacerse la
+combinación de manera que para la primera contraseña se prueben todos los
+usuarios, para la segunda, todos, etc. puede añadirse la opción ``-u``.
+
+Otras opciones de interés son:
+
+``-f``
+   Abandona el ataque cuando se consigue obtener la primera pareja
+   usuario/contraseña.
+
+``-t N``
+   Fija el número de intentos simultáneos que, por defecto, es **16**.
+
+Con estos mimbres es fácil hacer un ataque::
+
+   $ hydra -l usuario -P /tmp/passwords.txt -e nsr -t 4 -vV VICTIMA ssh
+
+o si se prefiere::
+
+   $ hydra -l usuario -P /tmp/passwords.txt -e nsr -t 4 -vV ssh::/VICTIMA
+
+.. note:: ¿Hay alguna manera de tomar un diccionario y probar no sólo las
+   palabras que contiene, sino también otras contraseñas generadas a partir de
+   esas palabras? Algo así a lo que hace :ref:`john <john>` al añadir
+   ``-rules``. Desgraciadamente, no. O no al menos exclusivamente con
+   :program:`hydra`. Sí podemos, sin embargo, generar las transformaciones con
+   :program:`john` y su opción ``-stdout`` y el diccionario resultante pasárselo
+   a :program:`hydra`, haciendo uso de una tubería::
+
+      $ john -wordlist:/tmp/words.list -rules -stdout | hydra -l usuario -P /dev/fd/0 -e nsr -t 4 -vV ssh::/VICTIMA
+
+
+.. _contra-bruta:
+
+Contramedidas
+*************
+De los métodos de ataque anteriores, debemos de entresacar dos enseñanzas:
+
++ Hemos de evitar el robo de ficheros de contraseñas, aunque éstas estén
+  ofuscadas, ya que existen herramientas como :ref:`john <john>` para intentar
+  averiguarlas.
+
++ Deben evitarse los nombres de usuarios que por defecto nos sugieran las
+  aplicaciones, porque son esos usuarios los que suelen probarse con
+  herramientas como :ref:`hydra <hydra>`.
+
++ Hemos de defender los servicios accesibles de ataques automatizados como los
+  realizados por :ref:`hydra <hydra>`. Enfocaremos esta sección en ver cómo
+  hacerlo mediante dos alternativas:
+
+  1. Ocultamiento del servicio mediante *port-knocking*, de manera que el
+     servicio será accesible sólo si previamente se ha dado el "santo y seña".
+
+  2. Veto al acceso para aquellas máquinas cuya actividad las vuelva
+     sospechosas de estar intentando un ataque contra la autenticación. Para
+     practicar este veto, *linux* provee dos mecanismos:
+
+     **hosts.deny**
+      Toda dirección |IP| listada en :file:`/etc/hosts.deny` no podrá acceder
+      a ningún servicio que use `TCP Wrappers
+      <https://es.wikipedia.org/wiki/TCP_Wrapper>`. El mecanismo es poco
+      versátil, porque se denegará el acceso a todos los servicios que lo
+      usen y no a algunos individuales, y porque los servicios ajenos al
+      mecanismo no se verá afectados en ningún caso. Para conocerse si un
+      servicio usa este mecanismo basta con comprobar si el ejecutable enlaza
+      con la librería :file:`libwrap.so`::
+
+         $ ldd /usr/sbin/sshd | grep -q 'libwrap.so' && echo "SI" || echo "NO"
+         SI
+         $ ldd /usr/sbin/nginx | grep -q 'libwrap.so' && echo "SI" || echo "NO"
+         NO
+
+     Por tanto, este método serviría para impedir el acceso al servidor |SSH|,
+     pero no al servidor web. Este mecanismo de veto era el que usaba
+     denyhosts_\ [#]_.
+
+     **Cortafuegos** (por lo general, :ref:`iptables <iptables>`)
+      Consiste en crear reglas para las máquinas sospechosas que impidan el
+      acceso a los servicios disponibles. El mecanismo es mucho más versátil ya
+      que se podrá aplicar a servicios individuales y será aplicable a todo
+      servicio\ [#]_. Las soluciones con :ref:`el módulo recent de iptables
+      <ipt-limit>` y :ref:`fail2ban <fail2ban>` usan esta técnica.
+
+     .. note:: Se use uno u otro mecanismo, las listas de direcciones vetadas
+        son dinámicas, así que debe habilitarse algún medio para
+        gestionarlas.
+
+
+.. _ipt-recent:
+
+iptables-recent
+===============
+*recent* es un módulo de iptables que permite crear una lista dinámica con las
+direcciones |IP| (en principio, direcciones |IP| de origen) que establecen
+conexión con nuestro servidor y toma decisiones en base a ello. Por ello, es
+útil para poner en práctica tanto el *port-knocking* como la *limitación de
+accesos*. Antes de ello, estudiemos brevemente las posibilidades del módulo:
+
+* El módulo permite realizar cuatro acciones:
+
+  ``--set``
+   que añade la dirección |IP| a la lista dinámica o actualiza la entrada
+   si ya estaba.
+
+  ``--rcheck``
+   que comprueba si la dirección |IP| se encuentra en la lista.
+
+  ``--update``
+   que además de la comprobación, actualiza la lista para añadir el instante de tiempo
+   como la última vez que se ha visto la |IP|.
+
+  ``--remove``
+   que elimina la |IP| de la lista.
+
+* Pueden existir varias listas independientes cada una con su nombre:
+
+  ``--name <NOMBRE>``
+   permite indicar el nombre de la lista. Si no se especifica ninguno, será "DEFAULT".
+
+* Cuando se comprueba si la entrada existe (``--rcheck`` o ``-update``) pueden añadirse
+  las siguientes opciones:
+
+  ``--seconds <SEGUNDOS>``
+   que restringe la búsqueda en la lista sólo a los últimos segundos que se
+   especifiquen.  Por tanto, si se añade :code:`--seconds 60`, la coincidencia
+   sólo se producirá si se añadió la |IP| en el último minuto.
+
+  ``--hitcount <N>``
+   la búsqueda tendrá éxito sólo si la dirección se encuentra en la lista el
+   número de veces indicado. Por supuesto, puede usarse en conjunción con ``--seconds``.
+
+  ``--reap``
+   usado en conjunción con ``--seconds`` provoca que se eliminen de la lista las entradas
+   de la |IP| anteriores al periodo de tiempo indicado.
+
+* Por último, para alterar el significado de la dirección |IP|:
+
+  ``--rdest``
+   apunta o comprueba tomando la |IP| de destino del paquete, en vez de la de
+   origen.
+
+  ``--mask <MASCARA>``
+   máscara que debe aplicarse a la lista de direcciones.
+
+Por otro lado, la listas pueden consultarse dentro del directorio
+:file:`/proc/net/xt_recent/` e incluso aplicar manualmente modificaciones sobre
+ellas según lo que expone la `página de manual
+<http://ipset.netfilter.org/iptables-extensions.man.html#lbBW>`_.
+
+Para ilustrar el uso, antes de pasar a resolver nuestros problemas completos,
+tomemos y comentemos un par de ejemplos inspirados en los de la documentación
+oficial:
+
+.. rubric:: Ejemplo 1
+
+.. code-block:: bash
+
+   iptables -A INPUT -m recent --rcheck --seconds 120 -j DROP
+   iptables -A INPUT -i eth0 -p icmp -m recent --set -j DROP
+
+Con estas reglas, si una máquina cualquiera intentos hacernos :command:`ping`
+por primera vez, la primera regla se evalúa a falso, ya que la |IP| no se
+encuentra aún en la lista *DEFAULT*. En consecuencia, este primer paquete prueba
+la segunda regla y al ser un paquete *ping* provocará la inclusión en la lista
+de la |IP| y, además, se rechazará el paquete, ya que ``--set`` siempre se
+evalúa a verdadero. A partir de la recepción de este paquete |ICMP| y durante 2
+minutos cualquier paquete procedente de esta |IP|, sea de la naturaleza que sea,
+se rechazará al toparse con la primera regla. Pasados los dos minutos, la
+primera regla se evaluará a falso para paquetes procedentes de la esa |IP| y
+sólo si vuelve a mandar un paquete |ICMP|, volveremos a vetar la dirección.
+
+En conclusión: si a una máquina se le ocurre mandarnos un paquete |ICMP| no
+podrá comunicarse con nosotros durante dos minutos.
+
+Para **comprobar** cómo funciona, podemos probar a hacer una conexión |SSH| a
+esta máquina (|IP| *192.168.1.239*) desde otra máquina (de |IP| *192.168.1.240*):
+deberíamos acceder sin problemas, supuesto que haya un servidor |SSH| instalado,
+claro está. Ahora bien, si hacemos desde *192.168.1.240* un :command:`ping`::
+
+   $ ping -c1 -W1 192.168.1.239
+
+No recibiremos respuesta (ya que la segunda regla lo impide) y además habremos
+metido a la dirección de origen en la lista::
+
+   # cat /proc/net/xt_recent/DEFAULT 
+   src=192.168.1.240 ttl: 1 last_seen: 4296132894 oldest_pkt: 1 4296132894
+
+A partir de este momento y durante dos minutos, no podremos conectar desde
+*192.168.1.240*. Si esperamos, volveremos a poder acceder por |SSH| a menos que
+en algún momento se nos ocurra volver a hacer un :command:`ping`.
+
+.. rubric:: Ejemplo 2
+
+.. code-block:: bash
+
+   iptables -A INPUT -m recent --update --seconds 120 -j DROP
+   iptables -A INPUT -i eth0 -p icmp -m recent --set -j DROP
+
+El segundo ejemplo es semejante, pero al sustituir ``--rcheck`` por ``--update``
+cualquier paquete que envíe la dirección |IP| renovará la entrada en la lista y,
+en consecuencia, la |IP| sólo dejará de estar vetada si pasa dos minutos sin
+enviarnos ningún paquete.
+
+.. _ipt-limit:
+
+Limitación de accesos
+---------------------
+Es obvio que en condiciones normales un uso legítimo de algunos de nuestros
+servicios no implica que una misma dirección |IP| abra muchas conexiones en un
+corto espacio de tiempo. Por ejemplo, al servidor |SSH| accederá de vez en
+cuando un usuario por lo que muy de vez en cuando se abrirá una conexión al
+puerto |SSH|. Con el servicio |SMTP| que escucha en los puertos **587** o
+**465** ocurrirá básicamente lo mismo: un usuario, cada cierto tiempo, mandará
+un mensaje, pero es bastante improbable que lo haga repetidamente en un corto
+espacio de tiempo.
+
+Nuestro propósito, pues, es vetar el acceso a aquellas direcciones que, durante
+un espacio de tiempo que establezcamos, sobrepasen un umbral de conexiones
+nuevas, porque si lo hacen, sospechamos que se trata de intentos automatizados
+de acceso que pretenden encontrar una pareja usuario/contraseña válida.
+
+Veamos cómo asegurar los servicios |SSH| y |SMTP| de ataques de fuerza bruta
+para impedir que desde una misma |IP| se pueda abrir más de **6** conexiones
+nuevas en un periodo menor a **5** minutos:
+
+.. code-block:: bash
+
+   # Para desechar paquetes registrando el rechazo
+   iptables -N LOGDROP
+   iptables -A LOGDROP -j LOG --log-level warning --log-prefix "Ataque fuerza bruta: "
+   iptables -A LOGDROP -j DROP
+
+   # Anti ataques de fuerza bruta contra SSH
+   iptables -N SSH
+   iptables -A SSH -m recent --name brute-ssh --update --seconds 300 --hitcount 6 --reap -j LOGDROP
+   iptables -A SSH -m recent --name brute-ssh --set -j ACCEPT
+
+   # Anti ataques de fuerza bruta contra SMTP
+   iptables -N SMTP
+   iptables -A SMTP -m recent --name brute-smtp --update --seconds 300 --hitcount 6 --reap -j LOGDROP
+   iptables -A SMTP -m recent --name brute-smtp --set -j ACCEPT
+
+   iptables -A INPUT -p tcp --dport ssh --syn -m conntrack --ctstate NEW -j SSH
+   iptables -A INPUT -p tcp -m multiport --dport urd,submission --syn -m conntrack --ctstate NEW -j SMTP
+
+.. note:: Suponemos que seguimos una política de lista blanca y que por el
+   puerto **25** no se realizan conexiones autenticadas, tal como :ref:`se
+   propugna aquí <postfix-25-465-587>`.
+
+Obsérvese, porque es importante que, usando esta estrategia, el tiempo de
+comprobación del accesos y el tiempo de veto debe coincidir. En nuestra
+propuesta, son 5 minutos. Cuanto mayor sea este tiempo, mayor es el tiempo de
+veto, pero también mayor el número de falsos positivos. Por tanto, una mejora a
+lo anterior consiste en independizar ambos tiempos, de modo que el de
+comprobación podamos reducirlo (por ejemplo, 30 segundos) y el de veto podamos
+ampliarlo (por ejemplo, 10 minutos). Para ello podemos crear dos conjuntos
+distintos: uno que apunte accesos y otro que apunte vetos (*banned*). Por
+ejemplo:
+
+.. code-block:: bash
+
+   # Para desechar paquetes registrando el rechazo
+   iptables -N LOGDROP
+   iptables -A LOGDROP -j LOG --log-level warning --log-prefix "Ataque fuerza bruta: "
+   iptables -A LOGDROP -m recent --name banned --set -j DROP
+
+   # Anti ataques de fuerza bruta contra SSH
+   iptables -N SSH
+   iptables -A SSH -m recent --name access-ssh --update --seconds 30 --hitcount 5 --reap -j LOGDROP
+   iptables -A SSH -m recent --name access-ssh --set -j ACCEPT
+
+   # Anti ataques de fuerza bruta contra SMTP
+   iptables -N SMTP
+   iptables -A SMTP -m recent --name access-smtp --update --seconds 30 --hitcount 5 --reap -j LOGDROP
+   iptables -A SMTP -m recent --name access-smtp --set -j ACCEPT
+
+   iptables -A INPUT -m conntrack --ctstate NEW -m recent --name banned --update --seconds 600 --reap -j DROP
+   iptables -A INPUT -p tcp --dport ssh --syn -m conntrack --ctstate NEW -j SSH
+   iptables -A INPUT -p tcp -m multiport --dport urd,submission --syn -m conntrack --ctstate NEW -j SMTP
+
+En la propuesta, los accesos a los distintos servicios se apuntan por separado
+(*access-ssh*, *access-smtp*), así que se pueden establecer distintas
+limitaciones según el servicio, pero una vez que un cliente alcanza la
+limitación en uno de ellos, se apunta en una lista única (*banned*): eso
+facilita las reglas a costa de que el tiempo de veto sea uno con independencia
+de por qué puerto se haya recibido el ataque. Además, el cliente vetado no podrá
+acceder a ningún servicio y, si lo intenta durante el tiempo de veto, se renovará
+el tiempo de veto.
+
+.. _port-knocking:
+
+Port-knocking
+-------------
+:dfn:`Port knocking` (:dfn:`golpeteo de puertos`, en castellano) es una técnica
+que permite abrir desde el exterior en el *firewall* el puerto en el que escucha
+algún servicio mediante una secuencia preestablecida de intentos de conexión a
+puertos cerrados. Con ello se logra que un escaneo de puertos no detecte los
+servicios realmente ofrecidos.
+
+En consecuencia, el acceso al servicio oculto se realiza del siguiente modo:
+
+* En principio, el cortafuegos impiede el acceso al servicio.
+* Un cliente que conoce la secuencia que permite abrir el puerto de escucha, la
+  lleva a cabo.
+* El servicio de *port-knocking* intercepta esta secuencia y, sin aviso al
+  cliente (nunca lo hay) abre durante un tiempo limitado el acceso a ese
+  cliente.
+* El cliente realiza la conexión al servicio.
+
+Para ponerlo en práctica puede usarse un servicio independiente como `knockd
+<https://www.digitalocean.com/community/tutorials/how-to-use-port-knocking-to-hide-your-ssh-daemon-from-attackers-on-ubuntu>`_,
+pero aquí trataremos de hacerlo exclusivamente con :ref:`iptables <iptables>`.
+
+Para nuestro ejemplo, el golpeteo será de tres golpes: el primero al puerto
+*11111/UDP*, el segundo al puerto *22222/UDP* y el tercero al puerto
+*33333/UDP*.
+
+.. literalinclude:: files/port-knocking
+   :language: bash
+
+Obsérvese que cada vez que damos un toque, borramos el toque anterior (p.e. al
+hacer "toctoc" borramos "toc") y que finalmente tras "toctoctoc" el siguiente
+paquete enviado borra el último "toctoctoc". En consecuencia, para conectar al
+servicio debemos mandar en orden y exclusivamente "toc", "toctoc", "toctoctoc" y
+el paquete que inicia la conexión. Si no seguimos la secuencia o intercalamos
+otro paquete entre medias, la apertura se malogrará.
+
+.. note:: Suponemos una política de lista blanca y que todas estas reglas
+   sustituyen a la repla única:
+
+   .. code-block:: bash
+
+      iptables -p tcp --dport ssh -j ACCEPT
+
+   es obvio que nuestro conjunto de reglas deberá incluir todas las demas
+   necesarias (permitir el tráfico de la interfaz loopback, permitir el tráfico
+   establecido, etc.)
+
+De este modo, para que una máquina pudiera acceder al servicio |SSH| debería
+antes hacer :download:`lo siguiente <files/ssh.sh>`:
+
+.. literalinclude:: files/ssh.sh
+   :language: bash
+
+.. note:: Si decidimos abrir el servicio con el golpeo del mismo puerto un
+   número determinado de golpes (en el ejemplo, 3), podemos simplificar las
+   reglas:
+
+   .. literalinclude:: files/port-knocking-1
+      :language: bash
+
+.. _fail2ban:
+
+fail2ban
+========
+:program:`fail2ban` (`página web
+<https://www.fail2ban.org/wiki/index.php/Main_Page>`_) es una aplicación escrita
+en *python* que escruta los accesos a distintos servicios, identifica cuáles de
+ellos son fallidos y, aplicando ciertas reglas de tolerancia (p.e. 5 accesos
+fallidos en los últimos 5 minutos desde una misma dirección) impide el acceso al
+servidor desde la dirección desde la que se realizan tales accesos durante un
+espacio de tiempo determinado. Para vetar el acceso crea dinámicamente reglas de
+:ref:`iptables <iptables>`.
+
+Por tanto, persigue el mismo objetivo que la :ref:`limitación de accesos que
+practicamos con iptables <ipt-limit>`, pero no del mismo modo, por lo que
+presenta ventajas y inconvenientes:
+
+**Ventajas**
+   * Al escudriñar si el acceso ha tenido éxito, sólo contabiliza como accesos
+     sospechos los fallidos. Por tanto, es más improbable que obtengamos con él
+     falsos positivos.
+   * Es una solución más general. El módulo *recent* no sirve para evitar ataques
+     de fuerza bruta a servidores web, por ejemplo, ya que por la naturaleza de
+     este protocolo, un cliente puede abrir muchas conexiones seguidas (o
+     incluso simultáneas) con el servidor. Por tanto, limitar el acceso no es
+     solución. En cambio, sí lo es detectar acceso fallidos.
+
+**Desventajas**
+   * Debemos instalar *software* adicional y mantenerlo en ejecución.
+   * El desempeño de la solución que usa el módulo *recent* de :program:`iptables`
+     es muchísimo mejor ya que, por su naturaleza, :program:`fail2ban` debe
+     hacer muchas más tareas y tareas más pesadas: cada cierto tiempo debe
+     buscar en uno o varios registros accesos restringidos y añadir o eliminar
+     reglas de :program:`iptables`.
+   * Cada servidor requiere una configuración de búsqueda de fallos diferente,
+     puesto que registra los acceso fallidos con un formato diferente y,
+     posiblemene, en un lugar diferente.
+
+La instalación es sencilla puesto que se dispone de paquete en *debian*::
+
+   # apt install fail2ban
+
+Estructura de la configuración
+------------------------------
+Toda la configuración se encuentra dentro de :file:`/etc/fail2ban`::
+
+   /etc/fail2ban/
+   |-- action.d
+   |   |-- iptables.conf
+   |   `-- ...
+   |-- fail2ban.conf
+   |-- fail2ban.d
+   |-- filter.d
+   |   |-- sshd.conf
+   |   `-- ...
+   |-- jail.conf
+   `-- jail.d
+       |-- sshd.conf
+       `-- ...
+
+Las claves de esta configuración modular son las siguientes:
+
+* Los ficheros de configuración son ficheros `ini
+  <https://es.wikipedia.org/wiki/INI_(extensi%C3%B3n_de_archivo)>`_ con
+  extensión *.conf*. Ahora bien, si en el mismo directorio se encuentra un
+  fichero extensión *.local*, :program:`fail2ban` leerá el fichero *.conf*
+  primero y usará el fichero *.local* para añadir más opciones o sobreescribir
+  las que incluyera *.conf*. Por tanto, es mejor no modificar nunca los
+  ficheros *.conf* ya que son los que distribuye *debian* con su paquete.
+
+* El fichero :file:`fail2ban.conf` incluye opciones para controlar cómo arranca
+  el demonio (p.e. podríamos cambiar el nombre del fichero donde
+  :program:`fail2ban` apunta sus propios registros). En realidad, la definición
+  de estas opciones no se circunscribe exclusivamente al fichero, sino que hay toda
+  una estructura modular de ficheros que se leen en el siguiente orden:
+  
+  #. :file:`fail2ban.conf`.
+  #. :file:`fail2ban.d/*.conf`, en orden alfabético.
+  #. :file:`fail2ban.local`
+  #. :file:`fail2ban.d/*.local`, en orden alfabético.
+
+  de manera que lecturas posteriores añaden nuevas opciones y sobreescriben las
+  ya existentes.
+
+* El fichero :file:`jail.conf` (y toda su estructura correspondiente) es lo que
+  nos toca modificar fundamentalmente para ajustarlo a nuestro servidor. Aquí
+  es donde se define cada *jail*, o sea, cada tarea de vigilancia que consiste en:
+
+  * Reconocer en la fuente correcta (un registro de *syslog*, por ejemplo) los
+    intentos fallidos de conexión. El reconocimiento de estos intentos se
+    logra aplicando expresiones regulares sobre los registros, la definición
+    de las cuales se denomina *filtro* en la jerga de :program:`fail2ban`.
+  * En base a lo anterior, establecer cuáles son los ataques sufridos por la máquina.
+    Lo habitual es que :program:`fail2ban` considere ataque la existencia de
+    una cantidad prefijada de conexiones fallidas en un periodo también
+    prefijado de tiempo.
+  * En caso de detectar uno o más ataques, desencadenar una *acción* de veto (la
+    adición de una regla de :program:`iptables`, por ejemplo).
+
+  Por tanto, la escritura de un *jail* supone definir:
+
+  - Qué filtro queremos aplicar.
+  - Qué condiciones se deben cumplir para encontrarnos ante un ataque. Por
+    ejemplo, la opción ``maxretry`` indica el máximo número de intentos
+    fallidos que toleramos o ``findtime`` el periodo de tiempo en que deben
+    buscarse esos intentos.
+  - Qué acción debe desencadenarse. Por ejemplo, :file:`iptables.conf` crea
+    reglas de :program:`iptables`, :file:`iptables-ipset-proto4.conf` crea
+    reglas de :program:`iptables` que aprovechan las capacidades del
+    :ref:`módulo set <ipt-ipset>`, :file:`hostsdeny.conf` añade entradas en
+    :file:`/etc/hosts.deny`, etc.
+
+* En :file:`action.d` se definen las acciones.
+* En :file:`filter.d` se definen los filtros.
+
+.. highlight:: ini
+
+Configuración básica
+--------------------
+El paquete trae un fichero :file:`jail.conf` que incluye entre otras cosas
+los valores de la configuración por defecto en la sección ``[DEFAULT]``. Esto
+es así, porque el fichero es de tipo *INI* y cada *jail* se define en una
+sección distinta.
+
+Si echamos un ojo veremos que en la referida sección hay opción que dice::
+
+   maxretry = 6
+
+Esto significa que, a menos que en un *jail* en particular redefinamos
+la opción con otro valor, para todos los servicios en umbral máximo de fallos
+que toleraremos será **6**.
+
+Empecemos por crear un :file:`jail.local` para redefinir a nuestro gusto las
+opciones comunes::
+
+   [DEFAULT]
+   ignoreip   = 127.0.0.0/8 192.168.0.0/16
+   bantime    = 1200    ; 20m
+   findtime   = 120    ; 2m
+   destemail  = root@localhost
+   sendermail = root@localhost
+
+Hemos modificado:
+
+``ignoreip``
+   Para que se evite crear reglas de veto a máquinas locales.
+
+``bantime``
+   Tiempo en segundo que se mantendrá vetada a la máquina.
+
+``findtime``
+   Periodo de tiempo hacia atrás en que se restrean accesos fallidos.
+
+``destemail``, ``sendermail``
+   Direcciones de correo que se usan como destinatario y remitente para el
+   envío de avisos cuando se ha realizado un veto. :program:`fail2ban` no tiene
+   una opción que habilite o deshabilite estos mensajes, sino que está definida
+   la acción :file:`action.d/sendmail.conf` que no realiza veto alguno, sino
+   que simplemente manda el aviso. Si nuestra intención es que el *jail* avise,
+   deberá de definirse con dos acciones: la que propiamente realiza el veto y
+   ésta.
+
+Bien, pero ¿qué hay de los *jails*? Vale. Pues hagamos (o mejor, modifiquemos)
+un *jail* para |SSH|. Si el servicio es habitual, es más que probable que ya
+tenga una sección en la configuración. La de este servicio se llama ``[sshd]`` y
+estudiaremos bajo el próximo epígrafe por qué es así y por qué ya viene activo
+este *jail*. Ahora nos limitaremos a establecer las opciones particulares para
+este *jail*. Lo más adecuado es crear :file:`jail.d/ssh.local` con un contenido
+como éste::
+
+   [sshd]
+   ;enable = true
+   maxretry = 5
+   findtime = 90     ; 1.5m
+
+.. note:: No lo habilitamos, porque ya está activo.
+
+Funcionamiento
+--------------
+Es obvio que cada vez que hagamos un cambio como en la configuración anterior,
+podremos reiniciar el servicio con la herramienta habitual de *debian*::
+
+   # invoke-rc.d fail2ban restart
+
+Además, podemos comprobar de forma genérica cuales son los servicios protegidos
+o, más precisamente dicho, los *jails* activos:
+
+.. code-block:: console
+
+   # fail2ban-client status
+   Status
+   |- Number of jail:      1
+   `- Jail list:   sshd
+   
+Para consultar el estado de un *jail* particular:
+
+.. code-block:: console
+
+   # fail2ban-client status sshd
+   Status for the jail: sshd
+   |- Filter
+   |  |- Currently failed: 0
+   |  |- Total failed:     2
+   |  `- File list:        /var/log/auth.log
+   `- Actions
+      |- Currently banned: 1
+      |- Total banned:     1
+      `- Banned IP list:   192.168.1.241
+
+Hurgando en la configuración
+----------------------------
+Hasta ahora, nos hemos limitado a modificar a tientas un *jail* ya creado
+(``[sshd]``). Ahora bien, más allá de que por su nombre parezca que
+efectivamente vigila el servicio |SSH|, ¿por qué realmente vigila tal servicio?
+¿Cómo lo hace? ¿Cómo lo defiende? Para resolver las preguntas lo mejor es hacer
+un poco de *ingeniera inversa* sobre la configuración. Si revisamos
+:file:`jail.conf` descubriremos la siguiente sección::
+
+   [sshd]
+
+   port    = ssh
+   logpath = %(sshd_log)s
+   backend = %(sshd_backend)s
+
+en donde está claro que parece un *jail* que actúa sobre el puerto **22** (ya
+veremos qué signifca eso). Por otro lado, se fija ``backend`` que si seguimos la
+madeja de variables nos lleva a un valor de "*auto*". Leyendo los comentarios en
+el propio fichero llegaremos a la conclusión de que esto implica usar como
+*backend* "*polling*", que significa que se leen registros del fichero indicado
+con ``logpath``. De nuevo, siguiendo valores, veremos que en este caso tal
+fichero es :file:`/var/log/auth.log`, valor que es correcto si está activo
+:ref:`syslog <rsyslog>`, como es el caso de *stretch* o *buster*.
+
+.. note:: Desde las últimas versiones de :program:`fail2ban` es posible también
+   usar como *backend* para los registros :ref:`systemd <systemd>`, aunque esto
+   exige definir la opción ``journalmatch`` y no ``logpath``.
+
+Bien, sabemos qué registros revisa :program:`fail2ban`, pero ¿qué filtros usa
+este *jail*? Es obvio que, si la respuesta no está en su sección, se tiene que
+hallar en la sección ``[DEFAULT]``, y efectivamente así es::
+
+   filter = %(__name__)s
+
+que implica de modo predeterminado que el filtro se llama como el nombre de la
+sección, en este caso, *sshd*. Por tanto, el filtro se encuentra en
+:file:`filter.d/sshd.conf`. Si echamos un ojo al filtro, encontraremos las
+expresiones regulares que concuerdan con los mensajes de acceso fallido que el
+demonio del servicio escribe en los registros. Además, está definida la opción
+``journalmatch`` apropiada, de modo que hacer que el *jail* use
+:program:`systemd` en vez de :program:`syslog` se limita a escribir::
+
+   [sshd]
+   # ... configuración personalizada ...
+   backend = systemd
+
+Resuelto el asunto del filtro, ¿cuál es la *acción* que se lleva a cabo? La
+respuesta de nuevo está en la sección ``[DEFAULT]``::
+
+   banaction = iptables-multiport
+   action_ = %(banaction)s[name=%(__name__)s, bantime="%(bantime)s",
+                           port="%(port)s", protocol="%(protocol)s", chain="%(chain)s"]
+   action_mw = %(banaction)s[name=%(__name__)s, bantime="%(bantime)s",
+                             port="%(port)s", protocol="%(protocol)s", chain="%(chain)s"]
+               %(mta)s-whois[name=%(__name__)s, sender="%(sender)s",
+                             dest="%(destemail)s", protocol="%(protocol)s", chain="%(chain)s"]
+
+   # ... otras variantes de la acción ...
+
+   action = %(action_)s
+
+La configuración está desgranada de esta forma para simplificar las
+modificaciones:
+
+* La opción que define cuál es la acción a realizar es ``action``, que se apoya
+  en ``action_``, que a su vez usa ``banaction``. Una alternativa podría haber
+  sido::
+
+   [sshd]
+   action = iptables-allports[name=%(__name__)s, chain=INPUT]
+
+  que veta a la máquina sospechosa el acceso a todos los puertos. En este caso,
+  no es necesaria la inclusión de *port* o *protocol*.
+ 
+* La razón de la existencia de ``action_`` es que es necesario pasar a la acción
+  algunos datos necesarios como el puerto, por ejemplo. Lo cierto es que se
+  pasan parámetros muy generosamente, porque no todos son necesarios y pasar de
+  más no provoca ningún fallo.
+
+  .. note:: El valor predeterminado de ``chain`` está definido en
+     :file:`action.d/iptables-common.conf` y es *INPUT*.
+
+* La acción definida en :file:`action.d/` que usaremos viene definida por
+  ``banaction`` y será :file:`action.d/iptables-multiport.conf`. Si echamos un
+  vistazo a ese fichero, es fácil darse cuenta de que para vetar se usa
+  :program:`iptables` usando el módulo *multiport*\ [#]_ y se veta
+  exclusivamente el acceso a los puertos del servicio.
+
+  Así, podríamos hacer::
+
+   [sshd]
+   # ... otra configuración adicional ...
+   banaction = iptables-allports
+
+ y todo funcionaría perfectamente, ya que esta acción requiere aún menos
+ parámetros que *iptables-multiport* y, por tanto, el valor de ``action_``
+ seguirá siendo válido.
+
+* Otros ``action_*`` añaden alguna acción extra. Por ejemplo, si hiciéramos::
+
+   [sshd]
+   # ... otra configuración adicional ...
+   action = %(action_mw)s
+
+  Además de vetar, se enviaría un mensaje de aviso cada vez que se produjera
+  un veto.
+
+Por último, afirmamos rotundamente al principio que ``[sshd]`` estaba activo;
+pero, ¿por qué es así? De hecho, en la sección ``[DEFAULT]`` se dice sin
+ambages::
+
+   enabled = False
+
+La razón de ello es que :file:`jail.d/` viene de serie con un *jail* llamado
+:file:`jail.d/defaults-debian.conf` con este contenido::
+
+   [sshd]
+   enabled = true
+
+Por lo general, si los ataques son frecuentes es conveniente hacer\ [#]_::
+
+   banaction = iptables-ipset-proto6
+
+que usa el :ref:`módulo ipset de iptables <ipt-ipset>` para gestionar la lista
+de direcciones |IP| vetadas.
+
+.. warning:: Es bastante probable que :command:`ipset` no esté instalado en su
+   sistema::
+
+      # apt install ipset
+
+.. rubric:: Ejemplo de aplicación
+
+Si quisiéramos vetar con :file:`/etc/hosts.deny`, en vez de hacerlo con el
+cortafuegos y leer registros con :program:`systemd`, podríamos ensayar la
+siguiente configuración::
+
+   [sshd]
+   enabled = false
+
+   [sshd-denyhosts]
+   enabled = true
+
+   port    = ssh
+   backend = systemd
+
+   filter = sshd
+   ;banaction = hostsdeny[daemon_list=sshd]
+   banaction = hostsdeny
+
+.. warning:: Usar :file:`/etc/hosts.deny` es sólo una excentricidad para jugar
+   un poco más con la configuración: no imite esta idea en un servisdor real. De
+   hecho, :program:`fail2ban` no parece andar del todo fino usando este modo de
+   veto.
+
+.. rubric:: Notas al pie
+
+.. [#] Suponiendo que dispongamos de un file:`/etc/passwd` y un
+   :file:`/etc/shadown` completos, :program:`john` trae el ejecutable
+   :command:`unshadow` para combinar ambos y obtener un único fichero en que el
+   segundo campo de :file:`/etc/password` se sustituye por la contraseña del
+   usuarios::
+
+      # unshadow /etc/passwd /etc/shadow > ~/passwords.txt
+
+.. [#] En el ejemplo usamos un diccionario de palabras castellanas, que es muy
+   probable que ya esté instalado en el sistema. En `esta página
+   <https://wiki.skullsecurity.org/Passwords>`_ pueden obtenerse diccionarios de
+   con muy habituales en sitios de internet.
+
+.. [#] denyhosts_ lleva más de una década abandonado y *wheezy* fue la última
+   versión estable de *debian* que lo soportó.
+
+.. [#] Salvo `si se trata del servidor DHCP
+   <https://unix.stackexchange.com/questions/447440/ufw-iptables-not-blocking-dhcp-udp-port-67>`_
+
+.. [#] Precisamente esto es lo que permite que se pueda usar como valor de la
+   opción ``port`` algo así::
+
+      [apache-auth]
+      port     = http,https
+      logpath  = %(apache_error_log)s
+
+.. [#] *proto6* (hay también *proto4*) no hace referencia a la versión de
+   |IP| sino a la versión de *ipset*.
+
+.. _john the ripper: https://www.openwall.com/john/
+.. _versión Jumbo: https://github.com/magnumripper/JohnTheRipper
+.. _THC-Hydra: https://github.com/vanhauser-thc/thc-hydra
+.. |ICMP| replace:: :abbr:`ICMP (Internet Control Message Protocol)`
+.. _denyhosts: http://denyhosts.sourceforge.net/   

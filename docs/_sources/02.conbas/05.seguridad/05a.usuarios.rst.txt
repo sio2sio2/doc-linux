@@ -1,0 +1,665 @@
+.. _gesusu:
+
+Gestión de usuarios
+===================
+
+En los sistemas multiusuario suelen existir dos conceptos: el de :dfn:`usuario` relacionado con una *personalidad* que ejecuta algún programa y el de :dfn:`grupo`, que no es más que un conjunto de usuarios a los que se les quiere dotar de una característica común. Obsérvese que se ha hablado de *personalidad* y no de *persona*, porque un usuario no tiene necesaramente que corresponderse con un ser humano interactuando con el sistema. Muchos usuarios (en los sistemas de escritorio, la mayoría) no son usuarios creados para facilitar el acceso y el manejo a un humano, sino *usuarios de sistema*, creados para que un determinado programa actúe bajo su identidad.
+
+Con independencia de los anterior, puede haber dos tipos de usuarios (o grupos): usuarios *locales*, esto es, definidos en el propio sistema; y usuarios *remotos*, definidos a través de algún servidor de usuarios como **samba**. Bajo este epígrafe se estudiarán los primeros sin profundizar demasiado, ya que una instalación estándar deja preparado el sistema para funcionar con ellos.
+
+En los sistemas *unix* los ficheros que constituyen la *base de datos* de los usuarios son cuatro:
+
+* :file:`/etc/shadow`, que almacena las contraseñas cifradas\ [#]_ de los usuarios.
+* :file:`/etc/gshadow`, que almacena las contraseñas cifradas de los grupos.
+* :file:`/etc/group`, que almacena los grupos y el nombre de usuario de sus integrantes.
+* :file:`/etc/passwd`, que almacena los usuarios y sus datos, excepto la contraseña.
+
+Tiene interés conocer el formato de estos dos últimos ficheros.
+:file:`/etc/group` almacena en cada línea la definición de un grupo con este
+formato::
+
+   audio:x:29:pepe,manolo
+
+Cuatro campos separados por :kbd:`:` (dos puntos):
+
+#. El primer campo es el **nombre** del grupo (*audio* en este caso),
+
+#. El segundo, la *contraseña* de grupo. Esta contraseña sirve para dar acceso
+   a un usuario a un grupo al que no pertenezca (para ello puede usarse el
+   comando `newgrp`_). Sin embargo, es raro que tales contraseñas
+   existan, ya que este método para ganar accesos tiene la debilidad de exigir
+   que varios usuarios deban compartir una misma contraseña.
+
+#. El identificador del grupo (llamado **GID**).
+
+#. Los **usuarios** que pertenecen al grupo separados por comas. En esta lista
+   no aparecen los usuarios cuyo *grupo principal* sea este mismo grupo, ya
+   que su pertenencia al grupo puede obtenerse de :ref:`otro modo
+   <grupo_principal>`.
+
+Por su parte, :file:`/etc/passwd` define cada usuario en una línea también que
+presenta el siguiente aspecto::
+
+   josem:x:1000:1000:Jose Miguel,,,:/home/josem:/bin/bash
+
+.. _grupo_principal:
+
+En este caso, los campos son siete:
+
+#. El *nombre* de usuario.
+#. La *contraseña* que no suele encontrarse aquí, sino en :file:`/etc/shadow`.
+#. El identificador de usuario (**ID**) que es el código numérico asociado a
+   cada usuario. Este número es realmente el que se usa en el sistema de
+   ficheros para determinar la partenencia de los ficheros a los usuarios,
+   así que en el fondo es el identificador realmente importante y no el nombre
+   de usuario, que puede modificarse en cualquier momento sin provocar ningún
+   efecto traumático. Se discutirá despues. Este mismo comentario es
+   aplicable al nombre de grupo y su *gid* asociado que se encuentran en
+   :file:`/etc/group`.
+#. El **GID** del *grupo principal*
+#. La *información personal* del usuario (nombre real, etc.), que suele
+   denominarse información **gecos**.
+#. El **directorio personal** del usuario.
+#. La *shell* predeterminada del usuario que se ejecutará al hacer ingreso en
+   el sistema. Las cuentas que no representan usuarios normales, sino que son
+   necesarias para el funcionamiento de ciertos programas suelen tener como
+   *shell* el comando :ref:`false <false>` (:command:`/bin/false`), lo que
+   impide que puedan usarse de modo interactivo.
+
+   .. note:: En algunos linux, incluida debian, existe el ejecutable
+      :command:`/usr/sbin/nologin` que se comporta como
+      :command:`/bin/false`, pero, además, muestra un mensaje de que la
+      cuenta se encuentra deshabilitada.
+
+   .. note:: En :file:`/etc/shells` se encuentra la lista de *shells* que
+      el sistema considera válidas. Los servicios que usa de modo interactivo
+      el usuario (*login*, *ssh*, *ftp*, etc.) suelen comprobar si la *shell*
+      se encuentra dentro de este listado y, si no es así, impiden el acceso.
+
+Consulta
+--------
+
+Hay varios comando relacionados con el propósito de conocer información acerca
+de usuarios y grupos:
+
+.. index:: who
+
+.. _who:
+
+:command:`who`
+   Muestra los usuarios que ingresaron en el sistema y en qué terminal se
+   encuentran::
+
+      $ who
+      josem    pts/0        2016-10-12 08:35 (:0.0)
+      josem    pts/1        2016-10-12 08:36 (tmux(3218).%0)
+      josem    pts/2        2016-10-12 12:18 (tmux(3218).%5)
+
+   .. note::
+      Es también útil el comando con el parámetro ``-b`` que permite conocer
+      cuándo se arrancó el sistema::
+
+         $ who -b
+                  arranque del sistema 2016-10-12 08:33
+
+   .. warning::
+      Se muestran sólo los usuarios con los que se abrió la terminal y no usuarios
+      a los que se haya podido acceder luego a través del comando:`su`.
+
+.. _whoami:
+.. index:: whoami
+
+:command:`whoami`
+   Muestra quién es el usuario que se está utilizando::
+
+      $ whoami
+      josem
+
+.. _logname:
+.. index:: logname
+
+:command:`logname`
+   Muestra cuál es el usuario con el que se ingresó en el sistema::
+
+      $ logname
+      josem
+
+   .. warning::
+      En ciertas ocasiones :command:`whoami` (o el explicado posteriormente
+      :ref:`id <id>`) y :command:`logname` no devuelven el mismo usuario. Véase
+      :ref:`su <su>` más adelante.
+
+.. _groups:
+.. index:: groups
+
+:command:`groups`
+   Muestras los usuarios a los que pertenece el usuario que se proporciona como
+   argumento. Si no se especifica usuario, se sobreentiende que es aquel que
+   ejecuta la orden::
+
+      $ groups josem
+      josem cdrom floppy audio dip video plugdev staff users netdev qemusers
+
+.. index:: id
+
+.. _id:
+
+:command:`id`
+   Sirve para obtener información del usuario cuyo nombre se proporciona como
+   argumento. Si no se especifica, se sobreentiende que es aquel que ejecuta la
+   orden::
+
+      $ id josem
+      uid=1000(josem) gid=1000(josem) grupos=1000(josem),24(cdrom),25(floppy),29(audio),
+      30(dip),44(video),46(plugdev),50(staff),100(users),107(netdev),117(qemusers)
+
+   El comando puede usarse también para obtener información más precisa::
+
+      $ id -u josem
+      1000
+      $ id -g josem
+      1000
+      $ id -G josem
+      1000 24 25 29 30 44 46 50 100 107 117
+
+   Si se incluye el parámetro :kbd:`-n`, se devuelven nombres y no números. Por
+   tanto::
+
+      $ id -Gn josem
+      josem cdrom floppy audio dip video plugdev staff users netdev qemusers
+
+   equivale a usar `groups`_.
+
+.. index:: getent
+
+.. _getent:
+
+:command:`getent`
+   Sirve para obtener la información de usuarios, grupos y contraseñas tal y como
+   se observa en los ficheros :file:`/etc/passwd` y :file:`/etc/group`::
+
+      getent (passwd|group|shadow) [<nombre>]
+
+   Dependiendo de si el primer argumento es ``passwd`` o ``group`` o ``shadow``,
+   se devuelve información sobre usuarios, grupos o contraseñas. El segundo
+   argumento es el nombre de usuario o de grupo del que se quiere obtener la
+   información. Si no se especifica ninguno, se devuelve la información de
+   todos::
+
+      $ getent passwd josem
+      josem:x:1000:1000:Jose Miguel,,,:/home/josem:/bin/bash
+
+   .. note::
+      Podría pensarse que usar :command:`getent` es equivalente a consultar
+      directamente el contenido de los ficheros correspondientes, pero no es
+      así. :command:`getent` devuelve información sobre todos los usuarios y
+      grupos reconocidos por el sistema, algunos de los cuales pueden no ser
+      locales, sino estar definidos en servidores como *samba* o *openldap*.
+
+Manipulación
+------------
+
+La manipulación inplica la creación, eliminación y modificación de usuarios y
+grupos. Obviamente es posible editar\ [#]_ directamente los ficheros ya
+mencionados, aunque es infinitamente más recomedable hacer uso de programas
+específicos, que serán los que se traten a continuación.
+
+.. _adduser:
+
+.. index:: adduser
+
+:command:`adduser`
+   Como su nombre indica, sirve para añadir un usuario local al sistema. Su
+   sintaxis es::
+
+      adduser [opciones] <nombre>
+
+   Y en su uso más básico no exige ninguna opción. Ejecutado de este modo, el
+   comando preguntará por la contraseña y la información *gecos*; y hará una
+   serie de presuposiciones algunas de ellas basadas en el contenido del fichero
+   de configuración :file:`/etc/adduser.conf`:
+  
+   * El *UID* será el siguiente disponible dentro del rango de números
+     reservado para los usuarios que son personas,
+   * Se creará un grupo con el mismo nombre que el usuario y se le
+     escogerá como grupo principal.
+   * El usuario no pertenecerá a ningún grupò adicional.
+   * El directorio personal será :file:`/home/nombre_del_usuario`.
+
+   Por ejemplo::
+
+      $ adduser nuevo
+
+   Creará un usuario de nombre *nuevo* bajo estos presupuestos. Conviene leer
+   la página del manual y el fichero :file:`/etc/adduser.conf` para saber cómo
+   alterar este comportamiento. No obstante, es interesante aclarar algo que se
+   llegará a descubrir si se lee el fichero de configuración.
+
+   Hay tres rangos de números definidos para los usuarios:
+
+   #. El rango **1-99** (**0** es siempre el identificador del administrador,
+      que se llama **root**) reservado a ciertos usuarios que vienen creados
+      desde la instalación por *debian* (p.e. *www-data*).
+   #. El rango **100-999** se reserva a usuarios de sistema, esto es, usuarios
+      destinados a servir como ejecutores de ciertos programas, por lo
+      general, servicios (o *demonios* en la terminología de *unix*).
+   #. El rangp **1000-99999** se destina a usuarios normales que son los que
+      usan interactivamente las personas que acceden el sistema.
+
+   Es conveniente tener presente estos números si decidimos asignar nosotros
+   manualmente el *UID* al usuario. Pero lo más lógico y cómodo es dejar que
+   :command:`adduser` se encargue de asignar el identificador: jamas pondrá uno
+   menor a 100, normalmente usará uno por encima de 999, y sólo si se usa la
+   opción ``--system`` considerará el usuario como usuario de sistema y escogerá
+   un número entre 100 y 999.
+
+   También es importante reseñar que es imposible pasar a :command:`adduser` la
+   contraseña de usuario (lo más que puede hacerse es dejarlo sin contraseña) lo
+   que imposibilita usarlo para dar de alta usuarios funcionales
+   automáticamente. A menos, claro está, que se dejen sin contraseña y se use
+   luego otro comando como `chpasswd`_.
+
+   Un uso habitual de :command:`adduser` es añadir un usuario existente a un
+   grupo existente. Para ello basta con usarlo del siguiente modo::
+
+      $ adduser nuevo disk
+
+   En este caso, *nuevo* es el usuario que existe y *disk*, el grupo existente
+   al que se añade tal usuario.
+
+   En realidad, :command:`adduser` es un *script* escrito en `perl
+   <http://www.perl.org>`_ que evita tener que usar el :index:`comando <useradd>`
+   de más bajo nivel :command:`useradd`. De hecho, la página de manual de este
+   último comando aconseja a los administradores de *debian* usar
+   :command:`adduser`:
+
+      useradd is a low level utility for adding users. On Debian, administrators
+      should usually use adduser(8) instead.
+
+   Por esta razón, no entraremos a discutir el uso de :command:`useradd`;  ni
+   por la misma razón el :index:`uso <userdel>` de :command:`userdel`.
+
+
+.. _deluser:
+
+.. index:: deluser
+
+:command:`deluser`
+   *Script* que sirve para borrar usuarios locales. En principio, sólo borra el
+   usuario (y su grupo principal si a este grupo sólo pertenecía él), pero
+   pueden usarse distintas opciones para borrar el directorio personal
+   (``--remove-home``) o todos los ficheros del sistema que le pertenecen
+   (``--remove-all-files``)::
+
+      $ deluser --remove-home nuevo
+   
+   También es posible hacer copia de seguridad de los ficheros antes de proceder
+   al borrado. Consúltese la página del manual.
+
+   Del mismo modo que :command:`adduser` permite añadir un usuario a un grupo,
+   deluser permite borrarlo, si se usa::
+
+      $ deluser nuevo audio
+
+   Borra el usuario *nuevo* del grupo *audio*.
+
+   .. note::
+      Cuando se borra un usuario, si quedan en el sistema ficheros que le
+      pertenecían estos seguirán teniendo como usuario propietario un usuario
+      con el *UID* que tenía el usuario que se borró. Si comprobamos el
+      propietario (con :ref:`stat <stat>` o :ref:`ls -l <ls>`) veremos que aparece directamente
+      el *UID* y no el nombre de usuario ya que al haberlo borrado el sistema no
+      puede obtener ningún usuario con ese *UID*. Por supuesto, si creáramos un
+      nuevo usuario forzando que su *UID* fuera el del borrado, todos los
+      ficheros pasarían a ser de su propiedad.
+
+.. _passwd:
+
+.. index:: passwd
+
+:command:`passwd`
+   Permite cambiar la contraseña de usuario de modo interactivo. Su sintaxis
+   es::
+
+      passwd [opciones] [<nombre>]
+
+   Posee diversas opciones que permiten a :command:`passwd` hacer algo más que
+   cambiar contraseñas (bloquear o desbloquear el usuario, hacer que expire la
+   contraseña inmediatamente, etc.)::
+
+      $ passwd josem
+
+   Si no se especifica el nombre de usuario, el sistema entenderá que se quiere
+   operar sobre el usuario que ejecuta el comando.
+
+   .. note::
+      :command:`passwd` siempre pide la contraseña actual antes de pedir la
+      nueva, excepto si el usuario que lo ejecuta es *root*.
+
+   .. note::
+      Puede configurarse la robustez mínima exigible para la contraseña a través
+      de :ref:`PAM <PAM>`.
+
+.. _chpasswd:
+
+.. index:: chpasswd
+
+:command:`chpasswd`
+   Permite cambiar contraseñas de usuario de manera no interactiva, lo cual es
+   muy útil cuando se escriben *scripts*. El comando admite por la entrada
+   estándar líneas de la forma::
+
+      usuario:contraseña
+
+   e irá línea a línea asignando a cada usuario la contraseña proporcionada. Si
+   lo que se quiere es cambiar la contraseña de un usuario puede hacerse lo
+   siguiente haciendo uso de una :ref:`redirección <ioredirect>`::
+
+      $ echo "usuario:contraseña" | chpasswd
+
+   Ahora bien, esto último plantea un problema de seguridad ya que la contraseña
+   sin cifrar acabará almacenada en el historial de :program:`bash`. Para
+   evitarlo, podríamos deshabilitar para la sesión el historial redefiniendo la
+   variable :ref:`HISTFILE <HISTFILE>`::
+
+      $ HISTFILE=/dev/null
+
+   Esto basta con hacerlo antes de salir de la sesión que es el momento en que los
+   comandos se almacenan en el fichero del historial (:file:`~/.bash_history`).
+
+   La orden permite también la opción :kbd:`-e` que presupone que la contraseña
+   que se le pasa ya está cifrada. Esto tiene utilidad en algunos casos\ [#]_:
+
+   * Cuando se quiere crear un usuario con contraseña nula, esto es, el usuario
+     accede escribiendo sólo su nombre de usuario::
+
+      # echo "usuario:" | chpasswd -e
+
+     .. warning:: Tenga cuidado, porque no todos los servicios aceptan por
+        defecto usuarios con contraseña nula.
+
+   * Deshabilitar la contraseña, para lo cual se suele sustituir por un
+     asterisco::
+
+      # echo "usuario:*" | chpasswd -e
+
+.. _chfn:
+.. index:: chfn
+
+:command:`chfn`
+   Permite cambiar la información GECOS de un usuario. Esta información se
+   compone de distintos campos y :command:`chfn` nos permite modificarlos por
+   separado, por lo que tiene una opción distinta para cada campo. Por ejemplo::
+
+      # chfn -f "Usuario plebeyo" usuario
+
+   permitiría cambiar el nombre completo del usuario *usuario*.
+
+.. _chsh:
+.. index:: chsh
+
+:command:`chsh`
+   Permite cambiar la *shell* del usuario. Un usuario puede cambiar únicamente
+   su propia *shell*::
+  
+      $ chsh -s /bin/dash
+
+   mientras que el administrador puede cambiar la *shell* a
+   cualquier usuario::
+
+      # chsh -s /bin/dash usuario
+
+.. _usermod:
+
+.. index:: usermod
+
+:command:`usermod`
+   Permite modificar los datos de un usuario ya creado. Es el compañero de
+   :command:`useradd` y :command:`userdel`, pero en este caso si lo usaremos al
+   no existir alternativa.
+
+   Se puede hacer casi cualquier cosa: bloquear o desbloquear usuarios (lo cual
+   también es posible a través de `passwd`_), modificar la directorio personal,
+   cambiar el nombre de usuario o el grupo principal, etc. Todo está en su
+   página de manual. Algunos usos interesantes son:
+
+   * Cambia el nombre de usuario, pero también el directorio personal
+     moviendo los ficheros que hubiera dentro del antiguo directorio::
+
+      $ usermod -l otro -md /home/otro nuevo
+
+   * Añade el usuario a dos grupos más (*audio* y *video*)::
+
+      $ usermod -aG audio,video nuevo
+
+     Obsérvese que se incluye la opción ``-a``, porque en caso contrario el
+     usuario nuevo sólo pasará a pertenecer a estos dos grupos, eliminándose
+     su pertenencia a los grupos en los que ya estaba (excepto su grupo
+     principal, claro).
+
+   * El usuario dejará de poder iniciar sesiones interactivas::
+
+      $ usermod -s /usr/sbin/nologin nuevo
+
+.. _chage:
+.. index:: chage
+
+:command:`chage`
+   Ya se ha dejado escrito más arriba que las contraseñas se escriben en un fichero
+   aparte llamado :file:`/etc/shadow`. Esto permite no sólo impedir el acceso a
+   los usuarios, sino añadir campos adicionales que informen sobre la política
+   de contraseñas: máximo tiempo de vigencia de la contraseña, obligatoriedad de
+   cambiarla en el siguiente acceso, etc.
+
+   .. seealso:: Échele un ojo a la página de manual de :manpage:`shadow`.
+
+   :command:`chage` es la orden que nos permite modificar de modo sencillo los
+   campos de :file:`/etc/shadow` a fin de modificar la políca de contraseñas de
+   un usuario. Por tanto, es a las contraseñas lo que la orden a
+   :command:`usermod` a la información contenida en :file:`/etc/passwd`
+
+   .. note:: :command:`chage` permite cambiar todo lo referente a la contraseña,
+      excepto la contraseña misma, para lo cual hay que recurrir a
+      :command:`chpasswd` o :command:`usermod`.
+
+   Algunas operaciones útiles son:
+
+   * Comprobar la política de contraseñas (la propia, excepto *root* que puede
+     consultar todas)::
+
+      $ chage -l usuario
+
+   * Forzar el cambio de contraseña en el próximo ingreso::
+
+      # chage -d0 usuario
+
+   * Establecer la vigencia de la contraseña (en días)::
+
+      # chage -M30 usuario
+
+     Pasados estos días (que se cuentan a partir del último cambio de
+     contraseña), se obligará al usaurio a cambiar la contraseña antes de poder
+     acceder a la cuenta.
+
+   * Establecer con cuántos días de antelación se empeará a avisar de que la
+     contraseñá está próxima a caducar::
+
+      # chage -W5 usuario
+
+   * Establecer el límite de días que una cuenta con la contraseña caducada
+     permanecerá activa::
+
+      # chage -l15 usuario
+
+     Pasado este tiempo, la única forma de recuperar la cuenta será avisar alc
+     administrador para que la desbloquee.
+
+.. _newgrp:
+.. index:: newgrp
+
+:command:`newgrp`
+   Cambia el grupo perdeterminado del usuario. Por ejemplo, si *nuevo* ya
+   pertenece al grupo *audio*::
+
+      $ whoami
+      nuevo
+      $ groups
+      nuevo audio video plugdev
+      $ id -ng
+      nuevo
+      $ newgrp audio
+      $ id -ng
+      audio
+
+   Como se ve ahora el grupo principal de *nuevo* es *audio*. En principio, no
+   tiene demasiada utilidad en la medida en que los permisos que obtendrá el
+   usuario serán los mismo que ya tenía.
+
+   La utilidad real de este comando está en que se puede usar para cambiar a un
+   grupo al que no pertenece el usuario. Pero para ello el grupo debe tener
+   definida una contraseña y ya se ha discutido que esto no es algo demasiado
+   seguro y es mejor usar otros mecanismos para lograr que el usuario adquiera
+   los privilegios.
+
+   Consecuentemente, podemos prescindir perfectamente de este comando.
+
+Cambio de identidad
+-------------------
+
+En ocasiones, un usuario puede haber accedido con una determinada identidad al
+sistema y requerir tener otra identidad para realizar una tarea determinada. Por
+ejemplo, un usuario que se encuentra utilizando el sistema, pero que se ve en
+la necesidad de convertirse en *root*, para realizar una tarea de
+administración.
+
+.. _su:
+.. index:: su
+
+:command:`su`
+   Permite identificarse con otra identidad a un usuario ya identificado en el
+   sistema, sin necesidad de salir y acceder a esta nueva identidad a través
+   del proceso de *login*::
+
+      $ whoami
+      usuario
+      $ su - otro
+      Contraseña:
+      $ whoami
+      otro
+
+   Mediante este comando el usuario actual podría convertirse en el usuario
+   *otro* si es que conoce la contraseña de este último. La opción ``-`` hace
+   que la conversión al nuevo usuario sea lo más parecida posible a como sería
+   si se hiciera mediante *login*. 
+
+   La opción ``-c`` permite indicar el comando que se quiere ejecutar al
+   convertirse en el nuevo usuario. Al acabarse de ejecutar el comando, se
+   vuelve al usuario original::
+
+      $ whoami
+      usuario
+      $ su - otro -c "whoami"
+      Contraseña:
+      otro
+      $ whoami
+      usuario
+
+   Cuando no se especifica el nombre del nuevo usuario, se sobrentiende que es
+   *root*::
+
+      $ su -
+      Contraseña:
+      # whoami
+      root
+
+   .. note::
+      :command:`su` exige conocer la contraseña del usuario del que se quieren
+      obtener los privilegios. Además, nos convierte en tal usuario con lo que
+      se asumirán todos sus permisos. Existe otra manera de conseguir privilegios
+      de otro usuario que evita estos dos inconvenientes: :ref:`sudo <sudo>`.
+
+   .. note::
+      Como :command:`logname` devuelve el nombre del usuario con que se ingresó
+      en el sistema, si se cambia con :command:`su` de usuario, seguirá
+      devolviendo el nombre original del usuario::
+
+         $ whoami
+         usuario
+         $ logname
+         usuario
+         $ su -
+         Contraseña:
+         # whoami
+         root
+         # logname
+         usuario
+
+   .. warning::
+      En algunas distribuciones como *ubuntu* el administrador carece de
+      contraseña, por lo que es imposible escalar privilegios con :command:`su`
+      y debe usarse :ref:`sudo <sudo>`. Por supuesto, basta con asignar una
+      contraseña a *root* para que :command:`su` pueda usarse como método para
+      escalar privilegios.
+
+   .. note::
+      En algunas distribuciones sólo le es permitido escalar privilegios
+      mediante :command:`su` al usuario que pertenece al grupo *wheel*. Esto se
+      logra manipulando :ref:`el proceso de autenticación <pam>`; en particular,
+      usando el módulo :ref:`pam_wheel` en el proceso de autenticación de
+      :command:`su`. *debian* contiene la línea, pero la tiene comentada.
+
+.. include:: ../../ejercicios/04-usuarios.rst
+
+.. rubric:: Notas al pie
+
+.. [#] En realidad, las contraseñas no están propiamente cifradas, sino que se
+   les aplica una :ref:`función de hash <hash>`. Por ejemplo, la información
+   del usuario "*usuario*" es la siguiente::
+
+      # getent shadow usuario
+      usuario:$6$feeCGVjY$m4drjYETO7DNffE/8AwmTvRnTj8qmSMy8AhMq1jaNf3ZonyAFPVc64SsY/iWTR3LxtXKnD2hfavS1FXwelAyq1:17782:0:99999:7:::
+
+   La contraseña es el chorizo inmenso en el que se aprecian tres campos
+   separados por dólares:
+
+   ``6``
+      Es el :ref:`algoritmo <hash>` usado, según la siguiente tabla:
+
+      ======== ======================
+       Código   Algoritmo
+      ======== ======================
+         1       MD5 (desaconsejado)
+         2       Blowfish
+         2a      EksBlowfish
+         5       SHA-256
+         6       SHA-512
+      ======== ======================
+
+   ``feeCGVjY``
+      Es `la sal <https://es.wikipedia.org/wiki/Sal_(criptograf%C3%ADa)>`_
+      utilizada para la generación del resumen.
+   
+   ``m4drjYETO7DNffE/8AwmTvRnTj8qmSMy8AhMq1jaNf3ZonyAFPVc64SsY/iWTR3LxtXKnD2hfavS1FXwelAyq1``
+      El resumen resultante de aplicar a la contraseña el algoritmo usando la sal.
+
+   Como de antemano, sabemos que la contraseña en claro es "*usuario*", podemos
+   generar el resumen que aparece en :file:`/etc/shadow` del siguiente modo::
+
+      $ openssl passwd -6 -salt feeCGVjY usuario
+      m4drjYETO7DNffE/8AwmTvRnTj8qmSMy8AhMq1jaNf3ZonyAFPVc64SsY/iWTR3LxtXKnD2hfavS1FXwelAyq1
+
+   aunque la opción *-6* no se encuentra en versiones antiguas de
+   :program:`openssl`.
+
+.. [#] No deben, de ningún modo, editarse los ficheros a través del editor
+   normal, puesto que mientras se realiza la edición, podría darse el caso de
+   que otro usuario intentara modificarlo a través de una de las herramientas
+   específicas que existen. Si se tiene la mala idea de tocar a mano, debe
+   hacerse a través del :index:`commando <vipw>` :command:`vipw`, que bloquea el
+   fichero para que ningún otro programa lo toque en tanto se completa la
+   modificación.
+
+.. [#] Aunque en estos casos es mejor usar la opción :ref:`usermod <usermod>`
+   con la opción :kbd:`-p` y nos ahorramos la tubería. Por ejemplo::
+
+      # usermod -p "" usuario

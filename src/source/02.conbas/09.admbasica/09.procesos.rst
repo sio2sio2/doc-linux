@@ -1,0 +1,449 @@
+.. _procesos:
+
+Control de procesos
+===================
+
+*linux* es un sistema operativo multitarea, esto es, capaz de ejecutar varios
+programas en paralelo. Al hilo de este asunto, cabe hacer una serie de
+definiciones:
+
+**Proceso**
+   Se denomina proceso, simplemente, a un programa que está en ejecución. Cada
+   procesos tiene una serie de propiedades que definen su estado. Una de ellas,
+   muy importante es el *PID*
+
+.. _pid:
+
+**PID** (Process IDentifier)
+   Es el número asociada a un proceso que lo identifica de manera inequívoca.
+   Esto implica que es único.
+
+**Demonio** (**servicio** en la terminología de los sistemas *windows*)
+   Es un proceso que se ejecuta en segundo plano, es decir, que se ejecuta sin
+   que intervenga en su ejecución de manera interactiva el usuario.
+
+**Prioridad**
+   Es la preferencia que el sistema le da a la ejecución de un proceso. Está
+   representada por un número entre *-20* (máxima prioridad) y *19* (mínima
+   prioridad). La prioridad normal es *0*.
+
+Bajo este epígrafe trateremos el modo de conocer cuáles son los procesos que
+ejecuta el sistema, qué recursos consumen, cómo cancelarlos o como traerlos a
+primer plano y mandarlos a segundo plano. La gestión de los demonios, por ser
+más un asunto de servidor, se dejará para más adelante.
+
+.. _consproc:
+
+Consulta
+--------
+
+.. _ps:
+.. index:: ps
+
+:command:`ps`
+   Permite obtener información sobre los procesos que se ejecutan en el sistema.
+   Hay dos modos de pasarle opciones: siguiendo el estilo *BSD*, en que las
+   opciones no van precedidas de guión; y siguiendo el estilo *unix*, en que
+   son precedidas por uno. Por coherencia con el resto de comandos,
+   usaremos este segundo método\ [#]_.
+
+   El modo más elemental de uso es aquel que muestra todos los procesos::
+
+      $ ps -e
+      [...]
+      518 ?        00:00:00 ntpd
+      520 ?        00:00:00 samba
+      522 ?        00:00:00 samba
+      523 ?        00:00:00 samba
+      524 ?        00:00:00 samba
+      525 ?        00:00:00 samba
+      526 ?        00:00:00 smbd
+      527 ?        00:00:00 samba
+      528 ?        00:00:00 samba
+      529 ?        00:00:00 samba
+      530 ?        00:00:00 samba
+      531 ?        00:00:00 samba
+      532 ?        00:00:00 winbindd
+      533 ?        00:00:00 samba
+      534 ?        00:00:00 samba
+      535 ?        00:00:00 samba
+      536 ?        00:00:00 samba
+      541 ?        00:00:00 smbd-notifyd
+      542 ?        00:00:00 cleanupd
+      544 ?        00:00:00 winbindd
+      545 ?        00:00:00 lpqd
+      [...]
+
+   En la salida se observan entre otros el *PID* del proceso, la terminal
+   asociada y el ejecutable que lo originó. Puede obtenerse un formato
+   largo que da más información con ``-f``::
+
+      $ ps -ef
+      [...]
+      ntp        518     1  0 11:08 ?        00:00:00 /usr/sbin/ntpd -p /var/run/ntpd.pid -g -u 107:111
+      root       520     1  0 11:08 ?        00:00:00 /usr/sbin/samba
+      root       522   520  0 11:08 ?        00:00:00 /usr/sbin/samba
+      root       523   520  0 11:08 ?        00:00:00 /usr/sbin/samba
+      root       524   520  0 11:08 ?        00:00:00 /usr/sbin/samba
+      root       525   520  0 11:08 ?        00:00:00 /usr/sbin/samba
+      root       526   522  0 11:08 ?        00:00:00 /usr/sbin/smbd -D --option=server role check:inhibit=yes --foreground
+      root       527   520  0 11:08 ?        00:00:00 /usr/sbin/samba
+      root       528   520  0 11:08 ?        00:00:00 /usr/sbin/samba
+      root       529   520  0 11:08 ?        00:00:00 /usr/sbin/samba
+      root       530   520  0 11:08 ?        00:00:00 /usr/sbin/samba
+      root       531   520  0 11:08 ?        00:00:00 /usr/sbin/samba
+      root       532   531  0 11:08 ?        00:00:00 /usr/sbin/winbindd -D --option=server role check:inhibit=yes --foreground
+      root       533   520  0 11:08 ?        00:00:00 /usr/sbin/samba
+      root       534   520  0 11:08 ?        00:00:00 /usr/sbin/samba
+      root       535   520  0 11:08 ?        00:00:00 /usr/sbin/samba
+      root       536   520  0 11:08 ?        00:00:00 /usr/sbin/samba
+      root       541   526  0 11:08 ?        00:00:00 /usr/sbin/smbd -D --option=server role check:inhibit=yes --foreground
+      root       542   526  0 11:08 ?        00:00:00 /usr/sbin/smbd -D --option=server role check:inhibit=yes --foreground
+      root       544   532  0 11:08 ?        00:00:00 /usr/sbin/winbindd -D --option=server role check:inhibit=yes --foreground
+      root       545   526  0 11:08 ?        00:00:00 /usr/sbin/smbd -D --option=server role check:inhibit=yes --foreground
+      [...]
+
+   Los procesos derivan unos de otros, de manera que un proceso tiene un
+   proceso padre. SI se quiere observar esta jerarquía de permisos puede
+   usarse la opción ``-H``::
+
+      $ ps -eH
+      [...]
+      518 ?        00:00:00   ntpd
+      520 ?        00:00:00   samba
+      522 ?        00:00:00     samba
+      526 ?        00:00:00       smbd
+      541 ?        00:00:00         smbd-notifyd
+      542 ?        00:00:00         cleanupd
+      545 ?        00:00:00         lpqd
+      523 ?        00:00:00     samba
+      524 ?        00:00:00     samba
+      525 ?        00:00:00     samba
+      527 ?        00:00:00     samba
+      528 ?        00:00:00     samba
+      529 ?        00:00:00     samba
+      530 ?        00:00:00     samba
+      531 ?        00:00:00     samba
+      532 ?        00:00:00       winbindd
+      544 ?        00:00:00         winbindd
+      533 ?        00:00:00     samba
+      534 ?        00:00:00     samba
+      535 ?        00:00:00     samba
+      536 ?        00:00:00     samba
+      [...]
+
+   Alternativa a la opción ``-H`` es ``--forest``, con la que obtenemos una
+   salida más vistosa y elocuente::
+
+      $ ps -e --forest
+      [...]
+      518 ?        00:00:00 ntpd
+      520 ?        00:00:00 samba
+      522 ?        00:00:00  \_ samba
+      526 ?        00:00:00  |   \_ smbd
+      541 ?        00:00:00  |       \_ smbd-notifyd
+      542 ?        00:00:00  |       \_ cleanupd
+      545 ?        00:00:00  |       \_ lpqd
+      523 ?        00:00:00  \_ samba
+      524 ?        00:00:00  \_ samba
+      525 ?        00:00:00  \_ samba
+      527 ?        00:00:00  \_ samba
+      528 ?        00:00:00  \_ samba
+      529 ?        00:00:00  \_ samba
+      530 ?        00:00:00  \_ samba
+      531 ?        00:00:00  \_ samba
+      532 ?        00:00:00  |   \_ winbindd
+      544 ?        00:00:00  |       \_ winbindd
+      533 ?        00:00:00  \_ samba
+      534 ?        00:00:00  \_ samba
+      535 ?        00:00:00  \_ samba
+      536 ?        00:00:00  \_ samba
+      [...]
+
+   También hay formas de filtrar los procesos mostrados según distintos
+   criterios. Por ejemplo, para elegir los de un determinado usuario::
+
+      $ ps -u josem
+
+   o elegir procesos por nombre::
+
+      $ ps -C systemd
+
+   o por *PID* (sólo se podrá mostrar uno)::
+
+      $ ps -p 1000
+
+   o mostrar los procesos de un determinado padre. Para ello se debe indicar el
+   *PID* del proceso padre::
+
+      $ ps --ppid 1579
+
+   Para todas estas opciones de selección pueden indicarse varios valores,
+   separándolos por comas::
+
+      $ ps -C systemd,bash
+
+   También se puede definir exactamente qué campos se quieren obtener mediante
+   la opción ``-o`` seguida de los nombres de los campos (véase la página del
+   manual). Por ejemplo, esto mostraría para todos de los procesos el nombre del
+   usuario que lo ejecuta, el *pid*, el *ppid* y el ejecutable::
+   
+      $ ps -eo user=,pid=,ppid=,comm=
+
+   El signo *igual*, indica que no se desea que :command:`ps` incluya para el
+   campo cabecera. Si todos los campos incluyen un igual, entonces no habrá
+   cabecera alguna.
+
+   Se pueden también ordenar los resultados con ``-sort``::
+
+       $ ps -eo user=,pid=,ppid=,comm= --sort ppid,pid
+
+.. _pstree:
+.. index:: pstree
+
+:command:`pstree`
+   Muestra los procesos del sistema en forma de árbol, tal como hace el comando
+   :ref:`tree <tree>` con los directorios y ficheros. Para constituir este árbol
+   debe saber que todo proceso tiene un proceso padre del que deriva. Por
+   ejemplo, si en una sesión de :program:`bash` ejecutamos este comando
+   :command:`pstree`, el proceso correspondiente a éste es hijo del proceso de
+   :command:`bash`.
+
+.. _pgrep:
+.. index:: pgrep
+
+:command:`pgrep`
+   Como :ref:`ps <ps>` permite obtener los PID de los procesos atendiendo a
+   distintos criterios. Por ejemplo, la orden::
+
+      $ pgrep -u usuario
+      1223
+      1300
+      1311
+      1328
+      1380
+      1387
+   
+   devuelve los PID de los procesos que pertenecen al usuario *usuario*. Tiene
+   diversos criterios de selección que pueden consultarse en el manual. Las dos
+   diferencias principales con respecto a :ref:`ps <ps>` son las siguientes:
+
+   * Para seleccionar por nombres de comandos no hay una opción, sino que
+     se puede incluir una :ref:`expresión regular extendida <regex>` como
+     argumento que concuerde con nuestro criterio de búsqueda. Por ejemplo::
+
+        $ pgrep bash
+
+     buscará procesos cuyo nombre de comando contenga «*bash*». Si sospecháramos
+     que :command:`bash` no es el único comando del sistema que cumple con esto
+     podríamos haber hecho más precisa la expresión::
+
+        $ pgrep '^bash$'
+
+     Con la opcion ``-f`` la concordancia no se hace sólo con el nombre del
+     ejecutable, sino con toda la línea de comando.
+
+   * :command:`pgrep`, a diferencia de :command:`ps`, permite sumar los efectos
+     de los criterios de búsqueda. De manera que::
+
+        $ pgrep -u usuario bash
+
+     devuelve los PID de los procesos de :command:`bash` que pertenecen a
+     *usuario*\ [#]_.
+
+.. _top:
+.. index:: top
+
+:command:`top`
+   Permite observar los procesos en tiempo real::
+
+      $ top
+
+.. _uptime:
+.. index:: uptime
+
+:command:`uptime`
+   Muestra el tiempo trascurrido desde el arranque. el número de usuarios
+   conectados y la carga media del sistema en el último minuto, los cinco
+   últimos minutos y los quince últimos minutos::
+
+      $ uptime
+      00:07:44 up 116 days, 12:15,  2 users,  load average: 0,00, 0,03, 0,09
+
+   Tiene algunas opciones. Con ``-s`` da una respuesta muy parecida a :ref:`who
+   <who>` con la opción ``-b``::
+
+      $ uptime -s
+      2016-09-09 12:52:12
+
+.. _time:
+.. index:: time
+
+:command:`time`
+   Permite conocer el tiempo que tarda una orden en completarse::
+
+      $ time sleep 2
+
+      real    0m2.009s
+      user    0m0.004s
+      sys     0m0.000s
+
+   **real** es el tiempo trascurrido desde que comenzó la orden hasta que se
+   completo. **user** el tiempo de |CPU| fuera del *kernel* empleado y **sys**
+   el tiempo de |CPU| dentro del **kernel** empleado. Por tanto, la suma de las
+   dos últimas cantidad indica el tiempo total de |CPU| empleada.
+
+Manipulación
+------------
+
+Ya se ha explicado :ref:`cómo dar órdenes <ordenar>`. Una orden provoca la
+creación de un proceso durante un determiando tiempo. Ahora bien, es posible
+modificar la forma en que se da la orden para lograr distintos fines.
+
+.. _nice:
+.. index:: nice
+
+:command:`nice`
+   Modifica la prioridad de un proceso. Cuando se ejecuta una orden, la
+   prioridad del proceso es *0*. Sin embargo, :command:`nice` permite cambiar
+   esta prioridad. Para usuarios distintos del administrador sólo se puede
+   disminuir la prioridad, es decir, dar valores positivos.
+
+   Para usar :command:`nice` basta con anteponerlo al proceso que se quiere
+   ejecutar. Por ejemplo::
+
+      $ nice ffmpeg -i input.wmv -s hd720 -c:v libx264 -crf 23 -c:a aac -strict
+      -2 output.mp4
+
+   recodifica una película en calidad HD720, haciendo que para este proceso
+   bastante costoso disminuya la prioridad. Cuando :command:`nice` se usa sin
+   indicar la prioridad, se supone que esta es *10*. Puede especificarse la
+   prioridad exacta con la opción ``-n``::
+   
+      $ nice -n10 ffmpeg [...]
+
+   Valores negativos hace el proceso más prioritario de lo normal, pero deben
+   adjudicarse como *root*.
+
+.. _renice:
+.. index:: renice
+
+:command:`renice`
+   Modifica la prioridad de un proceso ya comenzado. Para seleccionar este
+   proceso necesitamos el *pid* del mismo, el cual podemos obtener a traves de
+   :command:`ps`, por ejemplo. Suponiendo que sea el *5789*::
+
+      $ renice -n 10 -p 5789
+
+.. _kill:
+.. index:: kill
+
+:command:`kill`
+   Cancela procesos antes de que estos hayan acabado. Podemos intentar hacer una
+   cancelación *suave* con la opción ``-1`` o *agresiva* con ``-9``. Para
+   referirnos al proceso necesitamos su pid. Además pueden indicarse varios, uno
+   por argumento::
+
+      $ kill -1 1897 1000
+      $ kill -9 5675 6676
+
+   En ocasiones, es imposible acabar con un proceso ni aun con la señal
+   ``SIGKILL`` (*9*). En estos casos, el proceso acaba en un estado *zombi*, que
+   se nota con un **Z**\  al consultar el proceso con :command:`ps`.
+
+.. _killall:
+.. index:: killall
+
+:command:`killall`
+   Cancela procesos identificándolos por su nombre. Pueden usarse los dos tipos
+   de cancelación que ya se han definido. Por ejemplo, esto cancela todas las
+   sesiones de :program:`bash` abiertas por el usuario::
+
+      $ kill -1 bash
+
+Por lo general, cuando se ejecuta una orden, la *shell* espera hasta que esta
+haya acabado para liberar la línea de comandos. Esto es debido a que la orden se
+ejecuta en primer plano. Arrancada de este modo, podemos escribir :kbd:`Ctrl+C`
+para cancelar la orden tal como haríamos con :command:`kill`; pero también
+podemos escribir :kbd:`Ctrl+Z` para detener la orden. Si hacemos esto segundo,
+la orden deja de ejecutarse, pero no están cancelada: simplemente queda a la
+espera de que demos la orden de proseguir. Por ejemplo, supongamos que hacemos
+una cuenta de 1 a 10 esperando un segundo entre número y número::
+
+   $ (for i in {1..10}; do sleep 1; echo $i; done)
+   1
+   ^Z
+   [1]+  Detenido                ( for i in {1..10};
+
+.. _jobs:
+.. index:: jobs
+
+:command:`jobs`
+   Permite consultar la lista de trabajos activos::
+
+      $ jobs
+      [1]+  Detenido                ( for i in {1..10};
+
+Por tanto, hay una tarea detenida. Si deseamos que prosiga, hay dos
+posibilidades: que mandemos que se ejecute en primer plano...
+
+.. _fg:
+.. index:: fg
+
+:command:`fg`
+   Manda una tarea a primer plano. Para referirse a ella se debe especificar
+   el número de trabajo que proporciona :command:`jobs`::
+
+      $ fg 1
+      2
+      3
+      ...
+      10
+      $
+
+o mandamos que se ejecute en segundo plano...
+
+.. _bg:
+.. index:: bg
+
+:command:`bg`
+   Manda una tarea a segundo plano. Para referirse a ella se debe especificar el
+   número de trabajo que proporciona :command:`jobs`::
+
+      $ bg 1
+
+Es posible también ejecutar una tarea en segundo plano acabando la orden con un
+*&*::
+
+   $ sleep 60 &
+   [1] 15991
+   $ jobs
+   [1]+  Ejecutando              sleep 60 &
+
+Al ejecutar de esta forma se facilita el número de *PID*. Es posible usar el
+comando :command:`kill` para cancelar tareas usando el número de tarea, en vez
+de el *pid*::
+
+   $ kill %1
+
+.. rubric:: Notas al pie
+
+.. [#] Aunque lo habitual es verlo explicado al estilo BSD:
+
+      =========== ========================
+      BSD         UNIX
+      =========== ========================
+      :code:`ax`  :code:`-ef`
+      :code:`axf` :code:`-ef --forest`
+      =========== ========================
+
+.. [#] Como :ref:`ps <ps>` da más posibilidades de formateo, es muy útil aunar
+   ambos comandos. Por ejemplo::
+
+      $ ps -f -p $(pgrep -d, -u usuario bash)
+
+   en donde hemos usado :command:`pgrep` para obtener la lista de PID de los
+   procesos que nos interesan (``-d`` los separa por comas en vez de sacar uno
+   por línea).
+
+.. |CPU| replace:: :abbr:`CPU (Central Processing Unit)`

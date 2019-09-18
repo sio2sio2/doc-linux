@@ -1,0 +1,278 @@
+.. _redminima:
+
+Configuración de red
+====================
+
+Los sistemas *linux* permiten una configuración amplísima de las interfaces de
+red, y profundizar en ello requeriría un tratamiento muchísimo más amplio del
+que aquí se mostrará\ [#]_. Bajo este epígrafe nos limitaremos a indicar cómo
+hacer una configuración simple de las interfaces, tanto con herramientas
+comunes a todas las distribuciones de *linux* como con las herramientas que
+provee *debian*.
+
+.. warning:: El epígrafe está referido a interfaces de cable, que son las
+   habituales en servidores. Las interfaces inalámbricas son más engorrosas ya
+   que es común que cambien la red a la que están conectada con todo lo que ello
+   supone (cambio del :abbr:`SSID (Service Set IDentifier)`, cambio de la
+   contraseña de acceso, etc.). Aunque es posible configurar estas interfaces
+   a travñes de la línea de órdenes y ficheros de configuración, lo más cómodo
+   (y recomendable) es usar herramientas más amigables e inmediatas como las que
+   se exponen en :ref:`el epígrafe referente a otros modos de configuración
+   <otros-conf-red>`.
+
+Interfaces presentes
+--------------------
+
+Antes de poner a configurar interfaces es indispensable saber qué interfaces hay
+presentes en nuestro sistema. Para que el sistema registre una interfaz es
+necesario que tal interfaz exista, pero también que haya un driver apropiado que
+nos permita usarla.
+
+Tradicionalmente, las interfaces ethernet cableadas se han venido llamando
+``ethN`` siendo ``N`` un número correlativo empezando en 0 (*eth0*, *eth1*,
+etc.) y las interfaces inalámbricas ``wlanN``. Con el advenimiento de
+:ref:`systemd <systemd>`, sin embargo, el nombre de las interfaces ha cambiado\
+[#]_. Ahora se usa un sistema de nombres que intenta evitar el que el núcleo
+cambie el nombre de las interfaces al ser cambiar su número o hacerse
+sustituciones.
+
+Para conocer cuáles son las interfaces presentes, basta con mirar dentro de
+:file:`/sys/class/net`::
+
+   $ ls /sys/class/net
+   eth0  lo
+
+También es posible obtener las interfaces a través del comando :ref:`ip <ip>`::
+
+   # ip link show
+
+Configuración en debian
+-----------------------
+
+La configuración de red en debian se basa fundamentalmente en el contenido del
+fichero :file:`/etc/network/interfaces`\ [#]_, el fichero
+:file:`/etc/resolv.conf` y en tres herramientas:
+
+.. _ifquery:
+.. index:: ifquery
+
+:command:`ifquery`
+   Permite hacer consultas sobre las interfaces gestionadas. Lo más habitual
+   es preguntar por cuál es la configuración de una interfaz::
+
+      $ ifquery eth0
+      address: 192.168.4.20/24
+      gateway: 192.168.4.253
+      up: iptables -t nat -A POSTROUTING -o $IFACE -j MASQUERADE
+      down: iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE
+
+   .. warning:: Esta es la configuración que se hizo para la interfaz
+      eth0 en :file:`/etc/network/interfaces` y no la configuración que
+      realmente tiene la interfaz.
+
+   También puede usarse::
+
+      $ ifquery --state
+      lo=lo
+      eth0=eth0
+
+   que nos devolverá la interfaces activas a través de :command:`ifup`.
+
+
+.. _ifup:
+.. index:: ifup
+
+:command:`ifup`
+   Permite activar la interfaz suministrada (puede pasarse varias) con la
+   configuración indicada en :file:`/etc/network/interfaces`::
+
+      # ifup eth0
+
+   Es interesante la opción ``-v`` que muestra información adicional sobre el
+   proceso de activación.
+
+.. _ifdown:
+.. index:: ifdown
+
+:command:`ifdown`
+   Permite desactivar una interfaz previamente activada con :command:`ifup`::
+
+      # ifdown eth0
+
+   Para que esto funcione la interfaz debió ser activada con :command:`ifup`. Si
+   se activó de cualquier otro modo, la interfaz no estará registrada como
+   activa, de modo que :command:`ifdown` no hará nada.
+
+   Puede también incluirse la opción ``-v`` y otra de interés es ``--force`` que
+   completa el proceso de desactivación incluso aunque se hayan producido
+   errores. Por ejemplo, porque se desactivara la interfaz de forma manual y,
+   cuando :command:`ifdown` intente desactivarla, se encuentre con que la
+   interfaz no tiene configuración.
+
+En realidad, el meollo de la configuración está en la escritura de
+:file:`/etc/network/interfaces`. Mostremos un fichero con la interfaz de
+*loopback*, una interfaz *eth0* configurada de forma dinámica y una interfaz
+*eth1* cpmfigurada de forma estática:
+
+.. literalinclude:: docs/interfaces
+   :language: none
+   :linenos:
+
+La configuración es bastante elocuente. La segunda interfaz, al tener una
+configuración estática, necesita algunos datos (*ip* y máscara, y puerta de
+enlace). Obsérvese que no se incluyen los servidores :abbr:`DNS (Domain Name
+Service)`\ [#]_, porque estos no se expresan en este fichero, sino en
+:file:`/etc/resolv.conf`.
+
+Sí es pertinente aclarar por qué algunas interfaces van acompañadas de la
+palabra :kbd:`auto` y otras de la palabra :kbd:`allow-hotplug`. Incluso podría
+haber otras en que no se hubiera incluido tal línea. Ésta determina qué ocurrirá
+durante el arranque: si no existe, la interfaz no se activará y tendrá que
+activarse durante el uso del sistema explícitamente. En cambio, tanto
+:kbd:`auto` como :kbd:`allow-hotplug`, las activan automáticamente. La
+diferencia es que la primera la activará siempre, mientras que la segunda sólo
+intentará la activación, si la interfaz realmente existe.
+
+Es posible añadir también en la configuración de cada interfaz líneas que
+comiencen con :kbd:`pre-up`, :kbd:`up`, :kbd:`down` y :kbd:`post-down`. Estas
+líneas permiten ejecutar comandos arbitrarios justamente antes de activar la
+interfaz, tras haberlo hecho, justamente antes de desactivarla o después de
+haberlo hecho. Es bastante común el caso en que queremos añadir alguna regla en
+el cortafuegos al levantar la interfaz y borrarla al desactivarla::
+
+   allow-hotplug eth0
+   iface eth0 inet dhcp
+      pre-up    iptables -A POSTROUTING -o $IFACE -j MASQUERADE
+      post-down iptables -D POSTROUTING -o $IFACE -j MASQUERADE
+
+Queda, por último, tratar la configuración de los servidores :abbr:`DNS (Domain
+Name Service)` en el fichero :file:`/etc/resolv.conf`. Si la configuración es
+dinámica, el propio cliente *dhcp* se encarga de escribir este fichero y no hay
+que hacer ninguna configuración. En cambio, si la configuración es estática, sí
+habrá que escribirlo o al menos cerciorarse que es válido. Se dejará la
+explicación de su contenido para el epígrafe siguiente.
+
+Configuración universal
+-----------------------
+.. warning:: Antes de comenzar, debemos cerciorarnos de que la interfaz no está
+   configurada a través de :command:`ifup`.
+
+La configuración más sencilla es la utomática, ya que el cliente de *dhcp* se
+encargará de todo. El cliente habitual es
+
+.. _dhclient:
+.. index:: dhclient
+
+:program:`dhclient`
+   Permite obtener una configuración de red ofrecida un un servidor :abbr:`DHCP
+   (Dynamic Host Configuration Protocol)`::
+
+      # dhclient eth0
+
+   Es necesario especificar la interfaz que se quiere configurar (en el ejemplo,
+   *eth0*). Es interesante incluir la opción ``-v`` para que se nos muestre
+   información adicional del proceso.
+
+   Si se desea revocar la concesión, basta con::
+
+      # dhclient -r
+
+   Como se ve no se expresa la interfaz. También es posible desconfigurar la
+   interfaz con la opción ``-x``, pero en este caso no se informa al servidor de
+   que deseamos dejar de usar la *ip* con lo que el servidor no la liberará.
+
+Si la configuración es manual, debemos realizar tres labores:
+
+#. Configurar los servidores :abbr:`DHCP (Dynamic Host Configuration
+   Protocol)`.
+#. Configurar los parámetros de red de la interfaz.
+#. Añadir una entrada a la tabla de encaminamiento para indicar cuál es la
+   puerta de enlace.
+
+Así que supongamos que queremos fijar una *ip* :kbd:`192.168.1.10/24`, la puerta
+de enlace es :kbd:`192.168.1.1` y los servidores *dns* :kbd:`8.8.8.8` y
+:kbd:`8.8.4.4`.
+
+Para las dos primeras tareas, el comando apropiado es\ [#]_:
+
+.. _ip:
+.. index:: ip
+
+:command:`ip`
+   Permite la configuración de distintos aspectos relacionados con la red:
+   políticas de encaminamiento, parámetros de configuración de la interfaz, etc.
+   Tiene un modo de funcionamiento similar a los comandos disponibles en
+   sistemas *ios* de cisco.
+
+   Para configurar la interfaz basta con::
+
+      # ip addr add 192.168.1.10/24 dev eth0
+
+   y para activarla con tal configuración::
+
+      # ip link set dev eth0 up
+
+   Esto habrá configurado la interfaz lo que puede comprobarse a través de::
+
+      $ ip addr show
+      [... Listado aquí ...]
+
+   que muestra la configuración asignada y::
+
+      $ ip link show
+      [... Listado aquí ...]
+
+   que muestra el estado de la interfaz. En este caso ``UP`` nos informa de que
+   la interfaz está activa y ``LOWER_UP`` de que tiene el cable conectado. En el
+   caso de estos últimos comandos es posible añadir :kbd:`dev eth0` para obtener
+   información solamente de esta interfaz.
+
+   No obstante, aún es necesario añadir la entrada en la tabla de encaminamiento
+   para configurar la puerta predeterminada::
+
+      # ip route add default via 192.168.1.1
+
+   Esta última orden provocará la adición de la entrada correspondiente::
+
+      $ ip route show
+      [... Listado aquí ...]
+
+.. _resolv-conf:
+
+Por último, es necesario definir los servidores *dns* para lo cual basta editar
+el fichero :file:`/etc/resolv.conf` e incluir las siguientes líneas::
+
+   nameserver 8.8.8.8
+   nameserver 8.8.4.4
+
+.. _otros-conf-red:
+
+Otros modos de configuración
+----------------------------
+
+Es posible realizar la configuración de red a través de aplicaciones gráficas,
+que ahorran la manipulación manual de ficheros. Las más habituales son:
+
+* `network-manager <https://wiki.gnome.org/Projects/NetworkManager>`_,
+  disponible en el escritorio GNOME
+
+* `wicd <http://wicd.sourceforge.net/>`_, apto para cualquier entorno gráfico
+  y que dispone incluso de interfaz para la terminal no gráfica.
+
+Ambas aplicaciones son compatibles con tener configurada alguna interfaz a
+través del fichero :file:`/etc/network/interfaces`.
+
+.. rubric:: Notas al pie
+
+.. [#] Para un tratamiento más profundo puede consultar `el siguiente enlace
+   <http://docs.iescdl.es/~josem/redes.html>`_.
+
+.. [#] En realidad en el contenido de todo el directorio :file:`/etc/network`.
+
+.. [#] Puede leerse con más detalle sobre esto en `este artículo
+   <https://www.freedesktop.org/wiki/Software/systemd/PredictableNetworkInterfaceNames/>`_.
+
+.. [#] Si se instala el paquete *resolvconf*, si pueden incluirse.
+
+.. [#] Tradicionalmente, los comandos para configurar la red han sido
+   :command:`ifconfig` y :command:`route`, pero su uso ya se ha desaconsejado.

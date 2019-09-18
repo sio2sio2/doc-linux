@@ -1,0 +1,690 @@
+
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>7.4.2. Conexión sede-equipo móvil &#8212; documentación de ServidorLinux - 0.1.0</title>
+    <link rel="stylesheet" href="../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/custom.css" />
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../_static/language_data.js"></script>
+    <script type="text/javascript" src="../../_static/translations.js"></script>
+    
+    <link rel="index" title="Índice" href="../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../search.html" />
+    <link rel="next" title="7.4.3. Conexión sede-sede" href="03.ss.html" />
+    <link rel="prev" title="7.4.1. Preparativos" href="01.previo.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="03.ss.html" title="7.4.3. Conexión sede-sede"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="01.previo.html" title="7.4.1. Preparativos"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de ServidorLinux - 0.1.0</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >7. Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="index.html" accesskey="U">7.4. Redes VPN</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="conexion-sede-equipo-movil">
+<h1>7.4.2. Conexión sede-equipo móvil<a class="headerlink" href="#conexion-sede-equipo-movil" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>Esta conexión se produce cuando se quiere conectar un equipo aislado (el
+ordenador portátil de un comercial) con la red local al servidor <abbr title="Virtual Private Network">VPN</abbr> (la
+empresa, por ejemplo). Los clientes, por supuesto, pueden ser varios pero cada
+uno de ellos se encontrará en una localización y distinta y las conexiones <abbr title="Virtual Private Network">VPN</abbr>
+con el servidor será distintas.</p>
+<img alt="../../_images/roadwarrior.png" src="../../_images/roadwarrior.png" />
+<p>En este caso, la red remota en la que se encuentra el cliente es absolutamente
+irrelevante mas allá de que debe ser tal que nos permita establecer el túnel.</p>
+<p>Desarrollaremos dos casos de estudio: en uno se establece el túnel en capa de
+red y en el otro en capa de enlace. Para ambos, no obstante, se desrrolla la
+configuración para que:</p>
+<ul class="simple">
+<li>La identificación de los clientes sea mediante usuario y contraseña.</li>
+<li>Se use como certificado de servidor el generado con <em>Let’s Encrypt</em>.</li>
+<li>El cliente pase a conectar a internet a través del túnel <abbr title="Virtual Private Network">VPN</abbr>.</li>
+</ul>
+<div class="section" id="capa-de-red">
+<h2>7.4.2.1. Capa de red<a class="headerlink" href="#capa-de-red" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>En este caso hay tres redes: la red remota del cliente, la red local al servidor
+y la red a la que pertenecen las dos interfaces virtuales (una del cliente y
+otra del servidor) entre las cuales se establece el túnel.</p>
+<p>Cuál sea la red remota importa poco, así que establezcamos las otras dos a
+efectos de aplicar el caso a la configuración:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="19%" />
+<col width="26%" />
+<col width="33%" />
+<col width="22%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head" colspan="2">Red</th>
+<th class="head" colspan="2">Máquina</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td rowspan="2">Local</td>
+<td rowspan="2">192.168.255.0/24</td>
+<td>Servidor <abbr title="Virtual Private Network">VPN</abbr> (eth0)</td>
+<td>192.168.255.2</td>
+</tr>
+<tr class="row-odd"><td>Router Local</td>
+<td>192.168.255.1</td>
+</tr>
+<tr class="row-even"><td rowspan="2">Túnel <abbr title="Virtual Private Network">VPN</abbr></td>
+<td rowspan="2">10.8.0.0/24</td>
+<td>Servidor <abbr title="Virtual Private Network">VPN</abbr> (tun0)</td>
+<td>-</td>
+</tr>
+<tr class="row-odd"><td>Cliente <abbr title="Virtual Private Network">VPN</abbr> (tun0)</td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+<div class="section" id="servidor">
+<span id="srw3-server"></span><h3>7.4.2.1.1. Servidor<a class="headerlink" href="#servidor" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Dispondremos <a class="reference download internal" download="" href="../../_downloads/be0289bc064e7de8fa05b17e3a0143cd/s-rw_3.txt"><code class="xref download docutils literal notranslate"><span class="pre">esta</span> <span class="pre">configuración</span></code></a>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/openvpn/server.conf</span>
+port <span class="m">1194</span>
+proto udp
+dev tun0
+
+<span class="c1"># Certificados y claves.</span>
+ca certs/ca.crt
+cert certs/server.crt
+key keys/server.key
+dh keys/dh2048.pem
+
+<span class="p">;</span>tls-verify <span class="s2">&quot;/usr/share/openvpn/verify-cn /etc/openvpn/allowed-cns&quot;</span>
+
+<span class="c1"># Autentificacion con usuario/password</span>
+verify-client-cert none
+username-as-common-name 
+tmp-dir <span class="s2">&quot;/etc/openvpn/tmp/&quot;</span>
+plugin /usr/lib/openvpn/openvpn-plugin-auth-pam.so /etc/pam.d/login
+
+<span class="c1"># Configuración de la red del túnel VPN</span>
+server <span class="m">10</span>.8.0.0 <span class="m">255</span>.255.255.0
+topology subnet
+ifconfig-pool-persist ipp.txt
+
+push <span class="s2">&quot;route 192.168.255.0 255.255.255.0 vpn_gateway&quot;</span>
+push <span class="s2">&quot;dhcp-option DNS 1.1.1.1&quot;</span>
+push <span class="s2">&quot;dhcp-option DNS 1.0.0.1&quot;</span>
+
+keepalive <span class="m">10</span> <span class="m">120</span>
+compress lz4
+persist-key
+persist-tun
+status openvpn-status.log
+verb <span class="m">3</span>
+
+cipher AES-128-CBC
+tls-auth keys/ta.key <span class="m">0</span>
+
+user nobody
+group nogroup
+
+max-clients <span class="m">5</span>
+<span class="p">;</span>client-to-client
+
+script-security <span class="m">2</span>
+up <span class="s2">&quot;/etc/openvpn/bin/masquerade.sh eth0&quot;</span>
+plugin /usr/lib/openvpn/openvpn-plugin-down-root.so <span class="s2">&quot;/etc/openvpn/bin/masquerade.sh eth0&quot;</span>
+</pre></div>
+</div>
+<p>Cuya justificación es la siguiente:</p>
+<ul class="simple">
+<li>Escuchamos en el puerto <em>1194/UDP</em></li>
+<li>Como establecemos el túnel en capa 3, la interfaz es <em>TUN</em>. Hemos especificado
+un nombre concreto (<em>tun0</em>), pero podríamos hacer indicado simplemente <em>tun</em> y
+<strong class="program">openvpn</strong> se habría encargado de buscar el primer nombre <em>tunX</em>
+disponible.</li>
+<li>Las rutas a los certificados son coherentes con los preparativos que hicimos
+bajo el epígrafe anterior.</li>
+<li>Si usáramos el certificado facilitado por <em>Let’s Encrypt</em>, deberíamos
+descomentar la línea que verifica con <code class="docutils literal notranslate"><span class="pre">tls-verify</span></code>.</li>
+<li>Añadimos las líneas necesarias para la autenticación de clientes con clave y
+contraseña. Obsérvese que para la autenticación con <em>PAM</em> usamos el módulo
+<em>login</em>. Podríamos usar otro personalizado, si <a class="reference internal" href="../../04.servidor/09.autenticacion/index.html#pam"><span class="std std-ref">entendemos cómo funciona
+PAM</span></a>.</li>
+<li>Establecemos que actuamos como servidor y definimos cuál es la
+red (<em>10.8.0.0/24</em>)</li>
+<li>Elegimos como topología <em>subnet</em> que se traduce en que se asigna a cada
+interfaz <em>TUN</em> una sola dirección <abbr title="Internet Protocol">IP</abbr> y no dos como hace la topología
+<em>net30</em>.</li>
+<li>Hacemos que los clientes reciban siempre la misma <abbr title="Internet Protocol">IP</abbr>.</li>
+<li><dl class="first docutils">
+<dt>Enviamos al cliente alguna información útil para su configuración<a class="footnote-reference" href="#id9" id="id1">[1]</a>:</dt>
+<dd><ul class="first last">
+<li>Le instamos a que incluya en su tabla de encaminamiento que para llegar
+a su red local debe utilizar el túnel.</li>
+<li>Le instamos a que cambie la información de los servidores de nombres.</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li>Hacemos <em>ping</em> periódicos entre cliente y servidor para mantener viva la
+conexión.</li>
+<li>Comprimimos la información<a class="footnote-reference" href="#id10" id="id2">[2]</a></li>
+<li>Establecemos un nivel de logs más bien bajo (3 cuando el rango va de 0 a 11).</li>
+<li>Ciframos con el algoritmo AES-128-CBC.</li>
+<li>Tras arrancar el servidor reducimos privilegios.</li>
+<li>Permitimos un máximo de cinco clientes conectados y, en caso de no haberse
+comentado la directiva <em>client-to-client</em>, estaría permitida la comunicación
+entre los propios clientes.</li>
+<li>Por último, establecemos que se ejecute un <em>script</em> tras arrancar y al parar.
+En el segundo caso, la ejecución debe hacerse de esta manera debido a que
+redujimos privilegios.</li>
+</ul>
+<p>Este <em>script</em> <code class="file docutils literal notranslate"><span class="pre">/etc/openvpn/bin/masquerade.sh</span></code> permite que el cliente
+pueda conectarse con la red local (o salir a internet a través del túnel).
+Obsérvese que, cuando el cliente intenta comunicar con un dispositivo que se
+halla <em>por detrás</em> del servidor <abbr title="Virtual Private Network">VPN</abbr> los paquetes tendrán como origen su <abbr title="Internet Protocol">IP</abbr>
+virtual, de manera que una máquina de la red local <em>192.168.255.0/24</em> tendrá que
+devolver su respuesta a esta <abbr title="Internet Protocol">IP</abbr>. Si el servidor <abbr title="Virtual Private Network">VPN</abbr> es la puerta de enlace
+de esta red, no habrá problema; pero, si no lo es, la máquina local no sabrá que
+debe entregar al servidor la respuesta para que éste la encamine hacia el
+cliente, por lo que la respuesta se perdera. Para evitarlo es necesario que el
+servidor enmascare los paquetes a su salida y de eso es de lo que se encarga el
+<em>script</em>. Admite como argumentos la lista de interfaces a cuya salida se quiere
+enmascarar.</p>
+<p>Puede descarse el <em>script</em> del <a class="reference download internal" download="" href="../../_downloads/7b80057ab178438ef6a0f300e9ff2b7d/masquerade.sh"><code class="xref download docutils literal notranslate"><span class="pre">siguiente</span> <span class="pre">enlace</span></code></a>.</p>
+</div>
+<div class="section" id="cliente">
+<span id="srw3-client"></span><h3>7.4.2.1.2. Cliente<a class="headerlink" href="#cliente" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>La configuración del cliente depende básicamente de si queremos que éste, además
+de establecer el túnel, lo use para salir a internet. Dado que en el cliente,
+podemos disponer varias configuraciones de acceso a varios servidores lo más
+adecuado es incluir todos los ficheros de una conexión dentro de un mismo
+subdirectorio de <code class="file docutils literal notranslate"><span class="pre">/etc/openvpn/client</span></code>. En nuestro caso:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkdir /etc/openvpn/client/example
+</pre></div>
+</div>
+<p>Dentro de él puede incluirse una configuración como <a class="reference download internal" download="" href="../../_downloads/67f57b6d9e5b8fc1515ca79f64f81d1d/c-rw_3.txt"><code class="xref download docutils literal notranslate"><span class="pre">ésta</span></code></a>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/openvpn/client/example/example.conf</span>
+client
+dev-type tun
+dev tun0
+topology subnet
+
+&lt;connection&gt;
+   remote www.example.net <span class="m">1194</span> udp
+&lt;/connection&gt;
+
+resolv-retry infinite
+
+ca client/example/ca.crt
+remote-cert-tls server
+
+nobind
+persist-key
+persist-tun
+compress lz4
+verb <span class="m">3</span>
+
+cipher AES-128-CBC
+tls-auth client/example/ta.key <span class="m">1</span>
+
+<span class="c1"># Autenticación con usuario/contraseña</span>
+auth-user-pass client/example/ident
+
+<span class="c1"># Encaminamiento</span>
+redirect-gateway autolocal
+route <span class="m">172</span>.16.0.0 <span class="m">255</span>.255.0.0 net_gateway
+
+script-security <span class="m">2</span>
+up /etc/openvpn/update-resolv-conf
+down /etc/openvpn/update-resolv-conf
+</pre></div>
+</div>
+<p>Muchas de las líneas ya está explicadas en la parte del servidor. Pero atiéndase
+a estas novedades:</p>
+<ul class="simple">
+<li>Hemos incluido la direciva <em>dev-type</em> para especificar que es una interfaz
+<em>TUN</em>. Esto ya lo sabe <strong class="program">openvpn</strong> porque el nombre de la interfaz es
+<em>tun0</em>. Sin embargo, el cliente no tiene por qué ser obligatoriamente <em>linux</em>
+y en otros sistemas como <em>windows</em> la interfaz tendrá un nombre más raro cuyo
+tipo el <em>software</em> no sabrá adivinar. De modo que es bueno especificarlo
+explícitamente.</li>
+<li>La directiva <em>remote</em> especifica cuál es el servidor, puerto de conexión y
+protocolo. Sólo es obligatorio que la incluyamos dentro de un nodo
+<em>connection</em> cuando definimos dentro del fichero varias conexiones
+alternativas. En ese caso, el cliente intentará secuencialmente establecer la
+conexión según los datos que facilite el <em>remote</em> correspondiente. Un
+ejemplo de esto, lo veremos al tratar el <a class="reference internal" href="04.misc.html#vpn-haproxy"><span class="std std-ref">acceso a redes restringidas</span></a>.</li>
+<li>Intentamos infinitamente la conexión en caso de que falle. Es el
+comportamiento por defecto, así que podríamos habernos ahorrado la línea.</li>
+<li>Declaramos cuál es el fichero donde almacenamos usuario y contraseña. Si
+deseáramos que estos escribieran interactivamente, podríamos no declarar
+ningún fichero. También podríamos escribir en el fichero sólo el nombre de
+usuario y se nos requeriría la contraseña interactivamente.</li>
+<li>Las restantes líneas (a partir del comentario «Encaminamiento») posibilitan
+que el cliente use el túnel para salir de la red:<ul>
+<li><em>redirect-gateway</em> es la encargada principal de ello, ya que se ocupa de
+añadir dos entradas a la tabla de encaminamiento: una para que la puerta
+de enlace predeterminada sea la <abbr title="Internet Protocol">IP</abbr> virtual del servidor, y otra para
+que la puerta de enlace que se use para acceder a la <abbr title="Internet Protocol">IP</abbr> pública del
+servidor (es decir, la que resuelve <em>www.example.net</em>) siga siendo la
+puerta de enlace que hubiera antes de establecer el túnel.</li>
+<li>El <em>route</em> que añadimos a continuación es sólo una muestra de cómo hacer
+para seguir accediendo a una red determinada por la puerta de enlace
+antigua.</li>
+<li>El <em>script</em> mencionado con <em>up</em> y <em>down</em> lo proporciona el propio
+<strong class="program">openvpn</strong> y permite haciendo uso de <strong class="program">resolvconf</strong>
+alterar los servidores de nombres para incluir los que proporciona el
+servidor <abbr title="Virtual Private Network">VPN</abbr>. Es probable que si queremos salir a internet por el túnel,
+también queramos usar los servidores de nombres que el servidor <abbr title="Virtual Private Network">VPN</abbr> nos
+sugiera.</li>
+<li>Si no quisiéramos usar el túnel para encaminar el tráfico a internet,
+podríamos prescindir de todas estas últimas líneas.</li>
+</ul>
+</li>
+</ul>
+<p>También es interesante notar lo que no hay en el fichero:</p>
+<ul>
+<li><p class="first">No rebajamos los privilegios como hicimos en el servidor. Esto es debido a que
+si lo hacemos, al acabar no tendremos permisos suficientes para volver a
+alterar la tabla de rutas y en consecuencia <strong class="program">openvpn</strong> no podrá
+restablecer la puerta de enlace antigua.</p>
+</li>
+<li><p class="first">El servidor <abbr title="Virtual Private Network">VPN</abbr> con la directiva <em>push</em> puede conminar al cliente a usar
+alguna configuración. Sin embargo, el cliente tiene potestad para hacerle
+caso o no. Para evitar hacerles caso, puede hacerse lo siguiente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">pull-filter ignore &quot;dhcp-option DNS 1.0.&quot;</span>
+</pre></div>
+</div>
+<p>es decir la directiva <em>pull-filter</em>, la palabra <em>ignore</em> y una cadena con el
+comienzo de la directiva que queremos evitar.</p>
+</li>
+</ul>
+<p>El subdirectorio <code class="file docutils literal notranslate"><span class="pre">/etc/openvpn/client/example/</span></code> deberá contener, además,
+otros ficheros necesarios: <code class="file docutils literal notranslate"><span class="pre">ca.crt</span></code>, <code class="file docutils literal notranslate"><span class="pre">ta.key</span></code> y <code class="file docutils literal notranslate"><span class="pre">ident</span></code> o
+<code class="file docutils literal notranslate"><span class="pre">cliente1.crt</span></code> y <code class="file docutils literal notranslate"><span class="pre">cliente2.key</span></code> dependiendo de cómo se realice la
+autenticación del cliente.</p>
+<p>Por otro lado, como <em>debian</em> espera que los ficheros de configuración se
+encuentren estrictamente dentro de <code class="file docutils literal notranslate"><span class="pre">/etc/openvpn</span></code> deberemos hacer un
+enlace simbólico:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="nb">cd</span> /etc/openvpn
+<span class="gp">#</span> ln -s client/example/example.conf
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p>Si usa versiones recientes de debian (<em>buster</em> en adelante) tenga
+en cuenta que <strong class="program">openssl</strong> está configurado para que sólo admita <abbr title="Transport Layer Security">TLS</abbr>v1.2 o superior, ya que en <code class="file docutils literal notranslate"><span class="pre">/etc/ssl/openssl</span></code> se encuentra esto:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[system_default_sect]</span>
+<span class="hll"><span class="na">MinProtocol</span> <span class="o">=</span> <span class="s">TLSv1.2</span>
+</span><span class="na">CipherString</span> <span class="o">=</span> <span class="s">DEFAULT@SECLEVEL=2</span>
+</pre></div>
+</div>
+<p>Si el servidor <strong class="program">openvpn</strong> es antiguo, es posible que requiera la
+versión 1.0, por lo que el cliente se negará a efectuar la conexión y fallará
+el establecimiento del túnel. Si no hay posibilidad de actualizar el
+servidor, se deberá reducir la versión mínima en el cliente:</p>
+<div class="last highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="na">MinProtocol</span> <span class="o">=</span> <span class="s">TLSv1.2</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="section" id="capa-de-enlace">
+<h2>7.4.2.2. Capa de enlace<a class="headerlink" href="#capa-de-enlace" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Implementar el túnel en la capa de enlace posibilita que el <em>guerrero de la
+carretera</em> pertenezca a la propia red local y no a una red diferenciada como
+ocurría en el caso anterior. A su vez tiene una desventaja: el tráfico
+aumentará, por lo que la conexión será menos eficiente.</p>
+<p>En este caso, se usan interfaces <em>TAP</em> y un esquema adecuado puede ser el
+siguiente:</p>
+<img alt="../../_images/br_c2.png" src="../../_images/br_c2.png" />
+<p>O sea, en el lado del servidor se crea una interfaz puente<a class="footnote-reference" href="#id11" id="id3">[3]</a> que contenga
+la interfaz real y la interfaz <em>TAP</em> creada por <strong class="program">openvpn</strong>: de esta
+manera la interfaz <em>TAP</em> del cliente pertenece a la red local. Por su parte la
+interfaz real del cliente pertenecerá a la red remota.</p>
+<p>Hay, además, otro aspecto a considerar impropio del caso anterior: cómo obtiene
+su configuración de red el cliente que, recordemos, deberá ser una configuración
+que le haga pertenecer a la red local. Aparte de asignarle una <abbr title="Internet Protocol">IP</abbr> fija (existe
+una opción llamada <em>ifconfig</em> para ello), tenemos dos posibilidades:</p>
+<ul class="simple">
+<li>Que sea el propio servidor <abbr title="Virtual Private Network">VPN</abbr> el que sirva las direcciones.</li>
+<li>Que el servidor <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> de la red local facilite estas direcciones, lo cual
+será más adecuado si tal servidor existe.</li>
+</ul>
+<p>La diferencia entre una y otra estrategia, además de quién facilita la
+dirección, es que el servidor <abbr title="Virtual Private Network">VPN</abbr> se limita a proporcionar <abbr title="Internet Protocol">IP</abbr> y máscara y el
+cliente a configurarla; mientras que en el segundo caso, el cliente debe
+ejecutar un cliente de <em>dhcp</em> (por ejemplo, <strong class="command">dhclient</strong>) que recibirá
+del servidor mucha más información (servidores de nombres, puerta de enlace,
+etc.).</p>
+<div class="section" id="srw2-server">
+<span id="id4"></span><h3>7.4.2.2.1. Servidor<a class="headerlink" href="#srw2-server" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>SI echamos un ojo al esquema dibujado, veremos que el servidor requiere una
+interfaz puente que contenga la interfaz real y la interfaz <em>TAP</em> creada por
+<strong class="program">openvpn</strong>. Podríamos, en vista de ello, preparar el servidor para que
+exista esta interfaz puente y ya esté dentro de ella la interfaz local<a class="footnote-reference" href="#id12" id="id5">[4]</a>.
+pero, en vez de eso, dejaremos la configuración de red sin tocar<a class="footnote-reference" href="#id13" id="id6">[5]</a> y
+esperaremos a que el <em>script</em> que se ejecuta al crear el túnel se encargue del
+trabajo de constituir el puente necesario. Para ello, planteamos <a class="reference download internal" download="" href="../../_downloads/93cd9345f39d323d90d50eb8166b10d3/s-rw_2.txt"><code class="xref download docutils literal notranslate"><span class="pre">esta</span>
+<span class="pre">posible</span> <span class="pre">configuración</span></code></a>, en la que dejamos que el servidor
+<abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> que haya en la red local sea el que facilita también a los clientes su
+configuración:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/openvpn/server.conf</span>
+port <span class="m">1194</span>
+proto udp
+dev tap0
+dev-type tap
+
+<span class="c1"># Certificados y claves</span>
+ca certs/ca.crt
+cert certs/server.crt
+key keys/server.key
+dh keys/dh2048.pem
+
+<span class="p">;</span>tls-verify <span class="s2">&quot;/usr/share/openvpn/verify-cn /etc/openvpn/allowed-cns&quot;</span>
+
+<span class="c1"># Autentificacion con usuario/password</span>
+verify-client-cert none
+username-as-common-name 
+tmp-dir <span class="s2">&quot;/etc/openvpn/tmp/&quot;</span>
+plugin /usr/lib/openvpn/openvpn-plugin-auth-pam.so /etc/pam.d/login
+
+<span class="c1"># Configuración de la red del túnel VPN</span>
+server-bridge
+
+keepalive <span class="m">10</span> <span class="m">120</span>
+compress lz4
+persist-key
+persist-tun
+status openvpn-status.log
+verb <span class="m">3</span>
+
+cipher AES-128-CBC
+tls-auth keys/ta.key <span class="m">0</span>
+
+user nobody
+group nogroup
+
+max-clients <span class="m">5</span>
+
+script-security <span class="m">2</span>
+up <span class="s2">&quot;/etc/openvpn/bin/bridge.sh eth0 vpn&quot;</span>
+plugin /usr/lib/openvpn/openvpn-plugin-down-root.so <span class="s2">&quot;/etc/openvpn/bin/bridge.sh eth0 vpn&quot;</span>
+</pre></div>
+</div>
+<p>De esta configuración, semejante a la que se realizó para el túnel en capa 3.
+hay dos aspectos que deben señalarse:</p>
+<ul>
+<li><p class="first">La directiva <code class="code docutils literal notranslate"><span class="pre">server-bridge</span></code> provoca que el servidor <abbr title="Virtual Private Network">VPN</abbr> no
+conceda direcciones a los clientes, sino que deje que sea el servidor <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr>
+de la red local el que lo haga. Por supuesto, si no existiera tal servidor
+<abbr title="Dynamic Host Configuration Protocol">DHCP</abbr>, podríamos hacer que <strong class="program">openvpn</strong> se encargara de esa tarea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">server-bridge 192.168.255.0 255.255.255.0 192.168.255.250 192.168.255.254</span>
+<span class="go">ifconfig-pool-persistent ipp.txt</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">De la constituición del túnel y toda la configuración que ello supone se
+encarga el <a class="reference download internal" download="" href="../../_downloads/ea9948bca36916fca774786b872310a3/bridge.sh"><code class="xref download docutils literal notranslate"><span class="pre">script</span> <span class="pre">bridge.sh</span></code></a>, que requiere
+que le pasemos la interfaz física que se incluirá en el puente y el nombre que
+le daremos a dicho puente.</p>
+</li>
+</ul>
+</div>
+<div class="section" id="srw2-client">
+<span id="id7"></span><h3>7.4.2.2.2. Cliente<a class="headerlink" href="#srw2-client" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Suponiendo que pretendamos que el cliente use el túnel para conectarse a
+internet <a class="reference download internal" download="" href="../../_downloads/173364ed0a9b59c47d19608a37518cfb/c-rw_2.txt"><code class="xref download docutils literal notranslate"><span class="pre">una</span> <span class="pre">configuración</span> <span class="pre">posible</span></code></a> es la
+siguiente:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/openvpn/client/example/example.conf</span>
+client
+dev-type tap
+dev tap0
+
+&lt;connection&gt;
+   remote www.example.net <span class="m">1194</span> udp
+&lt;/connection&gt;
+
+resolv-retry infinite
+
+ca client/example/ca.crt
+remote-cert-tls server
+
+nobind
+persist-key
+persist-tun
+
+compress lz4
+verb <span class="m">3</span>
+
+cipher AES-128-CBC
+tls-auth client/example/ta.key <span class="m">1</span>
+auth-user-pass client/example/ident
+
+<span class="c1"># Encaminamiento</span>
+route-delay <span class="m">30</span>
+route-gateway dhcp
+redirect-gateway autolocal
+
+<span class="c1"># Configuración de la interfaz</span>
+script-security <span class="m">2</span>
+up /etc/openvpn/bin/dhcp.sh
+down /etc/openvpn/bin/dhcp.sh
+
+<span class="c1"># Esto confiere una IP fija al cliente y</span>
+<span class="c1"># podría sustituir a las tres líneas anteriores</span>
+<span class="c1">#ifconfig 192.168.255.3 255.255.255.0</span>
+<span class="c1">#route-gateway 192.168.255.1</span>
+</pre></div>
+</div>
+<p>Antes de comentar la configuración, es indispensable tener presente que, cuando
+<strong class="program">openvpn</strong> actúa como <em>dhcp relay</em> del servidor <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> local, manipula
+los paquetes de concesión para eliminar de ellos la puerta de enlace (la opción
+<strong>3</strong> de <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr>), a fin de que el cliente <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> no modificaque la tabla de
+encaminamiento. Esto es así, porque <strong class="program">openvpn</strong> está pensado para que
+las modificaciones al encaminamiento se definan en el propio fichero de
+configuración tal como hacemos nosotros:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">route-delay 30</span>
+<span class="go">route-gateway dhcp</span>
+<span class="go">redirect-gateway autolocal</span>
+</pre></div>
+</div>
+<p>La segunda directiva define como puerta de enlace predeterminada la que haya
+definido el servidor <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> y que se extirpó del paquete de concesión. La
+tercera actúa exactamente igual que como vimos en el caso anterior. La primera
+pospone la escritura de las entradas <strong>30</strong> segundos, ya veremos por qué.</p>
+<p>Además, es preciso ejecutar un cliente que pida la concesión al levantar la
+interfaz y que pida la revocación al bajarla, por lo que se ha añadido la
+ejecución del script <strong class="command">dhcp.sh</strong>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="ch">#!/bin/sh</span>
+
+<span class="k">if</span> <span class="o">[</span> <span class="s2">&quot;</span><span class="nv">$script_type</span><span class="s2">&quot;</span> <span class="o">=</span> <span class="s2">&quot;up&quot;</span> <span class="o">]</span><span class="p">;</span> <span class="k">then</span>
+   dhclient -nw <span class="nv">$1</span>
+<span class="k">else</span>
+   dhclient -r <span class="nv">$1</span>
+<span class="k">fi</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p class="last">Esta configuración tiene un pequeño problema en sistemas <em>UNIX</em>:
+como no es posible utilizar el túnel hasta que no se ha completado su
+establecimiento (y esto incluye la finalización de <strong class="command">dhcp.sh</strong>)<a class="footnote-reference" href="#id14" id="id8">[6]</a>,
+hay que ejecutar <strong class="command">dhclient</strong> directamente en segundo plano (con la
+opción <em>nw</em>) a fin de que el <em>script</em> acabe, se establezca por completo el
+túnel, y <strong class="command">dhclient</strong> siga en segundo plano a su aire buscando al
+servidor <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr>. Como por otro lado hemos fijado que la puerta de enlace es
+la que nos facilite este servidor, la modificación de la tabla de
+encaminamiento debe realizarse después de que <strong class="program">dhclient</strong> haya
+completado su trabajo. Para ello diferimos <strong>30</strong> segundos la modificación
+del encaminamiento, aunque este tiempo podremos acortarlo o deberemos
+alargarlo segun el tiempo que veamos que tarda <strong class="program">dhclient</strong> en
+completar su tarea.</p>
+</div>
+<p class="rubric">Notas al pie</p>
+<table class="docutils footnote" frame="void" id="id9" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td>Ya veremos que en principio el cliente acepta la información recibida,
+pero también hacer oídos sordos si así lo indicamos.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id10" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id2">[2]</a></td><td>La opción <em>compress</em> existe a partir de la versión <em>2.4</em>. En versiones
+anteriores la única compresión posibles es con el algoritmo <em>lzo</em>. Téngalo en
+cuenta si prevé que haya conexiones con clientes antiguos.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id11" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id3">[3]</a></td><td>Como se hace en linux, esta interfaz puente (<em>br0</em>) será a la que se
+asigne <abbr title="Internet Protocol">IP</abbr>.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id12" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id5">[4]</a></td><td><p class="first">Por ejemplo, incluyendo en <code class="file docutils literal notranslate"><span class="pre">/etc/network/interfaces</span></code> esta
+configuración:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">auto br0</span>
+<span class="go">iface br0 inet static</span>
+<span class="go">   address 192.168.255.2/24</span>
+<span class="go">   gateway 192.168.255.1</span>
+<span class="go">   bridge_ports eth0</span>
+<span class="go">   openvpn server</span>
+
+<span class="go">allow-hotplug eth0</span>
+<span class="go">iface eth0 inet manual</span>
+</pre></div>
+</div>
+<p class="last">o bien usando esta misma configuración, pero eliminando la línea
+<code class="code docutils literal notranslate"><span class="pre">openvpn</span> <span class="pre">server</span></code> y tocando convenientemente
+<code class="file docutils literal notranslate"><span class="pre">/etc/default/openvpn</span></code>.</p>
+</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id13" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id6">[5]</a></td><td><p class="first">O sea que la configuración será algo
+así:</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">allow-hotplug eth0</span>
+<span class="go">iface eth0 inet static</span>
+<span class="go">   address 192.168.255.2/24</span>
+<span class="go">   gateway 192.168.255.1</span>
+<span class="go">   openvpn server</span>
+</pre></div>
+</div>
+</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id14" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id8">[6]</a></td><td>Véase <a class="reference external" href="https://forums.openvpn.net/viewtopic.php?t=20040">esta entrada en el foro de openvpn</a>, para más información.</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">7.4.2. Conexión sede-equipo móvil</a><ul>
+<li><a class="reference internal" href="#capa-de-red">7.4.2.1. Capa de red</a><ul>
+<li><a class="reference internal" href="#servidor">7.4.2.1.1. Servidor</a></li>
+<li><a class="reference internal" href="#cliente">7.4.2.1.2. Cliente</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#capa-de-enlace">7.4.2.2. Capa de enlace</a><ul>
+<li><a class="reference internal" href="#srw2-server">7.4.2.2.1. Servidor</a></li>
+<li><a class="reference internal" href="#srw2-client">7.4.2.2.2. Cliente</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="01.previo.html"
+                        title="capítulo anterior">7.4.1. Preparativos</a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="03.ss.html"
+                        title="próximo capítulo">7.4.3. Conexión sede-sede</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/07.serre/04.vpn/02.rw.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Ir a" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="03.ss.html" title="7.4.3. Conexión sede-sede"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="01.previo.html" title="7.4.1. Preparativos"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de ServidorLinux - 0.1.0</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >7. Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="index.html" >7.4. Redes VPN</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor 2016, José Miguel Sánchez Alés.
+      Creado con <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
+    </div>
+  </body>
+</html>

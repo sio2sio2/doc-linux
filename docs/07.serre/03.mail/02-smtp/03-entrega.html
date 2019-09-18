@@ -1,0 +1,857 @@
+
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>7.3.3.3. Entrega &#8212; documentación de ServidorLinux - 0.1.0</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/custom.css" />
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../_static/language_data.js"></script>
+    <script type="text/javascript" src="../../../_static/translations.js"></script>
+    
+    <link rel="index" title="Índice" href="../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../search.html" />
+    <link rel="next" title="7.3.3.4. Gestión de usuarios" href="04-usuarios.html" />
+    <link rel="prev" title="7.3.3.2. Aceptación de mensajes" href="02-accept.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="04-usuarios.html" title="7.3.3.4. Gestión de usuarios"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="02-accept.html" title="7.3.3.2. Aceptación de mensajes"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de ServidorLinux - 0.1.0</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >7. Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" >7.3. Correo electrónico</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="index.html" accesskey="U">7.3.3. Servidor <abbr title="Simple Mail Transfer Protocol">SMTP</abbr></a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="entrega">
+<span id="postfix-entrega"></span><h1>7.3.3.3. Entrega<a class="headerlink" href="#entrega" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>La última fase de la recepción de un mensaje de correo en el servidor es la de
+entrega al usuario local, labor realizada por el <abbr title="Mail Delivery Agent">MDA</abbr>. <strong class="command">postfix</strong>, no
+obstante, dispone de unas funciones muy básicas de entrega, que serán las que
+tratemos en este apartado.</p>
+<div class="section" id="buzones">
+<span id="maildir"></span><span id="mbox"></span><h2>7.3.3.3.1. Buzones<a class="headerlink" href="#buzones" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Antes de empezar, no obtante, es necesario señalar que los buzones de usuario
+presentan dos formatos:</p>
+<dl class="docutils">
+<dt><strong>mbox</strong></dt>
+<dd>En que el buzón es un único fichero dentro del cual los mensajes se van
+añadiendo uno a continuación del otro. Es el formato tradicional. Por lo
+general, suelen ocupar la ruta <code class="file docutils literal notranslate"><span class="pre">/var/mail/nombre_usuario</span></code>.</dd>
+<dt><strong>maildir</strong></dt>
+<dd><p class="first">En él, cada mensaje ocupa un fichero diferente dentro de un directorio. El
+formato es algo más complicado que un simple directorio, ya que en realidad
+es un directorio que se compone de tres subdirectorios: <code class="file docutils literal notranslate"><span class="pre">new</span></code>, que
+almacena los mensajes no vistos; <code class="file docutils literal notranslate"><span class="pre">cur</span></code>, que almacena los mensajes ya
+vistos; y <code class="file docutils literal notranslate"><span class="pre">tmp</span></code> que almacena temporalmente mensajes que están en
+proceso de ser entregados. Esta estructura, no obstante, es transparente al
+usuario final. Lo habitual es que este tipo de buzón se encuentre en
+<code class="file docutils literal notranslate"><span class="pre">~/Maildir</span></code>.</p>
+<p>Para construir un buzón en formato <em>maildir</em>, basta con recrear la estructura
+descrita:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> mkdir -m <span class="m">700</span> -p ~/Maildir/<span class="o">{</span>new,cur,tmp<span class="o">}</span>
+</pre></div>
+</div>
+<p>aunque los <abbr title="Mail Delivery Agent">MDA</abbr> suelen crearlo automáticamente si este no existe. Es común,
+además, disponer de varios buzones de correo para gestionar mejor nuestro
+propio correo. Para crear nuevos buzones, lo que suele hacerse es crear
+directorios ocultos dentro de <code class="file docutils literal notranslate"><span class="pre">~/Maildir</span></code> que reproducen la
+estructura<a class="footnote-reference" href="#id9" id="id1">[1]</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> mkdir -m <span class="m">700</span> -p ~/Maildir/.Trabajo/<span class="o">{</span>new,cur,tmp<span class="o">}</span>
+</pre></div>
+</div>
+<div class="last admonition note">
+<p class="first admonition-title">Nota</p>
+<p>En realidad, si planeamos usar <strong class="program">dovecot</strong> como servicio
+<abbr title="Internet Message Access Protocol">IMAP</abbr> o <abbr title="Mail Delivery Agent">MDA</abbr>, éste usa dentro de cada buzón ficheros adicionales que le
+ofrecen información adicional sobre los buzones. Por esa razón, es más
+recomentable usar la herramienta de creación de buzones:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> doveadm mailbox create -u usuario@mail1.org INBOX
+<span class="gp">#</span> doveadm mailbox create -u usuario@mail1.org Trabajo
+</pre></div>
+</div>
+<p class="last">En cualquier caso, los buzones se crean automaticamente al entregar en
+ellos mensajes; y si se crearon artesanalmente con <strong class="command">mkdir</strong>, se
+pueblan al ser utilizados por primera vez.</p>
+</div>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">Si se cambia la ruta predeterminada del buzón, el usuario es usuario
+del sistema y se acostumbra a abrir sesiones interactivas en el servidor
+(p.e. a tarvés e <abbr title="Security SHell">SSH</abbr>) el aviso de «<em>Tiene mensajes en su buzón</em>» dejará de
+aparecer a menos que manipule la <a class="reference internal" href="../../../04.servidor/09.autenticacion/pam_modules/07.pam_mail.html#pam-mail"><span class="std std-ref">autenticación con PAM</span></a>.</p>
+</div>
+</div>
+<div class="section" id="reescritura-de-direcciones">
+<span id="postfix-rewrite"></span><h2>7.3.3.3.2. Reescritura de direcciones<a class="headerlink" href="#reescritura-de-direcciones" title="Enlazar permanentemente con este título">¶</a></h2>
+<p><strong class="command">postfix</strong> permite la reescritura de direcciones tanto de las
+direcciones de las cabeceras (<code class="docutils literal notranslate"><span class="pre">From:</span></code>, <code class="docutils literal notranslate"><span class="pre">To:</span></code>, <code class="docutils literal notranslate"><span class="pre">Subject:</span></code>) como de las
+«direcciones del sobre» (o sea, las que acompañan a los comandos <code class="docutils literal notranslate"><span class="pre">MAIL</span> <span class="pre">FROM</span></code> y
+<code class="docutils literal notranslate"><span class="pre">RCPT</span> <span class="pre">TO</span></code>).  Estas reescritura es habitual cuando se tiene un dominio
+«interno» y un dominio de internet, y no se quiere que desde fuera se vea el
+dominio interno inexistente (o al revés).</p>
+<p>Hay algunos mecanismos de reescritura automáticos (véase en la documentación
+<a class="reference external" href="http://www.postfix.org/ADDRESS_REWRITING_README.html">ADDRESS REWRITING</a>) como el que provoca que una dirección constituida sólo por
+un nombre de usuario, añada el dominio incluido en la variable <a class="reference external" href="http://www.postfix.org/postconf.5.html#myorigin">myorigin</a>.
+Además, el administrador también puede ordenar reescrituras de los mensajes
+recibidos (incluso si llegó a <strong class="program">postfix</strong>, no por <abbr title="Simple Mail Transfer Protocol">SMTP</abbr>, sino con
+<strong class="command">sendmail</strong>) a través de las directivas <a class="reference external" href="http://www.postfix.org/postconf.5.html#sender_canonical_maps">sender_canonical_maps</a> y
+<a class="reference external" href="http://www.postfix.org/postconf.5.html#recipient_canonical_maps">recipient_canonical_maps</a> y <a class="reference external" href="http://www.postfix.org/postconf.5.html#canonical_maps">canonical_maps</a>.  La primera sirve para reescribir
+las direcciones del emisor (cabecera <code class="docutils literal notranslate"><span class="pre">From:</span></code> y <code class="docutils literal notranslate"><span class="pre">MAIL</span> <span class="pre">FROM</span></code>), la segunda para
+reescribir las direcciones del receptor (cabeceras <code class="docutils literal notranslate"><span class="pre">To:</span></code>, <code class="docutils literal notranslate"><span class="pre">Cc:</span></code> y <code class="docutils literal notranslate"><span class="pre">RCPT</span>
+<span class="pre">TO</span></code>) y la tercera, ambas. Estos mecanismos actuan durante la recepción del
+mensaje antes de que operen las redirecciones de <a class="reference external" href="http://www.postfix.org/postconf.5.html#virtual_alias_maps">virtual_alias_maps</a>.</p>
+<div class="admonition seealso">
+<p class="first admonition-title">Ver también</p>
+<p class="last">Para el formato de las tablas <em>canonical</em> consulte <a class="reference external" href="http://www.postfix.org/canonical.5.html">la documentación
+al respecto</a>.</p>
+</div>
+<p>Para manipular todas las direcciones anteriores en mensajes salientes
+exclusivamente a través cliente <abbr title="Simple Mail Transfer Protocol">SMTP</abbr>, puede utilizarse la directiva
+<a class="reference external" href="http://www.postfix.org/postconf.5.html#smtp_generic_maps">smtp_generic_maps</a>. Por ejemplo:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">smtp_generic_maps</span> = hash:/etc/postfix/tb/no-dominio-local
+</pre></div>
+</div>
+<p>e incluimos en el fichero:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cat &gt; /etc/postfix/tb/no-dominio-local
+<span class="go">@localhost           @example.net</span>
+</pre></div>
+</div>
+<p>Si con esta configuración escribimos el siguiente mensaje:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">usuario@servidor:~$</span> /usr/sbin/sendmail -t
+<span class="go">From: usuario@localhost</span>
+<span class="go">To: pepe@localhost</span>
+<span class="go">Cc: paco.fdez@gmail.com</span>
+<span class="go">Subject: Una prueba de como actua smtp_generic_maps</span>
+
+<span class="go">s/t</span>
+</pre></div>
+</div>
+<p>El mensaje llegará tanto al buzón local de <em>pepe</em> como a la cuenta externa de
+<em>paco.fdez&#64;gmail.com</em>, pero sólo en este segundo envío se habrá reflejado el
+cambio de dominio. Si para el cambio hubiéramos usado <a class="reference external" href="http://www.postfix.org/postconf.5.html#canonical_maps">canonical_maps</a>, ambos
+envíos se habría visto modificados.</p>
+<div class="admonition seealso">
+<p class="first admonition-title">Ver también</p>
+<p class="last">Para el formato de las tablas <em>generic</em> consulte <a class="reference external" href="http://www.postfix.org/generic.5.html">la documentación
+correspondiente</a>.</p>
+</div>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p class="last">La reescritura de la cabecera sólo se lleva a cabo si el cliente
+que se conecta al servidor cumple algunas de las condiciones expresadas con
+la directiva <a class="reference external" href="http://www.postfix.org/postconf.5.html#local_header_rewrite_clients">local_header_rewrite_clients</a>. En caso contrario sólo se llevará
+a cabo la reescritura de la dirección del sobre.</p>
+</div>
+</div>
+<div class="section" id="cuentas-virtuales">
+<span id="postfix-cue-virt"></span><h2>7.3.3.3.3. Cuentas virtuales<a class="headerlink" href="#cuentas-virtuales" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Una posibilidad al configurar el servidor es habilitar la existencia de
+<em>cuentas virtuales</em>. Antes, no obstante, es necesario una disquisición entre los
+conceptos de <em>cuenta</em> y <em>usuario</em>.</p>
+<p>Desde el punto de vista del sistema (operativo) podemos definir <em class="dfn">usuario
+real</em> como aquel que existe para el propio sistema, es decir, aquel del que de
+forma práctica obtenemos información a traves de la orden <a class="reference internal" href="../../../02.conbas/05.seguridad/05a.usuarios.html#getent"><span class="std std-ref">getent passwd</span></a>. El sistema de correo (<strong class="program">postfix</strong> en nuestro caso) puede
+tener definidos, sin embargo, <em class="dfn">usuarios exclusivos</em>, que son aquellos que
+no existen en otro servicio que no sea el servicio de correo. A estos usuarios,
+muy comúnmente, se les denomina <em>usuarios virtuales</em>. Por su
+parte, en <strong class="program">postfix</strong> existen <em class="dfn">usuarios locales</em>, que son aquellos
+pertenecientes a los dominios listados en <a class="reference external" href="http://www.postfix.org/postconf.5.html#mydestination">mydestination</a> y <em class="dfn">usuarios
+virtuales</em> que son aquellos listados en <a class="reference external" href="http://www.postfix.org/postconf.5.html#virtual_mailbox_domains">virtual_mailbox_domains</a>. Ambos son
+usuarios propios para el sistema de correo, pero <strong class="program">postfix</strong>, en
+principio, entenderá que los primeros son <em>usuarios reales</em> del sistema y los
+segundos <em>exclusivamente</em> suyos. Visto así, está absolutamente justificado utilizar
+como equivalentes los términos <em>usuario virtual</em> y <em>usuario exclusivo</em>; pero
+<strong class="program">postfix</strong> permite manipular los mecanismos de entrega (p.e. <a class="reference internal" href="../03-imap/index.html#dovecot-mda"><span class="std std-ref">cediendo la
+entrega a dovecot</span></a>) lo cual permite tratar a los <em>usuarios
+exclusivos</em> como <em>locales</em>. por esta razón, nosotros al tratar
+<strong class="program">postfix</strong> evitaremos referirnos a los <em>usuarios exclusivos</em> como
+<em>usuarios virtuales</em><a class="footnote-reference" href="#id10" id="id2">[2]</a>.</p>
+<div class="admonition seealso">
+<p class="first admonition-title">Ver también</p>
+<p class="last">La definición de usuarios distintos a los usuarios reales del
+sistema, se tratará <a class="reference internal" href="04-usuarios.html#postfix-gest-usu"><span class="std std-ref">mas adelante</span></a>.</p>
+</div>
+<p>Por su parte las <em>cuentas</em> están asociadas a los usuarios, de manera que cada
+usuario (sea de la naturaleza que sea), tiene la suya. Así, si existe el usuario
+<em>pepe</em>, su cuenta es <em>pepe&#64;mail1.org</em>. Es más, si el servidor maneja varios
+dominios, tendremos que referirnos forzosamente al usuario como
+<em>pepe&#64;mail1.org</em>, ya que pueden existir otros «pepe» en otros dominios, con lo
+que nombre de usuario y cuenta coinciden. Esta cuenta de la que hablamos es la
+<em class="dfn">cuenta real</em> del usuario. Ahora bien, a un mismo usuario pueden asociarse
+varias cuentas distintas, por lo que se define como <em class="dfn">cuenta virtual</em> toda
+cuenta distinta a una <em>cuenta real</em> de usuario. Por lo general, las cuentas
+virtuales está asociadas a usuarios del sistema de correo, pero pueden incluso
+asociarse a cuentas externas de otros servidores (p.e. a una supuesta cuenta
+<em>soy_ajeno&#64;gmail.com</em>). A las cuentas virtuales también se las denomina
+<em class="dfn">alias de correo</em>.</p>
+<p>Para definir <em>cuentas virtuales</em> (o <em>alias de correo</em>, si se prefiere el
+término), se definen tablas que ligan la cuenta virtual con la cuenta
+real de usuario (o con una cuenta externa). Tenemos dos alternativas:</p>
+<dl class="docutils" id="postfix-aliases">
+<dt><strong>Tablas locales</strong> (en principio, <code class="file docutils literal notranslate"><span class="pre">/etc/aliases</span></code>)</dt>
+<dd><p class="first"><code class="file docutils literal notranslate"><span class="pre">/etc/aliases</span></code> es un fichero heredado del veterano servidor <a class="reference external" href="https://www.sendmail.org">Sendmail</a>,
+que <strong>sólo se consulta cuando la cuenta es una cuenta local</strong>, es decir,
+cuando el dominio está incluido en el valor de <a class="reference external" href="http://www.postfix.org/postconf.5.html#myorigin">myorigin</a> o <a class="reference external" href="http://www.postfix.org/postconf.5.html#mydestination">mydestination</a>.
+Sus líneas tienen el formato:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">alias:      address</span>
+</pre></div>
+</div>
+<p>«<em>alias</em>» es el alias que se define, pero <strong>siempre sin la expresión del
+dominio</strong>, ya que por el dominio se entenderá alguno de los referidos en
+<a class="reference external" href="http://www.postfix.org/postconf.5.html#mydestination">mydestination</a>. En nuestro ejemplo, la línea concordará tanto con
+<em>alias&#64;mail1.org</em> como con <em>alias&#64;localhost</em>. Por su parte, «<em>address</em>» es
+una dirección de correo arbitraria, local o no. Si no se especifica dominio,
+entonces se añade automáticamente el contenido de <a class="reference external" href="http://www.postfix.org/postconf.5.html#myorigin">myorigin</a> (<em>mail1.org</em> en
+nuestro caso). Las búsquedas, además, son recursivas de modo que, si la
+dirección resultante es local, volverá a buscarse en la tabla hasta que no se
+encuentre entrada<a class="footnote-reference" href="#id11" id="id3">[3]</a>.  Pueden, además, deinirse varios resultado:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">alias:     address1, address2, ...</span>
+</pre></div>
+</div>
+<p>y en ese caso, el <em>alias</em> redirigirá el mensaje a todas esas direcciones.</p>
+<p>Para el muy probable contenido de nuestro <code class="file docutils literal notranslate"><span class="pre">/etc/aliases</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">postmaster:    root</span>
+<span class="go">root:    usuario</span>
+</pre></div>
+</div>
+<p>si se envía un mensaje a <em>postmaster&#64;mail1.org</em> (o <em>postmaster&#64;localhost</em> o
+simplemente <em>postmaster</em><a class="footnote-reference" href="#id12" id="id4">[4]</a>), este se redirigirá a <em>root&#64;mail1.org</em>; pero,
+como <em>root también tiene entrada en la tabla y la búsqueda es recursiva, el
+mensaje acabará en el buzón de *usuario&#64;mail1.org</em>.</p>
+<p>Siempre que se modifique (o cree) una tabla, es necesario regenerar su <em>db</em>
+correspondiente para que tenga efecto en <strong class="program">postfix</strong>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> postalias /etc/aliases
+</pre></div>
+</div>
+<p>Ademas, pueden añadirse otros ficheros de <em>aliases</em> alternativos con el mismo
+formato, manipulando la variable <a class="reference external" href="http://www.postfix.org/postconf.5.html#alias_maps">alias_maps</a>.</p>
+<div class="admonition seealso">
+<p class="first admonition-title">Ver también</p>
+<p class="last">El formato es algo mas complejo (p.e. los resultados pueden ser
+ficheros o tuberías y no sólo direcciones). Hay información completa sobre
+esta tabla en la <a class="reference external" href="http://www.postfix.org/aliases.5.html">documentación oficial al respecto de postfix</a>.</p>
+</div>
+<p id="postfix-forward">En relación con el agente local, aunque no es propiamente una tabla es el
+fichero <code class="file docutils literal notranslate"><span class="pre">~/.forward</span></code>. de cada usuario, cuyo contenido actua exactamente
+igual que la columna de resultados de <code class="file docutils literal notranslate"><span class="pre">/etc/aliases</span></code>. Esto permite a un
+usuario sin privilegios, pero con acceso a su cuenta del servidor, redirigir
+los mensajes tal como si lo hubiera podido hacer escribiendo en la tabla
+<code class="file docutils literal notranslate"><span class="pre">/etc/aliases</span></code>. Por ejemplo:</p>
+<ul class="last">
+<li><p class="first">Podría referir una o varias cuentas de correo, lo que provocará que el mensaje se
+reenvíe a ellas:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">usuario usuario_remoto@gmail.com</span>
+</pre></div>
+</div>
+<p>dejará una copia del mensaje en el buzón local, pero enviará también una
+copia a la cuenta de <em>gmail.com</em> indicada.</p>
+</li>
+<li><p class="first">Podría crear una tubería a un <abbr title="Mail Delivery Agent">MDA</abbr> externo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">&quot;|IFS=&#39; &#39; &amp;&amp; exec /usr/bin/procmail || exit 75&quot;</span>
+</pre></div>
+</div>
+<p>lo cual permitiría a ese usuario particular hacer uso de los filtros que
+proporciona <a class="reference internal" href="../04-misc/02-cliente/04-procmail.html#procmail"><span class="std std-ref">procmail</span></a> para organizar la entrega del correo
+en distintos buzones.</p>
+</li>
+</ul>
+</dd>
+<dt><strong>Tablas virtuales</strong> (definidas con <a class="reference external" href="http://www.postfix.org/postconf.5.html#virtual_alias_maps">virtual_alias_maps</a>)</dt>
+<dd><p class="first">Se consultan sea cual sea la dirección de correo, ya que operan en la última
+etapa de la recepción del mensaje, justamente antes de que comience el
+proceso de entrega (véase <a class="reference external" href="http://www.postfix.org/ADDRESS_REWRITING_README.html">ADDRESS REWRITING</a>). Por tanto, afecta tanto a
+direcciones locales como a direcciones externas.</p>
+<p>Su formato sigue lo dispuesto <a class="reference external" href="http://www.postfix.org/virtual.5.html">en la documentación sobre virtual</a> y, básicamente, lo podemos
+describir con un ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cat &gt; /etc/postfix/tb/aliases
+<span class="go">el.holandes.errante     pepe</span>
+<span class="go">bartolo@gmail.com       @yahoo.es</span>
+<span class="go">yo                      yo_tamibien@hotmail.com</span>
+<span class="go">@mail1.org              chismoso</span>
+<span class="gp">#</span> postmap /etc/postfix/tb/aliases
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p class="last">Al crear o modificar una tabla <em>virtual</em> siempre es necesario
+regenerar el <em>db</em> correspondiente con <strong class="program">postmap</strong>.</p>
+</div>
+<p>Las reglas para añadir dominio a las direcciones que no lo tienen son
+exactamente las mismas que para el caso de las tablas <em>alias</em>, por lo que
+este fichero indique que:</p>
+<ul>
+<li><p class="first">Las direcciones <em>el.holandes.errante&#64;mail1.org</em> (o
+<em>el.holandes.errante&#64;localhost</em>) se redirigen a <em>pepe&#64;mail1.org</em>).</p>
+</li>
+<li><p class="first">La dirección <em>bartolo&#64;gmail.com</em> redirige a <em>bartolo&#64;yahoo.es</em> (ese es el
+efecto de que no haya un usuario en la columna derecha).</p>
+</li>
+<li><p class="first">La direcciones <em>yo&#64;mail1.org</em> y <em>yo&#64;localhost</em> se redirigen a
+<em>yo_tambien&#64;hotmail.com</em>.</p>
+</li>
+<li><p class="first">Finalmente, cualquier cuenta del dominio <em>&#64;mail1.org</em> (salvo
+<em>yo&#64;mail1.org</em>, por lo indicado antes), se redirige a <em>chismoso&#64;mail1.org</em>.</p>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">Como en el caso de las tablas anteriores, las búsquedas también
+son recursivas.</p>
+</div>
+</li>
+</ul>
+<p>Para que opere una tabla de este tipo es necesario referirla a través de
+<a class="reference external" href="http://www.postfix.org/postconf.5.html#virtual_alias_maps">virtual_alias_maps</a>:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">virtual_alias_maps</span> = hash:/etc/postfix/tb/aliases
+</pre></div>
+</div>
+<p>El prefijo <em>hash</em> incluido en la configuración indica que es una base de
+datos de literales. Pueden usarse otros prefijos como <em>regexp</em> o <em>pcre</em>, que
+permiten expresar los valores de entrada como expresiones regulares. Por ejemplo,
+para emular el comportamiento del servidor <em>gmail</em>, cuyos nombre de cuenta ignoran
+los puntos, de modo que <em>pepe</em>, <em>p.epe</em> o <em>pe..p.e</em> acaban todas en el buzón de
+<em>pepe</em> podemos definir el siguiente fichero:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cat &gt; /etc/postfix/tb/desechables
+<span class="go">/^(.*)\.(.*@mail1\.org)$/     $1$2</span>
+<span class="gp">#</span> postmap /etc/postfix/tb/desechables
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">La exoresión sólo quita un punto del nombre de la dirección, pero
+al ser la búsqueda recursiva, se irán eliminado uno a uno, hasta no quedar
+ninguno.</p>
+</div>
+<p>Por supuesto, pueden utilizarse ambos ficheros<a class="footnote-reference" href="#id13" id="id5">[5]</a>:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">virtual_alias_maps</span> = hash:/etc/postfix/tb/aliases regexp:/etc/postfix/tb/desechables
+</pre></div>
+</div>
+<div class="last admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p class="last">Tenga presente que, a partir de ahora, no podrá haber cuentas
+finales con algún punto en su nombre, ya que éste se eliminará siempre.</p>
+</div>
+</dd>
+</dl>
+<p>Al margen de las cuentas virtuales, el servidor define un <em>delimitador de
+recipiente</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> postconf recipient_delimiter
+<span class="go">recipient_delimiter = +</span>
+</pre></div>
+</div>
+<p>que propicia que el servidor descuente del nombre de cuenta todos los
+caracteres a partir de tal signo y, por tanto, mensajes dirigidos a
+<em>pepe+munoz&#64;mail1.org</em> o <em>pepe+munoz+vazquez&#64;mail1.org</em> acaban todos en el
+buzón de <em>pepe</em>. A la hora de buscar corcondancias, la extensión (la parte
+siguiente al signo) se ignora.</p>
+</div>
+<div class="section" id="entrega-local">
+<h2>7.3.3.3.4. Entrega local<a class="headerlink" href="#entrega-local" title="Enlazar permanentemente con este título">¶</a></h2>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p>Considere la posibilidad de usar <a class="reference internal" href="#postfix-dovecot-mda"><span class="std std-ref">dovecot para la entrega local</span></a>, especialmente:</p>
+<ul class="last simple">
+<li>Si pretende habilitar <a class="reference internal" href="#postfix-quota"><span class="std std-ref">cuotas de usuario</span></a>.</li>
+<li>Si desea crear usuarios exclusivos, y piensa <a class="reference internal" href="04-usuarios.html#postfix-usu-virtual-dovecot"><span class="std std-ref">hacerlo con dovecot</span></a>.</li>
+</ul>
+</div>
+<p>Ya se ha dicho que el encargado de esta labor es el <abbr title="Mail Delivery Agent">MDA</abbr>. En los sistemas
+<em>linux</em> los dos más usados son <a class="reference external" href="http://www.procmail.org">procmail</a> y <a class="reference external" href="https://www.courier-mta.org/maildrop/">maildrop</a>.</p>
+<p><strong class="program">postfix</strong>, si no se configura, usa un <abbr title="Mail Delivery Agent">MDA</abbr> interno (véase
+<em class="manpage">local(8)</em>) bastante simple, aunque pueden pasarse los mensajes a un
+<abbr title="Mail Delivery Agent">MDA</abbr> externo gracias a la directiva <code class="docutils literal notranslate"><span class="pre">mailbox_command</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">mailbox_command = /usr/bin/procmail -f-</span>
+</pre></div>
+</div>
+<p>o bien:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">mailbox_command = /usr/bin/maildrop</span>
+</pre></div>
+</div>
+<p>o bien:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">mailbox_command = /usr/lib/dovecot/dovecot-lda -f &quot;$SENDER&quot; -a &quot;$RECIPIENT&quot;</span>
+</pre></div>
+</div>
+<p>Nosotros, no obstante, prescindiremos de ellos y usaremos el <abbr title="Mail Delivery Agent">MDA</abbr> local de
+<strong class="program">postfix</strong>. En este caso, la directiva interesante es <code class="docutils literal notranslate"><span class="pre">home_mailbox</span></code>
+que permite definir cuál será el buzón de correo. Si no se fija valor alguno,
+<strong class="program">postfix</strong> dejará los correos en formato <em>mbox</em> dentro de
+<code class="file docutils literal notranslate"><span class="pre">/var/mail/nombre_usuario</span></code>. Cuando se fija valor deben tenerse en cuenta
+dos reglas:</p>
+<ul class="simple">
+<li>Las rutas relativas son relativas al directorio personal del usuario.</li>
+<li>Si el valor acaba en barra («<em>/</em>»), <strong class="program">postfix</strong> entenderá que queremos
+crear un buzón en formato <em>maildir</em>.</li>
+</ul>
+<p>Un valor común para esta directiva es:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">home_mailbox = Maildir/</span>
+</pre></div>
+</div>
+<p>La entrega local de correo con <strong class="program">postfix</strong> la realiza un <abbr title="Local Mail Transfer Protocol">LMTP</abbr> interno
+y es muy simple: se limitará a dejar el correo en el buzón referido.</p>
+</div>
+<div class="section" id="entrega-a-traves-de-lmtp">
+<span id="postfix-dovecot-mda"></span><h2>7.3.3.3.5. Entrega a través de <abbr title="Local Mail Transfer Protocol">LMTP</abbr><a class="headerlink" href="#entrega-a-traves-de-lmtp" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Si hemos <a class="reference internal" href="../03-imap/index.html#dovecot-mda"><span class="std std-ref">configurado dovecot para que actúe como un LMTP</span></a>,
+podemos hacer que sea él quien se encargue de realizar las entregas en los
+buzones de usuario.</p>
+<p>En principio, basta con añadir la línea:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">mailbox_transport</span> = lmtp:unix:private/dovecot-lmtp
+<span class="c">#mailbox_transport = lmtp:localhost:24</span>
+</pre></div>
+</div>
+<div class="admonition seealso">
+<p class="first admonition-title">Ver también</p>
+<p class="last">Si planea crear <a class="reference internal" href="04-usuarios.html#postfix-usu-virtual-dovecot"><span class="std std-ref">usuarios exclusivos</span></a>, tendrá que añadir una línea más a la
+configuración que se verá más adelante.</p>
+</div>
+<p>La configuración a este respecto está completa, ahora bien, al cambiar el
+transporte, ¿siguen siendo válidas las cuentas virtuales definidas a través de
+<a class="reference external" href="http://www.postfix.org/postconf.5.html#virtual_alias_maps">virtual_alias_maps</a> y <code class="file docutils literal notranslate"><span class="pre">/etc/aliases</span></code>? La respuesta es sí en cualquier caso
+para las primeras, y sí para las segundas gracias a que el dominio <em>mail1.org</em>
+está referido en <a class="reference external" href="http://www.postfix.org/postconf.5.html#mydestination">mydestination</a> y a que es el agente <em>local</em> de
+<strong class="program">postfix</strong>, después de operar, el que usa <a class="reference external" href="http://www.postfix.org/postconf.5.html#mailbox_transport">mailbox_transport</a> para ceder
+al <abbr title="Local Mail Transfer Protocol">LMTP</abbr> de <strong class="program">dovecot</strong> la última operación de entrega en los buzones.</p>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">Por esta última razón, el <a class="reference internal" href="#postfix-forward"><span class="std std-ref">fichero ~/.forward</span></a>
+de un usuario también es leído y se obra según se disponga en él.</p>
+</div>
+</div>
+<div class="section" id="cuotas">
+<span id="postfix-quota"></span><h2>7.3.3.3.6. Cuotas<a class="headerlink" href="#cuotas" title="Enlazar permanentemente con este título">¶</a></h2>
+<p><strong class="program">postfix</strong> dispone de las directivas <code class="docutils literal notranslate"><span class="pre">message_size_limit</span></code> y
+<code class="docutils literal notranslate"><span class="pre">mailbox_size_limit</span></code> la segunda de las cuales sólo es útil si usamos el
+formato <em>mbox</em>. En realidad, si se quiere implementar un mecanismo de cuotas de
+usuario, es necesario hacer uso de herramientas externas, por ejemplo, de
+<a class="reference internal" href="../03-imap/index.html#dovecot"><span class="std std-ref">dovecot</span></a> que usaremos como servidor <abbr title="Internet Message Access Protocol">IMAP</abbr> y que sí las
+implementa. Es más, <strong class="command">dovecot</strong> contiene un servicio especialmente
+escrito para <strong class="program">postfix</strong> que puede ser utilizado por éste para comprobar
+si el usuario tiene agotado su buzón en el momento en que recibe un mensaje de
+correo a través de <abbr title="Simple Mail Transfer Protocol">SMTP</abbr>. Esto permite rechazar correos e informar al servidor
+remitente del rechazo.</p>
+<p>Así pues, habilite las cuotas de correo según los explicado <a class="reference internal" href="../03-imap/index.html#dovecot-quota"><span class="std std-ref">en la sección
+correspondiente de dovecot</span></a>. Si <a class="reference internal" href="#postfix-dovecot-mda"><span class="std std-ref">entrega los mensajes con
+dovecot</span></a>, no necesitará más, aunque puede avanzar hasta el
+final del epígrafe para ver cómo enviar mensajes con adjuntos a fin de comprobar
+si alcanza la cuota.</p>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p>Con la configuración propuesta, los usuarios reales del sistema,
+son usuarios locales y, en consecuencia, usan el transporte local antes de
+que se ceda la entrega a <strong class="program">dovecot</strong>. Esta circunstancia permitiría a un
+usuario real con acceso al sistema crear un fichero <code class="file docutils literal notranslate"><span class="pre">~/.forward</span></code> que
+evitara la entrega con <strong class="program">dovecot</strong> y, en consecuencia, la aplicación
+de la cuota. Si nos resulta importante esto, podemos optar bien por tratar
+como virtuales todos los dominios salvo <em>localhost</em> (lo cual requiere una
+configuración distinta a la propuesta), bien por deshabilitar la lectura de
+este fichero:</p>
+<div class="last highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">forward_path</span> =
+</pre></div>
+</div>
+</div>
+<p>Sin embargo, si prefiere que sea el propio <strong class="program">postfix</strong> el que entregue los
+mensajes en los buzones locales, entonces deberá asegurarse de activar el
+servicio para la consulta de la cuota, tal como se expone en el enlace, y
+continuar leyendo el contenido de este epígrafe.</p>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p class="last">El problema de que <strong class="program">postfix</strong> se encargue de la entrega
+local y nos veamos obligados a usar este servicio de cuota, es que la
+consulta se realiza antes de que hayan operado los mecanismos de entrega, lo
+que impide ponerlo en práctica con cuentas virtuales. Para soslayar este
+problema es necesario que <a class="reference internal" href="#postfix-dovecot-mda"><span class="std std-ref">dovecot entregue los mensajes</span></a>.</p>
+</div>
+<p>Para lograr que program:<cite>postfix</cite> use el servicio al recibir mensajes, debe
+añadir en <code class="file docutils literal notranslate"><span class="pre">/etc/postfix/main.cf</span></code>:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">smtpd_end_of_data_restrictions</span> = check_policy_service inet:127.0.0.1:12340
+</pre></div>
+</div>
+<p>o, si se optó por escuchar en el socket:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">smtpd_end_of_data_restrictions</span> = check_policy_service unix:private/quota-status
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">La restricción se habilita una vez obtenido el contenido del mensaje,
+porque sólo entonces se conoce cual es su tamaño.</p>
+</div>
+<p>Si deseamos comprobar cómo se comporta el servicio al recibir la consulta de
+<strong class="program">postfix</strong> podemos utilizar la escucha a través del puerto y hacer lo
+siguiente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> <span class="nb">printf</span> <span class="s2">&quot;recipient=usuario@example.net\nsize=1000000000\n\n&quot;</span> <span class="p">|</span> netcat -q1 localhost <span class="m">12340</span>
+<span class="go">action=552 5.2.2 Mailbox is full</span>
+</pre></div>
+</div>
+<p>El servicio nos contestará con la acción apropiada. Si es <em>DUNNO</em>, el mensaje
+supera la restricción, pero si la cuota se ha sobrepasado se generará un
+error <strong>552</strong>, que se comunicará al servidor remitente.</p>
+<p>Si queremos saber exáctamente cuáles son los parámetros que <strong class="program">postfix</strong>
+comunica al servicio, podemos utilizar la siguiente argucia:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> invoke-rc.d dovecot stop
+<span class="gp">$</span> netcat -l -p <span class="m">12340</span>
+</pre></div>
+</div>
+<p>y enviamos el mensaje. <a class="reference internal" href="../../../02.conbas/99.misc/05.ordenes.html#netcat"><span class="std std-ref">netcat</span></a> debería mostrarnos entre otros
+muchos datos <em>recipient</em> y <em>size</em>, que son los que usa el servicio de cuota para
+aceptar o rechazar el mensaje.</p>
+<p>Por último, a fin de alcanzar la cuota y comprobar que se rechazar mensajes
+puede interesarnos enviar mensajes con adjuntos. Un método bastante sencillo es
+usar <a class="reference internal" href="../04-misc/02-cliente/05-mua.html#mutt"><span class="std std-ref">mutt</span></a> en conjunción con <strong class="program">msmtp</strong>, que ya deberíamos
+haber configurado al comprobar la instalación de <strong class="program">postfix</strong>. Para ello,
+debemos instalar <strong class="program">mutt</strong> y crear un fichero de configuración
+<code class="file docutils literal notranslate"><span class="pre">~/muttrc.vm</span></code> como este:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">set</span> sendmail=<span class="s2">&quot;/usr/bin/msmtp -a vm587&quot;</span>
+<span class="nb">set</span> use_from=yes
+<span class="nb">set</span> realname=<span class="s2">&quot;Usuario de MAIL1&quot;</span>
+<span class="nb">set</span> from=<span class="s2">&quot;usuario@mail1.org&quot;</span>
+</pre></div>
+</div>
+<p>Hecho lo cual, podremos enviar nuestro mensaje con adjunto del siguiente modo<a class="footnote-reference" href="#id14" id="id6">[6]</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> <span class="nb">echo</span> <span class="s2">&quot;Este es el cuerpo&quot;</span> <span class="p">|</span> mutt -F ~/mutt.vm -s <span class="s2">&quot;Mensaje con adjunto&quot;</span> -a /ruta/fichero_gordo -- usuario@mail1.org
+</pre></div>
+</div>
+</div>
+<div class="section" id="servidor-de-respaldo">
+<h2>7.3.3.3.7. Servidor de respaldo<a class="headerlink" href="#servidor-de-respaldo" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Un <em class="dfn">servidor de respaldo</em> es aquel que recibe el correo de un dominio,
+cuando el servidor principal es inaccesible. Su función es recibir los
+mensajes, almacenarlos en cola durante durante el tiempo que el servidor
+principal está caído y remitirlos cuando éste recupera su buen funcionamiento.
+Durante este tiempo, intentará conectarse periódicamente al servidor para
+entregar los mensajes que tenga en cola.</p>
+<p>Antes de entrar a configurar un servidor de este tipo, es indispensable que el
+servicio <abbr title="Domain Name Server">DNS</abbr> identifique a este servidor como servidor de correo menos
+prioritario. Por ejemplo, si llamamos a esta tercera máquina
+<em>backup-mx.mail1.org</em> para que sea servidor de <em>backup</em> del servidor de correo
+del primer dominio, deberá ocurrir lo siguiente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> host mail1.org
+<span class="go">mail1.org mail is handled by 2 backup-mx.mail1.org.</span>
+<span class="go">mail1.org mail is handled by 1 mail.mail1.org.</span>
+</pre></div>
+</div>
+<p>y que la nueva máquina tenga una <abbr title="Internet Protocol">IP</abbr> adecuada (p.e. 192.168.255.10):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> host backup-mx.mail1.org
+<span class="go">backup-mx.mail1.org has address 192.168.255.10</span>
+</pre></div>
+</div>
+<p>De este modo, cuando otro servidor de correo intente entregar un mensaje
+a alguna cuenta de <em>mail1.org</em> intentará entregárselo a <em>mail.mail1.org</em>, pero
+si no puede, porque comprueba que no puede conectar con la máquina, intentará
+la entrega a <em>backup-mx.mail1.org</em>.</p>
+<p>Para configurar <em>backup-mx.mail1.org</em> podemos obrar exactamente igual que cuando
+configuramos <em>mail.mail1.org</em> en cuanto a instalación y configuración básica y
+del cifrado<a class="footnote-reference" href="#id15" id="id7">[7]</a>, lo cual nos generará una <a class="reference internal" href="01-inst.html#postfix-conf-bas-main-cf"><span class="std std-ref">configuración equivalente a la
+ya vista en main.cf</span></a>. Esa configuración, no obstante,
+no es la definitiva y deberemos hacerle algunos cambios</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="hll"><span class="nb">smtpd_relay_restrictions</span> = permit_mynetworks
+</span><span class="hll">                           <span class="nb">reject_unauth_destination</span>
+</span><span class="hll">                           reject_rbl_client zen.spamhaus.org
+</span><span class="hll"><span class="nb">myhostname</span> = backup-mx.mail1.org
+</span><span class="nb">alias_maps</span> = hash:/etc/aliases
+<span class="nb">alias_database</span> = hash:/etc/aliases
+<span class="nb">myorigin</span> = <span class="sx">/etc/mailname</span>
+<span class="hll"><span class="nb">mydestination</span> = localhost
+</span><span class="hll"><span class="nb">relayhost</span> = mail.mail1.org
+</span><span class="nb">mynetworks</span> = <span class="m">127.0.0.0/8</span>
+<span class="nb">mailbox_size_limit</span> = <span class="m">0</span>
+<span class="nb">recipient_delimiter</span> = +
+<span class="nb">inet_interfaces</span> = <span class="k">all</span>
+<span class="nb">inet_protocols</span> = ipv4
+</pre></div>
+</div>
+<p>Los cambios, básicamente, han sido:</p>
+<ul class="simple">
+<li>Modificar la política de restricciones para tráfico de <em>relay</em>, ya que nuestro
+servidor hace de <em>relay</em> entre el <abbr title="Mail Transmission Agent">MTA</abbr> del que procede el correo y el <abbr title="Mail Transmission Agent">MTA</abbr>
+destinatario (<em>mail.mail1.org</em>).</li>
+<li>Ajustar convenientemente el nombre del servidor (cosa que también hicimos
+antes a posteriori).</li>
+<li>Definir como destino final para la máquina exclusivamente <em>localhost</em> y no el
+dominio <em>mail1.org</em>, ya que de lo contrario los mensajes se los quedaría
+esta máquina en vez de pasarlos a la máquina destinataria…</li>
+<li>… que es la que se indica con <a class="reference external" href="http://www.postfix.org/postconf.5.html#relayhost">relayhost</a>.</li>
+</ul>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p class="last">Es sumamente importante que el dominio <em>mail1.org</em> no aparezca en
+<a class="reference external" href="http://www.postfix.org/postconf.5.html#mydestination">mydestination</a> (ni en <a class="reference external" href="http://www.postfix.org/postconf.5.html#virtual_alias_domains">virtual_alias_domains</a> ni
+<a class="reference external" href="http://www.postfix.org/postconf.5.html#virtual_mailbox_domains">virtual_mailbox_domains</a>)</p>
+</div>
+<p>Debemos, además, completar la configuración añadiendo las siguientes líneas:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">relay_domains</span> = mail1.org
+<span class="nb">relay_recipient_maps</span> =
+<span class="c"># Máximo tiempo en cola</span>
+<span class="nb">maximal_queue_lifetime</span> = <span class="m">5</span>d
+</pre></div>
+</div>
+<p>que definen <em>mail1.org</em> como el dominio válido para el <em>relay</em> y mantienen los
+mensajes en nuestro servidor hasta cinco días, por lo que ese será el plazo para
+que el servidor principal recobre su funcionalidad.</p>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p>Ahora podemos probar nuestra configuración apagando <em>mail.mail1.org</em> y
+enviando un correo desde <em>mail.mail2.org</em>. Mirando los registros podremos
+observar cómo el correo acaba en <em>backup-mx.mail1.org</em> y queda en cola<a class="footnote-reference" href="#id16" id="id8">[8]</a>
+hasta que pueda remitirlo al servidor principal. Si encedemos luego éste y
+esperamos un tiempo, comprobaremos cómo finalmente el servidor de <em>backup</em>
+acaba por enviar el mensaje al principal. Si nos impacientamos, podemos
+ordenar al servidor de respaldo que pruebe a enviar la cola así:</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> sendmail -q
+</pre></div>
+</div>
+</div>
+<p>Con esta configuración, el servidor de <em>backup</em> recibe mensajes sin
+autenticación de otros servidores <abbr title="Mail Transmission Agent">MTA</abbr>, pero no es apto para que los clientes
+se configuren para enviar los mensajes a través de él.</p>
+<p>Conviene, en cualquier caso, asegurarse de que el servidor principal jamás
+rechará las conexiones del servidor de respaldo. Para ello, en <em>mail.mail1.org</em>
+podemos añadir a las restricciones de acceso la siguiente línea:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span>smtpd_recipient_restrictions = permit_mynetworks,
+                               permit_sasl_authenticated,
+<span class="hll">                               check_client_access hash:/etc/postfix/tb/clients
+</span>                               reject_unauth_destination,
+                               reject_unknown_client_hostname,
+                               reject_rbl_client zen.spamhaus.org
+</pre></div>
+</div>
+<p>y añadir al fichero <code class="file docutils literal notranslate"><span class="pre">/etc/postfix/tb/clients</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cat &gt; /etc/postfix/tb/clients
+<span class="go">backup-mx.mail1.org           OK</span>
+
+<span class="gp">#</span> postmap /etc/postfix/tb/clients  <span class="c1"># Necesario para que postfix use la tabla.</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p class="last">La configuración expuesta sólo es válida para servidores puramente
+de respaldo capaces de aceptar correos para sí mismos (los dirigidos a
+<em>&#64;localhost</em>) y para el único servidor al que respalda (el del dominio
+<em>&#64;mail1.org</em>).</p>
+</div>
+<p>La validez de la solución nace de que su comportamiento surge fundamendalmente
+de estas líneas de configuración:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">smtpd_relay_restrictions</span> = permit_mynetworks reject_unauth_destination reject_rbl_client zen.spamhaus.org
+<span class="nb">mydestination</span> = localhost
+<span class="nb">relayhost</span> = mail.mail1.org
+<span class="nb">relay_domains</span> = mail1.org
+</pre></div>
+</div>
+<p>que introduce tres limitaciones en el comportamiento:</p>
+<ol class="arabic">
+<li><p class="first">El servidor es inservible para gestionar su propio dominio de correo, porque
+aunque añadiéramos un dominio propio a <a class="reference external" href="http://www.postfix.org/postconf.5.html#mydestination">mydestination</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">mydestination = mail3.org, localhost</span>
+</pre></div>
+</div>
+<p>seguiría sin ser apto, ya que estos usuarios sólo podrían enviar mensajes a
+usuarios del propio dominio o de <em>mail1.org</em>. Mensajes dirigidos a cuentas de
+otros dominioo serían rechazados debido a la política reflejada en
+<a class="reference external" href="http://www.postfix.org/postconf.5.html#smtpd_relay_restrictions">smtpd_relay_restrictions</a>.</p>
+</li>
+<li><p class="first">No envía mensajes a cuentas de servidores distintos a los de <em>relay</em>, porque
+aunque hiciéramos la modificación expuesta en el punto anterior y
+nodificáramos la política de <em>relay</em>, introduciendo autenticación y
+permitiendo que los usuarios autenticados envíen mensajes a cuentas de
+cualquier dominio, los mensajes continuarían sin llegar a su destino, puesto
+que, al hacer <em>relay</em>, todo mensaje se entregaría al servidor
+<em>mail.mail1.org</em> y sería este el que se negase a retransmitir los mensajes a
+servidores externos.</p>
+</li>
+<li><p class="first">El servidor puede gestionar varios dominios de <em>relay</em>, pero todos esos
+dominios debe gestionarlos un único servidor: el indicado en <a class="reference external" href="http://www.postfix.org/postconf.5.html#relayhost">relayhost</a>.</p>
+</li>
+</ol>
+<p>Para soslayar estas limitaciones, además de hacer las pertinentes modificaciones
+en la configuración (cambiar las políticas de acceso, habilitar la autenticacón,
+etc.), es necesario dejar sin configurar <a class="reference external" href="http://www.postfix.org/postconf.5.html#relayhost">relayhost</a> y echar mano de
+<a class="reference external" href="http://www.postfix.org/postconf.5.html#transport_maps">transport_maps</a>. Un trozo de configuración (al que habría que añadir políticas
+de acceso y autenticación) puede ser este:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">mydestination</span> = mail3.org, localhost
+<span class="nb">relayhost</span> =
+<span class="nb">relay_domains</span> = mail1.org, mail2.org
+<span class="nb">transport_maps</span> = hash:/etc/postfix/tb/relay_domains_maps
+</pre></div>
+</div>
+<p>y en el fichero <code class="file docutils literal notranslate"><span class="pre">/etc/postfix/tb/relay_domains_maps</span></code> deberá indicarse qué
+servidor corresponde a cada dominio:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">mail1.org      smtp:[smtp.mail1.org]</span>
+<span class="go">mail2.org      smtp:[smtp.mail2.org]</span>
+</pre></div>
+</div>
+<p>Sobre esta base sí podríamos construir un servidor que maneja un dominio propio
+y que, además, respalda dos dominios de sendos servidores distintos.</p>
+<p class="rubric">Notas al pie</p>
+<table class="docutils footnote" frame="void" id="id9" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td><a class="reference internal" href="../03-imap/index.html#dovecot"><span class="std std-ref">dovecot</span></a>, el servidor <abbr title="Internet Message Access Protocol">IMAP</abbr> que veremos a continuación
+crea cuatro buzones de correo de manera predeterminada: el principal y tres
+buzones que son subdirectorios: <code class="file docutils literal notranslate"><span class="pre">.Sent</span></code> (para almacenar mensajes
+enviados), <code class="file docutils literal notranslate"><span class="pre">.Trash</span></code> (para la papelera de mensajes) y <code class="file docutils literal notranslate"><span class="pre">.Drafts</span></code>
+para almacenar borradores.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id10" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id2">[2]</a></td><td>No así en <strong class="program">dovecot</strong> para el que sí usaremos ese término, ya que
+no hay posibilidad de confusión.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id11" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id3">[3]</a></td><td>Sin embargo, si la dirección no es local, no se busca en las tablas
+definidas en <a class="reference external" href="http://www.postfix.org/postconf.5.html#virtual_alias_maps">virtual_alias_maps</a>. Téngalo en cuenta, porque un alias que
+haya definido en un a tabla <em>virtual</em>, no se resolverá y se topará con un
+error de usuario inexistente.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id12" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id4">[4]</a></td><td>A las direcciones sin dominio, se les añade el dominio definido en
+<a class="reference external" href="http://www.postfix.org/postconf.5.html#myorigin">myorigin</a>.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id13" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id5">[5]</a></td><td>En este caso, el orden de los factores altera el producto. Si invertimos
+el orden, se elimarán antes los puntos y, por tanto, al analizar la segunda
+tabla nunca habrá concordancia con <em>el.holandes.errante</em> (pero sí con
+<em>elholandeserrante</em>).</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id14" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id6">[6]</a></td><td>El mensaje se envía a una cuenta del propio <em>mail1.org</em>, porque se ha
+supuesto que ha sido en este servidor donde se ha habilitado la cuota.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id15" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id7">[7]</a></td><td>La configuración de autenticación no la haremos por ahora, porque no es
+estrictamente necesaria.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id16" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id8">[8]</a></td><td><p class="first">Para saber cuál es el tráfico en cola puede hacerse:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mailq
+</pre></div>
+</div>
+<div class="last admonition seealso">
+<p class="first admonition-title">Ver también</p>
+<p class="last">En <a class="reference external" href="https://www.wirehive.com/thoughts/5-top-tips-reviewing-postfix-mail-queue/">este artículo</a> se expone cómo investigar
+sobre nuestra cola de mensajes.</p>
+</div>
+</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">7.3.3.3. Entrega</a><ul>
+<li><a class="reference internal" href="#buzones">7.3.3.3.1. Buzones</a></li>
+<li><a class="reference internal" href="#reescritura-de-direcciones">7.3.3.3.2. Reescritura de direcciones</a></li>
+<li><a class="reference internal" href="#cuentas-virtuales">7.3.3.3.3. Cuentas virtuales</a></li>
+<li><a class="reference internal" href="#entrega-local">7.3.3.3.4. Entrega local</a></li>
+<li><a class="reference internal" href="#entrega-a-traves-de-lmtp">7.3.3.3.5. Entrega a través de <abbr title="Local Mail Transfer Protocol">LMTP</abbr></a></li>
+<li><a class="reference internal" href="#cuotas">7.3.3.3.6. Cuotas</a></li>
+<li><a class="reference internal" href="#servidor-de-respaldo">7.3.3.3.7. Servidor de respaldo</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="02-accept.html"
+                        title="capítulo anterior">7.3.3.2. Aceptación de mensajes</a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="04-usuarios.html"
+                        title="próximo capítulo">7.3.3.4. Gestión de usuarios</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../_sources/07.serre/03.mail/02-smtp/03-entrega.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Ir a" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="04-usuarios.html" title="7.3.3.4. Gestión de usuarios"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="02-accept.html" title="7.3.3.2. Aceptación de mensajes"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de ServidorLinux - 0.1.0</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >7. Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" >7.3. Correo electrónico</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="index.html" >7.3.3. Servidor <abbr title="Simple Mail Transfer Protocol">SMTP</abbr></a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor 2016, José Miguel Sánchez Alés.
+      Creado con <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
+    </div>
+  </body>
+</html>

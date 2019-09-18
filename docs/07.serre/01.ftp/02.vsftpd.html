@@ -1,0 +1,731 @@
+
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>7.1.2. FTP clásico &#8212; documentación de ServidorLinux - 0.1.0</title>
+    <link rel="stylesheet" href="../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/custom.css" />
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../_static/language_data.js"></script>
+    <script type="text/javascript" src="../../_static/translations.js"></script>
+    
+    <link rel="index" title="Índice" href="../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../search.html" />
+    <link rel="next" title="7.1.3. SSH como servidor FTP" href="03.ssh.html" />
+    <link rel="prev" title="7.1.1. Descripción teórica" href="01.desc.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="03.ssh.html" title="7.1.3. SSH como servidor FTP"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="01.desc.html" title="7.1.1. Descripción teórica"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de ServidorLinux - 0.1.0</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >7. Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="index.html" accesskey="U">7.1. Transferencia de ficheros</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="ftp-clasico">
+<span id="vsftpd"></span><h1>7.1.2. <abbr title="File Transfer Protocol">FTP</abbr> clásico<a class="headerlink" href="#ftp-clasico" title="Enlazar permanentemente con este título">¶</a></h1>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p class="last">Se recomienda encarecidamente implementar otra solución de
+transferencia de ficheros como <a class="reference internal" href="03.ssh.html#ssh-ftp"><span class="std std-ref">sftp</span></a>.</p>
+</div>
+<p>Para montar un clásico <abbr title="File Transfer Protocol">FTP</abbr> utilizaremos <a class="reference external" href="https://security.appspot.com/vsftpd.html">el servidor vsftpd</a>, que se jacta de ser el servidor
+<abbr title="File Transfer Protocol">FTP</abbr> más seguro. Es, ciertamente, un servidor simple que procura mantener un
+número limitado de características en aras a lograr seguridad y rapidez.</p>
+<div class="section" id="instalacion">
+<h2>7.1.2.1. Instalación<a class="headerlink" href="#instalacion" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Es sencilla al encontrarse en los repositorios de <em>debian</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt-get install vsftpd
+</pre></div>
+</div>
+<p>Su configuración se encuentra dentro del directorio <code class="file docutils literal notranslate"><span class="pre">/etc/vsftpd.conf</span></code> y,
+por defecto, permite el acceso de los usuarios definidos en el sistema (los
+validables haciendo uso de la autenticación con <abbr title="Pluggable Authentication Modules">PAM</abbr>) excepto los incluidos en
+el fichero <code class="file docutils literal notranslate"><span class="pre">/etc/ftpusers</span></code>, ya veremos por qué.</p>
+</div>
+<div class="section" id="configuracion">
+<h2>7.1.2.2. Configuración<a class="headerlink" href="#configuracion" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Básicamente consiste en modificar el valor de las directivas existentes,
+descomentar otras y añadir algunas que no aparecen, según nuestras necesidades.
+Intentaremos agrupar la explicación de algunas según el proposito que busquemos.</p>
+<div class="section" id="escucha">
+<h3>7.1.2.2.1. Escucha<a class="headerlink" href="#escucha" title="Enlazar permanentemente con este título">¶</a></h3>
+<p><strong class="program">vsftpd</strong> soporta tanto ser requerido por un <a class="reference external" href="https://es.wikipedia.org/wiki/Inetd">superservidor tipo inetd</a> como estar a la escucha constantemente
+(lo que se conoce como <em class="dfn">standalone</em>).  A este efecto tiene dos directivas
+<code class="docutils literal notranslate"><span class="pre">listen</span></code> y <code class="docutils literal notranslate"><span class="pre">listen_ipv6</span></code>:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="19%" />
+<col width="22%" />
+<col width="59%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head"><code class="docutils literal notranslate"><span class="pre">listen</span></code></th>
+<th class="head"><code class="docutils literal notranslate"><span class="pre">listen_ipv6</span></code></th>
+<th class="head">Descripción del efecto</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>NO</td>
+<td>NO</td>
+<td>Arrancado con <strong class="program">xinetd</strong> o similar<a class="footnote-reference" href="#id5" id="id1">[1]</a></td>
+</tr>
+<tr class="row-odd"><td>YES</td>
+<td>NO</td>
+<td>Acepta sólo tráfico IPv4.</td>
+</tr>
+<tr class="row-even"><td>NO</td>
+<td>YES</td>
+<td>Acepta tráfico IPv4 y tráfico IPv6.</td>
+</tr>
+<tr class="row-odd"><td>YES</td>
+<td>YES</td>
+<td>Error. No es posible la combinación.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="acceso-anonimo">
+<span id="ftp-anonimo"></span><h3>7.1.2.2.2. Acceso anónimo<a class="headerlink" href="#acceso-anonimo" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Los servidores, tradicionalmente, han permitido el acceso anónimo al servidor,
+esto es, la posibilidad de identificarse en el sistema sin tener asignado un
+usuario. Generalmente, exigen que se indique como usuario <em>anonymous</em> y como
+contraseña cualquier cadena, aunque en origen se indicaba el correo electrónico
+del usuario.</p>
+<p>Para habilitar el acceso anónimo es necesario hacer:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">anonymous_enable=YES</span>
+</pre></div>
+</div>
+<p>que configura un acceso con estas características:</p>
+<ul class="simple">
+<li>El usuario anónimo se corresponde con el usuario local <em>ftp</em>.</li>
+<li>Sólo se tiene permisos de lectura (o sea, sólo puede ver los ficheros
+disponibles y descargar aquellos que le interesen).</li>
+<li>Se accede al directorio <code class="file docutils literal notranslate"><span class="pre">/srv/ftp</span></code> y se está enjaulado en él, es decir,
+es imposible salir de él.</li>
+</ul>
+<p>Para modificar este comportamiento predeterminado hay otras directivas:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">anon_root=/otro/directorio/distinto</span>
+</pre></div>
+</div>
+<p>que permite modificar el directorio de enjaulado del usuario anónimo.</p>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p class="last">El usuario, en este caso <em>ftp</em>, no puede tener permisos de
+escritura sobre el directorio en el que se enjaula.</p>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">anon_upload_enable=YES</span>
+</pre></div>
+</div>
+<p>permite subir ficheros. Se requiere también, no obstante, habilitada la
+directiva <code class="docutils literal notranslate"><span class="pre">write_enable</span></code>. Véase más adelante el permiso de escritura para
+<cite>usuarios locales &lt;ftp-usuarios&gt;</cite>.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">anon_mkdir_write_enable=YES</span>
+<span class="go">anon_other_write_enable=YES</span>
+</pre></div>
+</div>
+<p>estas directivas permiten respectivamente la creación de nuevos subdirectorios y
+otros permisos de escritura (como borrado o renombrado).</p>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p>Hay aún otra directiva que cobra bastante importancia cuando el
+usuario anónimo sube ficheros al servidor:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">anon_world_readable_only=YES</span>
+</pre></div>
+</div>
+<p class="last">Al estar activa por defecto, obliga a que el fichero sólo pueda descargarse
+si es universalmente accesible (o sea, todos los usuarios tengan permiso de
+lectura). Cobra importancia, porque dependiendo de la máscara, por ejemplo
+una con valor 026, puede ocurrir que el usuario anónimo suba un fichero al
+servidor y este no sea universalmente accesibe. En ese caso, aunque el
+usuario anónimo haya subido el fichero, no podrá ser descargado luego por él.</p>
+</div>
+</div>
+<div class="section" id="usuarios-locales">
+<span id="ftp-usuarios"></span><h3>7.1.2.2.3. Usuarios locales<a class="headerlink" href="#usuarios-locales" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Los <em class="dfn">usuarios locales</em>, esto es, los usuarios registrados y con capacidad
+de autenticación en el sistema, están habilitado por defecto gracias a la
+directiva:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">local_enable=YES</span>
+</pre></div>
+</div>
+<p>Al ingresar en el sistema entraran en su directorio personal, pero a diferencia
+del usuario <em>anónimo</em>, tienen libertad para consultar todo la parte del sistema
+de ficheros accesible según sus permisos, en vez de estar enjauladas dentro de
+él.  Más adelante veremos cómo alterar esto. Para habilitar sus permisos de
+escritura es necesaria la directiva:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">write_enable=YES</span>
+</pre></div>
+</div>
+<p>No obstante lo anterior, es posible alterar el directorio de ingreso mediante la
+directiva:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">local_root=/home</span>
+</pre></div>
+</div>
+<p>que provocaría que todos los usuarios locales accedieran a <code class="file docutils literal notranslate"><span class="pre">/home/</span></code> en vez
+de a su directorio personal. No obstante, puede particularizarse el valor de esta
+directiva ayudándose de <code class="docutils literal notranslate"><span class="pre">user_sub_token</span></code>, del siguiente modo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">user_sub_token=$USER</span>
+<span class="go">local_root=/srv/ftp/$USER</span>
+</pre></div>
+</div>
+<p>de este modo, cada usuario podrá estar localizado en un directorio diferente
+sin ser el que indica su información de usuario.</p>
+<p>Otra forma de particularizar, aunque en este caso no sólo para indicar el
+directorio de usuario es la directiva <code class="docutils literal notranslate"><span class="pre">user_config_dir</span></code> que permite definir un
+directorio de configuraciones personalizadas. Si un fichero de ese directorio
+tiene el nombre de un usuario, se cargara la configuración contenida en él para
+ese usuario. Por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">user_config_dir=/etc/vsftpd</span>
+</pre></div>
+</div>
+<p>y además creamos el fichero:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cat &gt; /etc/vsftpd/pepe
+<span class="go">local_root=/srv/ftp/pepe_es_un_chico_especial</span>
+<span class="go">write_enable=NO</span>
+<span class="go">local_max_rate=10024</span>
+</pre></div>
+</div>
+<p>Al usuario <em>pepe</em> y sólo a él, se le aplican las directivas incluidas en el
+fichero, que sobreescribirán a la que puedan encontrarse en el fichero general.</p>
+</div>
+<div class="section" id="enjaulado">
+<h3>7.1.2.2.4. Enjaulado<a class="headerlink" href="#enjaulado" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Los usuarios locales también pueden ser enjaulados:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">chroot_local_user=YES</span>
+</pre></div>
+</div>
+<p>No obstante, la configuración nos permite establecer un fichero de excepciones a
+la políotica predeterminada con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">chroot_list_enable=YES</span>
+<span class="go">chroot_list_file=/etc/vsftpd.jail</span>
+</pre></div>
+</div>
+<p>En tal fichero, puede incluirse los usuarios, uno por línea, que <strong>no</strong> siguen la
+política de enjaulamiento general. Es importante, entender que estos usuarios
+son la excepción, por lo que representan los enjaulados si <code class="docutils literal notranslate"><span class="pre">chroot_local_user</span></code>
+está deshabilitado y los no enjaulados, si está habilitada.</p>
+<p>Un aspecto muy importante al enjaular los usuarios es que</p>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p class="last">Por motivos de seguridad, el usuario enjaulado no puede tener
+permisos de escritura sobre el directorio de enjaulamiento.</p>
+</div>
+<p>Esto provoca un problema, sobre todo para usuarios locales, porque lo habitual
+es que los usuarios requieran permisos de escritura sobre sus propios
+directorios, si acceden al sistema por otros medios. En principio, tenemos
+cuatro posibles soluciones:</p>
+<ol class="arabic">
+<li><p class="first">Enjaular a los usuarios dentro de <code class="file docutils literal notranslate"><span class="pre">/home</span></code>, para lo cual basta con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">local_root=/home</span>
+</pre></div>
+</div>
+<p>Esta solución tiene la desventaja de que el usuario puede ver qué usuarios
+están definidos en el sistema y dependiendo de los permisos de los
+directorios del resto, podría meterse en algunos ajenos.</p>
+</li>
+<li><p class="first">Eliminar los permisos de escritura de los directorios personales, lo cual
+puede llegar a ser un problema, si los usuarios acceder con otros servicios
+(<abbr title="Security SHell">SSH</abbr>, por ejemplo).</p>
+</li>
+<li><p class="first">Enjaular al usuario en un directorio exclusivo distinto al personal. Tiene
+dos variantes:</p>
+<ul>
+<li><p class="first">Que el directorio nada tenga que ver el directorio personal:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">user_sub_token=$USER</span>
+<span class="go">local_root=/srv/ftp/$USER</span>
+</pre></div>
+</div>
+<p>si suponemos claro, que los directorios personales son los habituales
+<code class="file docutils literal notranslate"><span class="pre">/home/nombre_usuario</span></code>.</p>
+</li>
+<li><p class="first">Otra variante es hacer que el directorio de enjaulamiento sea un
+subdirectorio del directorio personal:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">user_sub_token=$USER</span>
+<span class="go">local_root=/home/$USER/ftp</span>
+</pre></div>
+</div>
+</li>
+</ul>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p>Por supuesto, si queremos subir ficheros, será necesario haber
+creado un subdirectorio dentro con permisos de escritura. Por ejemplo:</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> mkdir -p ~/ftp/incoming
+<span class="gp">$</span> chmod <span class="m">444</span> ~/ftp
+</pre></div>
+</div>
+</div>
+</li>
+<li><p class="first">Añadir la opción (no documentada en la página de manual):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">allow_writeable_chroot=YES</span>
+</pre></div>
+</div>
+<p>que, directamente, permite enjaular a un usuario dentro de un directorio en
+el que tiene permisos de escritura. La directiva apareció en la versión
+<em>2.3.5</em>, después que desde la versión <em>2.3.4</em> se pasara a comprobar el
+permiso de escritura sobre el directorio de la jaula. Esto, sin embargo, se
+desaconseja, porque hace vulnerable el servidor a <a class="reference external" href="https://unix.stackexchange.com/questions/323711/what-are-the-dangers-of-having-writable-chroot-directory-for-ftp/332571#332571">un ataque contra su
+seguridad</a>.
+En cualquier caso, esta directiva sólo se aplica a usuarios no anónimos.</p>
+</li>
+</ol>
+</div>
+<div class="section" id="restricciones-de-acceso">
+<span id="ftp-acceso"></span><h3>7.1.2.2.5. Restricciones de acceso<a class="headerlink" href="#restricciones-de-acceso" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Entendemos por ello la posibilidad de prohibir el acceso <abbr title="File Transfer Protocol">FTP</abbr> a ciertos usuarios,
+que en principio tienen acceso al servidor. Para lograrlo hay dos vías:</p>
+<ul class="simple">
+<li>Cambiar la configuración del servidor (o sea editar <code class="file docutils literal notranslate"><span class="pre">/etc/vsftpd.conf</span></code>).</li>
+<li>Influir en el proceso de autenticación, que es una herramienta más poderosa
+y da pie a una restricción mucho más rica.</li>
+</ul>
+<p>Analicemos ambas vías.</p>
+<div class="section" id="mediante-configuracion">
+<h4>7.1.2.2.5.1. Mediante configuración<a class="headerlink" href="#mediante-configuracion" title="Enlazar permanentemente con este título">¶</a></h4>
+<p>Las directivas:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">userlist_enable=YES</span>
+<span class="go">userlist_file=/etc/vsftpd.userlist</span>
+</pre></div>
+</div>
+<p>permiten definir un fichero en el que pueden incluirse usuarios a los que se
+quiere o negar o permitir en exclusividad el acceso. Que nuestra política de
+accesos sea de lista blanca o negra depende del valor de otra directiva:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">userlist_deny=NO</span>
+</pre></div>
+</div>
+<p>Deshabilitada, la política será de lista blanca y el fichero contendrá los
+únicos usuarios capaz de usar el servidor; habilitada la política será de lista
+negra.</p>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">Nótese que sólo permite la inclusión de nombres de usuario, no de
+grupos. Para una configuración más flexible debe optarse por manipular la
+autenticación.</p>
+</div>
+</div>
+<div class="section" id="mediante-autenticacion">
+<h4>7.1.2.2.5.2. Mediante autenticación<a class="headerlink" href="#mediante-autenticacion" title="Enlazar permanentemente con este título">¶</a></h4>
+<p><strong class="program">vsftpd</strong> se vale para la autenticación con <a class="reference internal" href="../../04.servidor/09.autenticacion/index.html#pam"><span class="std std-ref">pam</span></a> para
+permitir el acceso al servidor. De hecho, la directiva <code class="docutils literal notranslate"><span class="pre">pam_service_name</span></code> nos
+permite indicar cuál es el nombre del servicio para <abbr title="Pluggable Authentication Modules">PAM</abbr>. Su valor
+predeterminado es <em>vsftpd</em> y es es la razón por la que existe
+<code class="file docutils literal notranslate"><span class="pre">/etc/pam.d/vsftpd</span></code> para controlar la autenticación:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Standard behaviour for ftpd(8).</span>
+<span class="hll">auth	required	pam_listfile.so <span class="nv">item</span><span class="o">=</span>user <span class="nv">sense</span><span class="o">=</span>deny <span class="nv">file</span><span class="o">=</span>/etc/ftpusers <span class="nv">onerr</span><span class="o">=</span>succeed
+</span>
+<span class="c1"># Note: vsftpd handles anonymous logins on its own. Do not enable pam_ftp.so.</span>
+
+<span class="c1"># Standard pam includes</span>
+@include common-account
+@include common-session
+@include common-auth
+<span class="hll">auth	required	pam_shells.so
+</span></pre></div>
+</div>
+<p>Este es un contenido. Como vemos a la autenticación común a todos los servicios,
+se añaden dos requisitos  más:</p>
+<ul>
+<li><p class="first">Que el usuario tenga definida una <em>shell</em> válida (módulo <em>pam_shell.so</em>).</p>
+</li>
+<li><p class="first">Que el usuario no este listado en el fichero <code class="file docutils literal notranslate"><span class="pre">/etc/ftpusers</span></code>. Esa es la
+razón la qu el usuario administrador no puede acceder por <abbr title="File Transfer Protocol">FTP</abbr> al servidor:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> grep root /etc/ftpusers
+<span class="go">root</span>
+</pre></div>
+</div>
+</li>
+</ul>
+<p>La restricción en el acceso mediante este método puede ser tanta como nos
+permita nuestro conocimiento de <abbr title="Pluggable Authentication Modules">PAM</abbr>. Por ejemplo, podríamos añadir una primera
+línea como esta:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">auth  required pam_listfile.so item=group sense=allow file=/etc/ftpgroups onerr=succeed</span>
+</pre></div>
+</div>
+<p>que permitiría crear un fichero donde incluyéramos los grupos de usuarios a los
+que exclusivamente permitiéramos el acceso al <abbr title="File Transfer Protocol">FTP</abbr>. Si esto lo complementáramos
+con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cat &gt; /etc/ftpgroups
+<span class="go">ftpusers</span>
+</pre></div>
+</div>
+<p>resultaría en que sólo los usuarios pertenecientes al grupo <em>ftpusers</em> serán
+capaces de acceder al servidor.</p>
+</div>
+</div>
+<div class="section" id="limitaciones-de-uso">
+<span id="ftp-limitaciones"></span><h3>7.1.2.2.6. Limitaciones de uso<a class="headerlink" href="#limitaciones-de-uso" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Disponemos de toda una serie de directivas relacionadas con las limitaciones de
+uso del servidor:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">local_max_rate=10240</span>
+</pre></div>
+</div>
+<p>permitir limitar la velocidad en bytes/segundo a la que los usuarios locales
+pueden subir o bajar ficheros:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">max_clients=5</span>
+</pre></div>
+</div>
+<p>limita el número máximo de conexiones simultáneas; mientras que:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">max_per_ip=2</span>
+</pre></div>
+</div>
+<p>limita el númnero máximo de conexiones por <em>IP</em>. En ambos casos, <strong>0</strong> significa
+que no hay límite y justamente ése es el valor predeterminado.</p>
+<p>En principio, no hay directiva para limitar el acceso por usuarios (o grupos),
+pero la directiva:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">session_support=YES</span>
+</pre></div>
+</div>
+<p>provoca que la sesión se apunte en <code class="file docutils literal notranslate"><span class="pre">/var/log/wtmp</span></code> y, consecuentemente,
+que las limitaciones <code class="docutils literal notranslate"><span class="pre">maxlogins</span></code> y <code class="docutils literal notranslate"><span class="pre">maxsyslogins</span></code> propiciadas por el módulo
+<em>pam_limits.so</em> tengan efecto. Para ver cómo hacerlo, puede consultar la
+<a class="reference internal" href="03.ssh.html#ssh-ftp-limits"><span class="std std-ref">discusión sobre limitaciones al acceso SSH</span></a>.</p>
+</div>
+<div class="section" id="conexion-segura">
+<h3>7.1.2.2.7. Conexión segura<a class="headerlink" href="#conexion-segura" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Como todos los viejos protocolos, <abbr title="File Transfer Protocol">FTP</abbr> no presta atención a la seguridad y la
+contraseña viaja en claro a través de la red. Para subsanarlo es posible
+embucharlo en una negociación <abbr title="Secure Socket Layer">SSL</abbr> (o <abbr title="Transport Layer Security">TLS</abbr> como se prefiera decir), para lo
+cual se requiere antes la creación de un certificado digital.</p>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">Consulte la <a class="reference internal" href="../02.web/02.nginx/02.avanz/07.https.html#https"><span class="std std-ref">creación de un certificado</span></a> que se expone
+en la parte dedicada al tráfico web. Sirve tanto el certificado autofirmado
+como el obtenido con <em>Let’s Encrypt</em>.</p>
+</div>
+<p>Obtenido el certificado, podemos optar por cifrar:</p>
+<ul class="simple">
+<li>ambos canales o sólo el canal de control y no el de datos.</li>
+<li>sólo la conexión para los usuarios locales o también para el usuario anónimo.</li>
+</ul>
+<p>Un ejemplo de configuración en el que intervienen las directivas relativas a la
+seguridad es esta:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> Sólo ciframos comunicación de los usuarios locales.
+<span class="go">ssl_enable=YES</span>
+<span class="go">allow_anon_ssl=NO</span>
+
+<span class="gp">#</span> Sólo comunicamos el canal de control
+<span class="go">force_local_data_ssl=NO</span>
+<span class="go">force_local_logins_ssl=YES</span>
+
+<span class="gp">#</span> Ciframos usando TTLv1.0 que es más seguro que SSLv3
+<span class="go">ssl_tlsv1=YES</span>
+<span class="go">ssl_sslv2=NO</span>
+<span class="go">ssl_sslv3=NO</span>
+
+<span class="gp">#</span> Certificado digital <span class="o">(</span>suponemos el autofirmado<span class="o">)</span>
+<span class="go">rsa_cert_file=/etc/ssl/certs/ssl-cert-snakeoil.pem</span>
+<span class="go">rsa_private_key_file=/etc/ssl/private/ssl-cert-snakeoil.key</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">También hay un <code class="docutils literal notranslate"><span class="pre">force_anon_data_ssl</span></code> y un <code class="docutils literal notranslate"><span class="pre">force_anon_logins_ssl</span></code>
+para cifrar de manera independiente los canales de control y datos de la
+conexión anónima.</p>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p>Con esta configuración, <code class="file docutils literal notranslate"><span class="pre">vsftpd</span></code> usa cifrado explícito (llamado
+<abbr title="FTP Explicit Secure">FTPS</abbr>), es decir, hay una negociación previa en la que el servidor
+obliga al cliente a que cifre la comunicación y se inicie el protocolo <abbr title="Transport Layer Security">TLS</abbr>.
+Tambien éxiste el cifrado implícito (<abbr title="FTP Secure">FTPS</abbr>), que es más antiguo y se
+habilita con la opción:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">implicit_ssl=YES</span>
+<span class="go">listen_port=990</span>
+</pre></div>
+</div>
+<p>y en el que no hay negociación previa, sino que directamente se establece el
+protocolo <abbr title="Transport Layer Security">TLS</abbr> para asegurar la comunicación  y dentro de él se comienza una
+sesión <abbr title="File Transfer Protocol">FTP</abbr> tradicional (o sea, lo mismo que ocurre en <abbr title="HyperText Transfer Protocol">HTTP</abbr>s). Cuando se
+usa este segundo método de cifrado, la escucha se suele hacer por el puerto
+<strong>990</strong>, de ahí que hayamos incluido la directiva para cambiar el puerto de
+escucha.</p>
+<p class="last">Cuando se usa <abbr title="FTP Explicit Secure">FTPS</abbr>, no es necesario declarar nada, puesto que la escucha
+es el el puerto 21 y el cifrado es consecuencia de una negociación. Con el
+implícito, en cambio, si que es necesario declararlo (generalmente con
+<kbd class="kbd docutils literal notranslate">ftps://</kbd>) ya que el cliente tiene que cambiar de puerto y además
+empezar directamente el protocolo <abbr title="Transport Layer Security">TLS</abbr>. En cualquier caso, lo recomentable
+es usar <abbr title="FTP Explicit Secure">FTPS</abbr>.</p>
+</div>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p>Al cifrar la comunicación, necesitaremos un cliente que la soporte.
+El cliente <abbr title="File Transfer Protocol">FTP</abbr> habitual de los <em>UNIX</em> no lo hace. Podemos, en su
+sustitución, usar <strong class="program">ftp-ssl</strong>, o <strong class="program">lftp</strong> que, además de
+soportar cifrado, tiene una interfaz de texto mucho más potente.</p>
+<p class="last">En entorno gráfico (y sistemas <em>windows</em>), <strong class="program">FileZilla</strong> soporta
+cifrado (también el implícito).</p>
+</div>
+</div>
+</div>
+<div class="section" id="cuota">
+<h2>7.1.2.3. Cuota<a class="headerlink" href="#cuota" title="Enlazar permanentemente con este título">¶</a></h2>
+<div class="admonition seealso">
+<p class="first admonition-title">Ver también</p>
+<p class="last">Consulte cómo crear <a class="reference internal" href="../../05.discos/03.cuotas/index.html#disk-quota"><span class="std std-ref">cuotas de disco</span></a>.</p>
+</div>
+</div>
+<div class="section" id="usuarios-virtuales">
+<span id="ftp-virtuales"></span><h2>7.1.2.4. Usuarios virtuales<a class="headerlink" href="#usuarios-virtuales" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Hasta ahora hemos configurado el servidor para que sea utilizado por usuarios
+que, además, tienen acceso al resto de servicios. El propósito, a partir de
+ahora, es crear usuarios cuyo único propósito es el acceso al <abbr title="File Transfer Protocol">FTP</abbr>, por lo que
+no serán válidos para el resto de los servicios.</p>
+<p>Haremos dos aproximaciones.</p>
+<div class="section" id="falsamente-virtuales">
+<span id="ftp-pseudo-virtuales"></span><h3>7.1.2.4.1. Falsamente virtuales<a class="headerlink" href="#falsamente-virtuales" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Los denominados <em class="dfn">falsamente virtuales</em>, porque no son virtuales, ya que son
+usuarios que realmente existen en el sistema ,es decir, que <kbd class="kbd docutils literal notranslate">getent passwd</kbd>
+los reconoce. A pesar de ello, manipulamos la autenticación para que sean
+incapaces de autenticarse en ningún otro servicio. La tarea, por tanto, se
+reduce a configurar <abbr title="Pluggable Authentication Modules">PAM</abbr> para lograrlo.</p>
+<p>Lo primero es caracterizar a tales usuarios de manera que sólo ellos cumplan el
+requisito que establezcamos. Por ejemplo, que sean los únicos que se encuentren
+dentro de un rango de <abbr title="User IDentifier">UID</abbr>s o que los únicos que pertenecen a un grupo
+determinado. Este último criterio es el más fácil de implementar así que
+crearemos un grupo nuevo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> addgroup --system ftponly
+</pre></div>
+</div>
+<p>y añadiremos a él los usuarios de <abbr title="File Transfer Protocol">FTP</abbr> <em>falsamente virtuales</em>.</p>
+<p>Una manera bastante limpia de impedirle el acceso al resto de usuarios es crear
+<a class="reference download internal" download="" href="../../_downloads/ea77a395a267d1aa107d752dd2a5163e/ftponly"><code class="xref download docutils literal notranslate"><span class="pre">este</span> <span class="pre">fichero</span></code></a> en
+<code class="file docutils literal notranslate"><span class="pre">/usr/share/pam-configs/ftponly</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>Name: Posibilita la existencia de usuarios exclusivos de FTP
+Default: no
+Priority: <span class="m">0</span>
+Account-Type: Additional
+Account:
+	<span class="o">[</span><span class="nv">success</span><span class="o">=</span><span class="m">1</span> <span class="nv">default</span><span class="o">=</span>ignore<span class="o">]</span>	pam_succeed_if.so <span class="nv">service</span> <span class="o">=</span> vsftpd
+	required			pam_listfile.so <span class="nv">item</span><span class="o">=</span>group <span class="nv">sense</span><span class="o">=</span>deny <span class="nv">onerr</span><span class="o">=</span>succeed <span class="nv">file</span><span class="o">=</span>/etc/vftpusers
+	required			pam_permit.so
+</pre></div>
+</div>
+<p>Esto propicia que ejecutando <strong class="program">pam-auth-update</strong>:</p>
+<img alt="../../_images/pam-auth-update_menu.png" src="../../_images/pam-auth-update_menu.png" />
+<p>podamos añadir (o quitar) cómodamente las siguientes líneas a
+<code class="file docutils literal notranslate"><span class="pre">/etc/pam.d/common-account</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">account  [success=1 default=ignore]  pam_succeed_if.so service = vsftpd</span>
+<span class="go">account  required                    pam_listfile.so item=group sense=deny onerr=succeed file=/etc/ftponly</span>
+<span class="go">account  required                    pam_permit.so</span>
+</pre></div>
+</div>
+<p>que impide que cualquier usuario perteneciente a un grupo incluido en el fichero
+<code class="file docutils literal notranslate"><span class="pre">/etc/ftponly</span></code> pueda autenticarse en un servicio que no sea <em>vsftpd</em><a class="footnote-reference" href="#id6" id="id2">[2]</a>. Por supuesto, deberemos añadir el grupo <em>ftponly</em> al fichero:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="nb">echo</span> <span class="s2">&quot;ftponly&quot;</span> &gt; /etc/ftponly
+</pre></div>
+</div>
+</div>
+<div class="section" id="realmente-virtuales">
+<span id="ftp-virtuales-feten"></span><h3>7.1.2.4.2. Realmente virtuales<a class="headerlink" href="#realmente-virtuales" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Como sí son virtuales, no existen en el sistema, sino únicamente en la
+autenticación del servidor <abbr title="File Transfer Protocol">FTP</abbr>. Esto provoca que no tengan más que un nombre
+de usuario y una contraseña, y que carezcan del resto de características que
+requiere un usuario real (<abbr title="User IDentifier">UID</abbr>, grupo principal, etc.). Consecuentemente, el
+servidor debe mapear los usuarios virtuales a un usuario real cuando estos
+realizan una acción en el servidor (p.e. crear un fichero en el sistema de
+fichero al subirlo).</p>
+<p>Para utilizar usuarios realmente virtuales son necesarias tres tareas
+diferenciadas:</p>
+<ul class="simple">
+<li>Crear y almacenar sus nombres y contraseñas.</li>
+<li>Manipular la autenticación.</li>
+<li>Configurar <strong class="program">vsftpd</strong> para poder utilizarlos.</li>
+</ul>
+<div class="section" id="creacion">
+<h4>7.1.2.4.2.1. Creación<a class="headerlink" href="#creacion" title="Enlazar permanentemente con este título">¶</a></h4>
+<p>Para la creación de los usuarios podemos crear una base de datos <em>Berkeley</em>
+(para luego usarla con <em>pam_userdb.so</em>), o  un fichero con formato semejante al
+de <code class="file docutils literal notranslate"><span class="pre">/etc/passwd</span></code>.</p>
+<p>Usaremos el primer método<a class="footnote-reference" href="#id7" id="id3">[3]</a> para lo cual, debe seguirse lo expuesto para
+<a class="reference internal" href="../03.mail/02-smtp/04-usuarios.html#userdb-crear"><span class="std std-ref">la creación de usuarios del correo electrónico</span></a>.</p>
+</div>
+<div class="section" id="autenticacion">
+<h4>7.1.2.4.2.2. Autenticación<a class="headerlink" href="#autenticacion" title="Enlazar permanentemente con este título">¶</a></h4>
+<p>Basta con añadir las dos siguientes líneas al comienzo de
+<code class="file docutils literal notranslate"><span class="pre">/etc/pam.d/vsftpd</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> Usuarios virtuales
+<span class="go">auth    sufficient      pam_userdb.so db=/etc/vsftpd_users crypt=crypt</span>
+<span class="go">account sufficient      pam_userdb.so db=/etc/vsftpd_users</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id4">
+<h4>7.1.2.4.2.3. Configuración<a class="headerlink" href="#id4" title="Enlazar permanentemente con este título">¶</a></h4>
+<p>Los usuarios virtuales son llamados <em>invitados</em> en la configuración. Para
+habilitarlos es necesario al menos incluir en <code class="file docutils literal notranslate"><span class="pre">/etc/vsftpd.conf</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">guest_enable=YES</span>
+</pre></div>
+</div>
+<p>que provoca que los usuarios se mapeen al usuario que indique <code class="docutils literal notranslate"><span class="pre">guest_username</span></code>
+y que por defecto es <em>ftp</em>. Pero:</p>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p class="last">Todos los usuarios, incluidos los reales, se mapean.</p>
+</div>
+<p>Además, los usuarios se tratan como el usuario anónimo: enjaulamiento, permisos,
+etc. Si se quiere que se traten tal como indican las directivas relativas a
+usuarios locales debe incluirse:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">virtual_use_local_privs=YES</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p>Al mapearse todos los usuarios a <em>ftp</em>, el directorio de ingreso será
+<code class="file docutils literal notranslate"><span class="pre">/srv/ftp</span></code> que es el directorio personal de tal usuario. Lo que puede
+hacerse para subsanarlo es particularizar el directorio de ingreso con alguno
+de los métodos ya descritos, por ejemplo:</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">user_sub_token=$USER</span>
+<span class="go">local_root=/home/$USER</span>
+</pre></div>
+</div>
+</div>
+<p class="rubric">Notas al pie</p>
+<table class="docutils footnote" frame="void" id="id5" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td>Obviamente exige la instalación y configuración del superservidor (el
+paquete trae un fichero de ejemplo para <strong class="program">xinetd</strong>).</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id6" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id2">[2]</a></td><td>Téngase en cuenta de que, si se cambia el nombre del servicio con
+<code class="docutils literal notranslate"><span class="pre">pam_service_name</span></code>, habrá que editar el fichero.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id7" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id3">[3]</a></td><td>Aunque el módulo se incluye dentro del paquete de módulos de <abbr title="Pluggable Authentication Modules">PAM</abbr> ya
+instalados, requiere la instalación del paquete <em>db-util</em>. El segundo método
+requiere la instalación del paquete <em>libpam-pwdfile</em>. El segundo método,
+además, permite añadir el resto de la información de usuario, no sólo la
+contraseña, pero dado que <strong class="program">vsftpd</strong> no hace uso de ello, no supone
+ninguna ventaja.</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">7.1.2. <abbr title="File Transfer Protocol">FTP</abbr> clásico</a><ul>
+<li><a class="reference internal" href="#instalacion">7.1.2.1. Instalación</a></li>
+<li><a class="reference internal" href="#configuracion">7.1.2.2. Configuración</a><ul>
+<li><a class="reference internal" href="#escucha">7.1.2.2.1. Escucha</a></li>
+<li><a class="reference internal" href="#acceso-anonimo">7.1.2.2.2. Acceso anónimo</a></li>
+<li><a class="reference internal" href="#usuarios-locales">7.1.2.2.3. Usuarios locales</a></li>
+<li><a class="reference internal" href="#enjaulado">7.1.2.2.4. Enjaulado</a></li>
+<li><a class="reference internal" href="#restricciones-de-acceso">7.1.2.2.5. Restricciones de acceso</a><ul>
+<li><a class="reference internal" href="#mediante-configuracion">7.1.2.2.5.1. Mediante configuración</a></li>
+<li><a class="reference internal" href="#mediante-autenticacion">7.1.2.2.5.2. Mediante autenticación</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#limitaciones-de-uso">7.1.2.2.6. Limitaciones de uso</a></li>
+<li><a class="reference internal" href="#conexion-segura">7.1.2.2.7. Conexión segura</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#cuota">7.1.2.3. Cuota</a></li>
+<li><a class="reference internal" href="#usuarios-virtuales">7.1.2.4. Usuarios virtuales</a><ul>
+<li><a class="reference internal" href="#falsamente-virtuales">7.1.2.4.1. Falsamente virtuales</a></li>
+<li><a class="reference internal" href="#realmente-virtuales">7.1.2.4.2. Realmente virtuales</a><ul>
+<li><a class="reference internal" href="#creacion">7.1.2.4.2.1. Creación</a></li>
+<li><a class="reference internal" href="#autenticacion">7.1.2.4.2.2. Autenticación</a></li>
+<li><a class="reference internal" href="#id4">7.1.2.4.2.3. Configuración</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="01.desc.html"
+                        title="capítulo anterior">7.1.1. Descripción teórica</a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="03.ssh.html"
+                        title="próximo capítulo">7.1.3. <abbr title="Security SHell">SSH</abbr> como servidor <abbr title="File Transfer Protocol">FTP</abbr></a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/07.serre/01.ftp/02.vsftpd.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Ir a" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="03.ssh.html" title="7.1.3. SSH como servidor FTP"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="01.desc.html" title="7.1.1. Descripción teórica"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de ServidorLinux - 0.1.0</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >7. Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="index.html" >7.1. Transferencia de ficheros</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor 2016, José Miguel Sánchez Alés.
+      Creado con <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
+    </div>
+  </body>
+</html>

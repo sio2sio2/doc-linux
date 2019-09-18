@@ -1,0 +1,119 @@
+.. _systemd-runlevels:
+
+*Runlevels*
+===========
+
+*systemd* emula los niveles de ejecución de *sysv* a través de las unidades de
+tipo *target*, que como ya se explicó son agrupaciones de otras unidades. Las
+equivalencias son las siguientes:
+
+========  ==========  =========
+Runlevel         Unidad
+--------  ---------------------  
+ (SysV)     Nombre      Alias 
+========  ==========  =========
+0         poweroff    runlevel0
+1         rescue      runlevel1
+2         multi-user  runlevel2
+3         multi-user  runlevel3
+4         multi-user  runlevel4
+5         graphical   runlevel5
+6         reboot      runlevel6
+\-        emergency   \-
+========  ==========  =========
+
+*systemd* define cinco *targets* distintos (*poweroff.target*, *rescue.target*,
+*multi-user.target*, *graphical.target* y *reboot.target*) correspondientes a
+los siete *runlevels* de *SystemV*. Por otro lado, *emergency.target* es un modo
+de funcionmiento mínimo aún más simple que el que proporciona *rescue.target* y
+que puede usarse en los casos en los que el sistema ni siquiera es capaz de
+entrar en este último modo.
+
+Podemos comprobar la existencia de estas unidades equivalentes a los *niveles de
+ejecución* usando :kbd:`list-unit-files`::
+         
+            $ systemctl list-unit-files --type=target
+            UNIT FILE                   STATE
+            [...]
+            default.target              static
+            [...]
+            emergency.target            static
+            [...]
+            graphical.target            static
+            [...]
+            multi-user.target           static
+            [...]
+            poweroff.target             disabled
+            [...]
+            reboot.target               disabled
+            [...]
+            rescue.target               disabled
+            [...]
+            runlevel0.target            disabled
+            runlevel1.target            disabled
+            runlevel2.target            static  
+            runlevel3.target            static  
+            runlevel4.target            static  
+            runlevel5.target            static  
+            runlevel6.target            disabled
+
+Obsérvese que se ha incluido *default.target*, porque esta unidad identifica
+cuál es el *runlevel* predeterminado. En realidad, es simplemente un enlace
+simbólico al *target* que identifica el modo en que quiere arrancarse. El nivel
+predefinido es::
+
+   $ systemctl get-default
+   graphical.target
+
+simepre que no hayamos estado trasteando antes, ya que esta orden nos devuelve
+el nivel de ejecución en que arrancará el sistema. Para cambiarlo podemos hacer
+lo siguiente::
+
+   # systemctl set-default multi-user.target
+
+Lo que provocará que el enlace *default.target* apunte ahora a
+*multi-user.target*\ [#]_::
+
+   $ readlink /etc/systemd/system/default.target
+   /lib/systemd/system/multi-user.target
+
+y que, a partir de ese momento, el sistema arranque siempre en el modo
+*multiusuario*, con lo que no arrancará automáticamente el modo gráfico.
+También es posible cambiar el *runlevel* modificando los parámetros que se pasan
+al núcleo en su arranque. Para un cambio permanente habría que modificar el
+fichero de configuración de *grub* (:file:`/etc/default/grub`) y regenerar los
+menús (:code:`update-grub`), pero tal acción no tiene demasiado sentido en la
+medida en que más limpio hacerlo a través de *default.target*. En cambio, sí
+puede ser útil conocer esta posibilidad cuando se quiere hacer un arranque en
+otro *nivel de ejecución*. En este caso, todo consistiría en editar la entrada
+de grub al aparecer el menú (pulsando :kbd:`e`), ir a la línea que indicar la
+carga del núcleo y añadir al final::
+
+   systemd.unit=multi-user.target
+
+o cualquier otro *target* en el que queramos arrancar\ [#]_.
+
+Si lo que se pretende es cambiar de nivel de ejecución sobre la marcha, puede
+usarse :kbd:`isolate`. Esto, por ejemplo::
+
+   # systemctl isolate poweroff.target
+
+cambiaría inmediatamente al *runlevel 0*, o sea, apagaría la máquina. 
+
+.. note:: Por retrocompatibilidad, *systemd* proporcional el :index:`ejecutable
+   <telinit>` :command:`telinit` que permitía hacer esto mismo con *sysv*::
+
+      # telinit 0
+
+.. rubric:: Notas al pie
+
+.. [#] De hecho, podríamos crear a mano directamente tal enlace simbólico y el
+   efecto sería el mismo::
+
+      # ln -sf /lib/systemd/system/multi-user.target /etc/systemd/system/default.target
+
+.. [#] Sigue siendo también válido el método usado con *sysv* consistente en
+   añadir el número de *runlevel* sin más. Así añadir al final de la línea un
+   simple :kbd:`3`, haría que arrancáramos en *runlevel 3*, o sea, en modo
+   *multi-user*.
+

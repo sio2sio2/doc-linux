@@ -1,0 +1,125 @@
+.. _mitm:
+
+Ataques de modificación
+***********************
+Para ilustrar los ataques de modificación analizaremos dos técnicas distintas.
+En ambos casos, daremos por hecho ya que el atacante ha logrado interceptar el
+tráfico (p.e. con un :ref:`envenenamiento ARP <arp-spoofing>`).
+
+.. _sslstrip:
+
+SSLstrip
+========
+
+Concepto
+--------
+*SSLstrip* es un ataque para capturar (y monitorizar en claro, claro está)
+conexiones |HTTP|\ s:
+
+.. image:: files/sslstrip.png
+
+En la imagen se presentan dos conexiones distintas entre cliente y superior. En
+la superior el tráfico está cifrado entre los dos extremos por lo que la
+máquina que intercepta el tráfico poco puede hacer, ya que será incapaz de
+descifrar el contenido envuelto por |SSL|. A lo más podría interceptar la
+consulta |DNS| previa y hacer una resolución espúrea para que el nombre del
+servidor se resolviera a la |IP| de un servidor web que controlara el atacante.
+De este modo, podría ser este segundo servidor y no el legítimo el que
+contestara a la petición del cliente. El problema que presenta este ataque es
+que el servidor suplantador presentará un certificado digital inválido y los
+navegadores web son, desde hace varios años, muy claros al respecto. Por
+tanto, sería muy, muy probable que el usuario se diera cuenta de que está
+sufriendo un ataque. 
+
+*SSLstrip*, sin embargo, no consiste en esto, sino en lo descrito en la
+conexión inferior. Si el navegador es la primera vez que se conecta al
+servidor, es probable que intente una conexión no cifrada y que el servidor web
+legítimo le pida que repita la petición por |HTTP|\ s. Ahora bien, esa primera
+conexión no es cifrada y, por tanto, es susceptible de ser capturada y
+manipulada. El ataque *SSLstrip* consiste en atrapar esa primera petición
+vulnerable y actuar como proxy repitiendo la petición hacia el servidor
+legítimo.  Éste redigirá la petición hacia la conexión segura, el proxy la
+realizará y recibirá la respuesta. En consecuencia, los dos extremos del tunel
+|SSL| son el servidor legítimo y el proxy atacante, y este último será capaz de
+descifrar la respuesta. La respuesta sin cifrar la remitirá al cliente y este
+la recibirá sin saber jamás que el servidor legítimo cifra las conexiones. De
+este modo, el cliente realizará siempre peticiones |HTTP| y el *proxy* atacante
+las cifrará y se comunicará con el servidor mediante |HTTP|\ s. En este caso,
+el usuario no tiene por qué sospechar que hay un ataque, puesto que jamás
+recibe ninguna alerta y sólo podría ponerse sobreaviso si considera sospechoso
+establecer una conexión insegura con un servidor con el que intercambia
+información sensible (p.e. datos bancarios si es la web de un banco).
+
+El único pero que se le puede poner al ataque es que necesita que el cliente
+realice una primera conexión insegura y eso no ocurrirá:
+
+* si el navegador ya intentó la conexión no segura en el pasado y el servidor ya
+  lo redirigió al sitio seguro, puesto que con toda seguridad el servidor envió
+  un código **301**.
+
+* si el cliente accede directamente al sitio seguro, por ejemplo, porque llega a
+  él a través de un buscador como `Google <https://www.google.com>`, que le
+  presentará el enlace seguro y no el inseguro.
+
+Cuando `Moxie Marlinspike <https://es.wikipedia.org/wiki/Moxie_Marlinspike>`_
+presentó el ataque en 2009, no había forma de evitarlo. Servidores y
+navegadores reaccionaron introduciendo con el :rfc:`6797` las campos de
+cabecera |HSTS|, que son campos de cabecera ``Strict-Transport-Security:`` que
+en la respuesta informan al cliente de que debe comunicarse con él usando
+|HTTP|\ s y no |HTTP|. Como consecuencia, las respuestas del servidor siempre
+incluyen una cabecera semejante a esta:
+
+.. code-block:: none
+
+   Strict-Transport-Security: max-age=31536000; includeSubDomains
+
+que informa al navegador de que durante un año (31536000 segundos) debe acceder
+al dominio solicitado y a todos sus subdominios usando protocolo seguro. Por
+tanto, después de haber aceptado esta cabecera, el navegador convertirá
+cualquier enlace inseguro en seguro y jamás hasta que se cumpla el plazo
+establecido accederá al servidor por |HTTP|. Además, la aceptación de esta
+cabecera, provoca que el navegador rechace la conexión al servidor si el
+certificado no es fiable o inválido sin dar ocasión al usuario de aceptarlo de
+todos modos.
+
+Por lo general, los navegadores no atienden la cabecera cuando se realiza una
+petición |HTTP|, ya que la cabecera ha podido ser inyectada por un proxy
+malintencionado; o cuando, aunque sea |HTTP|\ s, el certificado sea inválido,
+ya que no se puede asegurar que sea el servidor legítimo.
+
+.. seealso:: Para más información sobre esta cabecera consulte `su descripción
+   en el sitio para desarrolladores del proyecto Mozilla
+   <https://developer.mozilla.org/es/docs/Web/HTTP/Headers/Strict-Transport-Security>`_.
+
+Este proceder, no obstante, no resuelve el caso en que se accede por primera
+vez al sitio a través de un enlace no seguro. Para evitar la
+vulnerabilidad en este momento, se mantienen listas |STS| que los navegadores
+precargan. De este modo, la conexión a un sitio incluido en la lista siempre
+será segura, aunque se haga por primera vez y mediante enlace no seguro.
+
+.. note:: En el navegador Chrome_, puede consultar cuáles son las cabeceras |HSTS|
+   que se utilizan utilizan a través del enlace `chrome://net-internals#hsts
+   <chrome://net-internals#hsts>`_.
+
+.. Ver BEAST y CRIME.
+.. https://securityinside.info/hsts-una-defensa-mitm-ssltrip/
+.. https://www.nginx.com/blog/http-strict-transport-security-hsts-and-nginx/
+
+.. _bettercap:
+
+Implementación
+--------------
+
+.. https://miloserdov.org/?p=1112#4
+
+
+mitmproxy
+=========
+
+.. _mitmproxy:
+
+.. |mitm| replace:: man-in-the-middle
+.. |SSL| replace:: :abbr:`SSL (Secure Socket Layer)`
+.. |HSTS| replace:: :abbr:`HSTS (HTTP Strict Transport Security)`
+.. |STS| replace:: :abbr:`STS (Strict Transport Security)`
+.. _Chrome: https://www.google.com/chrome/

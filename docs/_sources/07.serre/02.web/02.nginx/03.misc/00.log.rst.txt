@@ -1,0 +1,62 @@
+.. highlight:: nginx
+
+.. _nginx-systemd:
+
+Registros con systemd
+=====================
+:program:`nginx` escribe directamente sus registros en el fichero que indiquemos
+en las directivas :ref:`access_log y error_log <nginx-logs>`. Ahora bien,
+también da la posibilidad de pasárselos al gestor de registros
+(:program:`systemd` en las versiones modernas de *debian*) y que éste se
+encargue. Para ello podemos crear el siguiente fichero::
+
+   # /etc/nginx/conf.d/logging.conf
+   log_format  journald  '$host[$remote_addr] - $request - $status $body_bytes_sent "$http_user_agent"';
+   access_log  syslog:server=unix:/dev/log,facility=local7,severity=info,nohostname journald;
+   error_log   syslog:server=unix:/dev/log,facility=local7,severity=error,nohostname; 
+
+.. warning:: Además, habra qué comentar las directivas correspondientes
+   presentes en :file:`/etc/nginx/nginx.conf`, porque de lo contrario seguirán
+   escribiéndose registros en los ficheros ahí definidos:
+
+   .. code-block:: nginx
+
+      ##
+      # Logging settings
+      ##
+
+      #access_log /var/log/nginx/access.log;
+      #error_log /var/log/nginx/access.log;
+
+De este modo, los registros de acceso y error aparecerían al ejecutar:
+
+.. code-block:: console
+
+   # journalctl -u nginx
+
+Para los de acceso se ha redefinido el formato, a fin de que aparezca el nombre
+del dominio al que se accede (por si manejamos varios dominios virtuales) y no
+la hora y fecha, ya que de esto último se encarga el propio gestor.
+Desgraciadamente para los de error no es posible.
+
+Si además queremos que los registros en su formato tradicional no se apunten
+en :file:`/var/log/syslog`, sino en otro fichero, entonces debemos crear el
+fichero :file:`/etc/rsyslog.d/nginx.conf` con el siguiente contenido:
+
+.. code-block:: console
+
+  # cat > /etc/rsyslog.d/nginx.conf
+  local7.=info    /var/log/nginx/access.log
+  local7.err      /var/log/nginx/error.log
+  local7.*        &
+  # invoke-rc.d rsyslog restart
+
+.. note:: Como las líneas contienen el nombre del dominio, los registros de
+   acceso es posible separarlos en distintos archivos dependiendo tal nombre.
+   Véase `cómo escribir las reglas para rsyslog
+   <http://www.rsyslog.com/doc/v8-stable/configuration/filters.html>`_
+
+.. note:: Como hemos colocado los registros dentro de :file:`/var/log/nginx` que
+   es donde *debian* espera encontrar los logs de :program:`nginx`, no tenemos
+   que preocuparnos de las rotaciones, ya que existe
+   :file:`/etc/logrotate.d/nginx` que se encarga de ello.

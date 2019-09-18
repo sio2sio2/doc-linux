@@ -1,0 +1,460 @@
+
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>7.6.3.4. Particularidades &#8212; documentación de ServidorLinux - 0.1.0</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/custom.css" />
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../_static/language_data.js"></script>
+    <script type="text/javascript" src="../../../_static/translations.js"></script>
+    
+    <link rel="index" title="Índice" href="../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../search.html" />
+    <link rel="next" title="8. Conceptos avanzados de redes" href="../../../08.redes/index.html" />
+    <link rel="prev" title="7.6.3.3. Configuración de syslinux" href="03.conf.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="../../../08.redes/index.html" title="8. Conceptos avanzados de redes"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="03.conf.html" title="7.6.3.3. Configuración de syslinux"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de ServidorLinux - 0.1.0</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >7. Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" >7.6. PXE</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../03.implementacion.html" accesskey="U">7.6.3. Implementación</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="particularidades">
+<h1>7.6.3.4. Particularidades<a class="headerlink" href="#particularidades" title="Enlazar permanentemente con este título">¶</a></h1>
+<div class="section" id="soporte-multiarquitectura">
+<span id="pxe-multiarch"></span><h2>7.6.3.4.1. Soporte multiarquitectura<a class="headerlink" href="#soporte-multiarquitectura" title="Enlazar permanentemente con este título">¶</a></h2>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p class="last">El soporte para <abbr title="Unified Extensible Firmware Interface">UEFI</abbr> de <strong class="program">syslinux</strong> es bastante
+deficiente. Ni la versión estable <strong>6.03</strong> que trae <em>debian</em> ni la versión
+<strong>6.04pre1</strong>, última publicada a fecha de redacción, funcionan correctamente.
+Sólo la versión <em>master</em> de desarrollo, pero aplicando algunos parches para
+poder compilarla<a class="footnote-reference" href="#id4" id="id1">[1]</a>, funcionan. Aun así, el módulo <code class="file docutils literal notranslate"><span class="pre">pxechn.c32</span></code> no
+está portando a arquitectura <abbr title="Unified Extensible Firmware Interface">UEFI</abbr> con lo que nuestra propuesta sólo puede
+implementarse en el primer escenario, gracias a que podemos saltar la carga
+de este módulo enviando la opción <strong>210</strong>. Por si fuera poco, tampoco
+funciona muy bien el módulo <code class="file docutils literal notranslate"><span class="pre">menu.c32</span></code><a class="footnote-reference" href="#id5" id="id2">[2]</a>.</p>
+</div>
+<p>Ya se ha comentado que un ordenador puede disponer de <abbr title="Basic Input/Output System">BIOS</abbr>, si es más antiguo,
+o de <abbr title="Unified Extensible Firmware Interface">UEFI</abbr>, si más moderno. Tal es así que nuestra <a class="reference internal" href="01.ficheros.html#pxe-ficheros"><span class="std std-ref">estructura de ficheros</span></a> está pensada para atender esta circunstancia. Sin embargo, en la
+configuración propuesta se carga de manera incondicional
+<code class="file docutils literal notranslate"><span class="pre">bios/pxelinux.0</span></code>, por lo que sólo somos capaces de dar soporte a clientes
+<abbr title="Preboot eXecution Environment">PXE</abbr> con <abbr title="Basic Input/Output System">BIOS</abbr> o, si son <abbr title="Unified Extensible Firmware Interface">UEFI</abbr>, emulando a la <abbr title="Basic Input/Output System">BIOS</abbr>. Sin embargo, empiezan a
+salir placas sin esta compatibilidad, por lo que sólo dar soporte a clientes
+<abbr title="Basic Input/Output System">BIOS</abbr> empieza a no ser adminisible.</p>
+<p>La solución, no obstante, es conceptualmente bastante sencilla: detectar de qué
+tipo de arquitectura es el cliente y enviar el fichero adecuado:
+<code class="file docutils literal notranslate"><span class="pre">bios/lpxelinux.0</span></code>, <code class="file docutils literal notranslate"><span class="pre">efi32/syslinux.efi</span></code> o
+<code class="file docutils literal notranslate"><span class="pre">efi64/syslinux.efi</span></code>. Al determinar éste cuál es el <em>directorio de
+trabajo</em>, el resto de módulos necesarios también sera de la arquitectura
+apropiada. Así pues, el objetivo es modificar la configuración del servidor
+<abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> (o del <abbr title="Preboot eXecution Environment">PXE</abbr> dependiendo del escenario).</p>
+<p>De acuerdo con el <span class="target" id="index-0"></span><a class="rfc reference external" href="https://tools.ietf.org/html/rfc4578.html"><strong>RFC 4578</strong></a>, el cliente <abbr title="Preboot eXecution Environment">PXE</abbr> debe enviar la opción <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr>
+<strong>93</strong> con un número que identifica la arquitectura:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="9%" />
+<col width="47%" />
+<col width="45%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Tipo</th>
+<th class="head">Nombre de la arquitectura</th>
+<th class="head">CSA en <strong class="program">dnsmasq</strong></th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>0</td>
+<td>Intel X86PC</td>
+<td>x86PC</td>
+</tr>
+<tr class="row-odd"><td>1</td>
+<td>NEC/PC98</td>
+<td>PC98</td>
+</tr>
+<tr class="row-even"><td>2</td>
+<td>EFI Itanium</td>
+<td>IA64_EDI</td>
+</tr>
+<tr class="row-odd"><td>3</td>
+<td>DEC Alpha</td>
+<td>Alpha</td>
+</tr>
+<tr class="row-even"><td>4</td>
+<td>Arc x86</td>
+<td>Arc_x86</td>
+</tr>
+<tr class="row-odd"><td>5</td>
+<td>Intel Lean Client</td>
+<td>Intel_Lean_Client</td>
+</tr>
+<tr class="row-even"><td>6</td>
+<td>EFI IA32</td>
+<td>IA32_EFI</td>
+</tr>
+<tr class="row-odd"><td>7</td>
+<td>EFI BC</td>
+<td>BC_EFI</td>
+</tr>
+<tr class="row-even"><td>8</td>
+<td>EFI Xscale</td>
+<td>Xscale_EFI</td>
+</tr>
+<tr class="row-odd"><td>9</td>
+<td>EFI x86-64</td>
+<td>X86-64_EFI</td>
+</tr>
+<tr class="row-even"><td>10</td>
+<td>EFI ARM32</td>
+<td>ARM32_EFI</td>
+</tr>
+<tr class="row-odd"><td>11</td>
+<td>EFI ARM64</td>
+<td>ARM64_EFI</td>
+</tr>
+</tbody>
+</table>
+<p>Además, cambía tambien el valor enviado al servidor para la opción <strong>60</strong>, que
+es de la forma «<em>PXEClient:Arch:00NN:UNDI:XXXX</em>». «<em>NN</em>» coincide con el número
+expuesto en la tabla: <em>00</em> para el primero tipo, <em>06</em> para el 6 y así
+sucesivamente.</p>
+<p>Dependiendo de si el servicio <abbr title="Preboot eXecution Environment">PXE</abbr> es independiente (segundo y tercer
+escenarios) o está incluido en el <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> (1º escenario), habrá que hacer una
+cosa u otra.</p>
+<div class="section" id="pxe">
+<h3>7.6.3.4.1.1. <abbr title="Preboot eXecution Environment">PXE</abbr><a class="headerlink" href="#pxe" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Recordemos que dijimos que la forma de prestar el servicio era incluir esta
+línea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">pxe-service=x86PC,&quot;Servicio de clonaciones&quot;,bios/lpxelinux.0</span>
+</pre></div>
+</div>
+<p>pero sin dar demasiadas explicaciones. El primer argumento es el tipo de
+arquitectura del cliente y la línea solamente se envía si el tipo de la línea
+coincide con el del cliente. Por tanto, nos basta con repetir la línea para las
+distintas arquitecturas que soportemos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">pxe-service=x86PC,&quot;Servicio de clonaciones&quot;,bios/lpxelinux.0</span>
+<span class="go">pxe-service=IA32_EFI,&quot;Servicio de clonaciones&quot;,efi32/syslinux.efi</span>
+<span class="go">pxe-service=BC_EFI,&quot;Servicio de clonaciones&quot;,efi64/syslinux.efi</span>
+<span class="go">pxe-service=x86-64_EFI,&quot;Servicio de clonaciones&quot;,efi64/syslinux.efi</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="dhcp">
+<h3>7.6.3.4.1.2. <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr><a class="headerlink" href="#dhcp" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Si la información de red la facilita directamente el servidor <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> entonces
+tendremos explícitamente que analizar la opción <strong>93</strong>.</p>
+<div class="section" id="dnsmasq">
+<h4>7.6.3.4.1.2.1. <strong class="program">dnsmasq</strong><a class="headerlink" href="#dnsmasq" title="Enlazar permanentemente con este título">¶</a></h4>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-match=x86,93,0</span>
+<span class="go">dhcp-match=efi32,93,6</span>
+<span class="go">dhcp-match=efi64,93,7</span>
+<span class="go">dhcp-match=efi64,93,9</span>
+
+<span class="go">dhcp-boot=tag:x86,bios/lpxelinux.0</span>
+<span class="go">dhcp-boot=tag:efi32,efi32/syslinux.efi</span>
+<span class="go">dhcp-boot=tag:efi64,efi64/syslinux.efi</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p>Recuérdese que en el primer escenario, podemos cambiar directamente al
+protocolo <abbr title="HyperText Transfer Protocol">HTTP</abbr>, proporcionando la opción <strong>210</strong> y nos ahorramos el paso
+por el módulo <code class="file docutils literal notranslate"><span class="pre">pxechn.c32</span></code>:</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-option=x86,encap:43,210,http://192.168.255.1/boot/bios/</span>
+<span class="go">dhcp-option=efi32,encap:43,210,http://192.168.255.1/boot/efi32/</span>
+<span class="go">dhcp-option=efi64,encap:43,210,http://192.168.255.1/boot/efi64/</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="servidor-del-isc">
+<h4>7.6.3.4.1.2.2. Servidor del <abbr title="Internet Systems Consortium">ISC</abbr><a class="headerlink" href="#servidor-del-isc" title="Enlazar permanentemente con este título">¶</a></h4>
+<p>Hay que hacer exactamente lo mismo que en <strong class="program">dnsmasq</strong>, aunque la sintaxis
+es algo más verborreica:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">option arch code 93 = unsigned integer 16;</span>
+<span class="go">if option arch = 00:06 {</span>
+<span class="go">   filename &quot;efi32/syslinux.efi&quot;;</span>
+<span class="go">} elsif option arch = 00:07 or option arch = 00:09 {</span>
+<span class="go">   filename &quot;efi64/syslinux.efi&quot;;</span>
+<span class="go">}</span>
+<span class="go">else {</span>
+<span class="go">   filename &quot;bios/lpxelinux.0&quot;;</span>
+<span class="go">}</span>
+</pre></div>
+</div>
+<p>Adicionalmente, podemos enviar la opción <strong>210</strong> para adelantar un paso del
+proceso de arranque.</p>
+</div>
+</div>
+</div>
+<div class="section" id="soporte-para-varias-redes">
+<span id="pxe-dns"></span><h2>7.6.3.4.2. Soporte para varias redes<a class="headerlink" href="#soporte-para-varias-redes" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Hasta ahora hemos supuesto que queremos dar servicio a una sola red y no a
+varias. Cuando se da este segundo caso es claro que el servidor <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> tendrá
+que servir configuraciones de red a todas las redes y que, en consonancia, en el
+tercer escenario, habrá que definir el servidor <em>proxyDHCP</em> también para todas
+las redes. El resto de nuestra configuración es <em>casi</em> independiente de cuáles y
+cuántas sean las redes, y el <em>script</em> <abbr title="PHP Hypertext Preprocessor">PHP</abbr> es capaz de saber la <abbr title="Internet Protocol">IP</abbr> del
+cliente con lo que conocerá la red de origen, si es que queremos particularizar
+el arranque para cada red.</p>
+<p>Ahora bien, hemos dicho <em>casi</em> y no completamente, porque hay un punto de nuestra
+configuración que la hemos hecho depender de la <abbr title="Internet Protocol">IP</abbr> del servidor y, por tanto,
+de la red en la que esté. Este punto es la configuración en la que se cambia el
+protocolo de <abbr title="Trivial FTP">TFTP</abbr> a <abbr title="HyperText Transfer Protocol">HTTP</abbr>:</p>
+<ul>
+<li><p class="first">En el fichero <code class="file docutils literal notranslate"><span class="pre">pxelinux.cfg/default</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">PROMPT 0</span>
+<span class="go">DEFAULT chain</span>
+
+<span class="go">LABEL chain</span>
+<span class="go">   MENU LABEL chain</span>
+<span class="hll"><span class="go">   KERNEL pxechn.c32 lpxelinux.0 -p http://192.168.255.1/boot/bios/</span>
+</span></pre></div>
+</div>
+</li>
+<li><p class="first">En el primer escenario en la configuración del servidor <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> al
+establecer el valor de la opción <strong>210</strong>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-option=encap:43,210,http://192.168.255.1/boot/bios/</span>
+</pre></div>
+</div>
+</li>
+</ul>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">De hecho, si nuestro escenario es el tercero, debíamos cambiar esta
+<abbr title="Internet Protocol">IP</abbr>, por aquella del servidor <abbr title="Preboot eXecution Environment">PXE</abbr>, que supusimos la <em>192.168.255.2</em>.</p>
+</div>
+<p>Pues bien, al haber varias redes el servidor dispondrá de varias direcciones,
+una para cada red y, aunque tomar una de ellas funciona, podría aparecer
+algún problema si decidimos mantener totalmente separadas las redes impidiendo
+el acceso mediante cortafuegos de una al resto.</p>
+<p>Una excelente solución es valernos del <abbr title="Domain Name Server">DNS</abbr>, ya que <strong class="program">pxelinux</strong> lo
+soporta y convertir la <abbr title="Uniform Resource Locator">URL</abbr><a class="footnote-reference" href="#id6" id="id3">[3]</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">http://192.168.255.1/boot/bios/</span>
+</pre></div>
+</div>
+<p>en:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">http://pxeserver/boot/bios/</span>
+</pre></div>
+</div>
+<p>Tal nombre añadirá el dominio de búsqueda asociado a cada red (p.e. <em>aula.ies</em>,
+<em>dpto.ies</em>, <em>admon.ies</em>, <em>direccion.ies</em>, etc.) con lo que los nombres serán
+distintos y cada uno de ellos podremos asociarlo a la <abbr title="Internet Protocol">IP</abbr> correspondiente.
+Configurar <a class="reference internal" href="../../../06.infraestructura/03.dns/02.isc.html#bind"><span class="std std-ref">bind</span></a> o <a class="reference internal" href="../../../06.infraestructura/03.dns/03.dnsmasq.html#dnsmasq-dns"><span class="std std-ref">dnsmasq</span></a> para ello es
+absolutamente trivial.</p>
+</div>
+<div class="section" id="deteccion-de-hardware">
+<span id="pxe-hdt"></span><h2>7.6.3.4.3. Detección de <em>hardware</em><a class="headerlink" href="#deteccion-de-hardware" title="Enlazar permanentemente con este título">¶</a></h2>
+<p><a class="reference external" href="http://hdt-project.org">hdt</a> es una herramienta de detección del hardware
+integrada como módulo de <strong class="program">syslinux</strong> (<code class="file docutils literal notranslate"><span class="pre">hdt.c32</span></code>, que requiere, además,
+<code class="file docutils literal notranslate"><span class="pre">libmenu.c32</span></code> y <code class="file docutils literal notranslate"><span class="pre">libgpl.c32</span></code>). Por ello, es interesante añadirlo a las
+posibiilidades de arranque:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">LABEL hdt</span>
+<span class="go">   MENU LABEL Hardware Detection Tool (HDT)</span>
+<span class="go">   COM32 hdt.c32</span>
+<span class="go">   APPEND modules_alias=../cfg/files/hdt/modules.ali pciids=../cfg/files/hdt/pci.ids</span>
+</pre></div>
+</div>
+<p>Requiere dos ficheros:</p>
+<ul class="simple">
+<li><code class="file docutils literal notranslate"><span class="pre">pci.ids</span></code>, que puede obtenerse del propio sistema dentro del directorio
+<code class="file docutils literal notranslate"><span class="pre">/usr/share/misc</span></code> (al menos en <em>debian</em>) o bien descargarse directamente
+de <a class="reference external" href="http://pci-ids.ucw.cz">aquí</a>.</li>
+<li><code class="file docutils literal notranslate"><span class="pre">modules.ali</span></code>, que es una copia de <code class="file docutils literal notranslate"><span class="pre">modules.alias</span></code>, sito en
+<code class="file docutils literal notranslate"><span class="pre">/lib/modules/$(uname</span> <span class="pre">-r)</span></code>.</li>
+</ul>
+<p>Ambos ficheros pueden compromirse con <a class="reference internal" href="../../../02.conbas/11.backup/01.compresion.html#gzip"><span class="std std-ref">gzip</span></a>, para hacer más ligera
+la descarga.</p>
+</div>
+<div class="section" id="graficos-sin-menu">
+<span id="pxe-syslinux-display"></span><h2>7.6.3.4.4. Gráficos sin menú<a class="headerlink" href="#graficos-sin-menu" title="Enlazar permanentemente con este título">¶</a></h2>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p class="last">En la versión 6 de <strong class="program">syslinux</strong> el soporte para imágenes
+<em>lss</em> está roto.</p>
+</div>
+<p>La interfaz simple que proporciona <strong class="program">syslinux</strong> es bastante espartana:
+alguna frase que podamos indicar con la directiva <code class="docutils literal notranslate"><span class="pre">SAY</span></code> y el prompt
+<kbd class="kbd docutils literal notranslate">boot:</kbd>. No obstante, es posible embeceller esta presentación gracias a la
+directiva <code class="docutils literal notranslate"><span class="pre">DISPLAY</span></code> y las <a class="reference external" href="https://www.syslinux.org/wiki/index.php?title=Display_file_format">explicaciones proporcionadas en la wiki de proyecto</a>.</p>
+<p>Groseramente explicado, podemos incluir en nuestro fichero de configuración la
+directiva referida para que cargue el fichero de definición:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">DISPLAY ../cfg/files/gboot/boot.msg</span>
+</pre></div>
+</div>
+<p>y dentro de tal fichero incluir las órdenes que explica la wiki. Por ejemplo,
+podríamos incluir este contenido:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">^L^X../cfg/files/gboot/logo.lss</span>
+<span class="go">^G^O03Escoja arranque</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">El significado de los caracteres especiales puede consultarse en la
+referida página.</p>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">En una terminal de linux, los caracteres especiales deben escribirse pulsando
+<kbd class="kbd docutils literal notranslate">Ctrl+V</kbd> y la letra indicada.</p>
+</div>
+<p>Es necesario aclarar, no obstante, cómo crear el gráfico del logo. Si lo tenemos
+en formato <code class="file docutils literal notranslate"><span class="pre">.png</span></code>, es necesario utilizar <strong class="command">ppmtolss16</strong>, que
+facilita el propio <strong class="program">syslinux</strong> (en <em>debian</em> se encuentra en el paquete
+<em>syslinux-utils</em>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> convert logo.png logo.ppm
+<span class="gp">$</span> ppmtolss16 &lt; logo.ppm &gt; logo.lss
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">El gráfico está limitado a 16 colores, por lo que hay que tenerlo en
+cuenta al crear el logo original.</p>
+</div>
+</div>
+<div class="section" id="arranque-con-ipxe">
+<span id="pxe-ipxe"></span><h2>7.6.3.4.5. Arranque con <strong class="program">iPXE</strong><a class="headerlink" href="#arranque-con-ipxe" title="Enlazar permanentemente con este título">¶</a></h2>
+<p class="rubric">Notas al pie</p>
+<table class="docutils footnote" frame="void" id="id4" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td><p class="first">El mayor éxito se logró obteniendo:</p>
+<ul class="last simple">
+<li>Tomando la última versión disponible (de 23/11/2017) del <a class="reference external" href="http://repo.or.cz/syslinux.git">repositorio git</a>.</li>
+<li>Añadiendo al subdirectorio <code class="file docutils literal notranslate"><span class="pre">gnu-efi</span></code> de las fuentes el
+código de <a class="reference external" href="https://sourceforge.net/projects/gnu-efi/">este proyecto</a>.
+La versión <em>3.0.8</em> en concreto, pero renombrando el directorio raíz a <em>3.0</em> tras descomprimirla.</li>
+<li>Usando los parches <em>0007</em> y <em>0008</em> disponibles <a class="reference external" href="https://github.com/nvdla/buildroot/tree/master/boot/syslinux">en esta página</a></li>
+</ul>
+</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id5" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id2">[2]</a></td><td>En cualquier caso, se desarrolla cómo dotar de soporte, porque ilustra el
+modo de distinguir las distintos clientes en el servidor y porque el
+procedimiento será válido, si en algún momento <strong class="program">syslinux</strong> ofrece un
+soporte aceptable.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id6" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id3">[3]</a></td><td>Como pasamos a usar un nonbre específico para este servicio, podríamos
+prescindir de añadir a la <abbr title="Uniform Resource Locator">URL</abbr> <code class="file docutils literal notranslate"><span class="pre">/boot/</span></code> cambiando mínimamente la
+configuración de <strong class="program">nginx</strong>.</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">7.6.3.4. Particularidades</a><ul>
+<li><a class="reference internal" href="#soporte-multiarquitectura">7.6.3.4.1. Soporte multiarquitectura</a><ul>
+<li><a class="reference internal" href="#pxe">7.6.3.4.1.1. <abbr title="Preboot eXecution Environment">PXE</abbr></a></li>
+<li><a class="reference internal" href="#dhcp">7.6.3.4.1.2. <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr></a><ul>
+<li><a class="reference internal" href="#dnsmasq">7.6.3.4.1.2.1. <strong class="program">dnsmasq</strong></a></li>
+<li><a class="reference internal" href="#servidor-del-isc">7.6.3.4.1.2.2. Servidor del <abbr title="Internet Systems Consortium">ISC</abbr></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#soporte-para-varias-redes">7.6.3.4.2. Soporte para varias redes</a></li>
+<li><a class="reference internal" href="#deteccion-de-hardware">7.6.3.4.3. Detección de <em>hardware</em></a></li>
+<li><a class="reference internal" href="#graficos-sin-menu">7.6.3.4.4. Gráficos sin menú</a></li>
+<li><a class="reference internal" href="#arranque-con-ipxe">7.6.3.4.5. Arranque con <strong class="program">iPXE</strong></a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="03.conf.html"
+                        title="capítulo anterior">7.6.3.3. Configuración de <strong class="program">syslinux</strong></a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="../../../08.redes/index.html"
+                        title="próximo capítulo">8. Conceptos avanzados de redes</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../_sources/07.serre/06.pxe/03.implementacion/04.misc.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Ir a" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="../../../08.redes/index.html" title="8. Conceptos avanzados de redes"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="03.conf.html" title="7.6.3.3. Configuración de syslinux"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de ServidorLinux - 0.1.0</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >7. Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" >7.6. PXE</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../03.implementacion.html" >7.6.3. Implementación</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor 2016, José Miguel Sánchez Alés.
+      Creado con <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
+    </div>
+  </body>
+</html>

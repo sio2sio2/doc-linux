@@ -1,0 +1,591 @@
+.. highlight:: bash
+
+Estructuras de control
+**********************
+El epígrafe está dedicado a las *estructuras de control* disponibles es linux,
+excepto las funciones, que se verán :ref:`mas adelante <sh-func>`.
+
+.. _sh-if:
+
+``if``
+======
+La sentencia condicional tiene la siguiente forma::
+
+   if ORDEN; then
+      ORDENES
+   else
+      ORDENES
+   fi
+
+y, si quiere encadenarse varios::
+
+   if ORDEN; then
+      ORDENES
+   elif ORDEN; then
+      ORDENES
+   else
+      ORDENES
+   fi
+
+La orden\ [#]_ que acompaña al ``if`` actúa como expresión evaluadora, de manera
+que si devuelve **0** (éxito) se evalúa el bloque del ``if``; y, en caso
+contrario, el bloque del ``else``. Por ejemplo::
+
+   if grep -q '^V' < fichero.txt; then
+      echo "Al menos una línea empieza por V"
+   else
+      echo "Ninguna línea empieza por V"
+   fi
+
+.. _test:
+.. index:: test
+
+Una de las órdenes que más se usa para construir expresiones evaluadoras es
+:command:`test`, que permite inquirir sobre el valor de las variables y la
+existencia o inexistencia de ficheros, y es tanto una orden interna
+proporcionada por la propia *shell* como un comando independiente.  Por
+ejemplo::
+
+   if test "$USER" = "root"; then
+      echo "Es usted el administrador"
+   fi
+
+o también::
+
+   if test -d "$HOME"; then
+      echo "¡Felicidades, $USER! Su directorio personal existe"
+   fi
+
+Para conocer todas las posibilidades que brinda :command:`test`, consulte la
+ayuda interna o la página de manual del comando correspondiente::
+
+   $ help test
+   $ man test
+
+No obstante lo anterior, existe una variante de la orden anterior llamada
+:command:`[` (sí, un corchete, así como se escribe), que funciona de la misma
+forma excepto por el hecho de que obliga siempre a que su argumento final sea
+``]``. Por ese motivo, las condicionales arriba escritas se escriben más
+comunmente así::
+
+   if [ "$USER" = "root" ]; then
+      echo "Es usted el administrador"
+   fi
+
+   if [ -d "$HOME" ]; then
+      echo "¡Felicidades, $USER! Su directorio personal existe"
+   fi
+   
+.. warning:: Recuerde que :command:`[` es una orden y ``]``, su último
+   argumento. En consecuencia, siempre debe existir un espacio de separación entre
+   entre ellos y el contenido (que son argumentos). De la misma forma, que no
+   tiene sentido :code:`test-d "$HOME"`, no tiene sentido :code:`[-d "$HOME"]`.
+
+Para construir una condición compuesta, basta con concatenar varias órdenes
+:command:`test`, tal como se explicó con la :ref:`concatenación de órdenes
+<sh-concat>`::
+
+   if [ -d "$HOME" ] || [ -z "$HOME" ]; fhen
+      # Bla, bla, bla...
+   fi
+
+.. note:: La orden :command:`test` `según el estándar POSIX
+   <http://pubs.opengroup.org/onlinepubs/009695399/utilities/test.html>`_
+   dispone de las opciones :kbd:`-a` y :kbd:`-o`, pero como extensiones
+   *XSI* que no son obligatorias, por lo que por portabilidad es
+   preferible usar varias órdenes :command:`test`.
+
+.. warning:: Recuerde que en la *shell* el operador lógico :kbd:`&&` tiene la
+   misma precedencia que :kbd:`||`.
+
+.. _sh-regex:
+
+:command:`bash` dispone, además, de la orden interna :command:`[[` que introduce
+`algunas mejoras al test estándar <http://mywiki.wooledge.org/BashFAQ/031>`_.
+Una de sus ventajas es que permite el uso de :ref:`expresiones regulares <regex>`\ [#]_,
+lo cual nos puede evitar el uso de :ref:`grep <grep>`, cuando lo que hacemos es
+comprobar valores de variables. Por ejemplo, esta evaluación::
+
+   if echo "$HOME" | grep -qw "$USER"; then
+      echo "El directorio personal contiene el nombre de usuario"
+   fi
+
+es equivalente a esta otra\ [#]_::
+
+   if [[ $HOME =~ $USER ]]; then
+      echo "El directorio personal contiene el nombre de usuario"
+   fi
+
+También permite el uso de expansiones con las operaciones de igualdad y
+desigualdad (tal como hace ``case`` como veremos a continuación). Por ejemplo::
+
+   $ var="HOLA"
+   $ [ $var = H* ] && echo "Éxito"
+   $ [[ $var = H* ]] && echo "Éxito"
+   Éxito
+
+.. _sh-case:   
+
+``case``
+========
+Esta estructura se usa para expresar la sentencia condicional múltiple. Tiene
+esta forma::
+
+   case $VARIABLE in
+      v1)
+         # Bloque de instrucciones para el primer valor
+         ;;
+      v2)
+         # Bloque de instrucciones para el segundo valor
+         ;;
+         .
+         .
+         .
+      vn)
+         # Bloque de instrucciones para el enésimo valor
+         ;;
+   esac
+
+donde *v1*, *v2*, ..., *vn* son los distintos valores que puede tomar la
+variable ``VARIABLE`` cuyo valor se prueba al principio de la sentencia. El
+intérprete comprueba en orden si el valor de la variable coincide con los
+expresados y ejecutará el bloque del primero con el que coincida. Los bloques
+siempre deben acabar con dos puntos y coma. La potencia de esta estructura es
+que el intérprete expande los valores *v1*, *v2*, etc:
+
+.. literalinclude:: files/case.sh
+
+También es posible usar el carácter ``|`` para permitir la coincidencia múltiple
+con un bloque::
+
+   case nombre in
+      Luis|Manolo|Pablo)
+         echo "$nombre es mi amigo."
+         ;;
+      *)
+         echo "No tengo el gusto de conocer a $nombre"
+         ;;
+   esac
+   
+
+.. _sh-while:
+
+``while``/``until``
+===================
+Son los ordenes que permiten repetir un bucle mientras se cumpla (``while``) o no
+(``until``) una condición::
+
+   while ORDEN; do
+      # Órdenes del bucle
+   done
+
+y para ``until`` se tiene la misma estructura::
+
+   until ORDEN; do
+      # Órdenes del bucle
+   done
+
+La orden que expresa la condición se evalúa exactamente de la misma forma que en
+el caso de ``if``. Por ejemplo:
+
+.. code-block:: bash
+
+   #!/biun/sh
+
+   RANDOM=5
+
+   echo "Acabo de pensar un número entre 1 y 10."
+
+   while [ "$num" != "$RANDOM" ]; do
+      read -p "Intente averiguarlo: " num
+   done
+
+   echo "¡¡¡Correcto!!!"
+
+Sí, es cierto: el programa sólo sirve para jugar una vez, porque el número
+oculto siempre es el mismo. La idea es sólo mostrar cómo usar el bucle, pero
+podemos complicar el programa para que el número se obtenga al azar\ [#]_:
+
+.. literalinclude:: files/numero.sh
+
+Como en otros lenguajes de programación, se dispone (y también en el próximo
+tipo de bucle) de ``break`` (romper el bucle) y ``continue`` (volver a comenzar
+el bucle sin completar la iteración actual).
+
+.. _while-read:
+
+Es bastante común usar el bucle ``while`` junto a la orden :ref:`read <read>`
+para leer línea a línea el contenido de un fichero, aprovechando que ésta orden
+tienen éxito si lee algo y fracasa si no queda nada que leer o, visto de otro
+modo, si lee el carácter :abbr:`EOF (End Of File)`:
+
+.. code-block:: bash
+
+   while read linea; do
+      echo $linea
+   done < fichero.txt
+
+Si las líneas que deseamos leer se encuentran en una variable, también podemos
+utilizar esta construcción, bien con la redirección `<<<` (exclusiva de
+:program:`bash`), o bien usando una tubería::
+
+   echo "$contenido" | while read linea; do
+      echo $linea
+   done
+
+
+.. warning:: La tubería provoca que el bucle se ejecute en una subshell y, en
+   consecuencia, que toda definición o redefinición de variable que se haga
+   dentro de él no exista fuera::
+
+      $ echo "AAA" | while read linea; do var="$linea"; done
+      $ echo "El valor de var es: $var"
+      El valor de var es: 
+
+   A pesar de lo que podríamos esperar la variable *var* no vale "AAA", puesto
+   que la asignación se hizo dentro del bucle y este se ejecuta en una
+   *subshell*. Este es un error muy común, incluso entre programadores
+   experimentados.
+
+   Soslayar este problema supone o cambiar la estructura (p.e. usando el
+   :command:`for` que se verá a continuación) o eliminar la tubería utilizando
+   un :ref:`Here Document <sh-here-document>` (si programamos en
+   :program:`bash` podemos usar un :ref:`Here String <bash-here-string>`)::
+
+      $ while read linea; do var="$linea"; done <<EOF
+      > AAA
+      EOF
+      $ echo "El valor de var es: $var"
+      El valor de var es: AAA
+
+.. _sh-for:
+
+``for``
+=======
+La *shell* dispone tambien de un bucle de tipo ``for``, que está asociado a una
+variable que va tomando distintos valores\ [#]_::
+
+   for var in a b c; do
+      echo $var
+   done
+
+En este caso, se imprimirán tres líneas con los valores *a*, *b* y *c*,
+respectivamente.
+
+.. note:: Aunque los caracteres separadores de campos vienen dado por el valor
+   de la variable :ref:`IFS <sh-ifs>`, las expansiones de la *shell* se
+   comportan de modo que cada campo es cada uno de los resultados individuales
+   de la expansión. Por ejemplo, supongamos estos dos ficheros::
+
+      $ ls *.mp3
+      cancion1.mp3
+      cancion 2.mp3
+
+   Le expansión genera dos elementos, no tres, aunque el segundo nombre contenga
+   un espacio::
+
+      $ for f in *.mp3; do
+      >    echo "$f"
+      > done
+      cancion1.mp3
+      cancion 2.mp3
+
+   Esto no es una característica exclusiva de *for*, sino que es aplicable a
+   cualquier ocasión en que haya que interpretar distintos campos (p.e. cuando
+   se pasan argumentos a una función).
+
+:command:`bash`, además, dispone de un ``for`` con la sintaxis de *C*\ [#]_::
+
+   for((i=0; i<10; i++)); do
+      echo $i
+   done
+
+Bloque
+======
+Un :dfn:`bloque` no es propiamente una estructura de control de flujo, sino
+simplemente un modo de agrupar lógicamente varias instrucciones:
+
+.. code-block:: bash
+
+   {  # Bloque: encerrado entre llaves.
+      orden1
+      orden2
+      orden3
+   }
+
+.. note:: Si queremos llevar la llave de cierre a la misma línea que la última
+   orden, hay que separarla de esta con un ";" (punto y coma):
+
+   .. code-block:: bash
+
+      { orden1; orden2; orden3; }
+
+En principio, no hay diferencia alguna entre crear o no el bloque, esto es,
+encerrar las instrucciones entre llaves, si no es la de organizar con más
+claridad el código. Tiene, sin embargo, utilidad cuando se combina con
+redirecciones, puesto que permite redirigir la entrada o la salida de todas las
+instrucciones hacia el mismo sitio. Por ejemplo::
+
+   { 
+      read _  # Este read lee la primera línea.
+      while read -r linea; do
+         # Manipulamos la línea
+      done
+   } < entrada.txt
+
+El efecto del código anterior es desechar la primera línea del fichero, ya que
+no la tratamos. Con la redirección de salida podemos obrar igual::
+
+   { echo "Hola"; echo "Adios"; } > salida.txt
+
+O con la tubería:
+
+.. code-block:: console
+
+   $ echo "Hola"; echo "Adios" | tr '[:lower:]' '[:upper:]'
+   Hola
+   ADIOS
+   $ { echo "Hola"; echo "Adios"; } | tr '[:lower:]' '[:upper:]'
+   HOLA
+   ADIOS
+
+.. warning:: Usar parentesis tiene el efecto aparente de agrupar, pero en
+   realidad, lo que hace es crear una *subshell* y que todas las órdenes
+   encerradas en él, se ejecuten en la *subshell*.
+
+.. _xargs:
+.. index:: xargs
+
+*Bonus track*: :command:`xargs`
+===============================
+:command:`xargs` no es propiamente un bucle, sino una orden externa que nos
+permite emular el comportamiento de un bucle\ [#]_ y, bajo ciertas circunstancias,
+tomar ventaja sobre el uso de :command:`while` o :command:`for`. Básicamente es
+una orden que se alimenta de la entrada estándar y pasa los datos que recibe a
+la orden que se haya escrito como argumento suyo. Por ejemplo::
+
+   $ seq 1 5 | xargs printf "%05d\n"
+   00001
+   00002
+   00003
+   00004
+   00005
+
+que equivale a\ [#]_::
+
+   for x in $(seq 1 5); do
+      printf "%05d\n" $x
+   done
+
+Hay que tener presente, no obstante, varias particularidades:
+
+#. :program:`xargs` considera separadores de argumentos el espacio, la
+   tabulación y el cambio de línea. Esta consideración es independiente del
+   valor de la :ref:`variable de ambiente IFS <sh-ifs>`.
+
+   Ahora bien, como en la *shell*, el escapado o las comillas simples o dobles
+   permiten construir argumentos que contienen estos caracteres separadores.
+   Por ejemplo::
+
+      $ echo "1 '2 3'" | xargs printf "%05d\n"
+      00001
+      printf: «2 3»: valor no completamente convertido
+      00002
+
+   que funciona mal, porque el segundo argumento que se pasa es el conjunto "*2
+   3*" y eso no es un número. Sin las comillas, *2* y *3* serían dos argumentos
+   distintos y así es como :program:`xargs` los habria pasado a
+   :ref:`printf <printf>`.
+
+#. En principio, no pasa todos los argumentos uno a uno, sino todos de golpe\
+   [#]_.  En consecuencia, la orden del primer ejemplo es, en realidad,
+   equivalente a::
+
+      $ printf "%05d\n" $(seq 1 5)
+
+   pero como tenemos la suerte de que :program:`printf` interpreta que debe
+   aplicar el mismo formato (*%05d\\n*) a los cinco argumentos, el resultado de
+   la orden es el mismo que si se hubiera ejecutado cinco veces repetidamente lo
+   que nos ha permitido antes mentir al respecto. Para llegar a ver cómo puede
+   comportarse :command:`xargs` como un bucle, debemos avanzar un poco más.
+
+#. En ausencia de indicación alguna (como es el caso) añade los datos recibidos
+   al final de la orden que se da como argumento.
+
+#. Cuando :program:`xargs` propicia que la orden de la que se acompaña se ejecute
+   varias veces, se ejecuta secuencialmente (no en paralelo), que es
+   precisamente la forma en que se ejecutan las iteraciones de un bucle.
+
+Para alterar el *primer aspecto* existe la opción:
+
+:kbd:`-0`
+   que provoca que sólo se considere como carácter separador de argumentos el
+   caracter nulo. Por tanto::
+
+      $ printf "1\00002" | xargs -0 printf "%4.2f\n"
+      1,00
+      2,00
+
+   .. note:: :ref:`find <find>` tiene un argumento `-print0` para hacer que los
+      ficheros que encuentre se separen con un carácter nulo, en vez de con un
+      cambio de línea, lo cual lo hace muy apto para usarlo en conjunción con
+      :command:`xargs`.
+
+El *segundo aspecto* lo podemos alterar con algunas opciones:
+
+:kbd:`-L`
+   Permite indicar cada cuántas líneas queremos que :command:`xargs` pare de
+   pasar de un tirón argumentos y continúe pasando los siguientes en una nueva
+   orden. Por ejemplo::
+
+      $ echo -e "1 2\n3 4" | xargs echo
+      1 2 3 4
+
+   hace que :command:`xargs` pasa los cuatro números a :command:`echo` por lo que
+   todos se escribirán en una misma línea. En cambio::
+
+      $ echo -e "1 2\n3 4" | xargs -L1 echo
+      1 2
+      3 4
+
+   pasa los dos primeros argumentos (números) a un primer :command:`echo`,
+   mientras que los dos segundos se los pasa a un :command:`echo` distinto. En
+   consecuencia, aparecen en dos líneas distintas.
+
+:kbd:`-n`
+   Permite indicar cuántos argumentos como máximo pasa :command:`xargs` a la
+   orden expresada en su argumento. En consecuencia::
+
+      $ echo 1 2 3 4 | xargs -n1 echo
+      1
+      2
+      3
+      4
+
+   escribe los dos argumentos en líneas distintas, ya que son imprimidos por
+   distinto :command:`echo`.
+
+:kbd:`-r`
+   No ejecuta la orden si no tiene nada que pasar. Un ejemplo bastante
+   estúpido es éste::
+
+      $ echo "" | xargs echo
+
+      $ echo "" | xargs -r echo
+
+   En el primer caso se imprime una línea en blanco, pues ejecuta el
+   :command:`echo` sin argumentos. En el segundo caso, al añadir la opción
+   :kbd:`-r` jamás se llega a ejecutar el :command:`echo` derecho. Es bastamte
+   útil, por ejemplo, cuando pasamos líneas completas, pero queremos saltar las
+   líneas en blanco.
+
+Para el *tercer aspecto* existe la opción:
+
+:kbd:`-I`
+   que permite indicar una cadena que se usará para indicar en qué punto de la
+   orden deben incluirse los datos suministrados. Por ejemplo::
+
+      $ echo "eth0 eth1" | xargs -n1 -I {} arp-scan --interface {} --localnet
+
+   hará que el nombre de la interfaz aparezca como argumento de la opción
+   :kbd:`--interface` de `arp-scan <https://linux.die.net/man/1/arp-scan>`_.
+
+   .. note:: Tal como prescribe su página de manual, usar esta opción implica
+      ``-L 1``
+
+El *cuarto aspecto* también se puede modificar, de manera que las órdenes se
+procesen en paralelo. De hecho, puede ser interesante si nos es indiferente el
+orden de procesamiento y, además, cada una se demora un tiempo. Para ello existe
+la opción:
+
+:kbd:`-P`
+   que permite indicar el número de órdenes que admitimos que se ejecuten en
+   paralelo (**0**, si queremos que se ejecuten todas en paralelo). En este
+   caso::
+
+      $ echo 192.168.1.{1..254} | xargs -n1 -P20 ping -q -W2 -c1 
+
+   Hacemos :command:`ping` a los 254 posibles dispositivos de la red, pero de 20
+   en 20, para ahorrar tiempo.
+
+En conclusión, podemos usar :command:`xargs` para emular bucles pero teniendo en
+cuenta lo siguiente:
+
+* Sólo vale para ejecución de una orden, que, además, no puede ser una función
+  de la *shell*, ya que :command:`xargs` es un programa externo.
+
+* Usarlo implica la ejecución en *subshells* y la ejecución de :program:`xargs`
+  como intermediario.
+
+* En compensación, es una sintaxis más compacta y permite hacer fácilmente
+  ejecuciones en paralelo.
+
+.. rubric:: Notas al pie
+
+.. [#] En realidad, pueden escribirse varias ordenes, de manera que el resultado
+   evaluable será el que devuelva la última.
+
+.. [#] :program:`bash` tiene soporte limitado para
+   :abbr:`ERE (Extended Regular Expressions)`.
+
+.. [#] En honor a la verdad no son equivalentes. Para que lo fueran el patrón
+   debería ser :code:`\b$USER\b`. Sin embargo, usar estos caracteres dentro del
+   corchete da problemas en :command:`bash` por lo que nos veríamos obligados a
+   usar una variable intermedia::
+
+      pattern=\\b$USER\\b
+      if [[ $HOME =~ $pattern ]]; then
+         echo "El directorio personal contiene el nombre de usuario"
+      fi
+
+.. [#] :command:`bash` dispone de una variable para generar número aleatorios
+   entre 0 y 32767::
+
+      $ echo $RANDOM
+      28396
+      $ echo $RANDOM
+      1919
+
+   pero no existe en otras *shell* lo que hace la solución no portable. Para
+   evitarlo, hemos accedido al dispositivo de bytes pseudo-aleatorios
+   :file:`/dev/urandom`.
+
+.. [#] Es decir, que el bucle es más bien del tipo *foreach*.
+
+.. [#] Podríamos escribir este bucle coon la sintaxis anterior usando las
+   expansiones::
+
+      for i in {0..9}; do
+         echo $i
+      done
+
+   .. _seq:
+   .. index:: seq
+
+   pero, de nuevo, esta forma sólo es compatible con :command:`bash`, porque
+   en el estándar no existe la expansión de llaves. Preservando la
+   compatibilidad, podría llevarse a cabo la acción, recurriendo a la orden
+   :command:`seq`::
+
+      for i in $(seq 1 10); do
+         echo $i
+      done
+
+.. [#] Para el programador familiarizado medianamente con la `programación
+   funcional <https://es.wikipedia.org/wiki/Programaci%C3%B3n_funcional>`_,
+   podríamos considerar :command:`xargs` una suerte de función `map
+   <https://en.wikipedia.org/wiki/Map_(higher-order_function)>`_. Claro que,
+   siendo tan laxos, también podríamos considerar :ref:`grep <grep>` el
+   sucedáneo de la función `filter
+   <https://en.wikipedia.org/wiki/Filter_(higher-order_function)>`_.
+
+.. [#] Mentira, no equivale a tal bucle, sino a lo que se explicará a
+   continuación, pero con el argumento apropiado sí podríamos hacer que
+   equivaliera a ese bucle de cinco iteraciones. Tras la explicación quedará
+   todo claro.
+
+.. [#] Esta afirmación no es complemente exacta: hay un tamaño máximo, superado
+   el cual los restantes argumentos se reservan para una segunda ejecución de la
+   orden. Esta cantidad máxima de caracteres que se pueden pasar como argumentos
+   dependen del sistema. Para más información puede consultarse lo que se dice
+   de la opción :kbd:`-s` en su página de manual.

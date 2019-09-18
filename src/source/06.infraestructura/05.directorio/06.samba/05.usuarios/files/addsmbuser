@@ -1,0 +1,233 @@
+#!/bin/sh
+
+CONF="/etc/samba/smb.conf"
+DRIVE="H:"
+# Nombre de las Secciones:
+PROFILES="Profiles"
+HOME="home"
+
+ayuda() {
+   cat<<-EOF
+   $(basename $0) [<usuario>] [<opciones>]
+      Programa para crear usuarios en AD de samba.
+
+   La creación de usuarios se hace atendiendo a las sioguientes reglas:
+      - No se añade información sobre UID ni GID, ya que se presupone que sssd
+        mapeará en linux los SID de windows.
+      - No se define el campo gecos, por lo que se recomienda usar en sssd.conf:
+            ldap_user_gecos = displayName
+      - Se define un directorio para albergar el directorio personal de linux y
+         una letra para montarlo.
+      - Se define un directorio para albergar el directorio personal de windows.
+
+   Opciones:
+      -c, --conf-file <FICHERO>  Fichero de configuración de samba.
+                                 Predeterminado: "/etc/samba/smb.conf".
+      -d, --domain <DOMAIN>      Dominio de samba. Si no se especifica,
+                                 se calcula.
+      -D, --drive <VOLUMEN>      Volumen en el que aparecerá el directorio UNIX
+                                 en las sesiones de WINDOWS.
+                                 Predeterminado: "H:".
+      -h, --help                 Muestra esta ayuda.
+      -H, --home                 Nombre de la sección que define los
+                                 directorios personales de UNIX.
+                                 Predeterminado: "home".
+      -n, --name <NOMBRE>        Nombre de pila del usuario
+      -p<CONTRASEÑA>             Contraseña de usuario. Debe escribirse
+                                 pegada al argumento.
+      -P, --profiles <NOMBRE>    Nombre de la sección que define los perfiles
+                                 personales de windows.
+                                 Predeterminado: "Profiles".
+      -s, --surname <SURNAME>    Apellidos del usuario.
+
+   Si no es especifican las opciones sin valor predeterminado, el programa las pedirá
+   de manera interactiva.
+
+   Ejemplos:
+
+      1. Se crea un usuario respondiendo a cuál sera su nombre, su contraseña,
+     	 su nombre de pila y sus apellidos:
+
+            # addsmbuser
+
+      2. Se crea un usuario, sin necesidad de responder ninguna pregunta.
+
+            # addsmbuser zicotropico -pzico -n "Perico" -s "de los Palotes"
+EOF
+}
+
+DOMAIN=$(hostname -d)
+
+#ARGUMENTOS:
+while [ $# -gt 0 ]; do
+   case $1 in
+      -h|--help) # Ayuda
+         ayuda 
+         exit 0
+         ;;
+      -d|--domain) # Escoge dominio alternativo
+         DOMAIN=$2
+         shift 2
+         ;;
+      -D|--drive)  # Volumen donde aparece el directorio HOME.
+         DRIVE=$2
+         shift 2
+         ;;
+      -H|--home)   # Nombre de la sección de directorios personales de UNIX
+         HOME=$2
+         shift 2
+         ;;
+      -P|--profiles) # Nombre de la sección de perfiles personales de WINDOWS.
+         PROFILES=$2
+         shift 2
+         ;;
+      -n|--name)   # Nombre de pila del usuario
+         NAME=$2
+         shift 2
+         ;;
+      -p*)         # Contraseña del usuario
+         PASSWORD=${1#??}
+         shift 1
+         ;;
+      -s|--surname) # Apellido del usuario
+         SURNAME=$2
+         shift 2
+         ;;
+      -*) # Opción desconocida.
+         echo "$1: Opción desconocida" >&2
+         exit 1
+         ;;
+      *) # Nombre de usuario
+         if [ -n "$USERNAME" ]; then
+            echo "Demasiados argumentos" >&2
+            exit 1
+         fi
+         USERNAME=$1
+         shift 1
+         ;;
+   esac
+done
+
+if [ $(id -u) -ne 0 ]; then
+   echo "Debe ejecutar el programa como administrador" >&2
+   exit 4
+fi
+
+#
+# Busca en el fichero de configuración, las rutas (path)
+# de los recursos definidos a través de las variables.
+#   $1: El fichero de configuración
+#   $2,.., $n: La variables que contienen los nombres de las secciones.
+# Si a la función se le pasa una variable "SECCION" con el nombre de
+# la sección, definirá una variable SECCIONPATH con la ruta de esa sección
+#
+get_paths() {
+   local FILE=$1
+   shift 1
+   while [ $# -gt 0 ]; do
+      eval dirs='"$dirs
+"'$1:\$$1
+      shift 1
+   done
+   while read LINEA; do
+      if echo $LINEA | grep -qE '^\s*\['; then
+         seccion=$(echo $LINEA | grep -oP '(?<=\[)[^\]]+(?=\])' | tr 'A-Z' 'a-z' )
+         local var=$(echo "$dirs" | awk -F: 'tolower($2) == "'"$seccion"'" {print $1}')
+      fi
+      [ -n "$var" ] || continue
+      if echo $LINEA | grep -qE '\bpath\b\s*='; then
+         eval ${var}PATH='$(echo ${LINEA#*=} | xargs)'
+         unset var
+      fi
+   done < "$FILE"
+}
+
+# Averigua cuál es el controlador de dominio.
+get_dc() {
+   if info=$(wbinfo --dsgetdcname "$1"); then
+      echo $info | head -n1
+   else
+      return 1
+   fi
+}
+
+# Averigua si el programa corre en el controlador de dominio
+dc() {
+   local DCIP="$(getent hosts $1 | cut -f1 -d\ )"
+   ip addr show | awk '$1 == "inet" {print substr($2, 1, match($2, "/")-1)}' | grep -q "$DCIP"
+}
+
+if [ -z "$DOMAIN" ]; then
+   read -p "Indique el dominio: " DOMAIN
+fi
+
+DC="$(get_dc $DOMAIN)"
+
+if [ $? -ne 0 ]; then
+   echo "No se encuentra controlador para el dominio '$DOMAIN'" >&2
+   exit 2
+fi
+
+DC=$(echo ${DC%%.*} | tr '[:lower:]' '[:upper:]')
+
+if ! dc $DOMAIN; then
+   echo "$(basename $0) sólo puede ejecutarse en el controlador del dominio" >&2
+   exit 3
+fi
+
+if [ -z "$USERNAME" ]; then
+   read -p "Nombre de usuario" USERNAME
+fi
+
+settings=$(stty -g)
+stty -echo
+while [ -z "$PASSWORD" ]; do
+   read -p "Contraseña para el usuario: " PASS1
+   echo
+   read -p "Repita la contraseña: " PASS2
+   echo
+   if [ "$PASS1" = "$PASS2" ]; then
+      PASSWORD=$PASS1
+   else
+      echo "Las contraseñas no coinciden. Inténtelo de nuevo" >&2
+   fi
+done
+stty "${settings}"
+
+if [ -z "$NAME" ]; then
+   read -p "Nombre de pila: " NAME
+fi
+
+if [ -z "$SURNAME" ]; then
+   read -p "Apellidos: " SURNAME
+fi
+
+HOMESAMBAPATH='\\'$DC'\'$HOME
+PROFILESSAMBAPATH='\\'$DC'\'$PROFILES
+
+samba-tool user create $USERNAME "$PASSWORD" --given-name="$NAME" --surname="$SURNAME" --use-username-as-cn --profile-path="$PROFILESSAMBAPATH"\\$USERNAME --home-drive=$DRIVE --home-directory="$HOMESAMBAPATH"\\$USERNAME
+
+if [ $? -ne 0 ]; then
+   exit 5
+fi
+
+get_paths "$CONF" HOME
+
+if [ -z "$HOMEPATH" ]; then
+   echo "No se crea directorio personal porque no ha sección [$HOME] definida."
+   exit 0
+fi
+
+DIR="$HOMEPATH/$USERNAME" 
+mkdir "$DIR"
+
+uid=`wbinfo --sid-to-uid $(wbinfo --name-to-sid $USERNAME)`
+auid=`wbinfo --sid-to-uid $(wbinfo --name-to-sid "BUILTIN\Administrators")`
+chown $auid:users "$DIR"
+setfacl -m "g:$uid:7,u:$uid:7,d:g:$uid:7,d:u:$uid:7," "$DIR"
+setfacl -m "g:$auid:7,u:$auid:7,d:g:$auid:7,d:u:$auid:7," "$DIR"
+setfacl -x "g:domain_admins:,d:g:domain_admins:" "$DIR"
+setfacl -m "g:users:0,d:g:users:0" "$DIR"
+tar -C /etc/skel --owner=$uid --group=users -cf - . |  tar --strip-component=1 -C "$DIR" -xf -
+
+echo "Creado $DIR."

@@ -1,0 +1,460 @@
+Permisos y atributos
+====================
+
+Los ficheros del sistema se encuentran protegidos mediante un sistema de
+permisos para impedir que usuarios o torpes o malintencionados puedan provocar
+daños al sistema; y también, para proteger la privacidad frente a usuarios
+indiscretos.
+
+En lo referente a permisos y atributos se puede discutir sobre:
+
+* Los *permisos clásicos* en *unix*.
+* Los *atributos extendidos* en sistemas *ext4*.
+* Los *atributos extendidos de usuario* en sistemas que los soporten (*ext4*,
+  *brtfs*, *xfs*).
+* Las listas de control de accesos (:abbr:`ACL (Access Control List)`).
+
+Se tratarán aquí exhaustivamente los permisos clásicos, por ser un pilar básico
+para el uso del sistema y se comentarán brevemente los atributos extendidos, que
+carecen de demasiada importancia. En cambio, son útiles para algunas situaciones
+los permisos basados en listas de control de accesos, pero se su estudio se
+diferirá para más adelante.
+
+.. _ugo:
+
+Permisos clásicos
+-----------------
+
+En el sistema clásico de permisos de *unix* cada fichero tiene un usuario
+propietario y un grupo propietario, que ya hemos visto que pueden consultarse a
+través de :ref:`ls <ls>` o :ref:`stat <stat>`. Recibe también el nombre de
+*permisos UGO* (de **U**\ usuario-\ **G**\ rupo-\ **Otro**\ ), porque consiste
+en definir los permisos del fichero para:
+
+* El usuario propietario.
+* El grupo propietario.
+* El resto de usuarios que ni sean el propietario ni pertenezcan al grupo
+  propietario.
+
+Para cada uno de ellos se definen tres permisos:
+
+* El permiso de *lectura*, representado por un letra **r**.
+* El permiso de *escritura*, representado por una letra **w**.
+* El permiso de *ejecución*, representado por una letra **x**.
+
+Por todo ello, cuando inspeccionamos la salida de :command:`ls`, vemos lo
+siguiente::
+
+   $ ls -l /var/log/syslog
+   -rw-r----- 1 syslog adm 125534 oct 19 10:56 /var/log/syslog
+
+Tal fichero pertenece a un usuario llamado *syslog* y a un grupo llamado *adm*.
+Los permisos por su parte son ``rw-r-----``, o sea tres ternas de permisos.
+``rw-``, ``r--`` y ``---``. La primera terna corresponde al propietario, la
+segunda al grupo propietario y la tercena al resto. Como un guión indica
+ausencia del permiso y el orden en que se expresan son siempre **rwx**,
+resulta que *syslog* tiene permisos de lectura y escritura; *adm*, sólo de
+lectura; y el resto de usuarios, ninguno.
+
+Además, de expresar los permisos mediante letras, pueden expresarme por medio de
+un código numérico de tres números, de manera que cada cifra representa una
+terna de permisos. Para calcular esta cifra se toma **r** como 4, la **w** como
+2 y la **x** como 1. Por tanto, una terna **rwx** es 7 (4+2+1) o una terna
+**r-x**, 5 (4+1).
+
+Por tanto, para el caso del fichero :file:`/var/log/syslog` los permisos se
+pueden expresar con el número **640**. Como :command:`stat` muestra los permisos
+en formato numérico y alfabético, podemos comprobar que hemos hecho bien el
+cálculo::
+
+   $ stat /var/log/syslog
+     Fichero: «/var/log/syslog»
+     Tamaño: 197721      Bloques: 392        Bloque E/S: 4096   fichero regular
+   Dispositivo: 801h/2049d   Nodo-i: 1188288     Enlaces: 1
+   Acceso: (0640/-rw-r-----)  Uid: (  101/  syslog)   Gid: (    4/     adm)
+   Acceso: 2016-10-19 07:43:21.173102488 +0200
+   Modificación: 2016-10-19 12:17:01.720998505 +0200
+         Cambio: 2016-10-19 12:17:01.720998505 +0200
+       Creación: -
+
+Permisos habituales
+"""""""""""""""""""
+
+Hemos introducido ya los permisos habituales, pero no hemos entrado a valorar
+qué significan exactamente. Dependiendo de si el fichero es un fichero regular o
+un directorio, el significado cambia:
+
+**Fichero regular**
+   * Permiso de *lectura*: Implica que se tiene permiso para ver su contenido,
+     por tanto, podremos hacer un :ref:`cat <cat>` sobre él.
+   * Permiso de *escritura*: Implica la potestad de poder alterar su contenido.
+   * Permiso de *ejecución*: Permite ejecutar el fichero como programa, si este,
+     obviamente, es un programa. Si no lo es, el permiso no tiene razón de ser.
+
+**Directorio**
+   * Permiso de *lectura*: Implica ver el contenido de un directorio, esto es,
+     poder comprobar que ficheros y subdirectorios contiene. Por tanto, podremos
+     usar sobre él :command:`ls`.
+   * Permiso de *escritura*: Implica modificar su contenido lo cual se traduce
+     en poder crear y borrar ficheros dentro de él.
+   * Permiso de *ejecución*: Permite acceder al directorio o a algún
+     subdirectorio descendiente suyo, ya que para acceder hay que pasar por él.
+
+.. warning::
+   Téngase en cuenta que la posibilidad de poder borrar un fichero no reside en
+   los permisos del propio fichero, sino en los permisos del directorio en el que
+   se encuentra. Si tenemos permisos de escritura sobre el directorio, podremos
+   borrar el fichero. En caso contrario, no; aun teniendo permiso de escritura
+   sobre el fichero. Lo más que podremos hacer en este último caso es dejarlo
+   vacío.
+
+Permisos especiales
+"""""""""""""""""""
+
+Además de los permisos habituales, se pueden definir sobre los ficheros otros
+tres permisos:
+
+* El bit pegajoso (*sticky bit*), cuyo valor numérico es 1.
+* El bit *setgid*, cuyo valor numérico es 2.
+* El bit *setuid*, cuyo valor numérico es 4.
+
+Como en el caso de los tres permisos anteriores, esta terna de permisos
+especiales puede expresarse con un numero formado por la suma de sus
+respectivos valores numéricos. Al expresarse todos los permisos juntos (es decir
+los especiales junto a los habituales), se usa un número de cuatro cifras: la
+primera representa los permisos especiales y las otras tres los habituales. Por
+ejemplo, la cifra **1750** representa un fichero con el bit pegajoso activo (\ **1**\ ),
+con todos los permisos para el propietario (\ **7**\ ), y con permisos de lectura y
+ejecución para el grupo propietario y con ningún permiso para el resto (\ **0**\ ). Aunque
+en puridad, la expresión completa de los permisos exige las cuatro cifras, si
+sólamente se indican tres, se sobrentiende que la cifra para los
+permisos especiales es **0**\ . Por tanto, unos permisos expresados como **640**
+equivalen a **0640**\ .
+
+Es pertinente también aclarar qué significa cada permisos:
+
+**Ejecutable** (para ficheros regulares normales no tiene significado)
+   * *Bit pegajoso*: El programa sigue en memoria aun después de dejarse de usar.
+     Esto permite no tener que volver a cargarlo, si se vuelve a usar. No obstante,
+     en linux se eliminó este uso, de modo que no tiene ninguna utilidad.
+   * *setgid*: El programa se ejecuta con los privilegios del grupo propietario.
+   * *setuid*: El programa se ejecuta con los privilegios del propietario.
+
+**Directorios**
+   * *Bit pegajoso*: Los ficheros que contiene sólo pueden ser borrados por el
+     propietario del propio directorio o el dueño del fichero que se pretende
+     borrar. Un caso típico es el del fichero temporal :file:`/tmp`, ya que
+     cualquier usuario debe poder escribir en él, por lo que todos los usuarios
+     tendrán permiso de escritura. Sin embargo, debe impedirse que los usuarios
+     borren ficheros ajenos. La solución, pues, es fijar el bit pegajoso.
+   * *setgid*: Todos lo fichero creados dentro tendrán como grupo
+     propietario el grupo propietario del propio directorio y no el grupo. Además,
+     en el caso de subdirectorios, estos tendrán también habilitado el *setgid*.
+     principal del usuario que crea el fichero (que es lo habitual).
+   * *setuid*: No tiene utilidad.
+
+Por último, es necesario explicar cómo se notan estos permisos: el bit pegajoso
+aparece como una ``t`` en el lugar donde aparece la ``x`` para *otros*\ ::
+
+   $ ls -ld /tmp
+   drwxrwxrwt 7 root root 4096 oct 19 18:43 /tmp/
+
+El *setgid* se nota con una ``s`` en el lugar donde aparece la ``x`` para el
+grupo propietario::
+
+   $ find / -perm -2000 -ls -quit 2> /dev/null
+      9605   0 drwxr-sr-x   3 root   systemd-journal    60 oct 19 19:26 /run/log/journal
+
+Por último, el *setuid* se nota con una ``s`` en el lugar donde aparece la ``x``
+para el grupo propietario::
+
+   $ ls -l /usr/bin/sudo
+   -rwsr-xr-x 1 root root 140944 jul  5 16:01 /usr/bin/sudo
+
+.. note::
+   Aparecen letras minúsculas cuando el fichero tiene definido el permiso de
+   ejecución que oculta la letra del permiso especial. Cuando este permiso de
+   ejecución no existe, la letra se muestra en mayúscula.
+
+Máscara
+"""""""
+
+Cuando se crean fichero y directorios, estos pertenecen al usuario que lo crea
+y el grupo propietario es el principal del creador. Además, se crean con unos
+permisos específicos::
+
+   $ mkdir directorio
+   $ touch fichero
+   $ ls -ld directorio fichero
+   drwxr-xr-x 2 usuario usuario 1024 oct 19 17:17 directorio/
+   -rw-r--r-- 1 usuario usuario    0 oct 19 17:17 fichero
+
+.. _mask:
+.. index:: mask
+
+:command:`umask`
+   El directorio se ha creado con permisos 755 y el fichero con permisos 644. Esto
+   es debido a que hay definida en el sistema una máscara predeterminada::
+
+      $ umask
+      0022
+
+   Para saber los permisos con los que se creará un fichero es necesario hacer
+   la operación binaria :code:`0666 & ~mask`\ [#]_, y para conocer aquellos con los
+   que se creará un directorio :code:`0777 & ~mask``. Consecuentemente, si la
+   máscara es **0022**, los ficheros se crearán con permisos **0644** y los
+   directorios con permisos **0755**, que es precisamente lo que ocurre.
+
+   Para cambiar la máscara predeterminada basta con ejecutar :command:`umask`
+   indicándola como argumento::
+
+      $ rm fichero directorio -r
+      $ umask 027
+      $ mkdir directorio
+      $ touch fichero
+      ls -ld fichero directorio                                                                                                
+      drwxr-x--- 2 usuario usuario 1024 oct 19 17:37 directorio
+      -rw-r----- 1 usuario usuario    0 oct 19 17:37 fichero
+
+
+   .. note::
+      Obviamente, el cambio sólo tendrá efecto durante la sesión. Si se quiere
+      hacer permanente, se deberá incluir el comando en algún fichero de
+      :ref:`arranque de sesión <inicio-bash>`.
+
+Manipulación
+""""""""""""
+
+Manipular el sistema de permisos implica cambiar usuario y grupo propietarios y
+cambiar los propios permisos.
+
+.. _chgrp:
+.. index:: chgrp
+
+:command:`chgrp`
+   Permite cambiar el grupo propietario del fichero. Sólo el propietario del
+   fichero (o *root*) es capaz de hacer este cambio y sólo podrá cambiar a un
+   grupo del que sea miembro::
+
+      $ chgrp audio fichero
+      $ ls -l fichero
+      -rw-r----- 1 usuario audio 0 oct 19 17:37 fichero
+      $ chgrp root fichero
+      chgrp: cambiando el grupo de «fichero»: Operación no permitida
+
+   Es posible usar la opción ``-R`` para hacer los cambios recursivos y que se
+   apliquen a los argumentos y a toda la parte del árbol de directorios que
+   cuelgue de ellos.
+
+.. _chown:
+.. index:: chown
+
+:command:`chown`
+   Permite cambiar el propietario o el grupo propietario o ambos a la vez. El
+   cambio de propietario sólo puede llevarlo a cabo el administrador (*root*). 
+   La sintaxis del comando es la siguiente::
+
+      chown [usuario][:grupo] fichero1 [fichero2...]
+
+   Así, si desea cambiarse sólo el propietario::
+
+      # chown usuario /tmp/fichero
+
+   Si desea cambiarse sólo el grupo::
+
+      # chown :usuario /tmp/fichero
+
+   Y si desean cambiarse ambos a la vez::
+
+      # chown usuario:usuario /tmp/fichero
+
+   Como :command:`chgrp``, dispone de la opción ``-R``.
+
+   .. note::
+      El carácter de separación puede ser el punto (\ *.*\ ) en vez de los dos
+      puntos (\ *:*\ ).
+
+.. _chmod:
+.. index:: chmod
+
+:command:`chmod`
+   Permite cambiar los permisos sobre un fichero a su propietario (o al
+   administador). La sintaxis básica es la siguiente::
+
+      chmod <permisos> fichero1 [fichero2...]
+   
+   La expresión de los permisos, por otro lado puede ser bien numérica, bien
+   alfabética. La expresión numérica no tiene dificultad alguna, si se ha
+   entendido lo hasta aquí explicado::
+
+      $ chmod 600 fichero
+      -rw------- 1 usuario audio 0 oct 19 17:37 fichero
+      $ chmod 1700 fichero
+      -rws------ 1 usuario audio 0 oct 19 17:37 fichero
+
+   La expresión alfabética, en cambio, requiere algo más de explicación: está
+   constituida por tres partes:
+
+   * La expresión de a quién se le aplica el permiso: **u**\ (usuario
+     propietario), **g**\ (grupo propietario), **o**\ (otros) y
+     **a**\ (todos). Es posible también juntar varias letras (por ejemplo,
+     **ug** significa usuario y grupo propietarios) o bien no expresar
+     ninguna, en cuyo último caso se usará la máscara para determinar el
+     efecto. Por ejemplo, si la máscara es ``0022``, y se hace::
+
+         $ chmod +w fichero
+
+     Se añadirá el permiso de escritura sólo al propierario, ya que
+     los permisos predeterminados sólo dan permisos de escritura a este.
+
+   * Un signo que puede ser un **=**\ , si se quieren fijar los permisos que
+     se expresarán a continuación; un **+**\ , si se quieren añadir permisos
+     a los que hay ya fijados; y un **-**\ , si se quieren quitar permisos.
+
+   * La expresión alfabética del permiso **r**\ , **w**\ o **x**\ . Se pueden
+     yuxtaponer varias letras si se quieren indicar varios permisos a la
+     vez. Por ejemplo, **rw** o **wr** significa que se quiere expresar los
+     permisos de lectura y escritura. Dejar en blanco esta parte implica
+     indicar ningún permiso.
+
+   Ilustremos lo anterior::
+
+      $ chmod a=rw fichero
+      -rw-rw-rw- 1 josem josem 0 oct 19 20:05 fichero
+      $ chmod g= fichero
+      -rw----rw- 1 josem josem 0 oct 19 20:05 fichero
+      $ chmod uo-w fichero
+      -r-----r-- 1 josem josem 0 oct 19 20:05 fichero
+      $ chmod u+w fichero
+      -rw----r-- 1 josem josem 0 oct 19 20:05 fichero
+
+   También es posible escribir varias expresiones separadas por comas::
+
+      $ chmod u=rw,g=r,o= fichero
+      -rw-r----- 1 josem josem 0 oct 19 20:05 fichero
+
+   Para expresar los permisos especiales se usan las letras ``s`` y ``t``
+   aplicadas a ``u``, ``g`` o ``o``, según convenga::
+
+      $ chmod g+s,o=xt fichero
+      -rw-r-S--t 1 josem josem 0 oct 19 20:05 fichero
+
+   Como las dos órdenes anteriores, dispone de la opción ``-R``.
+
+Atributos extendidos
+--------------------
+
+**ext4** permite asignar a los ficheros una serie de atributos que modifican
+su comportamiento. No son en modo alguno permisos, aunque alguno de estos
+atributos influye en la capacidad que tenemos para modificar o eliminar su
+información. Para manipularlos es necesario ser administrador.
+
+.. _lsattr:
+.. index:: lsattr
+
+:command:`lsattr`
+   Sirve para comprobar cuáles son los atributos que tiene asignados el
+   fichero::
+
+      $ lsattr fichero
+      -------------e-- fichero
+
+   Sólo tiene activo el atributo ``e``\ [#]_.
+
+.. _chattr:
+.. index:: chattr
+
+:command:`chattr`
+   Permite modificar el atributo con un signo ``+`` para activarlo y con un
+   signo menos para desactivarlo. Por ejemplo, para hacer inmutable el fichero
+   (lo cual implica que sea imborrable)::
+
+      # chattr +i fichero
+      # lsaatr fichero
+      ----i--------e-- fichero
+
+   Hecho esto, será imposible alterar de forma alguna el fichero, incluso siendo
+   administrador::
+
+      # rm fichero
+      rm: no se puede borrar «fichero»: Operación no permitida
+      # echo "GGGGG" >> fichero
+      -su: fichero: Permiso denegado
+
+.. _user_xattr:
+
+Atributos extendidos de usuario
+-------------------------------
+
+Los *atributos extendidos de usuario* tampoco tienen relación con permisos, pero
+permiten asociar a un fichero atributos arbitrarios de texto con su respectivo
+valor. Para poder utilizarlos es necesario haber instalado el paquete *attr* y
+que el sistema de ficheros haya sido montado con la opción user_xattr::
+
+   $ grep xattr /proc/fs/ext4/sda1/options
+   user_xattr
+
+.. _attr:
+.. index:: attr
+
+:command:`attr`
+   Para consultar y definir los atributos extendidos de usuarios puede usarse el
+   comando :command:`attr`\ [#]_::
+
+      $ touch fichero
+      $ attr -qs autor -V "Perico de los Palotes" fichero
+      $ attr -qs desc -V "Un fichero vacio" fichero
+
+   Esto ha fijado dos atributos: *autor* y *desc* (de descripción). Los
+   atributos son arbitrarios, así que pueden usarse cualquier nombre. Podemos
+   consultados también con :command:`attr`::
+
+      $ attr -ql fichero
+      autor
+      desc
+      $ attr -qg autor fichero
+      Perico de los Palotes
+
+   También pueden borrarse atributos ya creados::
+
+      $ attr -qr autor fichero
+      $ attr -ql fichero
+      desc
+
+.. _setfattr:
+.. _getfattr:
+
+El paquete *attr* también incluye los programas :command:`setfattr` y
+:command:`getfattr`, que permiten fijar, borrar y consultar permisos.
+
+.. warning::
+   Cuando se usan :command:`setfattr` y :command:`getfattr` a los nombres
+   de los atributos se les debe añadir el prefijo *user*: *user.autor*,
+   *user.desc*, etc.
+
+.. include:: ../../ejercicios/05-permisos.rst
+
+.. rubric:: Notas al pie
+
+.. [#] Para entender bien cómo es esta operación binaria recuérdese que en
+       el número 666 cada cifra expresa una terna de permisos cada uno de
+       los cuales se representa con los números 4, 2 y 1. Es decir, que cada
+       cifra es la representación de un número de 3 bits. De modo que **6**
+       es, en realidad, **110** en binario.
+
+       Por esto mismo, si tenemos una máscara de **022**, su expresión en
+       binario es 000-010-010 y su negación **~022** es 111-101-101. Por
+       último, al hacer la operación *AND* sobre bits con **666** obtenemos:
+       ``110-110-110 & 111-101-101 = 110-100-100``, esto es, **644**.
+
+       Si no nos queremos calentar la cabeza, simplemente nos vale con restar
+       en decimal. Para ficheros obtendremos, 666-022 = **644** y, para
+       directorios, 777 - 022 = **755**.
+
+.. [#] Todos los atributos disponibles y su explicación correspondiente se
+       encuentran disponibles en la página de manual de :command:`chattr`.
+
+.. [#] El comando no viene instalado de serie, por lo que es necesario instalar
+   el paquete homónimo::
+
+      # apt-get install attr

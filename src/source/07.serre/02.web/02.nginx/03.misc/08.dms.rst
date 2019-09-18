@@ -1,0 +1,140 @@
+.. _dms:
+
+|DMS|
+=====
+Un |DMS| (es castellano, :dfn:`Sistema de gestión documental`) es una aplicación
+dedicada de la clasificación, gestión y ordenación de documentos. Para el caso
+que nos ocupa usaremos un |DMS| web llamando SeedDMS_.
+
+Preliminares
+------------
+Partiremos de disponer ya de un servidor web accesible a través del nombre
+*docs.example.net* y con :ref:`soporte para php y msql <nginx-php>`.
+
+Para :program:`seeddms`, además, requeriremos la instalación previa de los
+siguientes paquetes::
+
+   # apt install php-{gd,mbstring,log,http-webdav-server,pear} imagemagick poppler-utils catdoc id3
+
+También es necesario el *framework* `zend <https://framework.zend.com/>`_, pero
+la versión **1**, que es la que soporta :program:`seeddms`, por lo que no lo
+instalaremos a través del paquete (*stretch* trae la versión **2** y *buster* la
+**3**), sino de :command:`pear`, que acabamos de instalar::
+
+   # pear channel-discover pear.dotkernel.com/zf1/svn
+   # pear install zend/zend
+
+Configuración de :program:`nginx`
+---------------------------------
+Basta la más básica poara la ejecución de una aplicación |PHP|:
+
+.. code-block:: nginx
+
+   server {
+      listen  80;
+      listen 443 ssl;
+
+      server_name docs.example.net;
+
+      root /srv/www/seeddms;
+      try_files $uri $uri/ =404;
+      index index.php;
+
+      include snippets/snakeoil.conf;
+
+      # Redirección al sitio seguro
+      if ($https != "on") {
+         return 301 https://$host$request_uri;
+      }
+
+      # Aquí almacenaremos los documentos
+      # que gestiona la aplicación.
+      location ^~ /data {
+         return 404;
+      }
+
+      location ~ \.php$ {
+         include snippets/fastcgi-php.conf;
+         fastcgi_pass php;
+      }
+   }
+
+Como vemos, presuponemos que la aplicación se instalará dentro del directorio
+:file:`/srv/www/seeddms`.
+
+Instalación
+-----------
+A través de la página principal de SeedDMS_ podemos llegar a los enlaces de
+descarga de la última versión estable\ [#]_. Es necesario descargar cuatro
+ficheros y tratarlos del siguiente modo::
+
+   # pear install SeedDMS_Core-5.1.9.tgz
+   # pear install SeedDMS_Preview-5.1.9.tgz
+   # pear install SeedDMS_Lucene-5.1.9.tgz
+   # mkdir /srv/www/seeddms
+   # tar -C /srv/www/seeddms -axvf seeddms-5.1.9.tar.gz --strip-component=1
+
+Además debemos preparar el directorio dónde se alojarán los documentos que
+gestionará :program:`seeddms` y advertirle de que la próxima vez que lo
+arranquemos nuestra intención es configurarlo::
+
+   # mkdir -p /srv/www/seeddms/{conf,data/{staging,lucene,cache}}
+   # chown -R www-data:www-data /srv/www/seeddms/{conf,data}
+   # touch /srv/www/seeddms/conf/ENABLE_INSTALL_TOOL
+   
+Por último, podemos entrar en el entorno de :program:`mysql` y crear el usuario
+con permisos para escribir en la base de datos:
+
+.. code-block:: sql
+
+   CREATE DATABASE seeddms;
+   GRANT ALL PRIVILEGES ON seeddms.* TO 'seeddms'@'localhost' IDENTIFIED BY 'contraseña';
+
+Listo, entramos en::
+
+   http://docs.example.net/install
+
+y completamos la instalación. El acceso se hará a través del usuario "*admin*"
+con contraseña "*admin*".
+
+.. note:: En la instalación sólo hay que definir:
+
+   - El directorio de la aplicación (:file:`/srv/www/seeddms`), que debería
+     haberse averiguado bien. 
+   - La ruta (:file:`/`, en nuestro caso), que también debería estar bien.
+   - Los subdirectorios que almacenarán los ficheros subidos, que sí deberemos
+     cambiar, puesto que la aplicación los sugerirá a partir de
+     :file:`/srv/www/seeddms/../data`, es decir, de un directorio fuera del
+     directorio de la aplicación, mientras que nosotros lo hemos incluido
+     dentro\ [#]_.
+   - Los datos referentes a la conexión a la base de datos. Asegúrese de marcar
+     que deben generarse las tablas, ya que no lo hemos hecho a mano.
+
+Postinstalación
+---------------
+#. Es bastante probable que, si no ha realizado ninguna modificación en la
+   configuración de |PHP| y :program:`nginx`, el tamaño máximo de fichero sean
+   unos escasos 2MB. Para ampliar este límite, :ref:`consulte la explicación
+   dada en la instalación de moodle <nginx-php-filesize>`.
+
+#. ¡¡Recuerde cambiar la contraseña del administrador!! Existe otro usuario
+   invitado (*guest*) que, para que pueda usarse, necesita que se le fije una
+   contraseña.
+
+#. En la *Administración* necesita generar un "índice de texto completo" para
+   que la "búsqueda de texto completo" funcione\ [#]_.
+
+.. rubric:: Notas al pie
+
+.. [#] La **5.1.9** en el momento de la escritura de estas notas.
+.. [#] Observe que para evitar el acceso al directorio a través del servidor (lo
+   cual sería un grave problema de seguridad) nos hemos segurado en la
+   configuración de :program:`nginx` que eso jamás ocurra.
+.. [#] En la versión instalada si se prueba una búsqueda antes de la generación
+   del índice, la ejecución del *script* falla y se genera en :program:`nginx`
+   un error *500*. Debe de ser un *bug*.
+
+.. |DMS| replace:: :abbr:`DMS (Document Management System)`
+.. |PHP| replace:: :abbr:`PHP (PHP Hypertext Preprocessor)`
+
+.. _SeedDMS: https://www.seeddms.org/index.php?id=2

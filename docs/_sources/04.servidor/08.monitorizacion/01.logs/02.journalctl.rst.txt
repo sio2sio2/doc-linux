@@ -1,0 +1,291 @@
+.. _journalctl:
+.. index:: journalctl
+
+SystemD
+=======
+*SystemD* como de tantas otras tareas ha acabado por encargarse también de los
+registros del sistemai (servicio *systemd-journald*), de manera que su consulta
+puede llevarse a cabo a través de la orden :command:`journalctl`. La
+configuración predeterminada del demonio se lleva a cabo en
+:file:`/etc/systemd/journald.conf`.
+
+En esta configuración predeterminada:
+
+- Los registros no son persistentes, porque se almacenan bajo
+  :file:`/run/log/journal`. Ahora bien, si se crea el directorio
+  :file:`/var/log/journal`, los registros pasarán a almacenarse en esta
+  ubicación y, por tanto, se mantendrán entre reinicios\ [#]_.
+
+- Los registros se pasan también al demonio :command:`rsyslogd` para que este
+  siga clasificándolos y registrándolos tal como venía haciendo antes de la
+  aparición de *systemd*. Esta posibilidad es muy importante, porque muchos
+  programas usan el sistema tradicional de *logs* para obtener datos.
+
+Por tanto, podríamos seguir consultando los *logs* como hasta ahora (de ahí que
+los apuntes hayan explicado con cierta extención :command:`rsyslogd` y
+:command:`logrotate`), pero la consulta a través de :command:`journalctl` tiene
+algunas ventajas, que trataremos a continuación.
+
+Consulta
+--------
+Con :command:`systemd-journald` los registros son binarios (no texto), así que
+no pueden consultarse a través de los comandos ordinarios. Sin embargo, para la
+consulta *systemd* provee del :command:`journalctl` que permite muchos criterios
+de filtrado.
+
+El modo más sencillo de usarlo es sin argumento alguno::
+
+   # journalctl
+
+Esto mostraría todos los registros desde el primero que se almacena. La orden
+pagina automáticamente con lo que no es necesario el uso de paginadores
+adicionales como :command:`more` o :command:`less`.
+
+Los criterios de selección son muy variados (y pueden usarse conjuntamente):
+
+* Seleccionar por la *unidad*::
+
+   # journalctl --unit ssh.service
+
+  Es posible usar comodines::
+
+   # journalctl --unit "systemd-*"
+
+* Seleccionar por la prioridad (o el nivel) del mensaje::
+
+   # journalctl -p err
+
+* Seleccionar los mensajes del núcleo::
+
+   # journalctl -k
+
+* Seleccionar los mensajes desde un determinado momento. Se puede poner
+  tanto un momento absoluto::
+
+   # journalctl --since "2016-12-16 12:15:00"
+
+  Como un periodo de tiempo respecto al momento actual. Esto muestra los
+  mensajes de los últimos 10 minutos::
+
+   # journalctl --since "-10m"
+
+  También pueden usarse las palabras *today* o *yesterday*.
+
+* Seleccionar los mensajes hasta un determinado momento. Como en el caso
+  anterior admite fechas absolutas o relativas::
+
+   # journalctl --since "-10m" --until "-5m"
+
+* Selecciona mensajes generados por un determinado comando::
+
+   # journalctl /usr/sbin/sshd
+
+* Selecciona según el identificador de *syslog*\ [#]_::
+
+   # journalctl -t sshd
+
+  El identificador es la cadena que hay antes del *PID* encerrado entre
+  corchetes y que generalmente coincide con el ejecutable.
+
+* Selecciona mensajes según determinados campos. Los campos posibles pueden
+  consultarse con::
+
+   # journalctl -N
+
+  o bien recurriendo a la página del manual::
+
+   $ man systemd.journal-fields
+
+  De entre ellos pueden ser útiles:
+
+  :code:`SYSLOG_FACILITY`
+     Para seleccionar por la *facility* (*mail*, *authpriv*, etc.). Sin
+     embargo, sólo pueden usarse los códigos numéricos::
+
+        # journalctl SYSLOG_FACILITY=3
+
+  :code:`_TRANSPORT`
+     Para seleccionar mensajes según la forma en que se transmitieron a
+     *sytemd*. Por ejemplo, un valor *kernel* mostrará los mensajes del
+     núcleo::
+
+        # journalctl _TRANSPORT=kernel
+
+     o un valor *audit* los mensajes generados por el :ref:`servicio de
+     auditoria <audit>`::
+
+        # journalctl _TRANSPORT=audit
+
+  :code:`_UID`
+     Mensajes generados por el usuario con un determinado *UID*::
+
+        # journalctl _UID=1000
+
+  :code:`_PID`
+     Mensajes generados por el proceso con el *PID* indicado.
+
+  :code:`_GID`
+     Mensajes generados por el grupo con el *GID* especificado 
+
+  Algunos otros campos interesantes se pueden seleccionar mediante
+  opciones ya vistas: :code:`PRIORITY` (``-p``), :code:`_SYSTEMD_UNIT`
+  (``-unit`` o ``-u``).
+
+  Si se especifican varios campos en la línea las condiciones se consideran
+  enlazadas con el operador lógico *AND*\ [#]_. Para unirlos con *OR* debe
+  añadirse un signo ``+``::
+
+   # journalctl SYSLOG_FACILITY=4 + SYSLOG_FACILITY=10
+
+Es posible conocer qué valores distintos muestra uno de los campos anteriores
+con la opción -F::
+
+   # journalctl -F _SYSTEMD_UNIT
+
+Además de estos criterios, se puede mostrar los últimos *N* mensajes con la
+opción ``-n``. Esta orden mostraría los últimos diez registros de la unidad
+*ssh*::
+
+   # journalctl --unit ssh.service -n
+
+Son 10, porque es el número que se muestra si no se especifica ningún argumento
+para ``-n``. En estos casos en que sabemos de antemano que no ocuparemos toda la
+pantalla es útil prescindir del paginador::
+
+   # journalctl --unit ssh.service -n --no-pager
+
+Una alternativa a esto es desconfigurar el paginador::
+
+   # PAGER= journalctl --unit ssh.service -n
+
+También es posible hacer un seguimiento de los registros tal como se puede hacer
+con :code:`tail -f`::
+
+   # journalctl --unit ssh.service -f
+
+que mostrará los diez últimos registros y quedará esperando a recibir los
+siguientes. En este caso, también se podría haber añadido ``-n`` para modificar
+el número de líneas previsualizadas.
+
+Por último, es posible cambiar el formato con que se muestran las líneas a
+través de la opción ``-o``. Hay varios (véase la página de manual de
+:command:`journalctl`). Por ejemplo, esto mostraría una salida en formato *json*
+en que se muestra cada campo del mensaje::
+
+   # journalctl -o json-pretty
+
+Si se quiere filtrar registros usando expresiones regulares sobre el mensaje, no
+queda más remedio que pasar la salida de :command:`journalctl` a un comando como
+:ref:`grep <grep>`.
+
+Persistencia
+------------
+
+Ya se ha indicado que los registros de *systemd* no son persistentes, puesto que
+se almacenan sobre un sistema de ficheros volátil (:file:`/run`). Sin embargo,
+existe la posibilidad de hacerlos persistentes:
+
+* Porque deseemos revisar registros con :command:`journalctl` producidos
+  antes del último reinicio.
+
+* Porque deseamos prescindir de :command:`rsyslogd`. Para esto último
+  deberíamos estar muy seguros de que ninguna de nuestras aplicaciones usa
+  los archivos que este demonio genera.
+
+Lo primero es comprobar que *systemd-journald* está configurado para hacer
+persistentes lo datos. Para ello, en :file:`/etc/systemd/journald.conf` la
+directiva :code:`Storage` debe tener el valor de *auto* o de *persistent* o no
+estar fijada en absoluto (en cuyo caso, su valor será *auto*).
+
+Revisado esto, debemos crear el directorio donde se almacenará el log::
+
+   # mkdir /var/log/journal
+   # chmod 2755 /var/log/journal
+   # chgrp systemd-journal /var/log/journal
+
+Y reiniciar el servicio::
+
+   # systemctl restart systemd-journald
+
+Algo importante a tener en cuenta, cuando se hacen persistentes, es el espacio
+que ocupan los registros. Para controlarlo existen las directivas\ [#]_:
+
+* :code:`SystemMaxUse`, que determina la cantidad máxima de espacio que
+  ocuparan los registros. Se indica con un número que expresa *bytes*,
+  aunque el número puede acompañarse de unidades: *K*, *M*, *G*, etc.
+* :code:`SystemKeepFree`, que determina la cantidad mínima de espacio en el
+  sistema de ficheros que deben dejar libre los registros.
+* :code:`SystemMaxFileSize`, que determina el tamaño máximo de archivo de
+  registro. Pueden
+* :code:`SystemMaxFiles`, que determina el número máximo de ficheros de
+  registros que puede haber.
+* :code:`MaxFileSec` indica el tiempo máximo que se almacenarán registros en
+  un mismo fichero después del cual se procederá a rotarlo. Se expresa en
+  segundos, pero puedo usar unidades: *m*, *h*, *day*, *week*, *month* ó
+  *year*.
+
+Por defecto, :code:`SystemMaxUse` se fija al 10% y `SystemMaxFileSize` a la
+octava parte del valor anterior, por lo que se guardarán siete rotaciones del
+fichero de registro, antes de que empiecen a eliminarse entradas.
+
+Para comprobar cuánto espacio ocupan los *logs* puede hacerse::
+
+   # journalctl --disk-usage
+
+Al hacer persistentes los ficheros, se acomularán registros de varios arranques\
+[#]_.  :command:`journalctl` posee la opción ``-b`` para escoger de qué
+arranque mostrar los registros (*0* el actual, *-1* el penúltimo, etc). Por
+ejemplo, esto mostrará los mensajes generados por el servicio *ssh* durante el
+penúltimo arranque::
+
+   # journalctl -b -1 --unit ssh
+
+Si no se indica arranque alguno, se buscará en todos. Para conocer qué arranques
+hay almacenados en el registro::
+
+   # journalctl --list-boots
+
+.. note:: La persistencia de sus registros no implica que
+   :command:`systemd-journald` deje de seguir enviando los registros a
+   :command:`rsyslogd`. Esto se rige a través de la directiva
+   :code:`ForwardToSyslog` que por defecto está fijada a *yes*. Puede fijarse a
+   *no* y eliminar *rsyslog* y *logrotate*\ [#]_.
+
+.. Uso de journalctl y hacer persistentes los logs.
+   https://www.digitalocean.com/community/tutorials/how-to-use-journalctl-to-view-and-manipulate-systemd-logs
+   https://www.loggly.com/ultimate-guide/linux-logging-with-systemd/
+   Explicación del sistema de login:
+   http://unix.stackexchange.com/questions/205883/understand-logging-in-linux
+   Configuración de rsyslog.conf:
+   http://www.the-art-of-web.com/system/rsyslog-config/
+
+.. rubric:: Notas al pie
+
+.. [#] Este comportamiento (y otros cuantos más) se deben a la configuración
+   almacenada en :file:`/etc/systemd/journald.conf`. Puede echarle un ojo al
+   fichero o consultar su página de manual::
+
+      $ man journald.conf
+
+.. [#] Tanto la opción ``-t`` como la opción ``-N``, que se declara a
+   continuación, no están disponibles en la versión de *jessie*.
+
+.. [#] Excepto si se repite dos veces el mismo campo en cuyo caso se consideran
+   unidos con *OR*.
+
+.. [#] Para el caso de que no se hagan persistentes los registros existen las
+   correspondientes directivas *Runtime-\**: :code:`RuntimeMaxUse`,
+   :code:`RuntimeKeepFree`, etc.
+
+.. [#] Entiéndase que se usa :dfn:`arranque` como el tiempo en que la máquina está
+   en funcionamiento desde que se enciende hasta que se apaga; y no como el tiempo
+   que la máquina tarda en arrancar los servicios desde su encendido.
+
+.. [#] Eliminar *rsyslog* y *logrotate* puede ahorranos memoria y espacio de
+   disco, pero por contra puede provocar que algunas aplicaciones que se
+   alimenten de los ficheros tradicionales dejen de funcionar. Tal es el caso de
+   `fail2ban <http://www.fail2ban.org>`_, *software* muy conveniente en
+   servidores para evitar los ataques de fuerza bruta. :program:`fail2ban`
+   soporta los el sistema de *logs* de :program:`systemd`, pero sólo a partir de
+   su versión *0.9.1*, que es más moderna que la que ofrece *jessie*.
+

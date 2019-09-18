@@ -1,0 +1,115 @@
+.. _pxe-sys-conf:
+
+Configuración de :program:`syslinux`
+====================================
+Para escribir la configuración es necesario tener presentes tres cosas:
+
+* Al establecer la estructura de ficheros, se decidió que todo lo necesario
+  para la configuración de :program:`syslinux` se encuentra dentro del
+  subdirectorio :file:`/srv/tftp/cfg`.
+
+* Los ficheros de arranque de los sistemas operativos se encuentran dentro de
+  :file:`/srv/tftp/ssoo`.
+
+* El directorio de trabajo, sin embargo, es :file:`/srv/tftp/bios/`\ [#]_\ [#]_.
+
+Esto determina cuál será la ruta relativa que deberemos usar con los distintos
+ficheros que refiramos en la configuración:
+
+* Los módulos podemos citarlos sin más::
+
+   KERNEL reboot.c32 -w
+
+* La referencia a ficheros de configuración, imágenes, etc. que se encuentren
+  bajo :file:`/srv/tftp/cfg` deberemos hacerla con :file:`../cfg`. Por ejemplo::
+
+   MENU BACKGROUND ../cfg/images/fondo.png
+
+* La referencia a ficheros de los sistemas operativos arrancables deberá hacerse
+  con :file:`../ssoo`. Por ejemplo::
+
+   KERNEL ../ssoo/slitaz/bzImage
+
+Desarrollemos una configuración de ejemplo que ilustre cómo escribirlas.
+
+¿Qué hace nuestra configuración?
+--------------------------------
+En realidad, nada del otro mundo:
+
+#. Ofrece una primera interfaz sin menú para seleccionar el sistema escribiendo
+   su etiqueta, a menos que escribamos "*menu*".
+
+#. En tal caso, vuelve a permitir la selección de los mismas sistemas de
+   arranque, pero a través de un menú no gráfico.
+
+#. Las opciones de arranque son:
+
+   - Comprobar la memoria.
+   - Arrancar `SliTaZ <http://www.slitaz.org/es/>`_.
+   - Proseguir la secuencia de arranque.
+   - Reiniciar el ordenador.
+   - Apagar el ordenador.
+
+.. note:: ¿Y no se puede mostrar directamente el menú no gráfico? Por supuesto,
+   pero obrar de esta forma da un poco más de juego y permite hacer la
+   configuración un poco más completa.
+
+Requisitos
+----------
+Aparte de :program:`memtest` y *SliTaZ*, necesitamos incluir dentro del
+subdirectorio :file:`bios/syslinux` los siguientes módulos:
+
+* :file:`ldlinux.c32`.
+* :file:`libcom32.c32`
+* :file:`libutil.c32`
+* `menu.c32 <https://www.syslinux.org/wiki/index.php?title=Comboot/menu.c32>`_
+* `pxechn.c32 <https://www.syslinux.org/wiki/index.php?title=Pxechn.c32>`_
+* :file:`poweroff.c32`
+* `reboot.c32 <https://www.syslinux.org/wiki/index.php?title=Reboot.c32>`_
+
+Ficheros
+--------
+Observando estos principios, hagamos una configuración bastante simple que sirva
+de modelo:
+
+:file:`cfg/boot.php`
+   Es el *script* inicial. Se limita a recoger los datos que recibe del cliente
+   (|MAC| y arquitectura) y pasárselos a su versión de menú. Usa la interfaz más
+   sencilla de selección.
+
+   Los sistemas arrancables están enumerados en :file:`items.cfg`:
+
+   .. literalinclude:: files/boot.php.txt
+      :language: php
+
+:file:`cfg/items.cfg`
+   Nos vale para ilustrar cómo enumerar algunos sistemas arrancables\ [#]_:
+
+   .. literalinclude:: files/items.cfg
+
+:file:`cfg/menu.php`
+   Es la versión *medio bonita* (la bonita usaría el módulo *vesamenu.c32*) de
+   la configuración que también proporciona :file:`boot.php`:
+
+   .. literalinclude:: files/menu.php.txt
+      :language: php
+
+   El título del menú muestra la arquitectura, el tipo de máquina (los tres
+   primeros pares de la |MAC|) y la ip del cliente como demostración de que
+   podemos hacer uso de esos datos para personalizar la configuración
+   dependiendo del cliente:
+
+   .. image:: files/menu-pxe.png
+
+.. rubric:: Notas al pie
+
+.. [#] O su equivalente para arquitecturas *efi32* y *efi64*. 
+
+.. [#] Habría que decir más bien :file:`http://192.168.255.1/boos/bios/` o
+       :file:`tftp://192.168.255.1/bios/`, pero, como usaremos rutas relativas
+       en la configuración, no debe preocuparnos demasiado la imprecisión.
+
+.. [#] Uno de ellos es `SliTaz <http://www.slitaz.org/es/>`_ que es un linux
+   mínimo, útil en algunos casos. Sus dos ficheros citados, se extraen de su
+   imagen *iso* y los parámetros para cargarlo se han copiado de los que
+   muestra el :program:`syslinux` de arranque de la propia distribución.

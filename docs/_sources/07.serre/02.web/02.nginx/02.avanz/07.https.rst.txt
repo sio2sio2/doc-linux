@@ -1,0 +1,446 @@
+.. _https:
+
+Conexión segura
+===============
+El protocolo |HTTP| no es seguro para la transmisión de contraseñas y otros
+datos confidenciales, puesto que toda la información viaja en claro. La
+solución, como en el caso de otros protocolos no seguros, es encapsularlo dentro
+del protocolo criptográfico |SSL|/|TLS|\ [#]_, a fin de que el protocolo viaje
+cifrado. Al |HTTP| encapsulado dentro de |TLS| es a lo que se denomina |HTTPs|
+Por lo general, el puerto reservado para comunicación |HTTPs| es el *443/TCP*.
+
+Consecuentemente, hacer que un servidor ofrezca páginas seguras se limita a:
+
+* Obtener un certificado que permita el cifrado |TLS|.
+* Desarrollar la configuración que hace que el servidor escuche en el puerto
+  **443** tal como se hace cuando sirve |HTTP|, pero indicando que en este caso
+  debe usar el certificado anterior para cifrar.
+
+
+.. note:: Encapsular el tráfico |HTTP| dentro de |TLS| supone que todos los
+   paquetes viajan cifrados y que, en consecuencia, todo el contenido |HTTP|,
+   incluida la cabecera, está cifrado. Esto inutiliza cualquier cacheo de
+   contenido o cualquier filtrado web que se base en la |URL| o el propio
+   contenido.\ [#]_
+   
+.. _tls-cert:
+
+Obtención del certificado
+-------------------------
+Para la obtención del certificado podemos optar por dos vías: crear un
+certificado autofirmado o hacernos con un certificado expedido por una autoridad
+acreditadora.
+
+.. note:: Estos certificados no son exclusivos para el servicio web. Son
+   certificados que se usan con el protocolo |TLS| y, en consecuencia, sirven
+   para cualquier protocolo que se cifre con él. Por ejemplo, también son
+   válidos para usados con los protocolos |SMTP| o |IMAP|.
+
+.. _auto-cert:
+
+Autofirmado
+"""""""""""
+La ventaja de hacer un certificado así es la inmediatez y gratuidad de su
+obtención, pero a costa de no ser confiable para el cliente, que tendrá que
+hacer un acto de fe al aceptarlo la primera vez que lo recibe.
+
+.. warning:: Con toda lógica, los navegadores cada vez son más estrictos en la
+   admisión de estos certificados autofirmados y, además, hay proxies web que
+   los rechazan e impiden la conexión de los clientes a los que protegen. Por
+   tanto, lo más recomendable es pasarse al siguiente epigrafe.
+
+.. _make-ssl-cert:
+.. index:: make-ssl-cert
+
+Para la creación de certificados, debe usarse :command:`openssl`\ [#]_. El método
+más sencillo, no obstante, es hacerlo mediante :command:`make-ssl-cert`::
+
+   # apt-get install ssl-cert
+
+La postinstalación genera directamente la clave private en
+:file:`/etc/ssl/private/ssl-cert-snakeoil.key` y la pública en
+:file:`/etc/ssl/certs/ssl-cert-snakeoil.pem` y crea un certificado para el
+nombre completo de la máquina\ [#]_. Si nuestra intención es que el certificado
+sirva para distintos nombres (por ejemplo, porque tenemos definidos varios
+dominios virtuales), entonces es necesario volver a generar los certificados::
+
+   # make-ssl-cert /usr/share/ssl-cert/ssleay.cnf keycert.pem
+
+Así, mediante una interfaz amigable hecha en :ref:`whiptail <whiptail>`, podemos
+generar otro distinto. La manera más sencilla de obtener un certificado válido
+para cualquier nombre del domino es contestar a la primera pregunta con
+:kbd:`*.example.net`. La segunda podemos dejarla en blanco. La orden genera un
+único fichero con las claves pública y privada. Para separarlas y dejarlas en su
+ubicación predeterminada::
+
+   # sed '1,/-END PRIVATE KEY-/d' keycert.pem > /etc/ssl/certs/ssl-cert-snakeoil.pem
+   # sed '/-END PRIVATE KEY-/q' keycert.pem > /etc/ssl/private/ssl-cert-snakeoil.key
+
+¡Y listo! Ya tenemos un certificado no fiable para crear conexiones |SSL|.
+
+.. _certbot:
+
+Acreditado
+""""""""""
+El principal problema de estos certificados es que siempre ha habido que pagar
+por ellos. Sin embargo, desde mediados de 2016, una autoridad de certificación,
+`Let'\s Encrypt`, facilita la obtención gratuita de certificados de un modo
+bastante cómodo. Tienen la desventaja de que caducan a los tres meses, pero
+proporcionan un mecanismo automático de renovación bastante cómodo.
+
+Para la creación y renovación de estos certificados acreditados, necesitamos
+instalar el paquete *certbot*::
+
+   # apt-get install certbot
+
+Antes, no obstante, de usar el programa es preciso entender cómo *Let's Encrypt*
+se cerciora de que somos quien decimos ser. Como la aplicación corre en el
+servidor que usará el certificado, se supone que al conectar vía web a la
+máquina con cuyo nombre pedimos el certificado, se accede efectivamente a ella.
+Como esto es así, :command:`certbot` deja localmente en el directorio accesible
+por el servidor web unos ficheros y, desde sus servidores intenta acceder a
+ellos vía web: si lo consigue es que somos los propietarios del nombre y, por
+tanto, ha comprobado nuestra identidad y puede emitirnos el certificado.
+
+Como los certificados se usaran luego con distinto *software*,
+:command:`certbot` tiene distintos *plugins* para, además de crear o renover el
+certificado, proceder a su instalación en ellos. Nosotros, no obstante, sólo
+repararemos en dos:
+
+* **standalone**, que debe usarse si prevemos que no tendremos ocupado nunca el
+  puerto **80**. Con este *plugin*, el propio :command:`certboot` levanta
+  temporalmente un servidor web en el proceso de creación o renovación. No debe
+  usarse si montamos un servidor web, porque en ese caso, la renovación fallará
+  levantando el servidor web temporal al encontrar ocupado el puerto.
+
+* **webroot**, que implica tener un servidor web instalado e indicarle a
+  :command:`certboot` cuál es el directorio raíz del mismo.
+
+Nosotros usaremos este último, suponiendo que ya tenemos listo el servidor web y
+que nuestro directorio raíz es :file:`/srv/www`, Tras ello, podemos lanzar la
+generación del certificado así::
+
+   # certbot certonly --webroot -w /srv/www -d www.example.net \
+      --non-interactive --agree-tos --email licencias@iesmiravent.es \
+      --post-hook "/etc/letsencrypt/posthook.sh"
+
+Como resultado de la orden tendremos dentro de
+:file:`/etc/letsencrypt/live/www.example.net` las claves generadas y, además,
+justamente tras la generación, se habrá ejecutado el *script* que pasemos con la
+opción ``--post-hook``\ [#]_. El :download:`mío <files/posthook.sh>` copia
+juntas las claves públicas y privada (:file:`fullchain.pem` y
+:file:`privkey.pem`) en el lugar adecuado y reinicia :command:`haproxy`, que es
+lo que necesito. Lo que realmente haya que hacer para que la nueva clave sea
+efectiva dependerá de cómo se tenga configurado el servidor. La gracia de
+incluir el *script* es que *certboot* viene con un *timer* de :program:`systemd`
+para intentar diariamente la renovación del *script* y que este proceso de
+renovación también lanza el *script*. Por tanto, podremos olvidarnos por
+completo de estar al tanto de la actualización.
+
+.. note:: Es posible también generar un certificado asociados a varios nombres
+   repitiendo las opciones ``-w`` y ``-d``, de modo que las opciones ``-d``
+   harán referencia al ``-w`` que las precede. Por ejemplo::
+
+      # certbot certonly --webroot -w /srv/www/main -d example.net -d www.example.net \
+         -w /srv/www/blog -d blog.example.net --non-interactive --agree-tos \
+         --email licencias@iesmiravent.es --post-hook "/etc/letsencrypt/posthook.sh"
+
+Es común que en algún momento añadamos un nuevo sitio al servidor y necesitemos
+que este sitio también use cifrado. Podemos ampliar el uso del mismo
+certificado al nuevo sitio usando la opción ``--expand``::
+
+   # certbot certonly --webroot --expand -w /srv/www -d www.example.net \
+      -w /srv/www/moodle -d moodle.example.net \
+      --non-interactive --agree-tos --email licencias@iesmiravent.es \
+      --post-hook "/etc/letsencrypt/posthook.sh"
+
+Hay, eso sí, que enumerar todos los dominios a los que ya estaba asociado el
+servidor y añadir los nuevos.
+
+.. _nginx-https:
+
+Configuración
+-------------
+Para configurar un dominio virtual servidor por |HTTP|\ s es necesario crear el
+fichero :file:`/etc/nginx/conf.d/ssl.conf`\ [#]_ que dependiendo de cómo hallamos
+generado el certificado variará:
+
+* Para el certificado autofirmado, :download:`éste <files/ssl.auto.conf>`.
+* Para el certificado con *Let's Encrypt* :download:`este otro <files/ssl.certbot.conf>`.
+
+Luego, tomando como referencia la configuración más básica, basta con incluir
+los siguientes cambios:
+
+.. code-block:: nginx
+   :emphasize-lines: 2, 9
+
+   server {
+      listen   443 ssl;
+
+      server_name _;
+
+      root /srv/www;
+      try_files $uri $uri/ =404;
+
+      include snippets/snakeoil.conf;
+   }
+
+O sea, incluimos un fichero :file:`/etc/nginx/snippets/snakeoil.conf` que
+indica cuáles son las claves de cifrado para el sitio y que deben ser las que
+genera :ref:`make-ssl-cert <make-ssl-cert>`. El fichero ya está incluido en el
+paquete de *debian* y, como no podía ser de otra firma, contiene estas dos
+directivas:
+
+.. code-block:: nginx
+
+   ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;
+   ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;
+
+Sin embargo, el propio fichero avisa que no deberían usarse en un servidor real.
+Si hacemos caso y utilizamos las certificadas por *Let's Encrypt*, entonces
+deberemos indicar las claves que generamos con él de un modo análogo a cómo
+hicimos antes:
+
+.. code-block:: nginx
+   :emphasize-lines: 2, 9
+
+   server {
+      listen   443 ssl;
+
+      server_name _;
+
+      root /srv/www;
+      try_files $uri $uri/ =404;
+
+      include snippets/letsencrypt.conf;
+   }
+
+y el fichero :file:`/etc/nginx/snippets/letsencrypt.conf` queda:
+
+.. code-block:: nginx
+
+   ssl_certificate /etc/letsencrypt/live/www.example.net/fullchain.pem;
+   ssl_certificate_key /etc/letsencrypt/live/www.example.net/privkey.pem;
+   ssl_trusted_certificate /etc/letsencrypt/live/www.example.net/fullchain.pem;
+
+.. _nginx-https+http:
+
+Las configuraciones anteriores sólo ofrecerían servicio a través del puerto
+**443**. Si queremos ofrecerlo a través del **80** también, podemos hacer lo
+siguiente:
+
+.. code-block:: nginx
+
+   server {
+      listen   80;
+      listen   443 ssl;
+
+      server_name _;
+
+      root /srv/www;
+      try_files $uri $uri/ =404;
+
+      include snippets/snakeoil.conf;
+
+      if ($https != "on") {
+         return 301 https://$host$uri$is_args$args;
+      }
+
+      # Cabecera HSTS (fuerza a que el certificado sea válido)
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+   }
+
+.. warning:: El ``if`` provoca que, si el tráfico es no seguro, se repita la
+   petición por el puerto seguro. Si queremos permitir ambos podemos eliminar
+   este bloque. Añadimos, además, la cabecera |HSTS| para informar al cliente de
+   que use |HTTP|\ s\ y de que no acepte bajo ningún concepto un certificado no
+   fiable (p.e. uno autofirmado)\ [#]_. Para más información, consulte :ref:`el
+   epígrafe dedicado al ataque SSLstrip <sslstrip>`.
+
+.. warning:: Cuando el servidor define varios dominios virtuales y dos o más de
+   ellos usan tráfico seguro debe tenerse en cuenta que, antes de usar un
+   certificado para descifrar la comunicación, el servidor web es incapaz de
+   saber cuál es el nombre de *host* que usó el cliente para conectarse al
+   servidor. Por tanto, la directiva ``server_name`` es absolutamente inútil
+   para tomar decisiones sobre el cifrado. Por este motivo, :program:`nginx`
+   siempre usa la configuración de |SSL| que se encuentra en el servidor
+   predeterminado e ignora cualquier otra. Por ello debemos usar siempre un
+   mismo certificado virtual para todos los dominios virtuales\ [#]_ y hacer una
+   configuración de este estilo:
+
+   .. code-block:: nginx
+
+      server {
+         listen   80       default_server;
+         listen   443 ssl  default_server;
+
+         server name _;
+
+         include snippets/letsencrypt.conf;
+
+         # Resto de configuración.
+      }
+
+      server {
+         listen 80;
+         listen 443;  # Nótese que no hace falta ni usar ssl.
+
+         server_name  moodle.example.net;
+
+         # Configuración para moodle
+      }
+
+.. _nginx+haproxy:
+
+Puerto compartido
+-----------------
+
+En ocasiones necesitamos acceso remoto al servidor desde redes restringidas. Lo
+habitual de estas redes es que, al menos, permitan el acceso al puerto **443**,
+ya que de lo contrario sus clientes no podrían navegar por la mayoría de los
+sitios web que, cada vez más, usan el protocolo seguro. Esto nos obliga a hacer
+que el servidor *web* "comparta" con servicios de acceso remoto (típicamente
+|SSH| y |VPN|) tal puerto. "Compartir" en este caso es una forma de hablar; en
+realidad, la técnica consiste en que el servidor web deje de ocupar ese puerto
+y, en su sustitución, se ponga otro servicio capaz de identificar la
+comunicación que recibe (|HTTP|, |SSH|, |VPN|) y redirigirla al servicio
+correspondiente.
+
+.. note:: Bajo este epígrafe se trata exclusivamente cómo afecta esto a la
+   configuración del servicio *web*, y no cómo se configura el servicio
+   segregador. Esto último se discute en el :ref:`epígrafe dedicado a redes
+   restringidas <redes-restr>`.
+
+Hay dos ténicas para lograr esto:
+
+* Colocar un *multiplexor* como :ref:`sslh <sslh>` que discrimina el tráfico,
+  pero no altera en absoluto los paquetes.
+
+* Colocar un verdadero *proxy*, como :ref:`haproxy <haproxy>`, que, además de
+  discriminar, manipula el tráfico lo cual supone, al menos, que el servidor
+  *web* vea como |IP| de origen la del servicio segregador (típicamente la
+  *127.0.0.1* si :program:`haproxy` y :program:`nginx` están en la misma
+  máquina)
+
+En el primer caso, al no haberse obrado ninguna manipulación, el cambio se
+limita a dejar libre el puerto **443** de la interfaz física por lo que bastará
+con hacer:
+
+.. code-block:: nginx
+
+   listen localhost:443 ssl;
+
+En cambio, en el segudo caso los cambios son más profundos e incluyen
+que la tarea de cifrado y descrifado se haga en :program:`haproxy`. Esto provoca
+que:
+
+#. Como lo que llega al servidor es siempre tráfico |HTTP| en claro, deja de tener
+   sentido que el servidor escuche en otro puerto distinto al **80**.
+#. Es necesario, no obstante, que el servidor sea capaz de saber si la conexión
+   se hizo directamente al puerto **80** (y, por tanto, el tráfico siempre fue no
+   seguro) o si se hizo a través de :program:`haproxy` y originariamente era
+   segura. Para ello :program:`haproxy` puede añadir la cabecera
+   *X-Forwarded-Proto*.
+#. También es necesario que el servidor web sea capaz de reconocer cuál es el
+   cliente original de la petición lo que obligará a añadir o modificar la
+   cabecera *X-Forwarded-For*.
+#. Debe configurarse el servidor de modo que las dos circunstancias anteriores
+   no obliguen a las aplicaciones web a tener en cuenta si hubo o no *proxy*, esto
+   es a revisar esas dos cabeceras. Por ejemplo, las aplicaciones escritas en
+   |PHP| consultan la dirección remota a través de ``$_SERVER["ADDRESS"]`` y si
+   está activo el protocolo seguro a través de ``$_SERVER["HTTPS"]``. Por tanto,
+   configurar bien el servidor para que ejecute aplicaciones |PHP| implica que
+   ambos parámetros que pasa el servidor *web* al intérprete tengan los valores
+   adecuados.
+
+La solución al problema de la dirección :ref:`ya se trató al discutir sobre el
+control de accesos <nginx-clientip>`. Para darle solución al segundo problema
+podemos definir la variable *$_https*:
+
+.. code-block:: nginx
+
+   # /etc/nginx/conf.d/https.conf
+   map $http_x_forwarded_proto $_https {
+      default  $https;
+      https    on;
+   }
+
+que permite conocer la naturaleza original del tráfico en sustitución de la
+variable *$https* que usamos cuando no hay proxy. De este modo, podemos hacer la
+siguiente configuración:
+
+.. code-block:: nginx
+
+   server {
+      listen   80;
+
+      server_name _;
+
+      root /srv/www;
+      try_files $uri $uri/ =404;
+
+      # Necesario si queremos redirigir el tráfico seguro a no seguro
+      if ($_https != "on") {
+         return 301 https://$host$uri$is_args$args;
+      }
+
+      # Cabecera HSTS (fuerza que el certificado sea válido)
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+   }
+
+Es decir, una configuración exactamente igual que la *no* segura, puesto que al
+servidor llega tráfico ya no seguro. El último bloque ``if`` puede interesarnos
+si queremos que el tráfico originariamente no seguro pase a seguro.
+
+Además, si el sitio es dinámico y usa |PHP|, entonces deberemos hacérselo saber
+al cliente añadiendo otro bloque a la configuración:
+
+.. code-block:: nginx
+   :emphasize-lines: 3
+
+   location ~ \.php$ {
+      include snippets/fastcgi-php.conf;
+      fastcgi_param  HTTPS  $_https if_not_empty;
+      fastcgi_pass php;
+   }
+
+.. rubric:: Notas al pie
+
+.. [#] |TLS| es simplemente la evolución de la versión 3 de |SSL|. A menudo
+   suele decirse |SSL| para referise también a |TLS|.
+
+.. [#] En principio, establecer un filtrado de sitios web para clientes sólo
+   puede hacerse manipulando la resolución |DNS|, que sí que no está cifrada.
+
+.. [#] Por ejemplo, para generar un certificado cuya validez sea de diez
+   años::
+
+      # openssl req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout /etc/ssl/private/ssl-cert-snakeoil.key \
+         -out /etc/ssl/certs/ssl-cert-snakeoil.pem
+
+.. [#] o sea, el que se obtiene así::
+
+      $ hostname -f
+
+.. [#] También hay una opción ``-pre-hook`` para ejecutar antes.
+
+.. [#] Las únicas directivas relativas al cifrado que se encuentran en
+      :file:`nginx.conf` son estas::
+
+         ssl_protocols TLSv1 TLSv1.1 TLSv1.2; # Dropping SSLv3, ref: POODLE
+         ssl_prefer_server_ciphers on
+
+      de ahí que no se hayan incluido en nuestra propia configuración.
+
+.. [#] Para más información sobre esta cabecera, consulte :ref:`el ataque
+   SSLstrip <sslstrip>`.
+
+.. [#] Lo cual no es ningún problema, puesto que un certificado digital se puede
+   asociar a varios nombres.
+
+.. |SSL| replace:: :abbr:`SSL (Secure Socket Layer)`
+.. |TLS| replace:: :abbr:`TLS (Transport Layer Security)`
+.. |HTTPs| replace:: :abbr:`HTTPs (HTTP seguro)`
+.. |PHP| replace:: :abbr:`PHP (PHP Hypertext Preprocessor)`
+.. |URL| replace:: :abbr:`URL (Uniform Resource Locator)`
+.. |HSTS| replace:: :abbr:`HSTS (HTTP Strict Transport Security)`

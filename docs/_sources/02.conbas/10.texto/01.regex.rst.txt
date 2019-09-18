@@ -1,0 +1,499 @@
+.. _regex:
+
+Expresiones regulares
+=====================
+
+Una :dfn:`expresión regular` (comúnmente denominadas *regex*) es una secuencia
+de caracteres que conforman un patrón de búsqueda. Por lo general, estas
+búsquedas se realizan sobre cadenas de caracteres, esto es, sobre texto plano.
+
+Existen muchas herremientas de selección o sustitución de texto que las usan,
+por lo que antes de pasar a presentar éstas, es necesario conocer cómo se
+construyen.
+
+Tipos de expresiones regulares
+------------------------------
+Hay muchas implementaciones distintas de *regex*\ [#]_, pero todas las podemos
+agrupar dentro de una de estas tres familias:
+
+**BRE** (*Basic Regular Expression*):
+   Las expresiones regulares básicas, estándar POSIX, nacieron a partir de la
+   implementación de las *regex* por el antiguo editor `ed
+   <https://en.wikipedia.org/wiki/Ed_(text_editor)>`_, antecesor de
+   :program:`vim`\ [#]_
+
+**ERE** (*Extended Regular Expression*):
+   Las expresiones regulares extendidas, también estándar POSIX, nacieron a
+   partir de una extensión del comando :ref:`grep <grep>`, llamada
+   :command:`egrep`\ [#]_. Son similares, pero no compatibles con las
+   anteriores\ [#]_, y son la base del resto de tipos de expresiones regulares
+   nacidas después. De hecho, lo común es que cualquier implementación de
+   expresiones regulares que podamos encontrar, sea compatible con el estándar
+   |ERE|, aunque disponga de extensiones adicionales.
+
+**PCRE** (*Perl Compatible Regular Expression*):
+   Las expresiones regulares compatibles con Perl son la implementación de las
+   *regex* para el lenguaje de programación `perl <https://www.perl.org/>`_.
+   Añaden a las expresiones |ERE| algunas extensiones útiles y, aunque no son
+   estándar POSIX, son *de facto* un estándar, puesto que muchas
+   implementaciones posteriores las han tomado de base.
+
+En la línea de órdenes los herramientas básicas que permiten el uso de
+expresiones básicas (y que estudiaremos más adelante) son :ref:`grep <grep>`,
+:ref:`sed <sed>`, :ref:`awk <awk>` y el propio :program:`bash` desde su versión
+3. Las dos primeras usan por defecto expresiones |BRE|, pero con la adición de
+una opción también expresiones |ERE|; mientras que las dos últimas usan
+únicamente expresiones |ERE|. Por otro lado, la mayoría de implementaciones de
+los lenguajes de programación más conocidos entienden las expresiones |PCRE|,
+que son, a su vez, practicamente compatibles con las |ERE| (salvo por alguna
+excepción). Por tanto, lo más sensato es aprender las expresiones |PCRE|,
+sabiendo cuáles no existen en |ERE| para no usarlas con herramientas que no
+llegan a soportarlas\ [#]_\ [#]_.
+
+.. note:: Para probar las expresiones regulares que introduzcamos a
+   continuación, se utilizará :command:`grep` con la opción ``-E`` para que
+   interprete expresiones |ERE|, o con la opción ``-P`` para que interprete
+   expresiones |PCRE|. Tal comando se introducirá formalmente más adelante junto
+   a los demás.
+
+Patrones básicos
+----------------
+
+.. table:: **Patrones básicos**
+   :class: regex
+
+   +----------------+--------------------------------------------------------+--------------------------------------+----------------------+
+   | Operación      | Operador                                               | Descripción                          | Ejemplo (ERE)        |
+   |                +------------------+------------------+------------------+                                      |                      |
+   |                | BRE              | ERE              | PCRE             |                                      |                      |
+   +================+==================+==================+==================+======================================+======================+
+   |                | :kbd:`\\\?`      | :kbd:`?`                            | Una vez o ninguna.                   | :kbd:`a?`            |
+   |                +------------------+-------------------------------------+--------------------------------------+----------------------+
+   |                | :kbd:`\*`                                              | Las veces que sea (incluso ninguna)  | :kbd:`a*`            |
+   | Cuantificación +------------------+-------------------------------------+--------------------------------------+----------------------+
+   |                | :kbd:`\\\+`      | :kbd:`+`                            | Al menos una vez                     | :kbd:`a+`            |
+   |                +------------------+-------------------------------------+--------------------------------------+----------------------+
+   |                |:kbd:`\\\{n,m\\\}`| :kbd:`{n,m}`                        | Entre *n* y *m* veces. Puede omitirse| :kbd:`a{5,9}`        |
+   |                |                  |                                     | uno de los límites.                  |                      |
+   +----------------+------------------+-----------------+-------------------+--------------------------------------+----------------------+
+   | Agrupación     | Ver grupos.      | :kbd:`(?regex)` | :kbd:`(?:regex)`  | Para modificar el alcance de un      | :kbd:`(?123)+`       |
+   |                |                  |                 |                   | operador                             |                      |
+   +----------------+------------------+-----------------+-------------------+--------------------------------------+----------------------+
+   | Alternativa    | :kbd:`\\\|`      | :kbd:`|`                            | O lo uno o lo otro                   | :kbd:`(?Blas|Luis)`  |
+   +----------------+------------------+-------------------------------------+--------------------------------------+----------------------+
+   | Principio      | :kbd:`^`                                               | El patrón comienza                   | :kbd:`^a`            |
+   +----------------+--------------------------------------------------------+--------------------------------------+----------------------+
+   | Fin            | :kbd:`$`                                               | El patrón acaba                      | :kbd:`a$`            |
+   +----------------+--------------------------------------------------------+--------------------------------------+----------------------+
+   | Repr. universal| :kbd:`.`                                               | Cualquier carácter                   | :kbd:`.{2,3}`        |
+   +----------------+--------------------------------------------------------+--------------------------------------+----------------------+
+   | Escape         | :kbd:`\\`                                              | No interpretar un carácter especial  | :kbd:`\\.`           |
+   +----------------+--------------------------------------------------------+--------------------------------------+----------------------+
+
+.. warning:: La versión de :ref:`awk <awk>` que trae instalada *debian* por
+   defecto (:command:`mawk`) no soporta el cuantificador de llaves
+   :code:`{n,m}`.
+
+Ilustremos estos patrones con algunos ejemplos:
+
+#. ¿Contiene el texto una o ninguna «*e*» \ [#]_?
+   ::
+
+      $ grep -E 'e?' <<<"abracadabra"
+      abracadabra
+
+#. ¿El texto contiene al menos una «*e*»\ [#]_?
+   ::
+
+      $ grep -E 'e+' <<<"abracadabra"
+
+#. ¿El texto contiene al menos dos «*a*» seguidas?
+   ::
+
+      $ grep -E 'a{2,}' <<<"abracadabra"
+
+#. ¿El texto comienza por «*a*»?
+   ::
+
+      $ grep -E '^a' <<<"abracadabra"
+      abracadabra
+
+#. ¿El texto acaba en «*a*»?
+   ::
+
+      $ grep -E 'a$' <<<"abracadabra"
+      abracadabra
+      
+#. ¿El texto empieza y acaba en «*a*»?
+   ::
+
+      $ grep -E '^a(?.*a)?$' <<<"abracadabra"
+      abracadabra
+
+#. ¿El texto empieza por «*a*» y está constituida por *a* y otro carácter
+   cualquiera alternativamente?
+   ::
+
+      $ grep -E '^(?a.)+?$' <<<"abracadabra"
+
+   El patrón no concuerda porque el texto contiene dos grupos *-br-*.
+
+   .. note:: En realidad, el punto representa cualquier carácter lo cual
+      incluye a la propia «*a*». Por ese motivo, si la línea fuera «abaaac»
+      concordaría con el patrón y esa quizás no sea nuestro objetivo. Puede
+      volverse a este ejercicio, después de haber visto los patrones
+      extendidos, y sustituir *cualquier carácter* (o sea, el punto)
+      por *cualquier carácter que no sea una "a"*.
+
+#. Como en el caso anterior, pero entre una «*a*» y la siguiente puede haber
+   hasta dos caracteres::
+
+      $ grep -E '^(?a..?)+a?$' <<<"abracadabra"
+      abracadabra
+
+#. ¿El texto contiene al menos un carácter cualquier?
+   ::
+
+      $ grep -E '.' <<<"abracadabra"
+      abracadabra
+
+#. ¿El texto contiene un punto?
+   ::
+
+      $ grep -E '\.' <<<"abracadabra"
+
+.. warning:: Es muy importante tener presente que el patrón siempre concuerda
+   con el mayor número de caracteres posibles. Por ejemplo, la *regex* '.*:'
+   expresa una cantidad indeterminada de caracteres cualesquiera seguidas de dos
+   puntos. Si probamos a buscar dicho patrón en este ejemplo::
+
+      $ grep -E '.*:' <<< "usuario:x:1000"
+
+   La concordancia será con la subcadena *usuario:x:* y no con *usuario:* puesto
+   que la segunda incluye a la primera\ [#]_.
+
+Patrones avanzados
+------------------
+
+.. table:: **Patrones avanzados**
+   :class: regex
+
+   +-------------------+--------------------+--------------------+--------------------------------------------------+-----------------------+
+   | Operación         | Operador                                | Descripción                                      | Ejemplo               |
+   |                   +--------------------+--------------------+                                                  |                       |
+   |                   | BRE                | ERE/PCRE           |                                                  |                       |
+   +===================+====================+====================+==================================================+=======================+
+   | Alternativa       | :kbd:`[...]`                            | Uno de los caracteres incluidos. Puede           | :kbd:`[A-Za-z]`       |
+   |                   |                                         | indicarse un rango.                              |                       |
+   |                   +-----------------------------------------+--------------------------------------------------+-----------------------+
+   |                   | :kbd:`[^...]`                           | Un caracter que no sea ninguno de los incluidos  | :kbd:`[^A-Z]`         |
+   +-------------------+--------------------+--------------------+--------------------------------------------------+-----------------------+
+   |                   |  Sin equivalencia  | :kbd:`\\w`         | Un carácter de palabra (letra, dígito o «*_*»).  | :kbd:`\\w+`           |
+   |                   +--------------------+--------------------+--------------------------------------------------+-----------------------+
+   |                   |  Sin equivalencia  | :kbd:`\\W`         | Un carácter que no sea de palabra.               | :kbd:`^\\W`           |
+   |                   +--------------------+--------------------+--------------------------------------------------+-----------------------+
+   |                   |  Sin equivalencia  | :kbd:`\\d`         | Un dígito, o sea, [0-9]                          | :kbd:`\\d{4}`         |
+   |                   +--------------------+--------------------+--------------------------------------------------+-----------------------+
+   | Clases            |  Sin equivalencia  | :kbd:`\\D`         | Un carácter que no sea un dígito.                | :kbd:`\\D+`           |
+   |                   +--------------------+--------------------+--------------------------------------------------+-----------------------+
+   |                   |  Sin equivalencia  | :kbd:`\\s`         | Un carácter de espaciado, o sea, [ \\t\\r\\b\\f] | :kbd:`\\w+\\s\\w+`    |
+   |                   +--------------------+--------------------+--------------------------------------------------+-----------------------+
+   |                   |  Sin equivalencia  | :kbd:`\\S`         | Un carácter que no sea de espaciado.             | :kbd:`\\S+\\s`        |
+   |                   +--------------------+--------------------+--------------------------------------------------+-----------------------+
+   |                   |  Sin equivalencia  | :kbd:`[:nombre:]`  | Un carácter de la clase *nombre*.                | :kbd:`[[:alpha:],;.]+`|
+   |                   +--------------------+--------------------+--------------------------------------------------+-----------------------+
+   |                   |  Sin equivalencia  | :kbd:`[=x=]`       | Cualquier variante del caracter «*x*»            | :kbd:`[[=a=]]`        |
+   +-------------------+--------------------+--------------------+--------------------------------------------------+-----------------------+
+   | Límite de palabra |  Sin equivalencia  | :kbd:`\\b`\ [#]_   | Principio o fin de palabra.                      | :kbd:`\\bdado\\b`     |
+   +-------------------+--------------------+--------------------+--------------------------------------------------+-----------------------+
+   |                   | ``\(regex\)``      | :kbd:`(regex)`     | Captura un grupo                                 | :kbd:`(\\w+)\\s+\\1`  |
+   | Grupos            +--------------------+--------------------+--------------------------------------------------+                       |
+   |                   | :kbd:`\\1, \\2, ... \\9`                | Refiere un grupo previamente capturado           |                       |
+   +-------------------+-----------------------------------------+--------------------------------------------------+-----------------------+
+
+.. warning:: Ni :ref:`grep <grep>` ni :ref:`sed <sed>` entienden las clases
+   ``\d`` y ``\D``. :program:`bash`, por su parte, sólo entiende las clases con
+   nombre.
+
+.. warning:: Las clases que se expresan con el escapado y un carácter (como
+   ``\d`` o ``\s``) y la mayoría de los caracteres especiales (``.``, ``*``,
+   etc.), pierden su significado cuando se incluyen entre corchetes. Por
+   ejemplo, :code:`[\d.]` significa un carácter que es la barra invertida, la
+   letra *d* o el punto.
+
+Algunas de las clases posibles que se expresan con la fórmula ``[:nombre:]`` son:
+
+``[:any:]``
+   Cualquier carácter. Equivale por tanto al punto (``.``).
+   
+``[:alpha:]``
+   Carácter alfabético (letra). Téngase en cuenta que esta expresión no es
+   equivalente a ``[A-Za-z]``, puesto que en lenguas como el castellano *á**
+   o *ü* son también letras.
+
+``[:digit:]``
+   Carácter numérito (un dígito).
+
+``[:alnum:]``
+   Carácter alfanumérico (una letra o un dígito).
+
+``[:lower:]``
+   Letra minúscula.
+
+``[:upper:]``
+   Letra mayúscula.
+
+``[:punct:]``
+   Signo de puntuación.
+
+``[:space:]``
+   Carácter de espaciado.
+
+``[:ascii:]``
+   Carácter :abbr:`ASCII (American Standard Code for Information Interchange)`
+   (códigos 0-127).
+
+Por su parte, que la clase ``[=x=]`` represente cualquier carácter que sea
+variación del indicado, significa que ``[=a=]`` concordará con *a*, *A*, *á*,
+*à*, etc.
+
+.. warning:: Estas clases sólo pueden usarse dentro de una *alternativa*. Por
+   tanto, esto no es válido::
+
+      [:alpha:]
+
+   pero esto sí::
+
+      [[:alpha:]]
+
+Ejemplo de uso:
+
+#. ¿Comienza el texto por una letra mayúscula?
+   ::
+
+      $ grep -E '^[A-Z]' <<<"Pepe Gotera y Otilio"
+      Pepe Gotera y Otilio
+
+   No obstante, esto no hubiera funcionado si la mayúscula hubiera sido
+   acentuada. Es mejor esto::
+
+      $ grep -E '^[[:upper:]]' <<<"Pepe Gotera y Otilio"
+      Pepe Gotera y Otilio
+
+   Existe otra solución más, pero requiere los patrones extendidos de |PCRE|.
+
+#. ¿Acaba la frase en un texto que no es de palabra?
+   ::
+
+      $ grep -E '\W$' <<<"Pepe Gotera y Otilio"
+
+#. La frase no contiene ningún digito::
+
+      $ grep -E '^\D+$' <<<"Pepe Gotera y Otilio"
+      Pepe Gotera y Otilio
+
+#. ¿Hay alguna palabra que empieze por «o»?
+   ::
+
+      $ grep -E '\b[[=o=]]' <<<"Pepe Gotera y Otilio"
+      Pepe Gotera y Otilio
+
+#. ¿El texto empieza y acaba con los mismos caracteres?
+   ::
+
+      $ grep -E '^(?.+).*\1$' <<<"abracadabra"
+      abracadabra
+
+#. La frase sólo contiene palabras que empiezan por *o*::
+
+      $ grep -E '^\W*(?\b[[=o=]]\w*\W*)+$' <<<"¡Oh, Ovidio, obnubilido os oteo!"
+      ¡Oh, Ovidio, obnubilido os oteo!
+
+.. _regex-pcre:
+
+Patrones extendidos (PCRE)
+--------------------------
+
+.. warning:: El conocimiento de estos patrones no es estrictamente necesario
+   y rara vez tendremos que recurrir a ellos en las labores de administración.
+
+.. table:: **Patrones extendidos**
+   :class: regex
+
+   +---------------+-------------------------+--------------------------------------------------+----------------------------------------+
+   | Operación     | Operador                | Descripción                                      | Ejemplo                                |
+   +===============+=========================+==================================================+========================================+
+   |               | :kbd:`\\p{CLASS}`       | Un carácter de la clase unicode\ [#]_ *CLASS*    | :kbd:`\\p{L}+`                         |
+   | Clases        +-------------------------+--------------------------------------------------+----------------------------------------+
+   |               | :kbd:`\\P{CLASS}`       | Un carácter que no sea de clase unicode *CLASS*. | :kbd:`\\P{L}+`                         |
+   +---------------+-------------------------+--------------------------------------------------+----------------------------------------+
+   |               | :kbd:`(?P<nombre>regex)`| Captura un grupo, asignándole nombre             |:kbd:`(?P<palabra>\\w+)\\s+(?P=palabra)`|
+   | Grupos        +-------------------------+--------------------------------------------------+                                        |
+   |               | :kbd:`(?P=nombre)`      | Refiere un grupo con nombre previamente capturado|                                        |
+   +---------------+-------------------------+--------------------------------------------------+----------------------------------------+
+   | *Lookahead*   | :kbd:`(?=regex)`        | Comprueba que esté la regex hacia adelante       | :kbd:`\w(?=a)`                         |
+   |               +-------------------------+--------------------------------------------------+----------------------------------------+
+   |               | :kbd:`(?!regex)`        | Comprueba que no esté la regex hacia adelante    | :kbd:`\w(?!a)`                         |
+   +---------------+-------------------------+--------------------------------------------------+----------------------------------------+
+   | *Lookabehind* | :kbd:`(?<=regex)`       | Comprueba que esté la regex hacia atrás          | :kbd:`(?<=a)\s`                        |
+   |               +-------------------------+--------------------------------------------------+----------------------------------------+
+   |               | :kbd:`(?<!regex)`       | Comprueba que no esté la regex hacia atrás       | :kbd:`(?<!\.)$`                        |
+   +---------------+-------------------------+--------------------------------------------------+----------------------------------------+
+
+Los patrones extendidos que proporciona |PCRE| en algunos casos amplían las
+posibilidades de los que ya hay en |ERE|. Tal es el caso de las nuevas clases
+que pueden difinirse (se han incluido en las tablas las categorías unicode) o de
+los grupos con nombre. Sin embargo, introducen también la definición de
+*lookarounds* (*lookahead* y *lookbehind*) que son un concepto nuevo. Si
+tuviéramos que traducir el concepto quizás lo haríamos como *vistazos*, unos
+hacia adelante y otros hacia atrás.
+
+Los *lookarounds* consisten en seleccionar texto en función de lo que pudiera
+haber antes o después. Tomemos como ejemplo el último de los ejemplos del
+apartado anterior::
+
+   $ grep -E '^(.+).*\1$' <<<"abracadabra"
+
+en que determinamos si el texto empieza y acaba por los mismos caracteres.
+Conseguimos nuestro objetivo, pero la comprobación implica que seleccionemos
+todo el texto. De hecho, si usamos la opción ``--color`` comprobaremos que
+:command:`grep` remarca todo en rojo. Ahora bien, quizás lo único que queríamos
+seleccionar era el conjunto de caracteres que abren el texto y que sirven luego
+para cerrarlo. Para esto precisamente sirven los *lookarounds*. En este caso::
+
+   $ grep -P '^(.+)(?=.*\1$)' <<<"abracadabra"
+
+En este caso, sólo veremos señalado con color *-abra-*, porque es eso  mismo lo
+que hemos seleccionado. Lo que hay a continuación es simplemente para echar un
+vistazo, sin llegar a seleccionarlo. Esto, además, es una de las características
+de los *lookarounds* que no *consumen* caracteres. De hecho, esto queda
+meridianamente claro, si añadimos una *c*, que es el siguiente carácter a
+*abra*::
+
+   $  grep -P '^(.+)(?=.*\1$)c' <<<"abracadabra"
+
+Como se ve el *lookaround* comprobó los caracteres siguientes, pero no consumió
+ninguno. De ahí que el siguiente caracter a ``(.+)`` sea la letra *c*.
+
+.. note:: En teoría mirar hacia detrás y mirar hacia adelante funcionan del mismo
+   modo, pero en muchas implementaciones *lookbehind* tiene limitaciones que no
+   tiene *lookahead*. En algunos casos, la expresión regular que se usa debe
+   tener una longitud fija (como es el caso del propio :command:`grep`) mientras
+   que en otros se permite la longitud variable, lo que excluiría
+   cuantificadores como ``*`` o ``+``.
+
+Otra de las posibilidades que abren los *lookarounds*, es la de comprobar si un
+texto *no* contiene determinada cadena, aunque la solución no es nada trivial.
+Esto es imposible de hacer con los patrones |ERE|. Véanse los ejemplos que se
+incluyen a continuación.
+
+.. warning:: Algunas herramientas (:command:`grep`, por ejemplo)
+   permiten mediente opciones invertir la selección para que se muestren
+   las líneas que no contienen el patrón suministrado. De este modo, no
+   tendríamos que recurrir a los *lookarounds* de las expresiones |PCRE|.
+
+Ejemplos:
+
+#. ¿Comienza el texto por una letra mayúscula?
+   ::
+
+      $ grep -P '^\p{Lu}' <<<"Pepe Gotera y Otilio"
+      Pepe Gotera y Otilio
+
+#. ¿El texto empieza y acaba con los mismos caracteres?
+   (Úsense grupos con nombre)
+   ::
+
+      $ grep -P '^(?<princ>.+).*(?P=princ)$' <<<"abracadabra"
+      abracadabra
+
+#. Seleccionar una frase si no contiene la palabra *Pepe*::
+
+      $ grep -P '^((?!Pepe).)*$' <<<"abracadabra"
+
+   La explicación de que esto funcione es que se busca que la frase este
+   constituida repetidamente por algo y ese algo es :kbd:`(?!Pepe).`, es
+   decir, una *nada*, pero que no esté seguida por la palabra *Pepe* y un
+   carácter. Si la frase no contiene la palabra *Pepe* en algún lugar, esto
+   es cierto. Sin embargo, si la contiene, esto será falso cuando
+   :command:`grep` analice la primera *P* de *Pepe*, porque ese carácter es
+   una *nada* seguida de *Pepe* y luego un carácter: la propia *P*.
+
+   Podrámos pensar que :kbd:`^(.(?!Pepe))*$` también es solución, pero no lo
+   es, proque falla en un caso::
+
+      $ grep -P '^(.(?!Pepe))*$' <<<"Pepe Gotera y Otilio"
+   
+   ya que la expresión significa, cualquier carácter seguido de *Pepe*. Pero
+   en el ejemplo escogido, no hay ningún carácter anterior a *Pepe*, puesto
+   que *Pepe* abre la cadena.
+
+   Otra solución posible es :kbd:`'^(.(?<!Pepe))*$'`, o sea, comprobar si de
+   principio a fin hay un carácter seguido de una *nada* a la que antecede la
+   palabra *Pepe*. Esto también funciona en todos los caso. El problema es
+   que al usar una *lookbehind* estamos limitados a que la cadena que no
+   queramos encontrar tenga una longitud fija.
+
+Enlaces de interés
+------------------
+
+* `La "biblia" <http://www.regular-expressions.info>`_.
+* `regexpr <https://regexper.com/>`_: Analizador de expresiones regulares.
+* Ejercicios:
+
+  * `Relación 1 <http://www.mclibre.org/consultar/linux/modotexto/ejercicios_expresiones_regulares.html>`_
+  * `Relación 2 <https://code-maven.com/exercise-regexes-part-1>`_
+  * `Ejercicios con autocorrección <https://regexone.com>`_
+  * `Autodefinidos con expresiones regulares <https://regexcrossword.com>`_
+
+.. include:: /ejercicios/09-regex.rst
+
+.. rubric:: Notas al pie
+
+.. [#] Véase `regular-expressions.info
+   <http://www.regular-expressions.info/refflavors.html>`_.
+
+.. [#] En realidad, el parentesco es algo más lejano: el sucesor directo de *ed*
+   fue `ex <https://en.wikipedia.org/wiki/Ex_(text_editor)>`_, y de éste lo fue
+   :program:`vi`. :program:`vim`, por su parte, es un clónico mejorado de éste
+   último (hay otros como `elvis
+   <http://elvis.the-little-red-haired-girl.org/>`_). El caso es que
+   :program:`vi` y sus clónicos tienen un modo *ex* para trabajar tal y como se
+   trabajaba con :program:`ex`.
+
+.. [#] Modernamente el mismo ejecutable :program:`grep` soporta ambos tipos de
+   expresiones. 
+
+.. [#] Por ejemplo, el cuantificador ``+`` debe escaparse en |BRE| para ser
+   considerado un cuantificador y no simplemente el carácter *signo de la
+   suma*. En cambio, en |ERE| es al revés: a secas es el cuantificador y
+   *escapado* el signo.
+
+.. [#] :command:`grep` sí soporta expresiones |PCRE|, pero :command:`sed`,
+   :command:`awk` y :program:`bash`, no, por lo que nos vemos limitados a las
+   |ERE|.
+
+.. [#] La única orden básica del sistema que está limitada al uso de expresiones
+   |BRE| es :ref:`expr <expr>`, útil cuando se programan *scripts* porque permite
+   resolver algunas situaciones para las que podríamos usar :program:`grep`,
+   pero ahorrándonos una tubería, esto es, una *subshell*.
+
+.. [#] Si se ejecuta :command:`grep` con la opción :kbd:`--color=auto`, se
+   resaltarán las coincidencias con el patrón. Puede ser un buen momento para
+   definirlo como alias::
+
+      alias grep='grep --color=auto'
+
+.. [#] Como la respuesta es no, :command:`grep` no devuelve nada.
+
+.. [#] Obsérvese que los propios dos puntos también son un caracter cualquier.
+   Si se hubiera evitar que pudiera haber dos puntos intermedios, entonces habrá
+   que recurrir a ls rxpresiones |ERE|, que se verán  a continuación::
+
+      $ grep '[^:]*:'<<<"usuario:x:1000"
+
+.. [#] Para las expresiones |ERE| también son válidas ``\<`` para el comienzo y
+   ``\>`` para el fichal de palabra. Pero, como no son reconocidas en las
+   expresiones |PCRE|, no se indican.
+
+.. [#] Las categorías unicode pueden consultarse en `este enlace <http://www.regular-expressions.info/unicode.html#category>`_.

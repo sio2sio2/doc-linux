@@ -1,0 +1,387 @@
+
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>4.2. Gestión de servicios &#8212; documentación de ServidorLinux - 0.1.0</title>
+    <link rel="stylesheet" href="../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/custom.css" />
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../_static/language_data.js"></script>
+    <script type="text/javascript" src="../../_static/translations.js"></script>
+    
+    <link rel="index" title="Índice" href="../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../search.html" />
+    <link rel="next" title="4.2.2.1. Consulta" href="systemd/01.consulta.html" />
+    <link rel="prev" title="4.1.2. apparmor" href="../02.seguridad/02.apparmor.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="systemd/01.consulta.html" title="4.2.2.1. Consulta"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="../02.seguridad/02.apparmor.html" title="4.1.2. apparmor"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de ServidorLinux - 0.1.0</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">4. Gestión del servidor</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="gestion-de-servicios">
+<h1>4.2. Gestión de servicios<a class="headerlink" href="#gestion-de-servicios" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>Se trató bajo un epígrafe anterior <a class="reference internal" href="../../02.conbas/09.admbasica/09.procesos.html#procesos"><span class="std std-ref">cómo gestionar de manera básica los
+procesos del sistema</span></a>, en concreto, cómo conocer los que se ejecutan
+y cómo pararlos de manera más o menos expeditiva. Para un sistema de escritorio
+muy básico, estos conocimientos son suficientes, y, aunque en todo sistema
+corren una serie de servicios, estos rara vez son manipulados por el usuario que
+se limita a ejecutar sus aplicaciones finales.</p>
+<p>Sin embargo, en un sistema de servidor, es imprescidible saber cómo manipular y
+gestionar estos servicios, esto es, cómo, cuáles y por qué arrancan, cómo
+pararlos de manera ordenada. cómo modificar su arranque y finalmente cómo
+volverlos a arrancar. De todo esto, es de lo que trata el presente apartado.</p>
+<p>Antes de empezar, no obstante, es conveniente dar una pátina de conocimientos
+sobre cuál es la forma en que arrancan los sistemas UNIX.</p>
+<p>Nada más cargar su <em>kernel</em> los sistemas <em>UNIX</em> ejecutan un proceso llamado
+tradicionalmente <strong class="command">init</strong> (de <strong>init</strong>ialization) con <em>PID</em> 1, que es
+el encargado de generar el resto de procesos. Este ejecutable tiene dos estilos
+para gestionar qué servicios arrancar durante el arranque:</p>
+<ul class="simple">
+<li>El estilo <abbr title="Berkeley Software Distribution">BSD</abbr>, en el que un único
+escrito (<code class="file docutils literal notranslate"><span class="pre">/etc/rc</span></code>) se encarga de la gestión.</li>
+<li>El estilo <a class="reference external" href="https://es.wikipedia.org/wiki/System_V">SystemV</a> (también
+denominano <em>sysv</em>), en el que la gestión se hace modular por medio de
+distintos <em>scripts</em> almacenados bajo <code class="file docutils literal notranslate"><span class="pre">/etc/rc.d/</span></code>.</li>
+</ul>
+<p><em>Linux</em> optó por este segundo estilo, con la salvedad de la distribución
+<a class="reference external" href="http://www.slackware.com/config/init.php">slackware</a>, más cercano a la
+filosofía del estilo <em>BSD</em>. La principal limitación del sistema tradicional es
+que actúa de manera síncrona, de manera que hasta que no se ha completado una
+tarea no se continúa con la siguiente, lo que dilata los tiempos de arranque.
+Hubo tanteos para cambiar este sistema de gestión con irregular éxito
+(<em>Canonical</em> para <em>ubuntu</em> creó <a class="reference external" href="https://es.wikipedia.org/wiki/Upstart">upstart</a>), hasta la aparición de <a class="reference internal" href="#systemd"><span class="std std-ref">systemd</span></a>, que ha sido adoptado por la mayoría de las grandes distribuciones,
+con las excepciones de <em>slackware</em> y <em>gentoo</em>. <em>debian</em> fue la última que lo
+adoptó y arrastró con su decisión a <em>ubuntu</em>, que abandonó <em>upstart</em>.</p>
+<div class="section" id="sysv">
+<h2>4.2.1. SysV<a class="headerlink" href="#sysv" title="Enlazar permanentemente con este título">¶</a></h2>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p class="last">SystemV no se usa ya en debian (la última estable que lo uso fue
+<em>wheezy</em>), de modo que este apartado es meramente informativo y, de hecho, no
+se entrará en absoluto en detalle<a class="footnote-reference" href="#id8" id="id1">[1]</a>.</p>
+</div>
+<p>En el sistema de arranque basado en <em>SystemV</em> existe un fichero
+<code class="file docutils literal notranslate"><span class="pre">/etc/inittab</span></code> que controla la configuración para el ejecutable
+<strong class="command">init</strong>. Este fichero, entre otros aspectos, indica en qué <em>nivel de
+ejecución</em> arrancará el sistema. Un <em class="dfn">nivel de ejecución</em> (o <em>runlevel</em>)
+define el modo de operación con que actuará el sistema operativo, lo que se
+traduce en cuáles son los servicios que deben cargarse durante el arranque. En
+<em>linux</em> los niveles de ejecución típicos son <em>siete</em>:</p>
+<dl class="docutils">
+<dt><strong>0</strong>: <em>Halt</em></dt>
+<dd>Apagado del sistema.</dd>
+<dt><strong>1</strong>: <em>single-user mode</em></dt>
+<dd>Modo monousuario. No ejecuta apenas servicios y sólo permite entrar en el
+sistema con la contraseña del administrador (<em>root</em>). Es el nivel de
+ejecución en que arranca el ordenador cuando se detecta un problema que exige
+reparación.<a class="footnote-reference" href="#id9" id="id2">[2]</a></dd>
+<dt><strong>2</strong>: <em>multi-user mode</em></dt>
+<dd>Modo multiusuario sin funciones de red.</dd>
+<dt><strong>3</strong>: <em>multi-user mode with networking</em></dt>
+<dd>Modo multiusuario con funciones de red.</dd>
+<dt><strong>4</strong>: <em>user definible</em></dt>
+<dd>Modo sin uso específico, de modo que puede definirlo el usuario como mejor
+convega.</dd>
+<dt><strong>5</strong>: <em>multi-user mode with networking and GUI</em></dt>
+<dd>A los servicios cargados en el <em>runlevel</em> 3, se añade la carga del servidor
+gráfico.</dd>
+<dt><strong>6</strong>: <em>reboot</em></dt>
+<dd>Reinicio del sistema.</dd>
+</dl>
+<p>Por lo general, en <code class="file docutils literal notranslate"><span class="pre">/etc/inittab</span></code> se configura el nivel de ejecución
+predeterminado (normalmente 3 ó 5), aunque en <em>grub</em> se puede añadir alguna
+entrada que cargue un runlevel distinto. Por ejemplo, es relativamente común que
+se añada una entrada <em>recovery mode</em> (o modo de recuperación) que arranque el
+sistema en <em>runlevel</em> 1. Para ello basta con incluir el número del <em>runlevel</em>
+como parámetro en la carga del núcleo.</p>
+<p>Para organizar el arranque al estilo <em>sysv</em> las distribuciones de linux traen un
+directorio <code class="file docutils literal notranslate"><span class="pre">/etc/init.d</span></code> dentro del cual incluyen todos los <em>scripts</em> que
+lanzan o paran los servicios y una serie de directorios <code class="file docutils literal notranslate"><span class="pre">/etc/rcX.d</span></code> donde
+<em>X</em> es el número correspondiente al <em>runlevel</em>. El contenido de estos
+directorios son enlaces simbólicos a los <em>scripts</em> contenidos en
+<code class="file docutils literal notranslate"><span class="pre">/etc/init.d</span></code> con nombres tales como <code class="file docutils literal notranslate"><span class="pre">S05slim</span></code> o :file:` o
+<cite>K01slim</cite>.  El final de estos nombres (<em>slim</em> en el ejemploi) es el nombre del
+<em>script</em> con el que enlazan; la <em>S</em> o <em>K</em> indica si hay que arrancar o parar el
+servicio; y el número intermedio el orden en que han de ser arrancados o parados
+(un número <em>01</em> significa que ese <em>script</em> se arrancará antes que uno con número
+<em>02</em>). Lo habitual es que los <em>runlevels</em> de arranque (1-5) tengan enlaces
+simbólicos con <em>S</em> y los <em>runlevels</em> de cierre (0, 6) enlaces simbólicos con
+<em>K</em>. Además hay un directorio <code class="file docutils literal notranslate"><span class="pre">/etc/rc.S</span></code> que sirve para incluir <em>scripts</em>
+que se ejecutan al término del arranque, sea cual sea el nivel de ejecución (1-5).</p>
+<p>En la práctica en <em>debian</em> y derivadas, no se hace distinción entre los
+<em>runlevels</em> 2-5, de manera que los <em>runlevels</em> distintos se reducen a 4 (0, 1,
+2-5 y 6).</p>
+<p>Para gestionar lo explicado y arrancar y parar a mano durante la ejecución del
+sistema algún servicio, <em>debian</em> dispone de algunas herramientas que se
+explicarán en la sección <a class="reference internal" href="#gestion-al-modo-de-debian">Gestión al modo de debian</a> y que se han portado a
+<em>systemd</em> con lo que siguen siendo válidas, aunque el gestor del sistema haya
+cambiado.</p>
+</div>
+<div class="section" id="systemd">
+<span id="id3"></span><h2>4.2.2. SystemD<a class="headerlink" href="#systemd" title="Enlazar permanentemente con este título">¶</a></h2>
+<p><em>SystemD</em> es nuevo gestor de sistema desarrollado a partir de 2009 en principio
+para la distribución <a class="reference external" href="https://www.redhat.com/es">Red Hat</a>, pero que ha acabado
+siendo adoptado por la mayoría de las distribuciones modernas de <em>linux</em>,
+excepto <a class="reference external" href="http://www.slackware.com/config/init.php">*slackware</a> y <a class="reference external" href="https://wiki.gentoo.org/wiki/OpenRC">gentoo</a>.</p>
+<p>Utiliza características exclusivas de <em>linux</em> por lo que no es implementable
+para otros <em>unices</em> y ha recibido <a class="reference external" href="https://www.linuxito.com/gnu-linux/nivel-alto/431-por-que-systemd-es-una-mierda">fuertes críticas</a>
+y hasta hay una <em>wiki</em> para reúne información sobre <a class="reference external" href="http://without-systemd.org/wiki/index.php/Main_Page">sistemas linux sin
+systemd</a> Sea como sea,
+se ha convertido en el estándar de facto para el arranque de los sistemas
+<em>linux</em> y, por consiguiente, no queda otra que conocerlo<a class="footnote-reference" href="#id10" id="id5">[3]</a>. En particular
+nos interesa conocer los siguientes aspectos sobre los servicios<a class="footnote-reference" href="#id11" id="id6">[4]</a>:</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="systemd/01.consulta.html">4.2.2.1. Consulta</a></li>
+<li class="toctree-l1"><a class="reference internal" href="systemd/02.gestion.html">4.2.2.2. Manipulación</a></li>
+<li class="toctree-l1"><a class="reference internal" href="systemd/03.runlevels.html">4.2.2.3. <em>Runlevels</em></a></li>
+<li class="toctree-l1"><a class="reference internal" href="systemd/04.personalizacion.html">4.2.2.4. Personalización</a></li>
+<li class="toctree-l1"><a class="reference internal" href="systemd/05.ejercicios.html">4.2.2.5. Ejercicios sobre SystemD</a></li>
+</ul>
+</div>
+<div class="section" id="enlaces-de-interes">
+<h3>4.2.2.6. Enlaces de interés<a class="headerlink" href="#enlaces-de-interes" title="Enlazar permanentemente con este título">¶</a></h3>
+<ul class="simple">
+<li><a class="reference external" href="https://wiki.archlinux.org/index.php/Systemd_(Espa%C3%B1ol)">Información sobre systemd de la wiki de ArchLinux</a></li>
+<li><dl class="first docutils">
+<dt>Serie de artículos en <a class="reference external" href="https://www.linux.com">linux.com</a> sobre <em>systemd</em>:</dt>
+<dd><ul class="first last">
+<li><a class="reference external" href="https://www.linux.com/learn/here-we-go-again-another-linux-init-intro-systemd">Intro to systemd</a>.</li>
+<li><a class="reference external" href="https://www.linux.com/learn/understanding-and-using-systemd">Understanding and Using Systemd</a>.</li>
+<li><a class="reference external" href="https://www.linux.com/learn/intro-systemd-runlevels-and-service-management-commands">Intro to Systemd Runlevels and Service Management Commands</a>.</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt>Serie de artículos en <a class="reference external" href="https://www.digitalocean.com">digitalocean.com</a> sobre <em>systemd</em>:</dt>
+<dd><ul class="first last">
+<li><a class="reference external" href="https://www.digitalocean.com/community/tutorials/systemd-essentials-working-with-services-units-and-the-journal">Systemd Essentials</a></li>
+<li><a class="reference external" href="https://www.digitalocean.com/community/tutorials/how-to-use-systemctl-to-manage-systemd-services-and-units">How To Use Systemctl to Manage Systemd Services and Units</a></li>
+<li><a class="reference external" href="https://www.digitalocean.com/community/tutorials/understanding-systemd-units-and-unit-files">Understanding Systemd Units and Unit Files</a></li>
+<li><a class="reference external" href="https://www.digitalocean.com/community/tutorials/how-to-use-journalctl-to-view-and-manipulate-systemd-logs">How To Use Journalctl to View and Manipulate Systemd Logs</a> (este artículo
+trata la <a class="reference internal" href="../08.monitorizacion/01.logs/02.journalctl.html#journalctl"><span class="std std-ref">monitorización con systemd</span></a>).</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><a class="reference external" href="https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/7/html/System_Administrators_Guide/chap-Managing_Services_with_systemd.html">Epígrafe sobre systemd de la Guía de configuración de Red Hat</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="gestion-al-modo-de-debian">
+<h2>4.2.3. Gestión al modo de debian<a class="headerlink" href="#gestion-al-modo-de-debian" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Aunque de <em>wheezy</em> (<em>7.0</em>) a <em>jessie</em> (<em>8.0</em>) se cambió la gestión del sistema de
+<em>SystemV</em> a <em>SystemD</em>, <em>debian</em> ha portado también sus herramientas de un
+sistema a otro<a class="footnote-reference" href="#id12" id="id7">[5]</a>, a fin de que puedan seguirse gestionando los servicios como
+hasta la fecha.</p>
+<p>La <em>ventaja</em> de conocer estas herramientas es que pueden manipularse los
+servicios de idéntico modo con independencia de cuál versión de <em>debian</em>
+tratemos.  La <em>desventaja</em> es que podemos realizar un número reducido de
+operaciones.</p>
+<span class="target" id="update-rc-d"><span id="service"></span><span id="invoke-rc-d"></span></span><span class="target" id="index-0"></span><span class="target" id="index-1"></span><table border="1" class="docutils" id="index-2">
+<colgroup>
+<col width="34%" />
+<col width="28%" />
+<col width="22%" />
+<col width="16%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head" rowspan="2">SystemD</th>
+<th class="head" colspan="2">Tradicional</th>
+<th class="head" rowspan="2">Acción</th>
+</tr>
+<tr class="row-even"><th class="head">Con <code class="code docutils literal notranslate"><span class="pre">invoke-rc.d</span></code></th>
+<th class="head">Con <code class="code docutils literal notranslate"><span class="pre">service</span></code></th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-odd"><td><code class="code docutils literal notranslate"><span class="pre">systemctl</span> <span class="pre">start</span> <span class="pre">ssh.service</span></code></td>
+<td><code class="code docutils literal notranslate"><span class="pre">invoke-rc.d</span> <span class="pre">ssh</span> <span class="pre">start</span></code></td>
+<td><code class="code docutils literal notranslate"><span class="pre">service</span> <span class="pre">ssh</span> <span class="pre">start</span></code></td>
+<td>Arrancar servicio</td>
+</tr>
+<tr class="row-even"><td><code class="code docutils literal notranslate"><span class="pre">systemctl</span> <span class="pre">stop</span> <span class="pre">ssh.service</span></code></td>
+<td><code class="code docutils literal notranslate"><span class="pre">invoke-rc.d</span> <span class="pre">ssh</span> <span class="pre">stop</span></code></td>
+<td><code class="code docutils literal notranslate"><span class="pre">service</span> <span class="pre">ssh</span> <span class="pre">stop</span></code></td>
+<td>Parar servicio</td>
+</tr>
+<tr class="row-odd"><td><code class="code docutils literal notranslate"><span class="pre">systemctl</span> <span class="pre">restart</span> <span class="pre">ssh.service</span></code></td>
+<td><code class="code docutils literal notranslate"><span class="pre">invoke-rc.d</span> <span class="pre">ssh</span> <span class="pre">restart</span></code></td>
+<td><code class="code docutils literal notranslate"><span class="pre">service</span> <span class="pre">ssh</span> <span class="pre">restart</span></code></td>
+<td>Reiniciar servicio</td>
+</tr>
+<tr class="row-even"><td><code class="code docutils literal notranslate"><span class="pre">systemctl</span> <span class="pre">reload</span> <span class="pre">ssh.service</span></code></td>
+<td><code class="code docutils literal notranslate"><span class="pre">invoke-rc.d</span> <span class="pre">ssh</span> <span class="pre">reload</span></code></td>
+<td><code class="code docutils literal notranslate"><span class="pre">service</span> <span class="pre">ssh</span> <span class="pre">reload</span></code></td>
+<td>Recargar servicio</td>
+</tr>
+<tr class="row-odd"><td><code class="code docutils literal notranslate"><span class="pre">systemctl</span> <span class="pre">reload-or-restart</span> <span class="pre">ssh.service</span></code></td>
+<td><code class="code docutils literal notranslate"><span class="pre">invoke-rc.d</span> <span class="pre">ssh</span> <span class="pre">force-reload</span></code></td>
+<td><code class="code docutils literal notranslate"><span class="pre">service</span> <span class="pre">ssh</span> <span class="pre">reload</span></code></td>
+<td>Recargar servicio</td>
+</tr>
+<tr class="row-even"><td><code class="code docutils literal notranslate"><span class="pre">systemctl</span> <span class="pre">status</span> <span class="pre">ssh.service</span></code></td>
+<td><code class="code docutils literal notranslate"><span class="pre">invoke-rc.d</span> <span class="pre">ssh</span> <span class="pre">status</span></code></td>
+<td><code class="code docutils literal notranslate"><span class="pre">service</span> <span class="pre">ssh</span> <span class="pre">status</span></code></td>
+<td>Supervisar servicio</td>
+</tr>
+<tr class="row-odd"><td><code class="code docutils literal notranslate"><span class="pre">systemctl</span> <span class="pre">enable</span> <span class="pre">ssh.service</span></code></td>
+<td colspan="2"><code class="code docutils literal notranslate"><span class="pre">update-rc.d</span> <span class="pre">ssh</span> <span class="pre">enable</span></code></td>
+<td>Habilitar servicio</td>
+</tr>
+<tr class="row-even"><td><code class="code docutils literal notranslate"><span class="pre">systemctl</span> <span class="pre">disable</span> <span class="pre">ssh.service</span></code></td>
+<td colspan="2"><code class="code docutils literal notranslate"><span class="pre">update-rc.d</span> <span class="pre">ssh</span> <span class="pre">disable</span></code></td>
+<td>Deshabilitar servicio</td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Notas al pie</p>
+<table class="docutils footnote" frame="void" id="id8" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td>No obstante, tiene su utilidad conocerlo, ya que <em>debian</em> sigue
+incluyendo en sus paquetes los <em>scripts</em> para <em>sysv</em>. En cualquier caso,
+estos <em>scripts</em> no deben ejecutarse directamente. No ahora que la gestión la
+hace <em>systemd</em>, pero tampoco antes puesto que <em>debian</em> dispone de un conjunto
+de utilidades para gestionar el arranque. Estas utilidades siguen siendo
+válidas, puesto que se han portando a <em>systemd</em> y son las que se explican en
+la sección <a class="reference internal" href="#gestion-al-modo-de-debian">Gestión al modo de debian</a>.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id9" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id2">[2]</a></td><td>Por ejemplo, si es imposible montar una partición listada en
+<code class="file docutils literal notranslate"><span class="pre">/etc/fstab</span></code> que no tenga como opción de montaje <em>nofail</em>, se producirá
+un error que provocará que el sistema pase al <em>runlevel</em> 1.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id10" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id5">[3]</a></td><td>Aunque el método tradicional de gestión de permisos en <em>debian</em> ya está
+portado a <em>systemd</em>, éste sólo sirve para los servicios ajenos al propio
+<em>systemd</em>. Por ejemplo, el demonio <strong class="command">sshd</strong> que habilita el servidor
+<a class="reference internal" href="../10.ssh/01.basico.html#ssh"><span class="std std-ref">SSH</span></a> puede gestionarse de este modo, puesto que es un servicio
+que gestiona, pero no implementa, <em>systemd</em>. Sin embargo, los servicios
+propios de <em>systemd</em> no hay otra forma de manipularlos que a través de las
+herramientas de <em>systemd</em>.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id11" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id6">[4]</a></td><td>A los cuales habría que añadir la monitorización, de la que también se
+encarga <em>systemd</em>, pero que se trata en bajo <a class="reference internal" href="../08.monitorizacion/01.logs/02.journalctl.html#journalctl"><span class="std std-ref">un epígrafe posterior</span></a>.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id12" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id7">[5]</a></td><td>En realidad, las herramientas gestionan en paralelo ambos sistemas, ya
+que en <em>debian</em> puede seguirse instalando <em>SystemV</em>.</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">4.2. Gestión de servicios</a><ul>
+<li><a class="reference internal" href="#sysv">4.2.1. SysV</a></li>
+<li><a class="reference internal" href="#systemd">4.2.2. SystemD</a><ul>
+<li><a class="reference internal" href="#enlaces-de-interes">4.2.2.6. Enlaces de interés</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#gestion-al-modo-de-debian">4.2.3. Gestión al modo de debian</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="../02.seguridad/02.apparmor.html"
+                        title="capítulo anterior">4.1.2. apparmor</a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="systemd/01.consulta.html"
+                        title="próximo capítulo">4.2.2.1. Consulta</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/04.servidor/03.init/index.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Ir a" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="systemd/01.consulta.html" title="4.2.2.1. Consulta"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="../02.seguridad/02.apparmor.html" title="4.1.2. apparmor"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de ServidorLinux - 0.1.0</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >4. Gestión del servidor</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor 2016, José Miguel Sánchez Alés.
+      Creado con <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
+    </div>
+  </body>
+</html>

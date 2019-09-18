@@ -1,0 +1,372 @@
+Principios de configuración
+===========================
+
+.. _nginx-install:
+
+Instalación
+-----------
+Podríamos decir que basta con hacer::
+
+	 # apt-get install nginx-light
+
+pero en el caso de :program:`nginx` y *debian* sería una simplicación
+intolerable. La razón es la siguiente:
+
+:program:`nginx` hasta su versión *1.9.11* tenía módulos que se añadían
+monolíticamente al ejecutable, es decir, que no se podían cargar dinámicamente
+a través de la configuración, sino que en la compilación se añadían al núcleo
+del programa. Por esa razón, los empaquetadores de *debian* crearon tres
+sabores dependiendo de cuáles fueran los módulos que se habían incluido en la
+compilación:
+
+* :program:`nginx-light`.
+* :program:`nginx-full`, o simplemente, :program:`nginx`.
+* :program:`nginx-extras`.
+
+De este modo, dependiendo de si necesitábamos más o menos módulos para la
+configuración del servidor, instalábamos uno u otro.
+
+Sin embargo, las versiones modernas incluyen módulos dinámicos y posibilitan que
+un mismo ejecutable pueda ejecutar más o menos módulos para lo cual sólo
+necesitan cargarlos. A partir de *stretch* (que incluye la versión *1.10.3*), la
+distribución trae ejecutables con posibilidad de carga dinámica de módulos y,
+aunque se siguen distribuyendo los tres sabores, cualquier de ellos es apto para
+ejecutar cualquier módulo empaquetado\ [#]_. En *stretch* y posteriores, la
+única diferencia entre estos sabores son los paquetes *debian* adicionales
+(módulos de :program:`nginx`) que se instalan automáticamente y algún módulo
+*estándar* que trae algún ejecutable y otro no\ [#]_.
+
+Aquí optaremos por instalar la versión ligera y, si requerimos para alguna
+configuración un módulo, lo instalaremos explícitamente.
+
+Ficheros de configuración
+-------------------------
+La configuración de :program:`nginx` está incluida toda dentro de
+:file:`/etc/nginx`. Los ficheros y directorios relevantes son los siguientes:
+
+.. code-block:: none
+
+   /etc/nginx
+      +--- conf.d/
+      +--- modules-available/
+      +--- modules-enabled/
+      +--- nginx.conf
+      +--- sites-available/
+              +--- default
+      +--- sites-enabled/
+              +--- default -> ../sites-available/default
+      +--- snippets/
+              +--- fastcgi-php.conf
+              +--- snakeoil.conf
+
+cuyo significado podemos desglosar así:
+
+:file:`nginx.conf`
+   Es, en sí, el fichero de configuración. el resto de configuración existente
+   en este directorio se aplica, bien porque este fichero la carga directamente,
+   bien porque un fichero cargado por él, la carga a su vez.
+:file:`conf.d`
+   Contiene ficheros con trozos de configuración que :file:`nginx.conf` siempre
+   carga si su extensión es :file:`*.conf`.
+:file:`snippets`
+   Es un directorio destinado a contener también ficheros con trozos de
+   configuración, pero a diferencia de los contenidos en el directorio anterior,
+   sólo se aplicarán si son expresamente citados dentro de otros ficheros de
+   configuración. *debian* trae dos configuraciones ya definidas que podemos
+   aprovechar:
+
+   * :file:`fastcgi-php.conf` para la configuración de |PHP|.
+
+   * :file:`snakeoil.conf` que incluye las líneas necesarias para usar el
+     certificado autofirmado del servidor.
+
+   Para aplicar una configuración incluida en este directorio debe utilizar en
+   la línea en que queramos que se aplique la directiva ``include``:
+
+   .. code-block:: nginx
+
+      include snippets/snakeoil.conf;
+
+:file:`sites-available`
+   Un mismo servidor web puede alojar distintos sitios *web* mediante el
+   mecanismo de :ref:`dominios virtuales <ngx-server>`. Este directorio está
+   destinado a albergar la definición de todos los *dominios virtuales*. Ya se
+   verá más adelante esto con mayor profundidad.
+:file:`sites-enabled`
+   Contiene los *dominios virtuales* habilitados. Los que no se encuentren aquí,
+   no forman parte de la configuración y por tanto es como si no se hubieran
+   definido. Para habilitar dominios basta, simplemente, con hacer enlaces
+   simbólicos que apuntes a las definiciones incluidas en :file:`sites-available`.
+:file:`modules-available`
+   Para cargar dinámicante un módulo la documentación de :program:`nginx`
+   indica que debe incluirse en la configuración una línea así:
+
+   .. code-block:: nginx
+
+      load_module modules/nonbre_del_modulo.so
+
+   Para simplificarlo, *debian* incluye un fichero de configuración para cada
+   módulo con su línea ``load_module`` correspondiente, con lo que cargar el
+   fichero de configuración, implica cargar el módulo. Como *debian* prefiere
+   alojar para sus paquetes estos ficheros en
+   :file:`/usr/share/nginx/modules-available/`, en este directorio sólo cabría
+   crear ficheros de configuración para módulos que hubiéramos compilado
+   nosotros mismos.
+:file:`modules-enabled`
+   Son enlaces simbólicos a los módulos que realmente se cargan al arrancar
+   :program:`nginx`. Cada vez que se instala en el sistema un paquete
+   correspondiente a un módulo, *debian* crea el enlace simbólico que apunta
+   al fichero de configuración correspondiente en
+   :file:`/usr/share/nginx/modules-available`. Por supuesto, si algún módulo no
+   lo usamos, podemos aligerar :program:`nginx` eliminando el enlace (y
+   reiniciando el servidor, claro).
+
+En la práctica:
+
+* :file:`nginx.conf` se modifica si se desea alterar alguna directiva citada en
+  él.
+* Se escribe algún fichero :file:`conf.d`, si se desea añadir configuración
+  predeterminada a la labor |HTTP| de :program:`nginx`\ [#]_.
+* Nuestra tarea se basa fundamentalmente en crear sitios cuya configuración se
+  creará en un fichero dentro de :file:`sites-available` que luego se enlazará
+  desde :file:`sites-enabled`.
+* Si algún trozo de configuración es recurrente en varios sitios, o bien
+  deseamos apartarla para tenerla mejor controlada y organizada, podemos crear
+  un *snippet* para ella e incluir tal *snippet* con la directiva ``include`` en
+  el fichero de configuración del sitio correspondiente.
+
+.. _nginx-install-modules:
+
+Módulos adicionales
+-------------------
+Como hemos instalado *nginx-light* puede ocurrir que en algún momento
+necesitemos un módulo empaquetado que no instala automáticamente este sabor.
+Supongamos que tal módulo es *libnginx-mod-http-auth-pam*. En ese caso::
+
+   # apt-get install libnginx-mod-http-auth-pam
+
+El script de *postinstalación* se encarga de todo, así que nos podemos limitar
+a comprobar que en :file:`/etc/nginx/modules-enabled` se ha creado el enlace
+adecuado::
+
+   # ls -F /etc/nginx/modules-enabled/*pam*
+   50-mod-http-auth-pam.conf@
+
+.. note:: Por supuesto podemos deshabilitar módulos innecesarios eliminado los
+   enlaces simbólicos correspondientes en ese directorio.
+
+.. _nginx-basico:
+
+Configuración básica
+--------------------
+Para ilustrar la configuración, tomemos una muy básica que sirve contenido
+estático y analicémosla. En principio, editemos
+:file:`/etc/nginx/sites-available/default` y dejémoslo con este contenido:
+
+.. code-block:: nginx
+
+   server {
+      listen  80;
+      server_name _;
+
+      root /srv/www;
+      try_files $uri $uri/ =404;
+   }
+
+.. _nginx-server:
+.. _nginx-listen:
+.. _nginx-root:
+.. _nginx-try_files:
+
+Cada directiva `server
+<http://nginx.org/en/docs/http/ngx_http_core_module.html#server>`_ nos permite
+configurar un *dominio virtual* y es lo que hemos hecho. Por ahora:
+
+* sólo nos preocuparemos de definir una que escucha por el puerto **80**
+  (`listen <http://nginx.org/en/docs/http/ngx_http_core_module.html#listen>`_)
+* en el que no preocupa cuál sea el nombre (la cabecera ``Host``, de ahí el
+  valor de `server_name
+  <http://nginx.org/en/docs/http/ngx_http_core_module.html#server_name>`_)
+* en que todos los ficheros compartidos a través del servidor se sitúan bajo
+  :file:`/srv/www`\ [#]_, merced a la directiva `root
+  <http://nginx.org/en/docs/http/ngx_http_core_module.html#root>`_
+* la directiva `try_files
+  <http://nginx.org/en/docs/http/ngx_http_core_module.html#try_files>`_ le
+  indica al servidor qué recursos debe intentar devolver al realizarse una
+  petición. En la configuración propuesta, primero se intenta devolver el propio
+  recurso; si éste no es un fichero, debe comprobarse si es un directorio y en
+  tal caso tratarlo como tal; y, si tampoco es un directorio, devolver un error
+  **404**. Una alternativa podría haber sido:
+
+  .. code-block:: nginx
+
+     try_files $uri $uri/ /
+
+  en este caso, cuando el recurso no se encontró como fichero ni como
+  directorio, no se genera un error, sino que se devuelve la página principal.
+  Por tanto en esta configuración, jamás se devolverá al cliente un error de
+  recurso inexistente.
+
+.. note:: Si miramos dónde se inserta este fichero dentro de :file:`nginx.conf`,
+   comprobaremos que lo hace en un bloque ``http``. O sea que un bloque
+   ``server`` se inserta dentro de un bloque ``http``. Esto es importante
+   tenerlo en cuenta porque la configuración de :program:`nginx` se estructura
+   en contextos: el global, el ``http``, el ``server``, etc.` que se anidan unos
+   dentro de otros. Cuando consultemos la documentación oficial, podremos
+   comprobar que para cada directiva se define en qué contextos es válida.
+
+Para rematar la configuración, debemos probarla. Para ello, podemos escribir una
+página principal simple en :file:`/srv/www/index.html`:
+
+.. code-block:: html
+
+   <!DOCTYPE html>
+   <html lang="es">
+      <title>Página principal</title>
+      <meta charset="utf-8">
+      <h1>Página principal</h1>
+   </html>
+
+Y, por último, usar un navegador para acceder a lá página usando, por ejemplo,
+la propia *IP* de la máquina en la que hayamos instalado el servidor.
+
+Sobre esta configuración básica podemos añadir algunas modificaciones:
+
+* La directiva ``listen`` puede incluir explicitamente la interfaz en la que
+  queremos que escuche. Por ejemplo:
+
+   .. code-block:: nginx
+
+      listen localhost:80;
+
+  ya que cuando se indica únicamente el puerto se sobreentiende que escuchará en
+  todas las disponibles.
+
+* Esta misma directiva puede usarse repetidamente para esscuchar en múltiples
+  puertos o múltiples interfaces, de modo que:
+
+   .. code-block:: nginx
+
+      listen  80;
+      listen  8080;
+
+  hará que el servidor escuche tanto en el puerto **80** como en el **8080**\
+  [#]_.
+
+* Si en el navegador hemos usado esta dirección (cambiése la *ip* por la que
+  toque)::
+ 
+   http://192.168.1.11 
+
+  .. _nginx-index:
+
+  para pedir la página, deberíamos ser conscientes de lo que ha ocurrido. No
+  hemos incluido ruta alguna para especificar el recurso, así que
+  :program:`nginx` no encuentra el "no recurso" (por llamarlo de alguna forma).
+  Siguiendo la directiva ``try_files`` añade una barra y entonces prueba a pedir
+  el directorio raíz e, inexplicablemente, se devuelve el recurso
+  :file:`/index.html`. Obviamente el suceso tiene explicación. Cuando
+  :program:`nginx` se encuentra con que se le pide un directorio, revisa una
+  directiva llamada `index
+  <http://nginx.org/en/docs/http/ngx_http_index_module.html#index>`_ para saber
+  cuáles son los fichero que se consideran de índice y que se mostrarán. El
+  valor predeterminado de esta directiva es:
+
+   .. code-block:: nginx
+
+      index index.html;
+
+  así que esa es la razón por la que se sirve la página simple que preparamos.
+  La directiva, por supuesto, admite que le cambiemos el valor o incluso que
+  pongamos varios para que  :program:`nginx` pruebe su existencia ordenadamente.
+  Por ejemplo:
+
+  .. code-block:: nginx
+
+     index index.html index.htm;
+
+  probaría si existen :file:`index.html` y, si no es así, prueba :file:`index.htm`.
+  Ahora bien, ¿qué ocurre si no existen tales ficheros de índice? En ese caso,
+  :program:`nginx` mostrará el contenido del directorio, pero sólo si se añade
+  la directiva `autoindex
+  <http://nginx.org/en/docs/http/ngx_http_autoindex_module.html#autoindex>`_:
+
+  .. code-block:: nginx
+
+     autoindex on;
+     autoindex_exact_size off;  # Muestra unidades k, m, M, etc. y no bytes siempre
+
+  que por defecto tiene valor *off*.
+
+  .. Quizás podría ponerse un formato más aparente con xml y el módulo
+     http://nginx.org/en/docs/http/ngx_http_xslt_module.html. Estudiarlo y
+     añadir un epígrafe si es así.
+
+La configuración, además, admite algunos añadidos interesantes:
+
+.. _nginx-logs:
+
+* :program:`nginx` registra los accesos y los accesos fallidos dentro de los
+  ficheros :file:`access.log` y :file:`error.log` del directorio
+  :file:`/var/log/nginx`, ya que así de define dentro :file:`nginx.conf`
+  mediante las directivas `access_log
+  <http://nginx.org/en/docs/http/ngx_http_log_module.html#access_log>`_ y
+  `error_log
+  <http://nginx.org/en/docs/http/ngx_http_log_module.html#error_log>`_. A este
+  respecto es importante tener claras dos cosas:
+
+  - Es común definir distintos ficheros de registro para distintos dominios
+    virtuales, así que podríamos incluir dentro del bloque ``server`` estas
+    dos directivas con ficheros alternativos.
+  - Si en un mismo contexto se definen varios ``access_log`` (o ``error_log``),
+    se escribirán registros en los ficheros que definen todas las directivas.
+    Sin embargo, cuando en un contexto inferior se define la directiva, ésta
+    sobreescribe las definiciones que pudieran haberse hecho en un contexto
+    superior.
+  - Estos ficheros se escriben directamente y no pasan por el gestor de
+    registros (:program:`systemd` o :program:`rsyslog`, según el caso). Para
+    propiciar que :program:`nginx` use el gestor, vea más adelante :ref:`cómo
+    <nginx-systemd>`.
+
+* :program:`nginx` tiene unas páginas predefinidas para informar al cliente
+  de los errores (**403**, **404**, **502**, etc.). Podemos, no obtante, crear
+  páginas personalizadas y hacer que :program:`nginx` las envíe al cliente en
+  vez de las predefinidas:
+
+  .. code-block:: nginx
+
+     error_page 404                      /errors/404.html;
+     error_page 500 502 503 504          /errors/50X.html;
+
+.. rubric:: Notas al pie
+
+.. [#] A partir de *stretch* cada módulo cargable dinámicamente se encuentra
+   en un paquete diferente. Por ejemplo, *libnginx-mod-http-dav-ext* contiene el
+   módulo `ngx_http_dav_module
+   <http://nginx.org/en/docs/http/ngx_http_dav_module.html>`_, que da suporte a
+   :program:`nginx` para las extensiones de *WebDav*, ya comentadas.
+
+.. [#] Por ejemplo, `ngx_http_referer` no está incluido en el ejecutable de
+   *nginx-light*, pero sí en los de *nginx-full* y *nginx-extra*.
+
+.. [#] :program:`nginx` puede actuar como *proxy* de correo o *proxy* para
+   conexiones TCP crudas. Para estos casos, no sirve escribir dentro de este
+   fichero y se debe tocar directamente :file:`nginx.conf`.
+
+.. [#] Lo cierto es que *debian* sigue pretendiendo que el contenido del
+   servidor siga estando bajo :file:`/var/www`. Nosotros, en cambio, preferimos
+   seguir las directrices del `FHS <http://www.pathname.com/fhs/>`_, ya
+   citado al comienzo de este material.
+
+.. [#] Ya veremos que esto es útil cuando queramos versiones seguras e inseguras
+   del mismo sitio:
+   
+   .. code-block:: nginx
+
+      listen  80;
+      listen  443 ssl;
+
+   aunque esto requiere más configuración.
+
+.. |SSL| replace:: :abbr:`SSL (Security Socket Layer)`
+.. |PHP| replace:: :abbr:`PHP (PHP Hypertext Preprocesor)`

@@ -1,0 +1,474 @@
+.. _dnsmasq:
+.. _dnsmasq-dhcp:
+
+DHCP con :program:`dnsmasq`
+***************************
+:program:`dnsmasq` es un pequeño servidor que puede hacer las veces de servidor
+|DNS| caché y servidor |DHCP|\ [#]_. Si la configuración es sencilla, podemos usarlo
+en vez del tándem :program:`bind` (para |DNS|) y el servidor del |ISC| (para
+|DHCP|). En particular puede interesarnos cuando se dan las siguientes
+circunstancias:
+
+* El servicio |DNS| es interno y no pretedemos hacer nada especialemnte
+  complicado.
+* No requerimos que la caché de direcciones sea muy grande (:program:`dnsmasq`
+  almacena los nombres en memoria).
+
+.. note:: Bajo este epígrafe trataremos sólo su capacidad para hacer de servidor
+   |DHCP|. Para ver cómo usarlo como servidor |DNS|, consúltese :ref:`más adelante
+   <dnsmasq-dns>`.
+
+.. warning:: Sin configuración alguna, :program:`dnsmasq` levantará el servidor
+   |DNS|, por lo que si se quiere prescindir de él es necesario incluir en la
+   configuración la directiva::
+
+      port=0
+
+.. warning:: No trataremos aquí la configuración del servicio para arranque por
+   red. Si ese es un interés, vaya al `epígrafe correspondiente <pxe>` que se
+   desarrolla más adelante.
+
+Antes de empezar, supongamos que nuestro punto de partida es una máquina con
+tres interfaces físicas:
+
+.. literalinclude:: files/interfaces
+
+y que nuestra intención es proporcionar configuración dinámica de direcciones a
+las dos redes internas.
+
+La instalación no tiene ninguna complicación::
+
+   # apt-get install dnsmasq
+
+.. _dnsmasq-dhcp-confbas:
+
+Configuración básica
+====================
+Su fichero de configuración es :file:`/etc/dnsmasq.conf`, pero también
+puede hacerse una configuración modular creando ficheros dentro de
+:file:`/etc/dnsmasq.d`, gracias a cómo se lanza el servicio\ [#]_. Así pues,
+creemos dentro de tal directorio un fichero :file:`dhcp.conf` con la siguiente
+configuración::
+
+   log-dhcp
+
+   dhcp-range=192.168.255.64,192.168.255.127,10m
+   domain=interna1.vm,192.168.255.0/24
+
+La primera línea es prescindible, pero provoca más información en el registro
+que nos puede ser útil mientras estudiamos una configuración. Las otras dos
+líneas establecen el rango y tiempo de concesión y el dominio asociado. Para
+simplificar, nos olvidaremos por ahora de la otra interfaz.
+
+Esta es la configuración más básica por cuanto el resto de parámetros de
+configuración necesarios (fundamentalmente |DNS| y puerta de enlace) se ajustan
+a la |IP| del servidor.
+
+Podemos, no obstante, añadir parámetros (opciones) del siguiente modo::
+
+   dhcp-option=6,192.169.1.1
+
+es decir, a la opción **6**\ [#]_ (que representa los servidores |DNS|) se le
+asocia el valor *192.168.1.1*. La mayoría de estas opciones tiene asociado
+también un nombre que puede consultarse con::
+
+   $ /usr/sbin/dnsmasq --help dhcp
+   Opciones DHCP conocidas:
+     1 netmask
+     2 time-offset
+     3 router
+     6 dns-server
+     7 log-server
+     [...]
+
+Usando el nombre, la línea anterior también podría haberse escrito así::
+
+   dhcp-option=option:dns-server,192.168.1.1
+
+Obsérvese que no se indica de qué tipo es el dato, por lo que :program:`dnsmasq`
+lo interpreta según el aspecto que tenga el valor:
+
+* Si es una |IP|, lo interpretará como cuatro *bytes*\ [#]_.
+* Si una cadena, como cadena\ [#]_. y si
+* Si es un número decimal, habrá que especificar si se trata de un *byte*, dos o
+  tres rematando la expresión del número con los sufijos :kbd:`b`, :kbd:`s` o :kbd:`i`,
+  respectivamente.
+* Si se quieren escribir valores hexadecimales, debe separarse cada byte con dos
+  puntos: :kbd:`00:1A:CF`.
+
+Aunque el servidor |DHCP| sólo envía las opciones requeridas por el cliente, es
+posible forzar el envío de otras opciones. Por ejemplo::
+
+   dhcp-option-force=209,pxelinux.cfg/normal
+
+la cual, aunque no la haya pèdido, envía al cliente la opción *209*, que
+identifica al fichero de arranque y es propia de :ref:`PXE <pxe>`.
+
+.. warning:: Si atendemos al protocolo, el tiempo de concesión se envía como
+   opción (es la número **51**). Sin embargo, es inutil fijarlo con
+   ``dhcp-option``::
+  
+      dhcp-option=51,300i   # Esto es inútil.
+
+   ya que :program:`dnsmasq` atiende sólo al valor establecido con
+   ``dhcp-range``\ [#]_.
+
+.. _dnsmasq-host-decl:
+
+Declaración de máquinas
+=======================
+En ocasiones, se tienen máquinas en la red a las que se quiere asignar una |IP|
+fija. Esto se puede hacer mediante la directiva ``dhcp-host``::
+
+   dhcp-host=00:11:22:33:44:55,192.168.255.2
+
+.. warning:: Cuando se asocian |IP|\ s fijas con máquinas, éstas deben quedar
+   fuera del rango definido con ``dhcp-range``.
+
+Es posible añadir más opciones::
+
+   dhcp-host=00:11:22:33:44:55,192.168.255.2,nas,24h
+   
+lo cual proporciona, además, el nombre *nas* y hace la concesión durante 24
+horas. Salvo la |MAC|, que es el campo identificativo, el resto de campos son
+optativos y, como son todos de distinto tipo, no es necesario marcar de modo
+alguno que falta. Por ejemplo::
+
+   dhcp-host=00:11:22:33:44:55,nas
+
+asocia el nombre a la máquina con la |MAC| especificada, sin fijar |IP| alguna
+por lo que esta se concederá según el rango que se definiera con ``dhcp-range``.
+
+.. note:: El nombre no solamente se envía al cliente, sino que. si está
+   funcionando el |DNS| integrado en :program:`dnsmasq`, se hace la asociación
+   con la |IP| asignada en el servidor |DNS|, por lo que, durante el tiempo que
+   se encuentre concedida la |IP|, podrá hacerse tanto la resolución directa
+   como la inversa. Ahora bien, para esto es importante que se haya usado la
+   directiva ``dpmain`` para fijar el dominio y que :program:`dnsmasq` pueda
+   constituir el :abbr:`FQDN (Full Qualified Domain Name)`.
+
+Esta misma directiva permite identificar las máquinas con el identificador que
+envían al servidor, en vez de con la |MAC|. Para ello basta con usar el prefijo
+*id*::
+
+   dhcp-host=id:00:AA:21:11,192.168.255.10
+
+También se puede no escuchar la petición y dejárse tal máquina sin configuración::
+
+   dhcp-host=00:11:22:33:44:55,ignore
+
+Es posible, incluso, usar la directiva así::
+
+   dhcp-host=00:11:22:00:00:00,00:11:22:00:00:01,00:11:22:00:00:02
+
+es decir, incluir varias direcciones |MAC| y asociarlas a alguna propiedad
+(*ignore*, un tiempo de concesión, etc.) o bien no asociarlas a ninguna. Al no
+incluir ninguna opción, no se realiza una configuración especial, lo cual en
+principio puede parecer estúpido, pero sólo aparentemente: todas las máquinas
+que se citan expresamente, :program:`dnsmasq` las considera *conocidas* y se les
+asocia una etiqueta **known**, que podrá ser usada para realizar
+:ref:`configuración condicional <dnsmasq-dhcp-if>`.
+
+:program:`dnsmasq` da la posibilidad de hacer estas definiciones de máquina en
+uno o varios ficheros independientes gracias a las directivas ``dhcp-hostsfile``
+y ``dhcp-hostsdir``::
+
+   dhcp-hostsfile=/etc/dnsmasq.dhcphosts.conf
+
+Dentro de estos ficheros basta con escribir los valores que se usan en la
+directiva ``dhcp-host``, uno por línea. Por ejemplo::
+
+   # Definición de máquinas para DHCP
+   00:11:22:33:44:55,192.168.255.2,nas,24h
+   00:80:52:AA:BB:CC,alumno1,1h
+
+.. warning:: Hacer las definiciones de máquina de esta forma, es decir,
+   independientes de los ficheros de configuración, tiene una ventaja capital:
+   cuando se manda una señal *SIGHUP* \ [#]_ a :program:`dnsmasq` este no acaba,
+   sino que recarga los ficheros de máquina, tanto estos como los que usa el
+   servidor |DNS|. En consecuencia, si se usan ficheros independientes para
+   definir las máquinas, pueden modificarse y recargarse, sin necesidad de parar
+   el servidor.
+
+.. _dnsmasq-dhcp-if:
+
+Configuración condicional
+=========================
+Imaginemos que añadimos a nuestra configuración la segunda red con lo que la
+configuración queda así::
+
+   log-dhcp
+
+   dhcp-range=192.168.255.64,192.168.255.127,10m
+   domain=interna1.vm,192.168.255.0/24
+
+   dhcp-range=192.168.254.64,192.168.254.127,20m
+   domain=interna2.vm,192.168.245.0/24
+
+   #dhcp-option=6,192.168.1.1
+   dhcp-hostsfile=/etc/dnsmasq.hosts.conf
+
+Hemos definido los rangos y dominios para ambas redes y hasta aquí todo bien.
+Pero ahora imaginemos que descomentamos la directiva que define los servidores
+|DNS| y reiniciamos el servicio. Cuando lo hagamos, comprobaremos que el valor
+de la opción afecta a ambas redes y los clientes de ambas redes configurarán su
+servidor |DNS| como *192.168.1.1*. La pregunta ante esto es, ¿no hay alguna
+forma de que las definiciones de la configuración sean condicionales y no
+afecten a todos los clientes?
+
+La respuesta es que sí y para lograrlo se hace uso de las **etiquetas**. En el
+caso particular de la directiva ``dhcp-range`` se define implícitamente una
+etiqueta cuyo nombre coincide con el nombre de la interfaz\ [#]_, por lo que
+podemos usarla luego al definir la opción para hacer que ésta sólo se aplique a
+los clientes a los que sea aplicable la etiqueta::
+
+   dhcp-option=tag:eth1,6,192.168.1.1
+
+.. note:: como está claro que en el caso de las directiva ``dhcp-option`` la
+   etiqueta es para aplicación, no para definición, puede prescindirse del prefijo
+   :kbd:`tag:`::
+
+      dhcp-option=eth1,6,192.168.1.1
+
+El criterio general es que podemos definir una etiqueta con aquellas directivas
+que sirven para caracterizar al cliente y aplicar la etiqueta en aquellas otras
+directivas que sirven para definir la información que se les envía.
+
+Definición de etiquetas
+-----------------------
+Un cliente, al pedir una configuración, informa al servidor de lo siguiente\ [#]_:
+
+* El identificador del vendedor (la opción **60** o *vendor-class-identifier*)
+  que en :program:`dnsmasq` puede inquirirse con la directiva
+  ``dhcp-vendorclass``.
+* La dirección |MAC|, que puede inquirise con dos directivas:
+
+  - ``dhcp-host``, que ya hemos visto y que sirve para bastante más (por.
+    ejemplo, para asociar un nombre o una |IP|).
+  - ``dhcp-mac``, que sirve exclusivamente para lo que tratamos y que, además,
+    no incluye las máquinas referidas dentro de la etiqueta "*known*".
+
+* Su identificador de cliente (la opción **61** o *dhcp-client-identifier*), que
+  también puede inquirise con ``dhcp-host``. 
+* La clase de usuario (la opción **77** o *user-class*), que se inquiere con la
+  directiva ``dhcp-userclass``.
+* La lista de parámetros |DHCP| (opción **55** o *parameter request list*) que
+  el cliente pide al servidor.
+* Indirectamente, la red en la que está al enviar la petición y que ésta sea
+  recibida por el servidor a través de una interfaz (``dhcp-range``).
+  
+Por tanto, las directivas que permiten definir etiquetas son:
+
+``dhcp-range``
+   Ya hemos visto que ``dhcp-range`` realiza una definición implícita. 
+
+``dhcp-vendorclass``, ``dhcp-userclass``
+   Para ambas basta con incluir parte del valor que envíe el cliente y definir
+   el nombre de la etiqueta. Por ejemplo::
+
+      dhcp-vendorclass=set:pxeclient,PXEClient
+      dhcp-userclass=set:ipxe,iPXE
+
+   asociaría la etiqueta *pxeclient* a todos los clientes que enviaran como
+   identificador del vendedor una cadena que contenga "*PXEClient*" y asociaría la
+   etiqueta *ipxe* a los clientes que enviaran como clase de usuario una cadena que
+   contenga "*iPXE*".
+
+``dhcp-host``
+   Como en los casos anteriores, basta con definir la etiqueta prefijándola con
+   :kbd:`set:`::
+
+      dhcp-host=set:profesor,00:11:22:33:44:55,profesor,24h
+
+   De este modo, la máquina con |MAC| *00:11:22:33:44:55* estará asociada a la
+   etiqueta "*profesor*". También puede usarse la misma etiqueta repetidas
+   veces, de manera que todas las máquinas estará asociadas a la misma
+   etiqueta::
+
+      dhcp-host=set:profesor,00:11:22:33:44:55,profesor1,24h
+      dhcp-host=set:profesor,00:11:22:33:44:56,profesor2,24h
+
+   Es posible dejar en la directiva indefinidos los últimos pares de la |MAC|
+   sustituyéndolos por asteriscos ("\*"). Por ejemplo, si queremos sólo definir
+   los tres primeros pares que identifican al fabricante::
+
+      dhcp-host=set:nuevos,00:11:22:*:*:*
+
+   Además, ha de tenerse en cuenta que cualquier máquina definida con esta
+   directiva se incluye dentro de la etiqueta "*known*". Dentro de ellas están
+   incluidas las máquinas que concuerdan con |MAC| que tienen asteriscos. Por
+   tanto, en nuestro ejemplo, todas las máquinas "*nuevos*" son máquinas
+   *conocidas*.
+
+``dhcp-mac``
+   A diferencia de la anterior sólo permite definir una etiqueta basándose en el
+   valor de la |MAC|::
+
+      dhcp-mac=set:profesor,00:11:22:33:44:55
+      dhcp-mac=set:alumno,fc:a5:cd:*:*:*
+
+   .. warning:: Téngase en cuenta que las máquinas o grupos de máquinas
+      referidos mediante esta directiva no se consideran *conocidas* y, por
+      tanto, no se incluirán dentro de la etiqueta "*known*".
+
+``dhcp-match``
+   Permite comprobar el valor de una opción arbitraria mandada por el cliente,
+   frente a ``dhcp-vendorclass`` y ``dhcp-userclass`` que hacen la comprobación
+   exclusivamente para las opciones **60** y **71** respectivamente. Por ejemplo,
+   las dos líneas anteriores son equivalentes a estas::
+
+      dhcp-match=set:pxeclient,60,PXEClient 
+      dhcp-match=set:ipxe,71,iPXE
+
+   .. note:: En el caso de esta opción, podemos prescindir del prefijo.
+
+   .. note:: Con esta directiva es posible analizar el valor de la opción 55 y, ya
+      que cada cliente usa una lista característica, puede llegarse a conocer
+      cuál el sistema que ejecuta el cliente con bastante fiabiliad. Para más
+      información sobre ello, recurra a la lectura del apartado dedicado al
+      :ref:`tratamiento de smartphones <dhcp-smart>`.
+
+Aplicación de etiquetas
+-----------------------
+Como ya se ha adelantado, la definición de *etiquetas* se hace para diferenciar el
+trato que se tiene con los clientes. Por tanto, podremos aplicar *etiquetas* en
+aquellas opciones que sirven para modificar la información que se envía a los
+clientes. Fundamentalmente:
+
+``dhcp-range``
+   Permite definir el rango para las máquinas asociadas a una etiqueta. Por
+   ejemplo, si queremos tratar de distinta forma las asignaciones a clientes
+   |PXE|::
+
+      dhcp-vendorclass=set:pxeclient,PXEClient
+      dhcp-range=tag:pxeclient,192.168.255.100,192.168.255.127,3m
+      dhcp-range=tag:!pxeclient,192.168.255.128,192.168.255.223,8h
+
+   Obsérvese que para que que la directiva se aplique a los clientes **no**
+   asociados a la etiqueta debe anteponerse un signo "!" (o una almohadilla) al
+   nombre de la etiqueta.
+
+   .. note:: Si no se quiere definir un rango exclusivo, sino simplemente hacer
+      más corto el tiempo de concesión, basta con repetir el rango::
+
+         dhcp-vendorclass=set:pxeclient,PXEClient
+         dhcp-range=tag:pxeclient,192.168.255.128,192.168.255.223,3m
+         dhcp-range=tag:!pxeclient,192.168.255.128,192.168.255.223,8h
+      
+``dhcp-option`` (y ``dhcp-option-force``)
+   Para enviar la opción definida sólo a los clientes asociados a la etiqueta::
+
+      dhcp-option=tag:eth1,6,192.168.1.1
+
+   En este caso, es posible ahorrarse el prefijo::
+
+      dhcp-option=eth1,6,192.168.1.1
+       
+``dhc-ignore``
+   Evita responder a los clientes asociados a la etiqueta::
+
+      #dhcp-ignore=tag:PXEClient  # Esto también es válido
+      dhcp-ignore=PXEClient
+
+En cualquier caso, es posible incluir varias etiquetas lo que hará que sólo se
+aplique a los cliente que estén asociados a ambas. Por ejemplo, esto evitaría
+el arranque por red a las máquinas desconocidas, pero les permitiría obtener una
+configuración de red cuando ejecutan su sistema local::
+
+   dhcp-ignore=pxeclient,!known
+
+Configuraciones habituales
+==========================
+
+Simple
+------
+Una red con un rango único rango de asignación:
+
+.. literalinclude:: files/dhcp-simple.conf
+
+Con máquinas conocidas
+----------------------
+Una red que tiene algunas máquinas conocidas a las que se quiere asignar un
+rango distinto o una ip fija:
+
+.. literalinclude:: files/dhcp-rangos.conf
+
+y el fichero :file:`/etc/dnsmasq.hosts.conf` con este contenido::
+
+   # Máquinas conocidas
+   00:11:22:*:*:*                             # Tipo de máquinas que componen la red.
+   00:11:22:33:44:55,192.168.255.2,profesor   # Ordenador del profesor
+
+.. _dhcp-static-routes:
+
+Con rutas estáticas adicionales
+-------------------------------
+Lo habitual es que al configurar un cliente sólo se le indique cuál es la puerta
+de enlace predeterminada\ [#]_. pero puede ocurrir que necesitemos indicar a los
+clientes rutas adicionales. Para lograrlo existen dos opciones, la **33** que
+define el :rfc:`2132` y la **121** definida en el :rfc:`3442`. La diferencia
+entre una y otra es que la segunda permite usar la notación |CIDR| para indicar
+la máscara de la red, mientras que con la primera no es posible expresar máscara
+alguna. Como por lo general los clientes piden la opción **121**, pero no la
+**33**, centraremos nuestra configuración en enviar esta opción para, por
+ejemplo, declarar cuál es la puerta de enlace que nos permite conectar con la
+red *172.16.0.0/16*:
+
+.. literalinclude:: files/dhcp-static-routes.conf
+
+.. warning:: El :rfc:`3442` prescribe que si el cliente recibe la opción **121**
+   y la opción **3** (la que indica cuál es la puerta de enlace predeterminada),
+   debe obviar esta última. Por ello, cuando se desea la opción para añadir una
+   ruta adicional siempre es necesarto incluir la ruta predeterminada.
+
+.. rubric:: Notas al pie
+
+.. [#] E incluso también de servidor :abbr:`TFTP (Trivial FTP)` para integrar
+   todo lo necesario para proporcionar :ref:`arranque por red <pxe>`.
+
+.. [#] Véase :file:`/etc/default/dnsmsaq`
+
+.. [#] Para consultar las opciones disponibles, se puede echar un vistazo a
+   `esta tabla <http://www.networksorcery.com/enp/protocol/bootp/options.htm>`_.
+
+.. [#] Por ejemplo, la |IP| *192.168.1.1* equivaldría a *c0a80101* y así se
+   codificaría.
+
+.. [#] Cuando se quiere forzar a que un dato sea entendido como cadena, es
+   necesario encerrarlo entre comillas::
+
+      dhcp-option=66,"192.168.1.1"
+
+.. [#] Si probamos a usar ``dhcp-option-force`` es aún peor, porque se incluirá
+   la opción **51** dos veces, una con el valor declarado en ``dhcp-range`` y
+   otra con el declarado con la opción, lo cual viola fragantemente el estándar.
+
+.. [#] Para ello basta con::
+
+      # kill -1 pid_de_dnsmasq
+
+   o, más fácil aún, si la distribución usa :program:`systemd`::
+
+      # systemctl reload dnsmasq
+
+.. [#] aunque se podría haber hecho esta definición explícita, si se
+   prefiere::
+
+      dhcp-range=set:eth1,192.168.255.64,192.168.192.255.127,10m
+
+   o incluso prescindiendo del prefijo :kbd:`set:`::
+
+      dhcp-range=eth1,192.168.255.64,192.168.192.255.127,10m
+
+.. [#] Los nombres alternativos  al número de opción que se dan a continuación
+   son los que usa el servidor del |ISC|.
+
+.. [#] Si esta puerta de enlace es el propio servidor |DHCP| no será necesario
+   ningún parámetro adicional, y, si es otra máquina, bastará con un
+   *dhcp-option*::
+
+      dhcp-option=3,192.168.255.2
+
+.. |ISC| replace:: :abbr:`ISC (Internet Systems Consortium)`
+.. |PXE| replace:: :abbr:`PXE (Preboot eXecution Environment)`
+.. |CIDR| replace:: :abbr:`CIDR (Classless Inter-Domain Routing)`

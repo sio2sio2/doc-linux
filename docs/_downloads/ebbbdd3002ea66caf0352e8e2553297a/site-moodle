@@ -1,0 +1,40 @@
+server {
+   listen  80;
+   listen  443 ssl;
+
+   server_name  moodle.example.net;
+
+   root  /srv/www/moodle;
+   try_files $uri $uri/ @path_info;
+   index index.php;
+
+   include snippets/snakeoil.conf;
+
+   # Redirección al sitio seguro
+   if ($https != "on") {
+      return 301 https://$host$request_uri;
+   }
+
+   location ~ \.php$ {
+      include snippets/fastcgi-php.conf;
+      fastcgi_pass php;
+   }
+
+   include snippets/robotsoff.conf;
+
+   location @path_info {
+      rewrite ^/(.*\.php)(/.*)$ /$1?file=$2 last;
+      rewrite ^ /index.php?q=$request_uri last;
+   }
+
+   # Hacemos inaccesible el directorio de datos.
+   location ^~ /data/ {
+      return 404;
+   }
+
+   location ~* file=.+\.(as[fx]|wax|wm[vx]|avi|bmp|class|divx|docx?|eot|exe|gif|gz|gzip|ico|jpe?g|jpe|mdb|midi?|mov|qt|mp3|m4[av]|mp4|mpe?g|mpe|mpp|od[bcfgpst]|og[gv]|otf|pdf|png|pot|pp[st]|pptx|ram?|svgz?|swf|tar|t?gz|tiff?|ttf|wav|webm|wm[av]|woff|wri|xlsx?|xl[atw]|zip)$ {
+      expires max;
+      access_log off;
+      log_not_found off;
+   }
+}

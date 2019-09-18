@@ -1,0 +1,557 @@
+
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>7.2.2.3.8. MRBS &#8212; documentación de ServidorLinux - 0.1.0</title>
+    <link rel="stylesheet" href="../../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css" />
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../../" src="../../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../../_static/language_data.js"></script>
+    <script type="text/javascript" src="../../../../_static/translations.js"></script>
+    
+    <link rel="index" title="Índice" href="../../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../../search.html" />
+    <link rel="next" title="7.2.2.3.9. DMS" href="08.dms.html" />
+    <link rel="prev" title="7.2.2.3.7. Foro" href="06.foro.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="08.dms.html" title="7.2.2.3.9. DMS"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="06.foro.html" title="7.2.2.3.7. Foro"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">documentación de ServidorLinux - 0.1.0</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" >7. Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../index.html" >7.2. Web</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../index.html" >7.2.2. nginx</a> &#187;</li>
+          <li class="nav-item nav-item-4"><a href="index.html" accesskey="U">7.2.2.3. Recetas</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="mrbs">
+<h1>7.2.2.3.8. <abbr title="Meeting Room Booking System">MRBS</abbr><a class="headerlink" href="#mrbs" title="Enlazar permanentemente con este título">¶</a></h1>
+<p><a class="reference external" href="https://mrbs.sourceforge.io/">MRBS</a> es una pequeña aplicación web que
+facilita la reserva anticipada de aulas.</p>
+<div class="section" id="preliminares">
+<h2>7.2.2.3.8.1. Preliminares<a class="headerlink" href="#preliminares" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>No tiene muchas dependencias y la instalación básica de <abbr title="PHP Hypertext Preprocesor">PHP</abbr>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt-get install php<span class="o">{</span>,-mysql<span class="o">}</span> libapache2-mod-php7.0- mysql-<span class="o">{</span>server,client<span class="o">}</span>
+</pre></div>
+</div>
+<p>es más que suficiente. Además, como cualquier otra aplicación web, requiere que
+se le prepare una base de datos y un usuario para manipularla:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mysql
+<span class="go">mysql&gt; CREATE DATABASE mrbs;</span>
+<span class="go">mysql&gt; GRANT ALL PRIVILEGES ON mrbs.* TO &#39;mrbs&#39;@&#39;localhost&#39; IDENTIFIED BY &#39;contraseñadificil&#39;;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="configuracion-en-nginx">
+<h2>7.2.2.3.8.2. Configuración en <strong class="program">nginx</strong><a class="headerlink" href="#configuracion-en-nginx" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Basta con crear una <a class="reference download internal" download="" href="../../../../_downloads/eb3c2da156a01c29ef1ea1fff4502158/site-mrbs"><code class="xref download docutils literal notranslate"><span class="pre">configuración</span> <span class="pre">de</span> <span class="pre">sitio</span></code></a> con esta pinta:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">server</span> <span class="p">{</span>
+   <span class="kn">listen</span> <span class="mi">80</span><span class="p">;</span>
+   <span class="kn">listen</span> <span class="mi">443</span> <span class="s">ssl</span><span class="p">;</span>
+
+   <span class="kn">server_name</span> <span class="s">aulas.example.net</span><span class="p">;</span>
+
+   <span class="kn">include</span> <span class="s">snippets/snakeoil.conf</span><span class="p">;</span>
+
+   <span class="kn">if</span> <span class="s">(</span><span class="nv">$_https</span> <span class="s">!=</span> <span class="s">&quot;on&quot;)</span> <span class="p">{</span>
+      <span class="kn">return</span> <span class="mi">301</span> <span class="s">https://</span><span class="nv">$host$request_uri</span><span class="p">;</span>
+   <span class="p">}</span>
+
+   <span class="kn">index</span> <span class="s">index.php</span><span class="p">;</span>
+   <span class="kn">root</span> <span class="s">/srv/www/mrbs</span><span class="p">;</span>
+
+   <span class="kn">location</span> <span class="p">~</span><span class="sr">*</span>  <span class="s">\.(jpg|jpeg|png|gif|css|js|ico)</span>$ <span class="p">{</span>
+      <span class="kn">expires</span> <span class="s">max</span><span class="p">;</span>
+      <span class="kn">log_not_found</span> <span class="no">off</span><span class="p">;</span>
+   <span class="p">}</span>
+
+   <span class="kn">location</span> <span class="p">~</span> <span class="sr">\.php$</span> <span class="p">{</span>
+      <span class="kn">try_files</span> <span class="nv">$uri</span> <span class="p">=</span><span class="mi">404</span><span class="p">;</span>
+      <span class="kn">fastcgi_param</span> <span class="s">SCRIPT_FILENAME</span> <span class="nv">$request_filename</span><span class="p">;</span>
+      <span class="kn">include</span> <span class="s">fastcgi_params</span><span class="p">;</span>
+      <span class="kn">fastcgi_pass</span> <span class="s">php</span><span class="p">;</span>
+   <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="instalacion">
+<h2>7.2.2.3.8.3. Instalación<a class="headerlink" href="#instalacion" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Lo primero es ir a la <a class="reference external" href="https://mrbs.sourceforge.io">página del proyecto</a>,
+descargar la ultima versión<a class="footnote-reference" href="#id6" id="id2">[1]</a> y descomprimirla en un directorio adecuado:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkdir -p /srv/www/mrbs
+<span class="gp">#</span> tar -C /srv/www/mrbs --strip-component<span class="o">=</span><span class="m">2</span> -axvf mrbs-1.7.1.tar.gz mrbs-1.7.1/web
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">Sólo el contenido del subdirectorio <code class="file docutils literal notranslate"><span class="pre">web/</span></code> contiene los ficheros
+de la aplicación.</p>
+</div>
+<p>La instalación, a diferencia de otras aplicaciones web, es manual y requiere que
+la generación de la base de datos y la configuración básica, se haga en la
+consola. Para lo primero, la propia aplicación trae un guión <abbr title="tructured Query Language">SQL</abbr> apropiado:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> tar -C /tmp --strip-component<span class="o">=</span><span class="m">1</span> -axvf mrbs-1.7.1.tar.gz mrbs-1.7.1/tables.my.sql
+<span class="gp">#</span> mysql mrbs &lt; /tmp/tables.my.sql
+</pre></div>
+</div>
+<p>Por último es necesario editar el fichero <code class="file docutils literal notranslate"><span class="pre">config.inc.php</span></code> y descomentar o
+modificar las siguientes líneas:</p>
+<div class="highlight-php notranslate"><div class="highlight"><pre><span></span><span class="nv">$timezone</span> <span class="o">=</span> <span class="s2">&quot;Europe/Madrid&quot;</span><span class="p">;</span>
+
+<span class="nv">$dbsys</span> <span class="o">=</span> <span class="s2">&quot;mysql&quot;</span><span class="p">;</span>
+<span class="nv">$db_host</span> <span class="o">=</span> <span class="s2">&quot;localhost&quot;</span><span class="p">;</span>
+<span class="nv">$db_database</span> <span class="o">=</span> <span class="s2">&quot;mrbs&quot;</span><span class="p">;</span>
+<span class="nv">$db_login</span> <span class="o">=</span> <span class="s2">&quot;mrbs&quot;</span><span class="p">;</span>
+<span class="nv">$db_password</span> <span class="o">=</span> <span class="s2">&quot;crontraseñadificl&quot;</span><span class="p">;</span>
+<span class="nv">$db_tbl_prefix</span> <span class="o">=</span> <span class="s2">&quot;mrbs_&quot;</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>Con esto, ya es suficiente para ver cómo queda la aplicación. Podemos validarnos
+con <em>administrator</em>/<em>secret</em> para ser administradores o con <em>bob</em>/<em>b</em> para ser
+un usuario sin privilegios. Pero, obviamente, esto no puede quedar así…</p>
+</div>
+<div class="section" id="configuracion">
+<h2>7.2.2.3.8.4. Configuración<a class="headerlink" href="#configuracion" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Una configuración mínima pasa por añadir las siguientes líneas al final del
+fichero de configuración <code class="file docutils literal notranslate"><span class="pre">config.inc.php</span></code>:</p>
+<div class="highlight-php notranslate"><div class="highlight"><pre><span></span><span class="nb">unset</span><span class="p">(</span><span class="nv">$periods</span><span class="p">);</span>
+<span class="nb">unset</span><span class="p">(</span><span class="nv">$auth</span><span class="p">[</span><span class="s2">&quot;user&quot;</span><span class="p">]);</span>
+<span class="nb">unset</span><span class="p">(</span><span class="nv">$auth</span><span class="p">[</span><span class="s2">&quot;admin&quot;</span><span class="p">]);</span>
+
+<span class="k">require</span> <span class="s2">&quot;ies.inc.php&quot;</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>en que básicamente borramos todos los usuarios predeterminados, eliminamos los
+periodos de tiempo predefinidos y pedimos que se lea un fichero
+<code class="file docutils literal notranslate"><span class="pre">ies.inc.php</span></code>, que será donde realmente escribamos la configuración</p>
+<p>Para empezar, en este segundo fichero podemos incluir esta configuración:</p>
+<div class="highlight-php notranslate"><div class="highlight"><pre><span></span><span class="c1">#</span>
+<span class="c1"># Configuración de la empresa</span>
+<span class="c1">#</span>
+<span class="nv">$mrbs_company</span> <span class="o">=</span> <span class="s2">&quot;IES Bla, bla, bla&quot;</span>
+<span class="nv">$mrbs_company_logo</span> <span class="o">=</span> <span class="s2">&quot;/logo.png&quot;</span>  <span class="c1"># Y colocamos el logo dentro de /srv/www/mrbs</span>
+<span class="nv">$mrbs_company_url</span> <span class="o">=</span> <span class="s2">&quot;http://web.del.centro.es&quot;</span>
+
+<span class="c1">#</span>
+<span class="c1"># Autenticación de usuarios</span>
+<span class="c1">#</span>
+<span class="nv">$auth</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;config&quot;</span><span class="p">;</span>
+<span class="nv">$auth</span><span class="p">[</span><span class="s2">&quot;user&quot;</span><span class="p">][</span><span class="s2">&quot;admin&quot;</span><span class="p">]</span><span class="o">=</span><span class="s2">&quot;una.buena.contraseña&quot;</span><span class="p">;</span>
+<span class="nv">$auth</span><span class="p">[</span><span class="s2">&quot;user&quot;</span><span class="p">][</span><span class="s2">&quot;profesor&quot;</span><span class="p">]</span><span class="o">=</span><span class="s2">&quot;roseforp&quot;</span><span class="p">;</span>
+<span class="c1"># admin, además, es administrador</span>
+<span class="nv">$auth</span><span class="p">[</span><span class="s2">&quot;admin&quot;</span><span class="p">][]</span><span class="o">=</span><span class="s2">&quot;admin&quot;</span><span class="p">;</span>
+
+<span class="c1">#</span>
+<span class="c1"># Tramos horarios</span>
+<span class="c1">#</span>
+<span class="nv">$enable_periods</span> <span class="o">=</span> <span class="k">TRUE</span><span class="p">;</span>
+<span class="nv">$periods</span><span class="p">[]</span><span class="o">=</span><span class="s2">&quot;08:15-09:15&quot;</span><span class="p">;</span>
+<span class="nv">$periods</span><span class="p">[]</span><span class="o">=</span><span class="s2">&quot;09:15-10:15&quot;</span><span class="p">;</span>
+<span class="nv">$periods</span><span class="p">[]</span><span class="o">=</span><span class="s2">&quot;10:15-11:15&quot;</span><span class="p">;</span>
+<span class="nv">$periods</span><span class="p">[]</span><span class="o">=</span><span class="s2">&quot;Recreo&quot;</span><span class="p">;</span>
+<span class="nv">$periods</span><span class="p">[]</span><span class="o">=</span><span class="s2">&quot;11:45-12:45&quot;</span><span class="p">;</span>
+<span class="nv">$periods</span><span class="p">[]</span><span class="o">=</span><span class="s2">&quot;12:45-13:45&quot;</span><span class="p">;</span>
+<span class="nv">$periods</span><span class="p">[]</span><span class="o">=</span><span class="s2">&quot;13:45-14:45&quot;</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>Hay que destacar dos aspectos:</p>
+<ol class="arabic simple">
+<li>La autenticación es la más sencilla posible, y consiste en indicar en un
+<em>array</em> asociativo de la propia configuración quiénes son los usuarios y
+cuáles sus contraseñas. En otro array se indica qué usuarios son
+administradores. Para el caso se han establecido dos únicos usuarios: uno es
+administrador y el otro no.</li>
+<li>Se han definido también los tramos horarios en los que en principio se podrán
+reservar aulas.</li>
+</ol>
+<div class="section" id="configuracion-en-la-interfaz-web">
+<h3>7.2.2.3.8.4.1. Configuración en la interfaz web<a class="headerlink" href="#configuracion-en-la-interfaz-web" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>La configuración a través de la interfaz web, consiste básicamente en la
+creación de las aulas (<em>salas</em> en la terminología de la aplicación) susceptibles
+de ser reservadas. La creación es sencilla y no requiere explicación, pero si es
+pertinente una aclaración: las <em>aulas</em> se agrupan en <em>sedes</em>, de manera que
+antes de crearlas es necesario crear al menos una sede. Cada sede se caracteriza
+por el hecho de que puede tener definidos unos tramos horarios distintos, aunque
+en principio, cuando se crean, se copian los que hayamos definido en la
+configuración.</p>
+</div>
+<div class="section" id="personalizacion">
+<h3>7.2.2.3.8.4.2. Personalización<a class="headerlink" href="#personalizacion" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Con la configuración anterior es suficiente para echar a andar la aplicación,
+pero puede pulirse un poco más esta, según el gusto de cada cual. Por gusto
+propio me gusta añadir lo siguiente en <code class="file docutils literal notranslate"><span class="pre">ies.inc.php</span></code>:</p>
+<div class="highlight-php notranslate"><div class="highlight"><pre><span></span><span class="c1">#</span>
+<span class="c1"># Vista</span>
+<span class="c1">#</span>
+<span class="nv">$default_view</span><span class="o">=</span><span class="s1">&#39;week&#39;</span><span class="p">;</span>  <span class="c1"># La página inicial muestra la semana en curso completa.</span>
+<span class="nv">$dateformat</span><span class="o">=</span><span class="mi">1</span><span class="p">;</span>         <span class="c1"># Ver día-mes, en vez de mes-día.</span>
+
+<span class="c1">#</span>
+<span class="c1"># Semana</span>
+<span class="c1">#</span>
+<span class="nv">$weekstarts</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>           <span class="c1">#Lunes, primer día.</span>
+<span class="nv">$hidden_days</span> <span class="o">=</span> <span class="k">array</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="mi">6</span><span class="p">);</span> <span class="c1">#Sábados y domingos, no.</span>
+
+<span class="c1">#</span>
+<span class="c1"># Las reservas periódicas sólo pueden hacerlas administradores.</span>
+<span class="c1">#</span>
+<span class="nv">$auth</span><span class="p">[</span><span class="s1">&#39;only_admin_can_book_repeat&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="k">TRUE</span><span class="p">;</span>
+
+<span class="c1">#</span>
+<span class="c1"># Anticipación en las reservas</span>
+<span class="c1">#</span>
+<span class="nv">$max_book_ahead_enabled</span> <span class="o">=</span> <span class="k">TRUE</span><span class="p">;</span>
+<span class="nv">$max_book_ahead_secs</span> <span class="o">=</span> <span class="mi">60</span><span class="o">*</span><span class="mi">60</span><span class="o">*</span><span class="mi">24</span><span class="o">*</span><span class="mi">7</span><span class="o">*</span><span class="mi">4</span><span class="p">;</span> <span class="c1"># Máximo, cuatro semanas.</span>
+
+<span class="c1">#</span>
+<span class="c1"># Cancelación de reservas</span>
+<span class="c1">#</span>
+<span class="nv">$min_book_ahead_enabled</span> <span class="o">=</span> <span class="k">TRUE</span><span class="p">;</span>
+<span class="nv">$min_book_ahead_secs</span> <span class="o">=</span> <span class="o">-</span><span class="mi">10</span><span class="o">*</span><span class="mi">60</span><span class="p">;</span>   <span class="c1"># Se puede cancelar la reserva de un aula</span>
+                                 <span class="c1"># hasta 10 min. después de empezada la clase</span>
+</pre></div>
+</div>
+<p>La configuración es autoexplicativa, pero resumiendo:</p>
+<ul class="simple">
+<li>Al visitar la aplicación se muestran las reservas de la semana en curso de la
+primera de las aulas<a class="footnote-reference" href="#id7" id="id3">[2]</a>. Sin configurarlo, lo que se muestra son las
+reservas del día en curso para todas las aulas.</li>
+<li>Se eliminan los fines de semana, ya que siempre son festivos.</li>
+<li>Se impide que los usuarios normales puedan hacer reservas periódicas. Esto
+evita que un profesor acapare durante todo un curso una misma aula.</li>
+<li>En consonancia con lo anterior, se limita la reserva anticipada a cuatro
+semanas.</li>
+<li>También se limita la cancelación de las reservas: diez minutos después de
+haber empezado el tramo horario en que se hizo una reserva, la reserva no
+podrá eliminarse del cuadrante.</li>
+</ul>
+<p>Podemos hacer una última configuración: la aplicación permite definir reservas
+de distinto tipo que se distinguen a la vista por el color. De hecho, por
+defecto hay definidos dos tipos distintos: <em>Externa</em> e <em>Interna</em>. Por otro lado,
+y al margen de los tipos, las reservas periódicas se distinguen de las reservas
+puntuales tan sólo por un pequeño circulito que aparece a la derecha de la
+leyenda. Dado que en nuestra situación las reservas periódicas sólo las realiza
+el administrador y que son en realidad asignaciones fijas de aula, se nos antoja
+que sería bastante conveniente hacer que se distinguieran también por el color,
+así que definiremos los siguientes tipos de reserva:</p>
+<ul class="simple">
+<li>Tipo «Puntual», para que con ese tipo definan los profesores sus reservas de
+aula (que forzosamente serán puntuales).</li>
+<li>Tipo «Asignación fija», para que con ese tipo defina el administrador las
+reservas que son periódicas.</li>
+<li>Tipo «Festivo», para que el administrador reserve con este tipo todos los días
+festivos, ya que la aplicación no tiene ninguna forma de marcar días
+festivos e impedir la reserva en ellos.</li>
+</ul>
+<p>Hay, no obstante, un escollo para esto: que una reserva sea periódica o puntual
+nada tiene que ver con su tipo, así que un profesor podría elegir el tipo
+«Asignación fija» para hacer una reserva puntual. También podría hacer su
+reserva escogiendo el tipo «Festivo».</p>
+<p>Lo que haremos para evitarlo será parchear la aplicación para que se puedan
+definir tipos reservados sólo disponibles al administrador e incluiremos en
+este grupo a «Asignación fija» y «Festivo». El parche es <a class="reference download internal" download="" href="../../../../_downloads/e873148fc0ab9f53c8dd5dae5adacb57/mrbs-1.7.1.patch"><code class="xref download docutils literal notranslate"><span class="pre">éste</span></code></a> y modifica la función <em>create_field_entry_type</em> del
+fichero <code class="file docutils literal notranslate"><span class="pre">edit_entry.php</span></code>.</p>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p>El parche está creado para la versión <strong>1.7.1</strong> de <abbr title="Meeting Room Booking System">MRBS</abbr>, por lo
+que en otra versión puede fallar. Además realiza algunas otras modificaciones:</p>
+<ul class="last simple">
+<li>En la traducción castellana, una expresión que no se entiende bien.</li>
+<li>En la función <em>is_private_event</em> del fichero <code class="file docutils literal notranslate"><span class="pre">functions.inc</span></code> que
+corrige un bug según indica el creador de la extensión para autenticarse
+con <em>Google</em>, que trataremos más adelante.</li>
+<li>Añade al final de ese mismo fichero <code class="file docutils literal notranslate"><span class="pre">functions.inc</span></code> la función
+<em>get_day</em> que sistematiza la obtención del día teniendo en cuenta que puede
+haber días ocultos (mediante <em>$hidden_days</em>). Se aprovecha luego esta función
+en los ficheros <code class="file docutils literal notranslate"><span class="pre">standard_vars.inc.php</span></code>, <code class="file docutils literal notranslate"><span class="pre">day.php</span></code> y la función
+<em>getDateSelector</em> del propio <code class="file docutils literal notranslate"><span class="pre">functions.inc</span></code>. Esto permite solucionar
+un <em>bug</em> que provoca que, aunque el día en curso esté oculto, se nos
+muestre, en vez de mostrar el siguiente día no oculto, que sería lo más
+natural.</li>
+</ul>
+</div>
+<p>Para aplicarlo, basta con ir a <code class="file docutils literal notranslate"><span class="pre">/srv/www/mrbs</span></code> y ejecutar la orden:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="nb">cd</span> /srv/www/mrbs
+<span class="gp">#</span> patch -p1 --dry-run &lt; /tmp/mrbs-1,7,1.patch  <span class="c1"># ¿Hay algún problema? Si no:</span>
+<span class="gp">#</span> patch -p1 &lt; /tmp/mrbs-1,7,1.patch
+</pre></div>
+</div>
+<p>Hecho esto, podemos configurar la aplicación para que se comporte como hemos
+diseñado añadiendo en <code class="file docutils literal notranslate"><span class="pre">config.inc.php</span></code> justo antes de la carga de
+<code class="file docutils literal notranslate"><span class="pre">miravent.inc.php</span></code> lo siguiente:</p>
+<div class="highlight-php notranslate"><div class="highlight"><pre><span></span><span class="c1">#</span>
+<span class="c1"># Tipos de reservas</span>
+<span class="c1">#</span>
+<span class="nb">unset</span><span class="p">(</span><span class="nv">$booking_types</span><span class="p">);</span>
+<span class="nv">$booking_types</span><span class="p">[]</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">;</span>
+<span class="nv">$booking_types</span><span class="p">[]</span><span class="o">=</span><span class="s2">&quot;I&quot;</span><span class="p">;</span>
+<span class="nv">$booking_types</span><span class="p">[]</span><span class="o">=</span><span class="s2">&quot;F&quot;</span><span class="p">;</span>
+<span class="nv">$default_type</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">;</span>
+
+<span class="nv">$vocab_override</span><span class="p">[</span><span class="s2">&quot;es&quot;</span><span class="p">][</span><span class="s2">&quot;type.A&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;Asign.fija&quot;</span><span class="p">;</span>
+<span class="nv">$vocab_override</span><span class="p">[</span><span class="s2">&quot;es&quot;</span><span class="p">][</span><span class="s2">&quot;type.I&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;Puntual&quot;</span><span class="p">;</span>
+<span class="nv">$vocab_override</span><span class="p">[</span><span class="s2">&quot;es&quot;</span><span class="p">][</span><span class="s2">&quot;type.F&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;Festivo&quot;</span><span class="p">;</span>
+
+<span class="c1"># Tipos exclusivos del administrador (necesita parche)</span>
+<span class="nv">$restricted_booking_types</span><span class="p">[]</span><span class="o">=</span><span class="s2">&quot;A&quot;</span><span class="p">;</span>
+<span class="nv">$restricted_booking_types</span><span class="p">[]</span><span class="o">=</span><span class="s2">&quot;F&quot;</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p>La configuración está pensada para que el administrador, antes de que
+los profesores empiecen a reservar aulas, establezca los festivos
+(reservándolos como tipo «Festivo») y haga las asignaciones fijas (como
+reservas periódicas). Al hacerlo ha de tener en cuenta dos cosas:</p>
+<ul class="last simple">
+<li>Los festivos ha de marcarlos siempre como reservas puntuales, no
+periódicas. Por ello, una Semana Santa, por ejemplo, deberá marcarla como
+una reserva fija que dura una semana, y no como una reserva periódica de
+día completo que se repite durante una semana con una frecuencia diaria.</li>
+<li>Deberá establecer primero los festivos y después hacer las asignaciones
+fijas, ya que una reserva periódica puede llevarse a cabo aunque haya
+conflictos con reservas puntuales (simplemente, no se reservarán los días
+ya ocupados), pero no al revés.</li>
+</ul>
+</div>
+</div>
+<div class="section" id="autenticacion-con-google-openid">
+<h3>7.2.2.3.8.4.3. Autenticación con Google OpenID<a class="headerlink" href="#autenticacion-con-google-openid" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Otra posible mejora consiste en cambiar la autenticación para que sea más
+compleja que la simple de tener dos usuarios definidos en la propia
+configuración. Nótese que el hecho de que todos los profesores compartan el
+usuario con el que realizar las reservas supone que cualquiera podrá cancelar la
+reserva que haya hecho previamente otro, ya que a ojos de la aplicación todos
+serán el mismo sujeto.</p>
+<p><abbr title="Meeting Room Booking System">MRBS</abbr> trae de serie algunas alternativas como la autenticación con <abbr title="Lightweight Directory Access Protocol">LDAP</abbr>, pero
+puede ser interesante habilitar la autenticación con <em>Google</em> ya que la <a class="reference external" href="https://gsuite.google.es/intl/es/">G Suite</a> es <a class="reference external" href="https://support.google.com/a/answer/2856827">gratuita para centros educativos</a> y el centro puedo haber
+asociado su dominio al servidor de correo de <em>Google</em> y hacer que todos sus
+trabajadores dispongan de una cuenta del dominio autenticable con <em>Google</em>.
+Desgraciadamente, <abbr title="Meeting Room Booking System">MRBS</abbr> no trae soporte para ello, pero hay disponible <a class="reference external" href="https://github.com/AllSaintsHoole/mrbs-google-identity">una extensión
+que sí lo permite</a>.</p>
+<p>La extensión afirma ser usable al menos para la versión <strong>1.6.1</strong>, pero lo
+cierto es que el tema que trae consigo no funciona<a class="footnote-reference" href="#id8" id="id4">[3]</a> ni con esa versión. En
+cualquier caso, puede usarse este <a class="reference download internal" download="" href="../../../../_downloads/c2343e01e929353bdd682eb3926fca99/mrbs-google.tar.xz"><code class="xref download docutils literal notranslate"><span class="pre">arreglo</span> <span class="pre">para</span> <span class="pre">la</span> <span class="pre">extension</span></code></a> con estas diferencias respecto a la original:</p>
+<ul class="simple">
+<li>Sirve para la versión <strong>1.7.1</strong>.</li>
+<li>Incluye un tema (<em>google</em>) que añade al tema predeterminado lo necesario
+para que funcione esta autenticación.</li>
+<li>Añade la función <em>authGetUserMail</em> para que puedan implementarse los avisos
+mediante correo electrónico.</li>
+<li>Permite que cualquier usuario declarado en el array <em>$auth[“admin”]</em> sea
+considerado administrador<a class="footnote-reference" href="#id9" id="id5">[4]</a>.</li>
+<li>Al desautenticarnos de <abbr title="Meeting Room Booking System">MRBS</abbr>, también lo hacemos del propio sitio de
+<em>Google</em>.</li>
+</ul>
+<p class="rubric">Instalación</p>
+<ol class="arabic">
+<li><p class="first">Acudir a <a class="reference external" href="https://developers.google.com/identity/sign-in/web/sign-in#before_you_begin">google</a>
+para abrir un proyecto y obtener un <em>ID</em> que será necesario luego al escribir
+la configuración.</p>
+</li>
+<li><p class="first">Descomprimir <a class="reference download internal" download="" href="../../../../_downloads/c2343e01e929353bdd682eb3926fca99/mrbs-google.tar.xz"><code class="xref download docutils literal notranslate"><span class="pre">la</span> <span class="pre">extensión</span></code></a>. Los
+ficheros contenidos pueden copiarse dentro de <code class="file docutils literal notranslate"><span class="pre">/srv/www/mrbs</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> tar -C /srv/www/mrbs --strip-component<span class="o">=</span><span class="m">1</span> -axvf mrbs-google.tar.xz
+</pre></div>
+</div>
+</li>
+<li><p class="first">Borrar el fichero <code class="file docutils literal notranslate"><span class="pre">mrbs/edit_users.php</span></code> de la distribución original,
+ya que deja de tener utilidad.</p>
+</li>
+<li><p class="first">Descargar <a class="reference external" href="https://github.com/googleapis/google-api-php-client/blob/master/README.md">Google API PHP Client</a>
+e incluir los ficheros dentro de <code class="file docutils literal notranslate"><span class="pre">srv/www/mrbs/google-api</span></code>. En
+cualquier caso, la referencia a esta <abbr title="Application Programming Interface">API</abbr> se hace dentro del fichero
+<code class="file docutils literal notranslate"><span class="pre">auth/auth_google.inc</span></code>.</p>
+</li>
+<li><p class="first">Añadir la configuración necesaria en <code class="file docutils literal notranslate"><span class="pre">ies.inc.php</span></code>:</p>
+<div class="highlight-php notranslate"><div class="highlight"><pre><span></span><span class="c1">#</span>
+<span class="c1"># Autenticación</span>
+<span class="c1">#</span>
+<span class="nv">$theme</span> <span class="o">=</span> <span class="s1">&#39;google&#39;</span><span class="p">;</span>  <span class="c1"># Este tema soporta la autenticación con google.</span>
+<span class="nv">$auth</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;google&quot;</span><span class="p">;</span>
+<span class="nv">$auth</span><span class="p">[</span><span class="s2">&quot;session&quot;</span><span class="p">]</span>  <span class="o">=</span> <span class="s2">&quot;google&quot;</span><span class="p">;</span>
+<span class="nv">$google_domain</span> <span class="o">=</span> <span class="s1">&#39;midominio.es&#39;</span><span class="p">;</span>
+<span class="nv">$google_client_id</span> <span class="o">=</span> <span class="s1">&#39;ID-OBTENIDO-DE-GOOGLE.apps.googleusercontent.com&#39;</span><span class="p">;</span>
+<span class="nv">$auth</span><span class="p">[</span><span class="s2">&quot;admin&quot;</span><span class="p">][]</span> <span class="o">=</span> <span class="s2">&quot;soy.el.jefe@midominio.es&quot;</span><span class="p">;</span>
+
+<span class="c1">#</span>
+<span class="c1"># Configuración de los avisos por mail</span>
+<span class="c1">#</span>
+<span class="nv">$mail_settings</span><span class="p">[</span><span class="s1">&#39;from&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;no-reply@midominio.es&#39;</span><span class="p">;</span>
+<span class="nv">$mail_settings</span><span class="p">[</span><span class="s1">&#39;booker&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="k">true</span><span class="p">;</span>  <span class="c1"># Se envía correos al dueño de la reserva.</span>
+<span class="c1"># Correos al crear o eliminar la reserva.</span>
+<span class="nv">$mail_settings</span><span class="p">[</span><span class="s1">&#39;on_new&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="k">true</span><span class="p">;</span>
+<span class="nv">$mail_settings</span><span class="p">[</span><span class="s1">&#39;on_delete&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="k">true</span><span class="p">;</span>
+
+<span class="nv">$mail_settings</span><span class="p">[</span><span class="s1">&#39;admin_lang&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;es&#39;</span><span class="p">;</span>
+<span class="c1"># Configuración del envío.</span>
+<span class="nv">$mail_settings</span><span class="p">[</span><span class="s1">&#39;admin_backend&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;smtp&#39;</span><span class="p">;</span>
+<span class="nv">$smtp_settings</span><span class="p">[</span><span class="s1">&#39;host&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;smtp.servidorcorreo.com&#39;</span><span class="p">;</span>
+<span class="nv">$smtp_settings</span><span class="p">[</span><span class="s1">&#39;port&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">465</span><span class="p">;</span>
+<span class="nv">$smtp_settings</span><span class="p">[</span><span class="s1">&#39;auth&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="k">true</span><span class="p">;</span>
+<span class="nv">$smtp_settings</span><span class="p">[</span><span class="s1">&#39;secure&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;ssl&#39;</span><span class="p">;</span>
+<span class="nv">$smtp_settings</span><span class="p">[</span><span class="s1">&#39;username&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;una_cuenta@servidorcorreo.com&#39;</span><span class="p">;</span>
+<span class="nv">$smtp_settings</span><span class="p">[</span><span class="s1">&#39;password&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;contraseña&#39;</span><span class="p">;</span>
+
+<span class="c1"># $mail_settings[&#39;debug&#39;] = true;</span>
+</pre></div>
+</div>
+<p>La primera parte de la configuración configura la autenticación en sí,
+mientras que la segunda habilita el aviso por correo electrónico. En esta
+segunda es necesario asegurarse de que los correos serán confiables y no
+acabarán en la bandeja de <em>spam</em> de los usuarios. Un modo sencillo de
+logararlo es utlizar una cuenta de correo que permita el envío por <abbr title="Simple Mail Transfer Protocol">SMTP</abbr>.</p>
+</li>
+</ol>
+<p class="rubric">Problemas</p>
+<ol class="arabic">
+<li><p class="first">Para que la autenticación sea efectiva es necesario que el navegador acepte
+<em>cookies</em> de terceros o al menos <em>cookies</em> definidas para nuestro servidor
+procedentes del dominio <em>accounts.google.con</em>. En <a class="reference external" href="https://www.mozilla.org/es-ES/firefox/new/">Firefox</a> esto es posible por defecto,
+mientras que en <a class="reference external" href="https://www.google.com/chrome/">Chrome</a> se requiere acudir
+a:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">chrome://settings/content/cookies</span>
+</pre></div>
+</div>
+<p>y añadir en «<em>Permitir</em>» el dominio <em>accounts.google.com</em>.</p>
+</li>
+</ol>
+<p class="rubric">Notas al pie</p>
+<table class="docutils footnote" frame="void" id="id6" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id2">[1]</a></td><td>En el momento de la redacción es la versión <strong>1.7.1</strong>.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id7" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id3">[2]</a></td><td>La variable <em>$default_room</em> define cuál es el aula que se mostrará, pero
+su valor debe ser igual al identificador que se usa en la base de datos para
+el aula en cuestión. Tal identificador no aparecen en la página del sitio,
+pero puede consultarse mirando la propia base de datos o mirando los
+parámentros de la dirección <abbr title="Uniform Resource Locator">URL</abbr> cuando se pincha para editar tal aula.
+También existe una variable <em>$default_area</em> que permite definir la sede
+predeterminada.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id8" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id4">[3]</a></td><td>Tal vez la incompatibilidad es en <abbr title="PHP Hypertext Preprocesor">PHP</abbr>.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id9" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id5">[4]</a></td><td>El comportamiento predeterminado es que sea administrador el primer
+usuario que se autentique.</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../../../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">7.2.2.3.8. <abbr title="Meeting Room Booking System">MRBS</abbr></a><ul>
+<li><a class="reference internal" href="#preliminares">7.2.2.3.8.1. Preliminares</a></li>
+<li><a class="reference internal" href="#configuracion-en-nginx">7.2.2.3.8.2. Configuración en <strong class="program">nginx</strong></a></li>
+<li><a class="reference internal" href="#instalacion">7.2.2.3.8.3. Instalación</a></li>
+<li><a class="reference internal" href="#configuracion">7.2.2.3.8.4. Configuración</a><ul>
+<li><a class="reference internal" href="#configuracion-en-la-interfaz-web">7.2.2.3.8.4.1. Configuración en la interfaz web</a></li>
+<li><a class="reference internal" href="#personalizacion">7.2.2.3.8.4.2. Personalización</a></li>
+<li><a class="reference internal" href="#autenticacion-con-google-openid">7.2.2.3.8.4.3. Autenticación con Google OpenID</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="06.foro.html"
+                        title="capítulo anterior">7.2.2.3.7. Foro</a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="08.dms.html"
+                        title="próximo capítulo">7.2.2.3.9. <abbr title="Document Management System">DMS</abbr></a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../../_sources/07.serre/02.web/02.nginx/03.misc/07.mrbs.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Ir a" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="08.dms.html" title="7.2.2.3.9. DMS"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="06.foro.html" title="7.2.2.3.7. Foro"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">documentación de ServidorLinux - 0.1.0</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" >7. Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../index.html" >7.2. Web</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../index.html" >7.2.2. nginx</a> &#187;</li>
+          <li class="nav-item nav-item-4"><a href="index.html" >7.2.2.3. Recetas</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor 2016, José Miguel Sánchez Alés.
+      Creado con <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
+    </div>
+  </body>
+</html>
