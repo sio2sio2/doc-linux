@@ -19,6 +19,7 @@ html:
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 	@rm -rf "${DESTDIR}"
 	@mv "$(BUILDDIR)/html" "${DESTDIR}"
+	@test -f "${DESTDIR}/.nojekyll" || touch "${DESTDIR}/.nojekyll"
 
 pkg:
 	@echo -n "Creando paquete de copia en el directorio padre... "
