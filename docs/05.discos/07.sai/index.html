@@ -49,6 +49,211 @@
             
   <div class="section" id="sai">
 <span id="id1"></span><h1>5.7. <abbr title="Sistema de Alimentación Ininterrumpida">SAI</abbr><a class="headerlink" href="#sai" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>Un <abbr title="Sistema de Alimentación Ininterrumpida">SAI</abbr> (o <abbr title="Uninterruptible Power Supply">UPS</abbr>, si utilizamos las siglas en inglés) es un dispositivo que
+gracias a las baterias que incorpora, es capaz de mantener el suministro
+eléctrico al equipo, cuando se produce un apagón temporal. En consecuencia, el
+servidor no llega a apagarse y puede continuar dando servicio durante el corte
+y tras éste. Obviamente, las baterías serán capaces de alimentar sólo durante
+un tiempo limitado a los dispositivos que se alimentan a través del <abbr title="Sistema de Alimentación Ininterrumpida">SAI</abbr>, por
+lo que si el apagón se prolonga demasiado, será inevitable que el servidor
+acabe apagado.</p>
+<p>Adicionalmente a esta función principal, son capaces de:</p>
+<ul class="simple">
+<li>Defender los equipos conectados a él de oscilaciones en la tensión.</li>
+<li>Comunicar a un ordenador cuál es su estado (usando las baterías, a punto de
+agotar la carga de las baterías, etc.), lo que permite disponer un software
+en éste que defina qué hacer en cada caso. Por ejemplo, cuando falte poco para
+agotar las baterías, lo más juicioso es apagar el ordenador para que, ya que
+se acabará apagando, al menos que este apagado se haga de forma ordenada.</li>
+</ul>
+<div class="section" id="introduccion-teorica">
+<h2>5.7.1. Introducción teórica<a class="headerlink" href="#introduccion-teorica" title="Enlazar permanentemente con este título">¶</a></h2>
+<div class="admonition-todo admonition" id="index-0">
+<p class="first admonition-title">Por hacer</p>
+<p class="last">Por hacer.</p>
+</div>
+</div>
+<div class="section" id="configuracion">
+<h2>5.7.2. Configuración<a class="headerlink" href="#configuracion" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Los <abbr title="Sistema de Alimentación Ininterrumpida">SAI</abbr>s cumplen su función de defensa sin necesidad de configuración
+alguna, ahora bien, si queremos que los equipos atiendan sus alarmas y obren en
+consecuencia, sí es preciso configurar el servidor. Es común que para este
+propósito el propio <abbr title="Sistema de Alimentación Ininterrumpida">SAI</abbr> proporcione <em>software</em>, incluso con versión para
+Linux, pero lo conveniente es procurarse uno para el que tenga soporte <a class="reference external" href="https://networkupstools.org/">Nut</a>,
+que tiene paquete en las principàles distribuciones.</p>
+<p>Por lo general, los <abbr title="Sistema de Alimentación Ininterrumpida">SAI</abbr>s disponen de un conexión serie o <abbr title="Universal Serial Bus">USB</abbr> a través de
+la cual pueden conectarse a un equipo que recibe los avisos en sus cambios de
+estado, al que denominaremos <em>maestro</em>. Las dos supuestos que estudiaremos son:</p>
+<ol class="arabic simple">
+<li>El <abbr title="Sistema de Alimentación Ininterrumpida">SAI</abbr> sólo proporciona protección al equipo con el que se comunica
+(<em>maestro</em>).</li>
+<li>El <abbr title="Sistema de Alimentación Ininterrumpida">SAI</abbr> proporciona protección al <em>maestro</em> y a uno o varios equipos
+adicionales (<em>esclavos</em>).</li>
+</ol>
+<div class="section" id="maestro">
+<h3>5.7.2.1. Maestro<a class="headerlink" href="#maestro" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>En el <em>maestro</em>, tras llevar a cabo su alimentación a través del <abbr title="Sistema de Alimentación Ininterrumpida">SAI</abbr> y conectarlo
+por <abbr title="Universal Serial Bus">USB</abbr>, necesitamos <strong>instalar</strong> dos servicios diferentes:</p>
+<ul class="simple">
+<li><strong class="program">nut-server</strong>, que se encarga de atender las comunicaciones del <abbr title="Sistema de Alimentación Ininterrumpida">SAI</abbr>
+y generar mensajes que es capaz de procesar el servicio de monitorización.</li>
+<li><strong class="program">nut-client</strong>, que monitoriza los mensajes de <strong class="program">nut-server</strong> y
+permite definir las acciones que queremos llevar a cabo en base a ellos.</li>
+</ul>
+<p>Para hacerlo basta con instalar el metapaquete <em>nut</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt install nut
+</pre></div>
+</div>
+<p>Los ficheros de configuración se encuentran todos dentro de <code class="file docutils literal notranslate"><span class="pre">/etc/nut</span></code> y
+es dentro de ese directorio donde tenemos que hacer todos los cambios.</p>
+<p>En <code class="file docutils literal notranslate"><span class="pre">nut.conf</span></code> es preciso indicar en qué modo actúa el servidor:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">MODE</span><span class="o">=</span>standalone  <span class="c1"># Para el primer caso (sin esclavos)</span>
+<span class="c1">#MODE=netserver  # Para el segundo caso (con esclavos)</span>
+</pre></div>
+</div>
+<p>En <code class="file docutils literal notranslate"><span class="pre">ups.conf</span></code> debemos definir cuál es el <abbr title="Sistema de Alimentación Ininterrumpida">SAI</abbr> que configuramos. Para un
+<cite>Salicru SPS One</cite>, por ejemplo:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[salicru]</span>
+<span class="na">driver</span> <span class="o">=</span> <span class="s">blazer_usb</span>
+<span class="na">port</span>   <span class="o">=</span> <span class="s">auto</span>
+<span class="na">desc</span>   <span class="o">=</span> <span class="s">&quot;Salicru SPS One 900VA&quot;</span>
+</pre></div>
+</div>
+<p>«salicru» es el nombre que le hemos adjudicado a nuestro <abbr title="Sistema de Alimentación Ininterrumpida">SAI</abbr>: podemos escoger
+cualquier otro. Es preciso editar <code class="file docutils literal notranslate"><span class="pre">upsd.conf</span></code> para indicar en dónde
+escuchará el servidor:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">LISTEN</span> <span class="mi">127</span><span class="s">.0.0.1</span> <span class="mi">3499</span>  <span class="c1"># Para modo standalone (primer caso)</span>
+<span class="c1">#LISTEN 0.0.0.0 3499   # Para modo netserver (primer caso)</span>
+</pre></div>
+</div>
+<p>Además, es preciso definir los usuarios con permisos en <code class="file docutils literal notranslate"><span class="pre">upsd.users</span></code>:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="c1"># Administrador con capacidad para configurar opciones</span>
+<span class="k">[ædmin]</span>
+<span class="na">password</span> <span class="o">=</span> <span class="s">secretpass</span>
+<span class="na">actions</span> <span class="o">=</span> <span class="s">SET</span>
+<span class="na">instcmds</span> <span class="o">=</span> <span class="s">ALL</span>
+
+<span class="c1"># Usuario que es capaz de monitorizar</span>
+<span class="k">[monuser]</span>
+<span class="na">password</span> <span class="o">=</span> <span class="s">secretpass2</span>
+<span class="na">upsmon master</span>
+<span class="na">upsmon slave      # Sólo necesario en el caso 2.</span>
+</pre></div>
+</div>
+<p>Con estas acciones, habremos configurado completamente el servidor. Ahora bien,
+en el propio <em>maestro</em> debe actuar también el cliente monitor, de modo que
+configuraremos el fichero <code class="file docutils literal notranslate"><span class="pre">upsmon.conf</span></code>:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">MONITOR</span> <span class="s">salicru@localhost</span> <span class="mi">1</span> <span class="s">monuser</span> <span class="s">secretpass2</span> <span class="s">master</span>
+
+<span class="c1"># Comando que queremos que se ejecute al producirse</span>
+<span class="c1"># alguna notificación por parte de nut-server</span>
+<span class="s">NOTIFYCMD</span> <span class="s">/usr/local/bin/notifyme.sh</span>
+
+<span class="c1"># Modificamos algunos mensajes de aviso</span>
+<span class="s">NOTIFYMSG</span> <span class="s">ONLINE</span>        <span class="s">&quot;SAI</span> <span class="s">&#39;%s&#39;</span> <span class="s">recibe</span> <span class="s">alimentacion&quot;</span>
+<span class="s">NOTIFYMSG</span> <span class="s">ONBATT</span>        <span class="s">&quot;SAI</span> <span class="s">&#39;%s&#39;</span> <span class="s">usa</span> <span class="s">la</span> <span class="s">bateria&quot;</span>
+<span class="s">NOTIFYMSG</span> <span class="s">LOWBATT</span>       <span class="s">&quot;SAI</span> <span class="s">&#39;%s&#39;</span> <span class="s">tiene</span> <span class="s">muy</span> <span class="s">poca</span> <span class="s">carga</span> <span class="s">de</span> <span class="s">bateria&quot;</span>
+<span class="s">NOTIFYMSG</span> <span class="s">FSD</span>           <span class="s">&quot;SAI</span> <span class="s">&#39;%s&#39;</span> <span class="s">ordena</span> <span class="s">el</span> <span class="s">apagado&quot;</span>
+<span class="s">NOTIFYMSG</span> <span class="s">COMMOK</span>        <span class="s">&quot;Se</span> <span class="s">ha</span> <span class="s">establecido</span> <span class="s">comunicacion</span> <span class="s">con</span> <span class="s">SAI</span> <span class="s">&#39;%s&#39;&quot;</span>
+<span class="s">NOTIFYMSG</span> <span class="s">COMMBAD</span>       <span class="s">&quot;Se</span> <span class="s">ha</span> <span class="s">perdido</span> <span class="s">comunicacion</span> <span class="s">con</span> <span class="s">SAI</span> <span class="s">&#39;%s&#39;&quot;</span>
+<span class="s">NOTIFYMSG</span> <span class="s">SHUTDOWN</span>      <span class="s">&quot;SAI</span> <span class="s">&#39;%s&#39;</span> <span class="s">comienza</span> <span class="s">su</span> <span class="s">propio</span> <span class="s">apagado&quot;</span>
+<span class="s">NOTIFYMSG</span> <span class="s">REPLBATT</span>      <span class="s">&quot;La</span> <span class="s">bateria</span> <span class="s">de</span> <span class="s">SAI</span> <span class="s">&#39;%s&#39;</span> <span class="s">debe</span> <span class="s">reemplazarse&quot;</span>
+<span class="s">NOTIFYMSG</span> <span class="s">NOCOMM</span>        <span class="s">&quot;SAI</span> <span class="s">&#39;%s&#39;</span> <span class="s">no</span> <span class="s">esta</span> <span class="s">disponible&quot;</span>
+
+<span class="c1"># Qué hacer ante un aviso (los no definidos son SYSLOG+WALL)</span>
+<span class="s">NOTIFYFLAG</span> <span class="s">ONLINE</span>       <span class="s">SYSLOG+WALL+EXEC</span>
+<span class="s">NOTIFYFLAG</span> <span class="s">ONBATT</span>       <span class="s">SYSLOG+WALL+EXEC</span>
+<span class="s">NOTIFYFLAG</span> <span class="s">LOWBATT</span>      <span class="s">SYSLOG+WALL+EXEC</span>
+<span class="s">NOTIFYFLAG</span> <span class="s">NOCOMM</span>       <span class="s">SYSLOG</span>
+<span class="s">NOTIFYFLAG</span> <span class="s">NOPARENT</span>     <span class="s">SYSLOG</span>
+<span class="s">NOTIFYFLAG</span> <span class="s">REPLBATT</span>     <span class="s">SYSLOG+EXEC</span>
+</pre></div>
+</div>
+<p>Esta configuración requiere explicación:</p>
+<ul>
+<li><p class="first"><code class="docutils literal notranslate"><span class="pre">MONITOR</span></code> indica cómo conectar con el <abbr title="Sistema de Alimentación Ininterrumpida">SAI</abbr>.</p>
+</li>
+<li><p class="first"><code class="docutils literal notranslate"><span class="pre">NOTIFYCMD</span></code> es la orden que se ejecutará al comunicat <strong class="program">nut-server</strong>
+alguno de los eventos. El <em>script</em> sólo se ejecuta para aquellos avisos
+marcados con <code class="docutils literal notranslate"><span class="pre">EXEC</span></code> y deberemos escribirlo nosotros sabiendo que tiene
+definida la variable de entorno <em>NOTIFYTYPE</em> con el tipo de evento y que su
+primer argumento es el mensaje indicado en <code class="docutils literal notranslate"><span class="pre">NOTIFYFLAG</span></code>. Un <em>script</em>
+que mande un mensaje de correo al administrador<a class="footnote-reference" href="#id3" id="id2">[1]</a>, puede ser este:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="ch">#!/bin/sh</span>
+
+<span class="nv">USUARIO</span><span class="o">=</span><span class="s2">&quot;root&quot;</span>
+
+<span class="nb">echo</span> <span class="s2">&quot;</span>
+<span class="s2">From: root@localhost</span>
+<span class="s2">To: </span><span class="nv">$USUARIO</span><span class="s2"></span>
+<span class="s2">Subject: Mensaje del SAI -  </span><span class="nv">$NOTIFYTYPE</span><span class="s2"></span>
+
+<span class="nv">$*</span><span class="s2">&quot;</span> <span class="p">|</span> /usr/sbin/sendmail -t
+</pre></div>
+</div>
+</li>
+<li><p class="first">Los <code class="docutils literal notranslate"><span class="pre">NOTIFYMSG</span></code> traducen los mensajes en inglés predeterminados para cada
+tipo de evento.</p>
+</li>
+<li><p class="first">Los <code class="docutils literal notranslate"><span class="pre">NOTIFYFLAG</span></code> definen cómo se trata cada tipo de evento:</p>
+<ul class="simple">
+<li>Si es <em>SYSLOG</em>, se escribe en el fichero de registro el mensaje.</li>
+<li>Si es <em>WALL</em>, se escribe el mensaje en el sistema (aparecerá en la consola
+a todo usuario que esté conectado).</li>
+<li>Si es <em>EXEC</em>, se ejecutará el <em>script</em> definido con <code class="docutils literal notranslate"><span class="pre">NOTIFYCMD</span></code>.</li>
+<li>Si es <em>IGNORE</em>, que es incompatible con los otros tres, no se hará
+absolutamente nada.</li>
+</ul>
+</li>
+</ul>
+<p>Con esta configuración, podemos comprobar el estado del <abbr title="Sistema de Alimentación Ininterrumpida">SAI</abbr> con la orden:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> upsc salicru@localhost
+</pre></div>
+</div>
+<div class="admonition-todo admonition" id="index-1">
+<p class="first admonition-title">Por hacer</p>
+<p class="last">Pegar la salida del comando.</p>
+</div>
+</div>
+<div class="section" id="esclavo">
+<h3>5.7.2.2. Esclavo<a class="headerlink" href="#esclavo" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Un <em>esclavo</em> es un equipo cuya alimentación se realiza a través del <abbr title="Sistema de Alimentación Ininterrumpida">SAI</abbr>,
+pero que no recibe sus comunicaciones, ya que estas se llevan a cabo a través de
+<abbr title="Universal Serial Bus">USB</abbr> con el <em>maestro</em>. Para que pueden acceder a tales comunicaciones, es
+necesario instalarle el monitor y hacer que este se comunique con el servidor
+del <em>maestro</em>.</p>
+<p>Así, primero instalamos exclusivamente el cliente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt install nut-client
+</pre></div>
+</div>
+<p>indicar en <code class="file docutils literal notranslate"><span class="pre">/etc/nut/nut.conf</span></code> que se trata de un cliente:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">MODE</span><span class="o">=</span>netclient
+</pre></div>
+</div>
+<p>y, finalmente, configuar en <code class="file docutils literal notranslate"><span class="pre">/etc/nut/upsmon.conf</span></code> el cliente monitor del
+mismo modo que lo configuramos en el <em>maestro</em>, con la única diferencia de la
+directiva <code class="docutils literal notranslate"><span class="pre">MONITOR</span></code>:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">MONITOR</span> <span class="s">salicru@192.168.0.2</span> <span class="mi">1</span> <span class="s">monuser</span> <span class="s">secretpass2</span> <span class="s">slave</span>
+</pre></div>
+</div>
+<p>suponiendo que <em>192.168.0.2</em> sea la <abbr title="Internet Protocol">IP</abbr> del <em>maestro</em>.</p>
+</div>
+</div>
+<div class="section" id="ajuste-de-parametros">
+<h2>5.7.3. Ajuste de parámetros<a class="headerlink" href="#ajuste-de-parametros" title="Enlazar permanentemente con este título">¶</a></h2>
+<div class="admonition-todo admonition" id="index-2">
+<p class="first admonition-title">Por hacer</p>
+<p class="last">Por hacer</p>
+</div>
+<p class="rubric">Notas al pie</p>
+<table class="docutils footnote" frame="void" id="id3" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id2">[1]</a></td><td>Suponiendo, claro está, que se tenga instalado un servidor de correo en
+la máquina.</td></tr>
+</tbody>
+</table>
+</div>
 </div>
 
 
@@ -57,6 +262,20 @@
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
+  <h3><a href="../../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">5.7. <abbr title="Sistema de Alimentación Ininterrumpida">SAI</abbr></a><ul>
+<li><a class="reference internal" href="#introduccion-teorica">5.7.1. Introducción teórica</a></li>
+<li><a class="reference internal" href="#configuracion">5.7.2. Configuración</a><ul>
+<li><a class="reference internal" href="#maestro">5.7.2.1. Maestro</a></li>
+<li><a class="reference internal" href="#esclavo">5.7.2.2. Esclavo</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#ajuste-de-parametros">5.7.3. Ajuste de parámetros</a></li>
+</ul>
+</li>
+</ul>
+
   <h4>Tema anterior</h4>
   <p class="topless"><a href="../06.grub/index.html"
                         title="capítulo anterior">5.6. Gestor de arranque</a></p>
