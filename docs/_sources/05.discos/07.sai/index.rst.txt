@@ -20,10 +20,143 @@ Adicionalmente a esta función principal, son capaces de:
   agotar las baterías, lo más juicioso es apagar el ordenador para que, ya que
   se acabará apagando, al menos que este apagado se haga de forma ordenada.
 
+.. warning:: Obviamente, los |SAI|\ s no están relacionados directamente con la
+   gestión del disco, por lo que su inclusión en esta sección es más que
+   censurable. Sin embargo, al contribuir a la seguridad de los datos impidiendo
+   el apagado incontrolado del sistema y encontrarse los :ref:`RAID <raid>`
+   también en la sección, se ha incluido esta exposición en ella.
+
 Introducción teórica
 ====================
+Tipos
+-----
+Hay tres tipos de |SAI|:
 
-.. todo:: Por hacer.
+**Offline**
+   Es aquel que proporciona energía de sus baterías sólo mientras dure la
+   interrupción del suministro eléctrico. En condiciones normales, los
+   dispositivos que lo usan reciben corriente directamente de la red eléctrica,
+   por lo que presenta dos grandes incovenientes:
+
+   + No estabiliza la corriente procedente de la red.
+   + Cuando falla el suministro de red, existe un tiempo mínimo de conmutación
+     para que sean las baterías las que se hagan cargo de suministrar la
+     energía, por lo que en la práctica no proprocionan un suministro
+     ininterrumpido. Lo conveniente es que este tiempo sea menor a los 5 ms, que
+     son microcortes que toleran los ordenadores habituales.
+
+**Online**
+   En ellos se toma el suministro de red y se convierte en corriente continua
+   para cargar la batería, y de ésta se toma corriente continua que se vuelve a
+   convertir en alterna para alimentar a los dispositivos conectados. Esto
+   asegura la constancia y la estabilidad en el suministro y evito los dos
+   inconvenientes reseñados.
+
+   El problema de esta solución es que es muy cara.
+
+**Inline** o **interactivo**
+   Funcionan como los |SAI| *offline*, pero añaden un transformador que corrige
+   el suministro de red y que en la conmutación es capaz de mantener el voltaje.
+   Gracias a ello, se logran corregir los dos grandes defectos del diseño
+   *offline*.
+
+   La gran ventaja de esta solución frente a la anterior es que es mucho más
+   barata, por lo que la mayoría de los |SAI| para el mercado no profesional
+   utilizan este diseño.
+
+Características
+---------------
+En la elección de un |SAI| hay diversos factores a tener en cuenta:
+
+**Tipo**
+   El tipo discutido bajo el epígrafe anterior.
+
+**Factor de forma**
+   Refiere la forma externa del |SAI|, de la que podemos distinguir dos tipos:
+
+   * *Torre*, cuyas medidas dependenrán del modelo de |SAI|.
+
+   * *Enrackable*, que son aquellos |SAI| pensados para disponerlos dentro de un
+     *rack* (o bastidor). Tienen interés cuando ya se tiene un bastidor en que
+     se albergan servidores y dispositivos de red.
+
+**Potencia aparente** (*S*)
+   Es la potencia máxima consumida por el |SAI| de la red y que suele ser con la
+   que el fabricante lo caracteriza. Se mide en |VA|. Esta, sin embargo, no
+   coincide con la potencia útil capaz de sumnistrar a los dispositivos, medida
+   en vatios (**W**).
+
+**Potencia** (*P*) / **factor de potencia** (:math:`\cos \phi`)
+   Es la potencia útil que el |SAI| es capaz de suministrar a los dispotivos
+   conectados a él. Alternativamente, el fabricante puede proporcionar el factor
+   de potencia:
+
+   .. math::
+
+      P = S * \cos \phi
+
+**Baterías**
+   Conocer las características de las baterías que incorpora, es
+   indispensable para estimar durante cuánto tiempo podrá alimentar el |SAI| a
+   los dispostivos después de un corte de suministro.
+
+Estimaciones
+============
+Dos son las estimaciones que nos puede interesar hacer al adquirir un |SAI|:
+
++ De cuánta potencia se adquiere.
++ Cuánto durará en modo batería.
+
+Potencia necesaria
+------------------
+Para calcular el |SAI| basta con:
+
+#. Sumar todas las potencias de los aparatos que conectaremos a través del |SAI|.
+#. Tener presente que deberemos pasar las potencias expresadas en watios a |VA|
+   utilizando el factor de potencia que proporcione el |SAI|.
+#. Que la suma de las potencias no supere el 70% de la potencia del |SAI|. 
+
+Basándonos en estas reglas, supongamos que deseamos comprar un *SPS ONE* (`Ficha
+<https://www.salicru.com/files/documentacion/jm89200(1).pdf>`) para soportar un
+monitor que consuma 30W, unos altavoces de 20W y una torre cuyo consumo puede
+estimarse en 220W:
+
+.. math::
+
+   P = 30 + 20 + 220 = 270 W \Longrightarrow \dfrac{270}{0.7} \approx 386 W
+
+Como en la ficha de estos |SAI| se proporcionan directamente los valores de la
+potencia activa, se puede elegir directamente el adecuado: el SPS 900 ONE de 900
+|VA| (o también el SPS 700 ONE que está muy poco por debajo de esa potencia).
+
+Autonomía
+---------
+Para conocer cuánto tiempo será capaz el |SAI| de mantener encendidos los
+dispositivos que se alimentan a través de él, es preciso conocer cuánta potencia
+consumen. Conocida esta potencia, toca obtener las características de las
+baterías:
+
+- **Tensión**, típicamente de 12 voltios.
+- **Capacidad**, medida en *Ah* (Amperios-hora).
+- **Eficiencia**, que para las baterías de plomo y ácido, típica en los |SAI|
+  podemos estimar del 80%.
+
+EL |SAI| puede tener varias baterías dispuestas en serie. La fórmula general
+para obteher (en minutos) la autonomía del |SAI| es:
+
+.. math::
+
+  t = N * \dfrac{C * V * E}{P} * 60
+
+Por ejemplo, para un |SAI| que sólo dispone una batería de plomo y ácido, de 7
+Ah de capacidad y 12 voltios de tensión; y que está conectada a un servidor con
+poca carga que consume unos 40W de potencia la autonomía en minutos es:
+
+.. math::
+
+   t = 1 * \dfrac{7*12*0,8}{40} * 60 \approx 100
+
+.. https://ehomerecordingstudio.com/uninterruptible-power-supply/
 
 Configuración
 =============
@@ -161,7 +294,12 @@ Esta configuración requiere explicación:
 
 * Los ``NOTIFYFLAG`` definen cómo se trata cada tipo de evento:
 
-  - Si es *SYSLOG*, se escribe en el fichero de registro el mensaje.
+  - Si es *SYSLOG*, se escribe en el fichero de registro el mensaje. Para
+    consultar con posterioridad todos los mensajes del monitor puede usarse la
+    orden::
+
+      # journalctl -u nut-monitor
+
   - Si es *WALL*, se escribe el mensaje en el sistema (aparecerá en la consola
     a todo usuario que esté conectado).
   - Si es *EXEC*, se ejecutará el *script* definido con ``NOTIFYCMD``.
@@ -215,6 +353,7 @@ Ajuste de parámetros
 .. |SAI| replace:: :abbr:`SAI (Sistema de Alimentación Ininterrumpida)`
 .. |UPS| replace:: :abbr:`UPS (Uninterruptible Power Supply)`
 .. |USB| replace:: :abbr:`USB (Universal Serial Bus)`
+.. |VA| replace:: :abbr:`VA (Voltiamperio)`
 
 .. _Nut: https://networkupstools.org/
 
