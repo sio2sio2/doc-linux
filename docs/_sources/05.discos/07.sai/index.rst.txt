@@ -98,7 +98,25 @@ En la elección de un |SAI| hay diversos factores a tener en cuenta:
 **Baterías**
    Conocer las características de las baterías que incorpora, es
    indispensable para estimar durante cuánto tiempo podrá alimentar el |SAI| a
-   los dispostivos después de un corte de suministro.
+   los dispostivos después de un corte de suministro. Por lo general:
+
+   + Se usan baterías |SLA|, o sea, baterías selladas de ácido-plomo.
+   + El voltaje es de 12V.
+   + Tienen distintas capacidades (5Ah, 7Ah, 9Ah). Lo normal es que un SAI de
+     mayor potencia, tenga una batería de mayor capacidad (o varias conectadas
+     en serie, lo cual supone sumar sus capacidades).
+   + En principio, no parece haber un estándar sobre sus dimensiones, pero los
+     fabricantes tienden a hacerlas con `los mismos tamaños
+     <https://www.powerstream.com/Size_SLA.htm>`_ y los |SAI|\ s comerciales a
+     montar baterías con estas dimensiones. Lógicamente, a mayor capacidad,
+     mayor tamaño.
+
+   .. warning:: El componente más frágil de un |SAI| es la batería y es más que
+      común que, cuando un |SAI| deja de funcionar, lo haga porque la batería
+      haya completado su vida útil. En este punto, lo que hay que hacer es
+      confirmar que la culpable es la batería y, si es así, cambiarla por una
+      batería de idénticas dimensiones, lo cual suele ser bastante sencillo y
+      económico.
 
 Estimaciones
 ============
@@ -117,7 +135,7 @@ Para calcular el |SAI| basta con:
 #. Que la suma de las potencias no supere el 70% de la potencia del |SAI|. 
 
 Basándonos en estas reglas, supongamos que deseamos comprar un *SPS ONE* (`Ficha
-<https://www.salicru.com/files/documentacion/jm89200(1).pdf>`) para soportar un
+<https://www.salicru.com/files/documentacion/jm89200(1).pdf>`_) para soportar un
 monitor que consuma 30W, unos altavoces de 20W y una torre cuyo consumo puede
 estimarse en 220W:
 
@@ -129,6 +147,8 @@ Como en la ficha de estos |SAI| se proporcionan directamente los valores de la
 potencia activa, se puede elegir directamente el adecuado: el SPS 900 ONE de 900
 |VA| (o también el SPS 700 ONE que está muy poco por debajo de esa potencia).
 
+.. _sai-autonomia:
+
 Autonomía
 ---------
 Para conocer cuánto tiempo será capaz el |SAI| de mantener encendidos los
@@ -138,7 +158,7 @@ baterías:
 
 - **Tensión**, típicamente de 12 voltios.
 - **Capacidad**, medida en *Ah* (Amperios-hora).
-- **Eficiencia**, que para las baterías de plomo y ácido, típica en los |SAI|
+- **Eficiencia**, que para las baterías de ácido-plomo, típica en los |SAI|
   podemos estimar del 80%.
 
 EL |SAI| puede tener varias baterías dispuestas en serie. La fórmula general
@@ -148,7 +168,7 @@ para obteher (en minutos) la autonomía del |SAI| es:
 
   t = N * \dfrac{C * V * E}{P} * 60
 
-Por ejemplo, para un |SAI| que sólo dispone una batería de plomo y ácido, de 7
+Por ejemplo, para un |SAI| que sólo dispone una batería de ácido-plomo, de 7
 Ah de capacidad y 12 voltios de tensión; y que está conectada a un servidor con
 poca carga que consume unos 40W de potencia la autonomía en minutos es:
 
@@ -175,6 +195,14 @@ estado, al que denominaremos *maestro*. Las dos supuestos que estudiaremos son:
    (*maestro*).
 #. El |SAI| proporciona protección al *maestro* y a uno o varios equipos
    adicionales (*esclavos*).
+
+¿Qué |SAI| configuramos?
+------------------------
+Utilizaremos un `Salicru SPS 500 ONE <https://m.salicru.com/sais/sps-one.html>`_
+del que el enlace proporciona alguna información y `un manual
+<https://www.salicru.com/files/documentacion/ek80800(1).pdf>`_ con información
+técnica bastante relevante, como que el modelo de 500 |VA| incorpora una única
+batería de 4,5 Ah\ [#]_.
 
 Maestro
 -------
@@ -309,8 +337,67 @@ Esta configuración requiere explicación:
 Con esta configuración, podemos comprobar el estado del |SAI| con la orden::
 
    # upsc salicru@localhost
+   battery.charge: 100
+   battery.voltage: 13.60
+   battery.voltage.high: 13.00
+   battery.voltage.low: 10.40
+   battery.voltage.nominal: 12.0
+   device.type: ups
+   driver.name: blazer_usb
+   driver.parameter.pollinterval: 2
+   driver.parameter.port: auto
+   driver.parameter.synchronous: no
+   driver.version: 2.7.4
+   driver.version.internal: 0.12
+   input.current.nominal: 1.0
+   input.frequency: 50.1
+   input.frequency.nominal: 50
+   input.voltage: 239.0
+   input.voltage.fault: 239.0
+   input.voltage.nominal: 230
+   output.voltage: 239.0
+   ups.beeper.status: enabled
+   ups.delay.shutdown: 30
+   ups.delay.start: 180
+   ups.load: 22
+   ups.productid: 5161
+   ups.status: OL
+   ups.type: offline / line interactive
+   ups.vendorid: 0665
 
-.. todo:: Pegar la salida del comando.
+Hay muchísimas otras variables que pueden consultarse en `la documentación de
+Nut <https://networkupstools.org/docs/user-manual.chunked/apcs01.html>`_), pero
+de las que este |SAI| no informa. De entre las que devuelve son interesantes:
+
+* **ups.status**, que informa del estado en el que está trabajando la batería.
+  Se encuentra en |OL|, es decir, recibiendo alimentación de la red. Si hubiera
+  un apagón (o lo fingiésemos, desconectado el |SAI| de la red), pasaría al
+  estado |OB|, es decir, usando la batería. Si la situación se prolongara en el
+  tiempo, el estado pasaría a |LB|, es decir, batería baja, y es a partir de
+  este estado que se envían las órdenes para que se apaguen ordenadamente los
+  equipos.
+
+  .. note:: Dependiendo del |SAI|, el estado |LB| está asociado a un nivel
+     mínimo de carga, dado por la variable *battery.charge.low*, o un tiempo
+     mínimo de autonomía dado por *battery.runtime.low*. Sin embargo, en este
+     |SAI| no se informa de cuáles son esos niveles ni de cuál se usa.
+     Simplemente, el |SAI| por un criterio que desconocemos exactamente alcanza
+     el estado y envía tal información. En otros |SAI|\ s más configurables sí
+     se nos podría informar e incluso se nos podría dejar alterar el criterio
+     modificando el valor de la variable.
+
+* **battery.charge**, que informa de cuál es el porcentaje de la batería. En
+  este caso, la batería se encuentra totalmente cargada. Si desconectaramos
+  el |SAI| de la red.
+
+* **ups.load**, que informa de cuál es el porcentaje sobre la potencia total que
+  representan las potencias de todos los dispositivos conectados a través del
+  |SAI|. En este caso, es el 22%, lo que significa que si la potencia total que
+  soporta el dispositivo es 240W, los dispositivos conectados están consumiendo
+  unos 53W. Obviamente este porcentaje depende de cuál sea el trabajo que los
+  dispotivos están realizando en cada momento, pero si estimamos cuál es la
+  cifra en condiciones normales de trabajo, podemos sacar una buena
+  :ref:`estimación de la autonomía de la batería <sai-autonomia>`.
 
 Esclavo
 -------
@@ -338,7 +425,9 @@ directiva ``MONITOR``:
 
    MONITOR salicru@192.168.0.2 1 monuser secretpass2 slave
 
-suponiendo que *192.168.0.2* sea la |IP| del *maestro*.
+suponiendo que *192.168.0.2* sea la |IP| del *maestro*. Todo lo referente a la
+monitorización en el *maestro* (como el *script* de aviso o la orden
+:command:`upsc`), es aplicable al *esclavo*.
 
 Ajuste de parámetros
 ====================
@@ -347,6 +436,10 @@ Ajuste de parámetros
 
 .. rubric:: Notas al pie
 
+.. [#] En cambio, si se abre el |SAI| podremos comprobar que hay espacio de
+   sobra y puede colocarse también una batería de 7 ó 9 Ah de las muy habituales
+   dimensiones 151mmx65mmx84mm, lo que aumentará su autonomía.
+
 .. [#] Suponiendo, claro está, que se tenga instalado un servidor de correo en
    la máquina.
 
@@ -354,6 +447,10 @@ Ajuste de parámetros
 .. |UPS| replace:: :abbr:`UPS (Uninterruptible Power Supply)`
 .. |USB| replace:: :abbr:`USB (Universal Serial Bus)`
 .. |VA| replace:: :abbr:`VA (Voltiamperio)`
+.. |OL| replace:: :abbr:`OL (On Line)`
+.. |OB| replace:: :abbr:`OB (On Battery)`
+.. |LB| replace:: :abbr:`LB (Low Battery)`
+.. |SLA| replace:: :abbr:`SLA (Sealed Lead Acid)`
 
 .. _Nut: https://networkupstools.org/
 
