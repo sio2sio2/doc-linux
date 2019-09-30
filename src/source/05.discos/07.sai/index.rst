@@ -196,6 +196,8 @@ estado, al que denominaremos *maestro*. Las dos supuestos que estudiaremos son:
 #. El |SAI| proporciona protección al *maestro* y a uno o varios equipos
    adicionales (*esclavos*).
 
+.. image:: files/sai.png
+
 ¿Qué |SAI| configuramos?
 ------------------------
 Utilizaremos un `Salicru SPS 500 ONE <https://m.salicru.com/sais/sps-one.html>`_
