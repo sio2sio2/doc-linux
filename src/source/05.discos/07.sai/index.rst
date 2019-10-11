@@ -54,13 +54,17 @@ Hay tres tipos de |SAI|:
    asegura la constancia y la estabilidad en el suministro y evito los dos
    inconvenientes reseñados.
 
+   .. image:: files/sai-online.png
+
    El problema de esta solución es que es muy cara.
 
 **Inline** o **interactivo**
    Funcionan como los |SAI| *offline*, pero añaden un transformador que corrige
-   el suministro de red y que en la conmutación es capaz de mantener el voltaje.
-   Gracias a ello, se logran corregir los dos grandes defectos del diseño
-   *offline*.
+   el suministro de red y que durante la conmutación es capaz de mantener el
+   voltaje evitando el microcorte.  Gracias a ello, se logran corregir los dos
+   grandes defectos del diseño *offline*.
+
+   .. image:: files/sai-inline.png
 
    La gran ventaja de esta solución frente a la anterior es que es mucho más
    barata, por lo que la mayoría de los |SAI| para el mercado no profesional
@@ -105,8 +109,11 @@ En la elección de un |SAI| hay diversos factores a tener en cuenta:
    + Se usan baterías |SLA|, o sea, baterías selladas de ácido-plomo.
    + El voltaje es de 12V.
    + Tienen distintas capacidades (5Ah, 7Ah, 9Ah). Lo normal es que un SAI de
-     mayor potencia, tenga una batería de mayor capacidad (o varias conectadas
-     en serie, lo cual supone sumar sus capacidades).
+     mayor potencia, tenga una batería de mayor capacidad o varias conectadas
+     en serie, lo cual supone sumar sus voltajes:
+
+     .. image:: files/bateria-serie.png
+
    + En principio, no parece haber un estándar sobre sus dimensiones, pero los
      fabricantes tienden a hacerlas con `los mismos tamaños
      <https://www.powerstream.com/Size_SLA.htm>`_ y los |SAI|\ s comerciales a
@@ -119,6 +126,16 @@ En la elección de un |SAI| hay diversos factores a tener en cuenta:
       confirmar que la culpable es la batería y, si es así, cambiarla por una
       batería de idénticas dimensiones, lo cual suele ser bastante sencillo y
       económico.
+
+**Monitorización**
+   Un |SAI| puede permitir o no su monitorización a través de un puerto serie,
+   un puerto |USB| o la conexión a red. Si nuestra intención es proteger al
+   equipo de irregularidades en el suministro exclusivamente, o bien,
+   asegurarnos de que ante un corte no perderemos el trabajo que estamos
+   haciendo en nuestro equipo, la monitorización es irrelevante. Sin embargo, si
+   el equipo es un servidor, es fundamental que el |SAI| sea monitorizable, ya
+   que en ese caso podrá avisar al servidor de que su batería está próximo 
+   agotarse y este podrá tomar la decisión de apagarse ordenadamente.
 
 Estimaciones
 ============
@@ -149,6 +166,9 @@ Como en la ficha de estos |SAI| se proporcionan directamente los valores de la
 potencia activa, se puede elegir directamente el adecuado: el SPS 900 ONE de 900
 |VA| (o también el SPS 700 ONE que está muy poco por debajo de esa potencia).
 
+.. note:: En este caso, las potencias de los aparatos para el cálculo deben ser
+   las máximas.
+
 .. _sai-autonomia:
 
 Autonomía
@@ -163,12 +183,12 @@ baterías:
 - **Eficiencia**, que para las baterías de ácido-plomo, típica en los |SAI|
   podemos estimar del 80%.
 
-EL |SAI| puede tener varias baterías dispuestas en serie. La fórmula general
-para obteher (en minutos) la autonomía del |SAI| es:
+El |SAI| puede tener varias baterías dispuestas en serie. La fórmula
+general para obteher (en minutos) la autonomía del |SAI| es:
 
 .. math::
 
-  t = N * \dfrac{C * V * E}{P} * 60
+  t = \dfrac{C * (N * V)}{P} * E * 60
 
 Por ejemplo, para un |SAI| que sólo dispone una batería de ácido-plomo, de 7
 Ah de capacidad y 12 voltios de tensión; y que está conectada a un servidor con
@@ -176,7 +196,11 @@ poca carga que consume unos 40W de potencia la autonomía en minutos es:
 
 .. math::
 
-   t = 1 * \dfrac{7*12*0,8}{40} * 60 \approx 100
+   t = \dfrac{7*(1*12)}{40}* 0,8 * 60 \approx 100
+
+.. note:: En este caso, sin embargo, para el cálculo de la autonomía, lo más
+   lógico es utilizar las potencias que normal consumen los dispositivos, no las
+   máximas.
 
 .. https://ehomerecordingstudio.com/uninterruptible-power-supply/
 

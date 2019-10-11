@@ -131,6 +131,9 @@ pregunta_password() {
 }
 
 
+#
+# Main
+#
 soy_root || error 1 "Debe ser administrador"
 
 [ "$1" = "--no-password" ] && unset PASSWORD
