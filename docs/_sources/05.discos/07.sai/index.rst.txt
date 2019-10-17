@@ -362,7 +362,12 @@ Esta configuración requiere explicación:
   - Si es *IGNORE*, que es incompatible con los otros tres, no se hará
     absolutamente nada.
 
-Con esta configuración, podemos comprobar el estado del |SAI| con la orden::
+Una vez establecida la configuración es necesario reiniciar ambos servidores::
+
+   # invoke-rc.d nut-server restart
+   # invoke-rc.d nut-client restart
+
+y podemos comprobar el estado del |SAI| con la orden::
 
    # upsc salicru@localhost
    battery.charge: 100
