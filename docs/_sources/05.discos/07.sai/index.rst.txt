@@ -3,22 +3,22 @@
 |SAI|
 *****
 Un |SAI| (o |UPS|, si utilizamos las siglas en inglés) es un dispositivo que
-gracias a las baterias que incorpora, es capaz de mantener el suministro
-eléctrico al equipo, cuando se produce un apagón temporal. En consecuencia, el
+permite proteger a los equipos conectados a través de él de
+irregularidades en el sumnistro eléctrico, como es el caso de los apagones
+gracias a las baterias que incorpora, En consecuencia, el
 servidor no llega a apagarse y puede continuar dando servicio durante el corte
-y tras éste. Obviamente, las baterías serán capaces de alimentar sólo durante
-un tiempo limitado a los dispositivos que se alimentan a través del |SAI|, por
-lo que si el apagón se prolonga demasiado, será inevitable que el servidor
-acabe apagado.
+y tras éste, si el corte no supera el tiempo de la batería. Obviamente, las
+baterías serán capaces de alimentar sólo durante un tiempo limitado a los
+dispositivos que se alimentan a través del |SAI|, por lo que si el apagón se
+prolonga demasiado, será inevitable que el servidor acabe apagado.
 
-Adicionalmente a esta función principal, son capaces de:
-
-- Defender los equipos conectados a él de oscilaciones en la tensión.
-- Comunicar a un ordenador cuál es su estado (usando las baterías, a punto de
-  agotar la carga de las baterías, etc.), lo que permite disponer un software
-  en éste que defina qué hacer en cada caso. Por ejemplo, cuando falte poco para
-  agotar las baterías, lo más juicioso es apagar el ordenador para que, ya que
-  se acabará apagando, al menos que este apagado se haga de forma ordenada.
+Adicionalmente a esta función principal, son capaces de  comunicar a un
+ordenador cuál es su estado (usando las baterías, a punto de agotar la carga de
+las baterías, etc.), lo que permite disponer un software en éste que defina qué
+hacer en cada caso. Por ejemplo, cuando falte poco para agotar las baterías, lo
+más juicioso es apagar el ordenador para que, ya que se acabará apagando, al
+menos que se apague de forma ordenada evitando la corrupción del sistema de
+ficheros.
 
 .. warning:: Obviamente, los |SAI|\ s no están relacionados directamente con la
    gestión del disco, por lo que su inclusión en esta sección es más que
@@ -28,6 +28,58 @@ Adicionalmente a esta función principal, son capaces de:
 
 Introducción teórica
 ====================
+Anomalías en el suministro
+--------------------------
+Ya se ha establecido que la función principal de un |SAI| es combatir los fallos
+en el suministro, de los cuales pueden distinguirse nueve distintos:
+
+.. table:: Amenazas en el suministro eléctrico
+   :class: saifallos
+
+   +----------------------+-----------------------------+--------------------------+---------------------------+
+   | Anomalía             | Descripción                 | Efecto                   | Causas frecuente          |
+   +===+==================+=============================+==========================+===========================+
+   | 1 | Corte (o apagón) | Interrupción total del      | - Pérdida de info en RAM | - Fallo en el suministro. |
+   |   |                  | suministro.                 | - Corripción de datos,   | - Fallo en la red interna.|
+   +---+------------------+-----------------------------+--------------------------+---------------------------+
+   | 2 | Microcorte       | Bajada momentánea de tensión| - Daño en componentes    | - Encendido de un aparato |
+   |   |                  | durante un breve tiempo     |   físicos sensibles.     |   de alto consumo (p.e.   |
+   |   |                  | (pocos ms) por debajo del   |                          |   un aire acondicionado). |
+   |   |                  | 90% de la tensión nominal.  |                          |                           |
+   +---+------------------+-----------------------------+--------------------------+                           |
+   | 3 | Pico de tensión  | Subida momentánea de tensión| - Daño en componentes    |                           |
+   |   |                  | durante un breve tiempo     |   físicos.               |                           |
+   |   |                  | (pocos ms) por encima del   |                          |                           |
+   |   |                  | 110% de la tensión nominal. |                          |                           |
+   +---+------------------+-----------------------------+--------------------------+---------------------------+
+   | 4 | Bajada de tensión| Bajada sostenida de la      | - Funcionamiento         | - Cercanía o lejanía a la |
+   |   |                  | tensión a partir del munuto.|   incorrecto.            |   subestación eléctrica   |
+   +---+------------------+-----------------------------+--------------------------+   (sobre todo en zonas    |
+   | 5 | Subida de tensión| Subida sostenida de la      | - Daño en componentes    |   rurales).               |
+   |   |                  | tensión a partir del munuto.|   físicos.               |                           |
+   +---+------------------+-----------------------------+--------------------------+---------------------------+
+   | 6 | Ruido eléctrico  | Distorsión de la señal      | - Funcionamiento         |                           |
+   |   |                  | generada por interferencias |   incorrecto.            |                           |
+   |   |                  | eléctricas o magnéticas.    |                          |                           |
+   +---+------------------+-----------------------------+--------------------------+                           |
+   | 7 | Conmutación      | Pequeña bajada de tensión   | - Daño en componentes    |                           |
+   |   | transitoria      | del orden de nanosegundos.  |   físicos sensibles.     |                           |
+   +---+------------------+-----------------------------+--------------------------+                           |
+   | 8 | Variaciones de   | Alteración de la frecuencia | - Funcionamiento         |                           |
+   |   | frecuencia       | de 50 Hz.                   |   incorrecto.            |                           |
+   |   |                  |                             | - Pérdida de datos.      |                           |
+   |   |                  |                             | - Daño en componentes    |                           |
+   |   |                  |                             |   físicos sensibles.     |                           |
+   +---+------------------+-----------------------------+--------------------------+---------------------------+
+   | 9 | Distorsión       | Cambio en la forma          | - Sobrecalentamiento.    | - Empleo de un |SAI|      |
+   |   | armónica.        | sinusoidal de la onda por   | - Errores en la          |   barato que tiene una    |
+   |   |                  | adición de frecuencias      |   comunicación.          |   onda de salida de mala  |
+   |   |                  | múltiplo de la original.    |                          |   calidad.                |
+   +---+------------------+-----------------------------+--------------------------+---------------------------+
+
+Es obvio que un |SAI| siempre es capaz de proteger del primer tipo de anomalía
+(el apagón). Del resto de anomalías protegerá dependiendo de cuál sea tu tipo.
+
 Tipos
 -----
 Hay tres tipos de |SAI|:
@@ -38,21 +90,22 @@ Hay tres tipos de |SAI|:
    dispositivos que lo usan reciben corriente directamente de la red eléctrica,
    por lo que presenta dos grandes incovenientes:
 
-   + No estabiliza la corriente procedente de la red.
+   + Sólo es capaz de proteger de los tres primeros tipos de anomalía.
    + Cuando falla el suministro de red, existe un tiempo mínimo de conmutación
      para que sean las baterías las que se hagan cargo de suministrar la
      energía, por lo que en la práctica no proprocionan un suministro
-     ininterrumpido. Lo conveniente es que este tiempo sea menor a los 5 ms, que
-     son microcortes que toleran los ordenadores habituales.
+     ininterrumpido. Es decir, en estos |SAI|\ s, un fallo de tipo 1, se traduce
+     en fallo de tipo 7. Lo conveniente es que este tiempo sea menor a los 5 ms,
+     tiempo que son capaces de tolerar los ordenadores habituales.
 
    .. image:: files/sai-offline.png
 
 **Online**
    En ellos se toma el suministro de red y se convierte en corriente continua
    para cargar la batería, y de ésta se toma corriente continua que se vuelve a
-   convertir en alterna para alimentar a los dispositivos conectados. Esto
-   asegura la constancia y la estabilidad en el suministro y evito los dos
-   inconvenientes reseñados.
+   convertir en alterna para alimentar a los dispositivos conectados. Esta
+   solución evita los nueve tipos de anomalías y no genera ningún problema en la
+   conmutación, porque de hecho es inexistente.
 
    .. image:: files/sai-online.png
 
@@ -60,9 +113,9 @@ Hay tres tipos de |SAI|:
 
 **Inline** o **interactivo**
    Funcionan como los |SAI| *offline*, pero añaden un transformador que corrige
-   el suministro de red y que durante la conmutación es capaz de mantener el
-   voltaje evitando el microcorte.  Gracias a ello, se logran corregir los dos
-   grandes defectos del diseño *offline*.
+   los siete primeros tipos de anomalías (las cinco primera siempre y la sexta y
+   la séptima muy habitualmente). y que durante la conmutación es capaz de mantener
+   la tensión. 
 
    .. image:: files/sai-inline.png
 
@@ -463,9 +516,14 @@ monitorización en el *maestro* (como el *script* de aviso o la orden
 :command:`upsc`), es aplicable al *esclavo*.
 
 Ajuste de parámetros
-====================
+--------------------
 
 .. todo:: Por hacer
+
+Enlaces de interés
+==================
+
+* `Blog de todosai.com <https://todosai.com/blog.html>`_.
 
 .. rubric:: Notas al pie
 
