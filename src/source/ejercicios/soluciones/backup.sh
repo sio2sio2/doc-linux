@@ -10,6 +10,7 @@ INDISPENSABLES='
    "/etc/resolv.conf"
 '
 
+# Directorio excluidos
 EXCLUIDOS='
    "/dev"
    "/sys"
@@ -18,8 +19,15 @@ EXCLUIDOS='
    "/run"
    "/var/run"
    "/var/cache/apt"
+   "/var/cache/man"
    "/var/lib/apt"
-   "/asgsag asasas/h ashsaas"
+   "/var/tmp"
+'
+
+# Ficheros excluidos
+EXCLUIDOS_F='
+   "*.pyc"
+   "__pycache__"
 '
 
 help() {
@@ -48,6 +56,13 @@ Opciones:
                            si quiere excluir varios. Hay una lista
                            predeterminada  de directorios excluidos que puede
                            resetearse si se añade la opción -E ''.
+ -F, --exclude-file <FILE> Fichero que se excluye de la copia. Puede incluir
+                           caracteres de expansión como '*'. También pueden
+                           ser nombres de directorios cuyo efecto es excluir
+                           el directorio y todo su contenido. Puede repetirse
+                           la opción para excluir varios. La lista
+                           predeterminada contiene '*.pyc' y '__pycache__',
+                           que excluye todos los precompilados de python.
  -f, --force               Fuerza a realizar la copia, aunque no se haya
                            cambiado el nombre de máquina.
  -l, --limit <N>           Tiempo en minutos antes del cual no se consideran
@@ -58,6 +73,8 @@ Opciones:
                            guión (-), no existirá referencia.
  -u, --update              Actualiza la referencia al momento en que se
                            ejecuta el programa.
+ -v, --verbose             Muestra los ficheros que se incorporan al backup,
+                           en vez de una sucesión de puntos.
 "
 }
 
@@ -128,15 +145,71 @@ get_uuid() {
 #
 # Obtiene los ficheros que deben incluirse en la copia
 # $1: Los directorios excluidos de la copia
+# $2: Los ficheros excluidos de la copia
 # $*: Las condiciones de filtro.
 #
 get_files() {
    local excl
-   [ -n "${1%% }" ] && excl="-path '$(eval join "\"' -o -path '\"" $1)' -o"
-   shift
+   [ -n "${1%% }" ] && excl="-path '$(eval join "\"' -o -path '\"" $1)'"
+   if [ -n "${2%% }" ]; then
+      [ -n "$excl" ] && excl="$excl -o "
+      excl="$excl -name '$(eval join "\"' -o -name '\"" $2)'"
+   fi
+   shift 2
 
-   eval set -- '/ \(' $excl '-name "*.pyc" \)' -prune -o $* -print
+   if [ -n "$excl" ]; then
+      excl="/ \( $excl \) -prune"
+      if [ $# -ne 0 ]; then
+         excl="$excl -o"
+      fi
+   fi
+
+   eval set -- $excl $* -print
    find "$@"
+}
+
+
+#
+# En una tubería simple de dos meimbros devuelve
+# el código de salida de la orden izquierda.
+#
+pf() {
+   local XC run
+
+   while [ $# -gt 0 ]; do
+      if [ "$1" = "|" ]; then
+         run="$run "'3>&- 4>&-; echo $? >&3; } '
+         break
+      else
+         run="$run '$1'"
+      fi
+      shift
+   done
+
+   eval "{ { { " $run "$@" '>&4; } 3>&1 | { read XC; return $XC; } } 4>&1'
+}
+
+
+#
+# Modifica la salida de tar -acvf
+#
+salida() {
+   local total PPL
+
+   if [ -n "$VERBOSE" ]; then
+      cat
+   else  # En vez de mostrar los nombres de los ficheros, muestra puntos.
+      total=0
+      PPL=$(($(tput cols) - 7))
+      [ $? -ne 0 ] && PPL=40
+
+      while read FILE; do
+         total=$((total+1))
+         printf "."
+         [ $((total%PPL)) -eq 0 ] && printf -- "%6d\n" "$total" 
+      done;
+      [ $((total%PPL)) -ne 0 ] && printf -- "%6d\n" "$total" 
+   fi
 }
 
 
@@ -174,6 +247,14 @@ get_files() {
                error 0 "El fichero o directorio '$1' no existe"
             fi
             ;;
+         -F|--exclude-file)
+            shift
+            if [ -z "$1" ]; then
+               EXCLUIDOS_F=
+            else
+               FEXTRA="$FEXTRA"' "'"$1"'"'
+            fi
+            ;;
          -f|--force)
             FORCE=1
             ;;
@@ -195,6 +276,9 @@ get_files() {
          -u|--update)
             UPDATE=1
             ;;
+         -v|--verbose)
+            VERBOSE=1
+            ;;
          --)
             shift
             break
@@ -213,6 +297,7 @@ get_files() {
 
    INDISPENSABLES="$INDISPENSABLES $EXTRA"
    EXCLUIDOS="$EXCLUIDOS $EEXTRA"
+   EXCLUIDOS_F="$EXCLUIDOS_F $FEXTRA"
 }
 
 
@@ -240,10 +325,9 @@ name=$(get_name "$TARGETDIR" "$TARGETNAME") || error 1 "$name"
 
 [ -f ~/.uuid ] || get_uuid > ~/.uuid && touch ~/.uuid
 
-get_files "$EXCLUIDOS" $FILTER | tar -P --no-recursion -acvf "$name" -T -
+get_files "$EXCLUIDOS" "$EXCLUIDOS_F" $FILTER | pf tar -P --no-recursion -acvf "$name" -T - \| salida
 EXITCODE=$?
 
-echo
 if [ $EXITCODE -ne 0 ]; then
    error $EXITCODE "La copia para restauración ha fallado."
 else
