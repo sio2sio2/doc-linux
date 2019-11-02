@@ -242,17 +242,16 @@ el certificado de la <abbr title="Fábrica Nacional de Moneda y Timbre">FNMT</ab
 <div class="section" id="cifrado-de-discos">
 <span id="disk-encrypt"></span><h2>9.1.3.2. Cifrado de discos<a class="headerlink" href="#cifrado-de-discos" title="Enlazar permanentemente con este título">¶</a></h2>
 <p>Aunque ya hemos ilustrado <a class="reference internal" href="02.algo.html#gnupg-1"><span class="std std-ref">cómo cifrar un fichero individual</span></a>,
-este procedimiento es absolutamente impracticable, ya que exige cada vez que se
-quiera realizar la modificación del contenido, un descrifrado y un cifrado
-manual. En la práctica, lo que se hace es utilizar sistemas de ficheros
-virtuales que almacenan cifrada la información y que al montarse sobre un
-directorio, muestran la información descifrada. El montaje exige la introducción
-de la contraseña simétrica de cifrado. Hay dos metodologías asociadas a
-esta idea:</p>
+este procedimiento sólo es útil si se quiere portar un fichero y es
+absolutamente impracticable si lo que se pretende es alamcenar ficheros en
+disco, ya que exige cada vez que se quiera realizar la modificación del
+contenido, un descrifrado y un cifrado manual. En la práctica, lo que se hace es
+cifrar la totalidad o parte de un sistema de ficheros a fin de que todo lo
+incluido en esa zona este cifrado y no ser leído (o escrito) a menos que se
+conozca la contraseña. Para ponerlo en práctica hay tres estrategias.</p>
 <ol class="arabic simple">
 <li>El cifrado de dispositivos de bloques completos (p.e. una partición), que usa
-<abbr title="Linux Unified Key Setup">LUKS</abbr> (véase <a class="reference external" href="https://wiki.archlinux.org/index.php/Dm-crypt_(Espa%C3%B1ol)">dm-crypt</a> para más
-información).</li>
+<abbr title="Linux Unified Key Setup">LUKS</abbr>.</li>
 <li>El cifrado del contenido de un directorio arbitrario, que, junto a <a class="reference external" href="https://es.wikipedia.org/wiki/Sistema_de_archivos_en_el_espacio_de_usuario">FUSE</a>, es
 la aproximación que usa software como:<ul>
 <li><a class="reference external" href="https://github.com/vgough/encfs">encfs</a>, que ha sido el <em>software</em> más usado, pero que es actualmente
@@ -263,9 +262,293 @@ contraseña de cifrado</a>.</li>
 anterior.</li>
 </ul>
 </li>
+<li>Usar las capacidades de cifrado del propio sistema de ficheros, si el que
+usamos las tiene. En el caso de <em>ext4</em>, éste soporta cifrado desde la versión
+4.1 del kernel de linux.</li>
 </ol>
-<p>Todo el <em>software</em> con este segundo enfoque se utiliza básicamente del
-mismo modo, de modo que pueden identificarse las siguientes operaciones básicas:</p>
+<div class="section" id="cifrado-de-bloques-luks">
+<h3>9.1.3.2.1. Cifrado de bloques (<abbr title="Linux Unified Key Setup">LUKS</abbr>)<a class="headerlink" href="#cifrado-de-bloques-luks" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Mediante esta técnica el software hace de intermediario entre los bloques
+físicos y los bloques de un dispositivo virtual cifrando en las escrituras y
+descifrando en las lecturas.</p>
+<img alt="../../_images/dm-crypt.png" src="../../_images/dm-crypt.png" />
+<p>En consecuencia:</p>
+<ul class="simple">
+<li>Ciframos un dispositivo de bloques entero.</li>
+<li>Como el cifrado es independiente del sistema de ficheros, se puede utilizar
+cualquier sistema de ficheros.</li>
+<li>Permite no sólo el cifrado de datos, sino el cifrado del sistema entero,
+preparando convenientemente el sistema (caso que no abordaremos aquí, pero que
+puede consultarse, por ejemplo, en un <a class="reference external" href="https://wiki.archlinux.org/index.php/Dm-crypt_(Espa%C3%B1ol)/Encrypting_an_entire_system_(Espa%C3%B1ol)#Modalidad_plain_de_dm-crypt">artículo de la wiki de Archlinux</a>).</li>
+</ul>
+<p>Abordaremos el caso más sencillo de querer cifrar una partición física, para lo
+cual debemos primero instalar el <em>software</em> de cifrado:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt install cryptsetup
+</pre></div>
+</div>
+<p class="rubric">Operativa manual</p>
+<p>Lo primero es mapear una partición física<a class="footnote-reference" href="#id5" id="id2">[1]</a> (p.e. <code class="file docutils literal notranslate"><span class="pre">/dev/sda6</span></code>) sobre
+un dispositivo virtual:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cryptsetup -y -v luksFormat /dev/sda6  <span class="c1"># Requerirá una contraseña</span>
+<span class="gp">#</span> cryptsetup open /dev/sda6 cifrado      <span class="c1"># Debemos proporcionar la contraseña</span>
+</pre></div>
+</div>
+<p>Esto generará el dispositivo virtual de bloques <code class="file docutils literal notranslate"><span class="pre">/dev/mapper/cifrado</span></code>,
+sobre el cual podemos actuar como si se tratara de un dispositivo físico, o
+sea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkfs.ext4 -L DATOSECRETOS /dev/mapper/cirado
+<span class="gp">#</span> mount /dev/mapper/cifrado /mnt
+</pre></div>
+</div>
+<p>Si en algún momento quisiéramos desmontar todo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> umount /mnt
+<span class="gp">#</span> cryptsetup close cifrado
+</pre></div>
+</div>
+<p class="rubric">Operativa automatizada</p>
+<p>Que le administrador deba llevar a cabo estas operaciones cada vez que se arranca
+el sistema, no es algo operativo. Para semiautomatizar el montaje durante el
+arranque podemos añadir la asociación entre el dispositivo físico y el virtual
+en <code class="file docutils literal notranslate"><span class="pre">/etc/crypttab</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="nb">echo</span> <span class="s2">&quot;cifrado /dev/sda6 none&quot;</span> &gt;&gt; /etc/crypttab
+</pre></div>
+</div>
+<p>y la asociación entre el dispositivo virtual y el punto de montaje en
+<code class="file docutils literal notranslate"><span class="pre">/etc/fstab</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="nb">echo</span> <span class="s2">&quot;/dev/mapper/cifrado /mnt ext4 defaults 0 0&quot;</span> &gt;&gt; /etc/fstab
+</pre></div>
+</div>
+<p>El montaje será semiautomático, porque durante el proceso de arranque deberemos
+digitalizar la contraseña. Es posible, también, en vez de que la clave sea
+interactiva, guardarla en un fichero. Es más, <abbr title="Linux Unified Key Setup">LUKS</abbr> dispone de ocho slots para
+almacenar claves alternativas. Ahora mismo sólo habría una:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cryptsetup luksDump /dev/sda6
+<span class="go">LUKS header information</span>
+<span class="go">Version:        2</span>
+<span class="go">Epoch:          8</span>
+<span class="go">Metadata area:  16384 [bytes]</span>
+<span class="go">Keyslots area:  16744448 [bytes]</span>
+<span class="go">UUID:           e26d3cf8-20a7-422f-ac8f-83340e63725f</span>
+<span class="go">Label:          (no label)</span>
+<span class="go">Subsystem:      (no subsystem)</span>
+<span class="go">Flags:          (no flags)</span>
+
+<span class="go">Data segments:</span>
+<span class="go">  0: crypt</span>
+<span class="go">        offset: 16777216 [bytes]</span>
+<span class="go">        length: (whole device)</span>
+<span class="go">        cipher: aes-xts-plain64</span>
+<span class="go">        sector: 512 [bytes]</span>
+
+<span class="hll"><span class="go">Keyslots:</span>
+</span><span class="go">  0: luks2</span>
+<span class="go">        Key:        512 bits</span>
+<span class="go">        Priority:   normal</span>
+<span class="go">        Cipher:     aes-xts-plain64</span>
+<span class="go">        Cipher key: 512 bits</span>
+<span class="go">        PBKDF:      argon2i</span>
+<span class="go">        Time cost:  4</span>
+<span class="go">        Memory:     98948</span>
+<span class="go">        Threads:    1</span>
+<span class="go">        Salt:       a0 a1 57 4c 30 6a af e5 de 76 d5 d8 a9 f0 11 b7</span>
+<span class="go">                    ac b5 c6 90 d0 1d 4e 92 4d 1c 4b b5 4c 07 97 70</span>
+<span class="go">        AF stripes: 4000</span>
+<span class="go">        AF hash:    sha256</span>
+<span class="go">        Area offset:32768 [bytes]</span>
+<span class="go">        Area length:58048 [bytes]</span>
+<span class="go">        Digest ID:  0</span>
+
+<span class="go">Tokens:</span>
+<span class="go">Digests:</span>
+<span class="go">  0: pbkdf2</span>
+<span class="go">        Hash:       sha256</span>
+<span class="go">        Iterations: 39337</span>
+<span class="go">        Salt:       2b c9 51 10 c7 29 4b 63 35 a4 83 63 bc 36 46 2f</span>
+<span class="go">                    49 92 af dd 32 a8 7c 9d 19 08 51 80 1b 58 6f 56</span>
+<span class="go">        Digest:     0c 52 b0 1d 8c 80 2e 6b 45 0a c8 ac 4a b2 e9 a2</span>
+<span class="go">                    f4 bf 81 e6 5a 00 c4 42 af 10 21 9c 3a 92 fe 6c</span>
+</pre></div>
+</div>
+<p>con lo que podemos añadir al mismo sistema otra clave que esté en un fichero.
+Para ello, vamos primero a generar esa clave, constituida por 512 <em>bytes</em>
+totalmente aleatorios:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> dd &lt; /dev/urandom &gt; /root/luks.key <span class="nv">bs</span><span class="o">=</span><span class="m">512</span> <span class="nv">count</span><span class="o">=</span><span class="m">1</span>
+</pre></div>
+</div>
+<p>que, podemos consultar en formato hexadecimal, así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> od -v -An -tx1 /root/luks.key  <span class="c1"># Consultamos la clave</span>
+<span class="go">dc 12 ae d8 2c b5 4e 12 56 a9 35 b4 5f a6 29 b9</span>
+<span class="go">[...]</span>
+</pre></div>
+</div>
+<p>Con la clave ya en el fichero <code class="file docutils literal notranslate"><span class="pre">/root/luks.key</span></code>, podemos añadirla a un
+<em>slot</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cryptsetup luksAddKey /dev/sda6 /root/luks.key
+<span class="gp">#</span> cryptsetup luksDump /dev/sda6
+<span class="go">[...]</span>
+<span class="go">Keyslots:</span>
+<span class="go">  0: luks2</span>
+<span class="go">        Key:        512 bits</span>
+<span class="go">        Priority:   normal</span>
+<span class="go">        Cipher:     aes-xts-plain64</span>
+<span class="go">        Cipher key: 512 bits</span>
+<span class="go">        PBKDF:      argon2i</span>
+<span class="go">        Time cost:  4</span>
+<span class="go">        Memory:     98948</span>
+<span class="go">        Threads:    1</span>
+<span class="go">        Salt:       a0 a1 57 4c 30 6a af e5 de 76 d5 d8 a9 f0 11 b7</span>
+<span class="go">                    ac b5 c6 90 d0 1d 4e 92 4d 1c 4b b5 4c 07 97 70</span>
+<span class="go">        AF stripes: 4000</span>
+<span class="go">        AF hash:    sha256</span>
+<span class="go">        Area offset:32768 [bytes]</span>
+<span class="go">        Area length:258048 [bytes]</span>
+<span class="go">        Digest ID:  0</span>
+<span class="go">  1: luks2</span>
+<span class="go">        Key:        512 bits</span>
+<span class="go">        Priority:   normal</span>
+<span class="go">        Cipher:     aes-xts-plain64</span>
+<span class="go">        Cipher key: 512 bits</span>
+<span class="go">        PBKDF:      argon2i</span>
+<span class="go">        Time cost:  4</span>
+<span class="go">        Memory:     100952</span>
+<span class="go">        Threads:    1</span>
+<span class="go">        Salt:       b1 63 a9 24 aa cc f5 9c b4 6c 8a 8b 27 7a cb 2c</span>
+<span class="go">                    72 cd f8 d9 68 b9 1b f4 43 c7 d6 b5 20 81 47 c5</span>
+<span class="go">        AF stripes: 4000</span>
+<span class="go">        AF hash:    sha256</span>
+<span class="go">        Area offset:290816 [bytes]</span>
+<span class="go">        Area length:258048 [bytes]</span>
+<span class="go">        Digest ID:  0</span>
+<span class="go">[...]</span>
+</pre></div>
+</div>
+<p>Por último, si en <code class="file docutils literal notranslate"><span class="pre">/etc/crypttab</span></code> modificamos la línea para que se use el
+fichero:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cifrado     /dev/sda6      /root/luks.key</span>
+</pre></div>
+</div>
+<p>durante el arranque no se pedirá ninguna clave y el sistema se encontrará
+montado al acabar la secuencia.</p>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p class="last">Ahora bien, ¿para qué ciframos una partición si dejamos la
+clave para su descifrado en un fichero de otra partición sin cifrar?</p>
+</div>
+<p>Lo interesante de lo enterior es, simplemente, comprobar que se puede guardar la
+clave en un fichero y usarlo para no tener que escribirla interactivamente. Y
+ello es útil, si almacenamos el fichero en un dispositivo externo como un pincho
+<abbr title="Universal Serial Bus">USB</abbr> que procuremos retirar y llevarnos lejos de la máquina cuando no la
+usemos. Además, es conveniente ocultar ese fichero para que pase desapercibido
+si alguien se hace con nuestro pincho. A este respecto, lo más juicioso es
+guardar las 512 <em>bytes</em> de la clave en algún espacio libre del pincho <abbr title="Universal Serial Bus">USB</abbr> y
+ajeno a los sistemas de ficheros que pueda haber en él:</p>
+<ul class="simple">
+<li>Si el particionado es <abbr title="Disk Operating System">DOS</abbr>, podemos utilizar los últimos 512 bytes del espacio
+entre el <abbr title="Master Boot Record">MBR</abbr> y la primera partición, ya que al principio de ese espacio
+puede haber código de un gestor de arranque como <abbr title="GRand Unified Bootloader">GRUB</abbr>.</li>
+<li>Si el particionado es <abbr title="GUID Partition Table">GPT</abbr>, podemos utilizar los últimos 512 bytes del espacio
+que se reserva para definir particiones, ya que es bastante improbable que en
+el pincho hayamos creado más de 124 particiones.</li>
+</ul>
+<p>Pongamos este segundo caso de ejemplo. En un disco <abbr title="GUID Partition Table">GPT</abbr>:</p>
+<ul class="simple">
+<li>El primer sector es un <abbr title="Master Boot Record">MBR</abbr> ficticio (512B)</li>
+<li>El segundo sector es la cabecera <abbr title="GUID Partition Table">GPT</abbr> (512B)</li>
+<li>A continuación hay espacio para 128 definiciones de particiones cada una
+de las cuales ocupa 128 bytes (16KiB).</li>
+</ul>
+<p>En consecuencia el comienzo del disco ocupa 17KiB o lo que es lo mismo 34
+sectores, así que podemos ocupar el sector <strong>34</strong> para almacenar nuestra clave,
+con el único costo de que «sólo» podremos definir 124 particiones, lo cual,
+ciertamente, no parece ningún problema.</p>
+<p>Supongamos que el pincho se encuentra en <code class="file docutils literal notranslate"><span class="pre">/dev/sdb</span></code><a class="footnote-reference" href="#id6" id="id3">[2]</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> gdisk -l /dev/sdb
+<span class="go">[...]</span>
+<span class="go">Number  Start (sector)    End (sector)  Size       Code  Name</span>
+<span class="go">   1             416          103003   50.1 MiB    EF00  EFI System Partition</span>
+<span class="go">   2          103008        30719966   14.6 GiB    0700  Microsoft basic data</span>
+</pre></div>
+</div>
+<p>Vamos a crear una clave aleatoria de 512 bytes directamente sobre su sector
+<strong>34</strong>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> dd &lt; /dev/urandom &gt; /dev/sdb <span class="nv">bs</span><span class="o">=</span><span class="m">512</span> <span class="nv">count</span><span class="o">=</span><span class="m">1</span> <span class="nv">seek</span><span class="o">=</span><span class="m">33</span>
+</pre></div>
+</div>
+<p>y, creada, la añadimos a un <em>slot</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="o">{</span> <span class="nb">echo</span> <span class="s2">&quot;secreto&quot;</span> <span class="p">;</span> dd &lt; /dev/sdb <span class="nv">bs</span><span class="o">=</span><span class="m">512</span> <span class="nv">count</span><span class="o">=</span><span class="m">1</span> <span class="nv">skip</span><span class="o">=</span><span class="m">33</span><span class="p">;</span> <span class="o">}</span> <span class="p">|</span> cryptsetup luksAddKey /dev/sda6 -
+</pre></div>
+</div>
+<p>donde «secreto» es la contraseña que introdujimos al crear el dispositivo
+cifrado y que nos servía para hacer el montaje interactivo. Añadida esta clave,
+podemos probar si funciona del siguiente modo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> dd &lt; /dev/sdb <span class="nv">bs</span><span class="o">=</span><span class="m">512</span> <span class="nv">count</span><span class="o">=</span><span class="m">1</span> <span class="nv">skip</span><span class="o">=</span><span class="m">33</span> <span class="p">|</span> cryptsetup open /dev/sda6 cifrado --key-file<span class="o">=</span>-
+</pre></div>
+</div>
+<p>que debe generar el dispositivo virtual y, si continua la línea en
+<code class="file docutils literal notranslate"><span class="pre">/etc/fstab</span></code>. montarnos directamente la partición sobre <code class="file docutils literal notranslate"><span class="pre">/srv</span></code>. Ya
+tenemos la mitad del trabajo hecho, ya que aún falta que al arrancar el sistema
+busque el dispositivo, lo monte y lleve a cabo justamente esta operación.</p>
+<p>Para ello, debemos crear una regla para <strong class="program">udev</strong>, que al detectar el
+dispositivo <abbr title="Universal Serial Bus">USB</abbr> lance un script:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cat &gt; /etc/udev/rules.d/70-usb.rules
+<span class="go">SUBSYSTEMS==&quot;usb&quot;, ACTION==&quot;add&quot;, ATTRS{idVendor}==&quot;abcd&quot;, ATTRS{idProduct}==&quot;1234&quot;, \</span>
+<span class="go">   KERNEL==&quot;sd?&quot;, SYMLINK+=&quot;usbkey&quot;, RUN+=&quot;/usr/local/bin/unlock.sh&quot;</span>
+</pre></div>
+</div>
+<p>La regla, identifica el dispositivo en el que hemos guardado la clave a través
+de su <em>idVendor</em> e <em>idProduct</em> que se pueden consultar fácilmente al hacer:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> lsusb
+<span class="go">[...]</span>
+<span class="go">Bus 002 Device 002: ID abcd:1234 Unknown</span>
+<span class="go">[...]</span>
+</pre></div>
+</div>
+<p>Además, aprovechamos la regla para añadir un enlace simbólico <code class="file docutils literal notranslate"><span class="pre">/dev/usbkey</span></code> que apunte
+al dispositivo. Con este nombre podremos referirnos al dispositivo dentro del <em>script</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span>!/bin/sh
+<span class="go">RT=&quot;/dev/sda6&quot;</span>
+<span class="go">DEVICE=&quot;/dev/usbkey&quot;</span>
+<span class="go">ENCVOL=&quot;cifrado&quot;</span>
+<span class="go">MOUNTP=&quot;/srv&quot;</span>
+
+<span class="go">{</span>
+<span class="go">   until [ -b &quot;$PART&quot; ]; do sleep .5; done</span>
+<span class="go">   dd &lt; &quot;$DEVICE&quot; bs=512 count=1 skip=33 | \</span>
+<span class="go">      cryptsetup open &quot;$PART&quot; &quot;$ENCVOL&quot; --key-file=-</span>
+<span class="go">} &amp;</span>
+</pre></div>
+</div>
+<p>Por último, en <code class="file docutils literal notranslate"><span class="pre">/etc/crypttab</span></code> no debe existir referencia alguna, ya
+que es el <em>script</em> el que realiza la operación de crear el dispositivo cifrado.
+En <code class="file docutils literal notranslate"><span class="pre">/etc/fstab</span></code>, sí podemos dejar la línea, pero añadiendo la opción
+<em>nofail</em>, para que no falle el montaje y pare el arranque en caso de que no se
+encuentre el pincho:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">/dev/mapper/cifrado /srv   ext4   defaults,nofail  0 0</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">Esta estrategia está tomada de <a class="reference external" href="https://possiblelossofprecision.net/?p=300">esta entrada de /dev/blog</a> y sólo es válida si se cifra
+una partición de datos y no la partición del sistema. Si se lleva a cabo el
+cifrado del sistema, es necesario recurrir a otra estrategia totalmente
+distinta basada en manipular la imagen <a class="reference external" href="https://wiki.gentoo.org/wiki/Initramfs/Guide/es">initramfs</a>.</p>
+</div>
+</div>
+<div class="section" id="cifrado-de-directorio-gocrypts">
+<h3>9.1.3.2.2. Cifrado de directorio (<strong class="command">gocrypts</strong>)<a class="headerlink" href="#cifrado-de-directorio-gocrypts" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Esta estrategia permite cifrar un directorio entero, de modo que todo sobre lo
+que trabajemos dentro de él se almacenará cifrado de forma transparente. Se basa
+en el uso de un <em>software</em> intermedio que, antes de almacenar datos en el
+sistema de ficheros o tras leerlos de él, cifra o descrifra la información.</p>
+<img alt="../../_images/gocryptfs.png" src="../../_images/gocryptfs.png" />
+<p>En consecuencia:</p>
+<ul class="simple">
+<li>Cifrados sobre el sistema de ficheros existen un directorio.</li>
+<li>El cifrado es también independiente del sistema de ficheros.</li>
+<li>Sólo nos permite cifrar datos, no el sistema completo.</li>
+</ul>
+<p>Todo el <em>software</em> con este segundo enfoque se utiliza básicamente del mismo
+modo, de modo que pueden identificarse las siguientes operaciones básicas:</p>
 <ul class="simple">
 <li>La creación del directorio cifrado, que exigirá el establecimiento de la clave
 simétrica de cifrado.</li>
@@ -277,8 +560,7 @@ hacer:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt install gocryptfs fuse
 </pre></div>
 </div>
-<div class="section" id="operativa-manual">
-<h3>9.1.3.2.1. Operativa manual<a class="headerlink" href="#operativa-manual" title="Enlazar permanentemente con este título">¶</a></h3>
+<p class="rubric">Operativa manual</p>
 <p>Es sumamente sencilla. Suponiendo que el directorio cifrado sea
 <code class="file docutils literal notranslate"><span class="pre">~/cipher</span></code>, podemos crearlo con:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> gocryptfs -init ~/cipher
@@ -302,9 +584,7 @@ directorio está montado):</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> gocryptfs -passwd ~/cipher
 </pre></div>
 </div>
-</div>
-<div class="section" id="operativa-automatizada">
-<h3>9.1.3.2.2. Operativa automatizada<a class="headerlink" href="#operativa-automatizada" title="Enlazar permanentemente con este título">¶</a></h3>
+<p class="rubric">Operativa automatizada</p>
 <p>Lo óptimo y cómodo, cuando se desea que los usuarios tengan la posibilidad de
 tener un directorio cifrado, es que las operaciones se hagan de modo
 automático, de manera que al acceder al sistema el usuario tenga montado el
@@ -349,6 +629,143 @@ el montaje automático continúe funcionado, también deberemos cambiar la clave
 de forma separada. Para ello podemos crear un <em>script</em> que haga de envoltorio a
 la orden que usemos para cambiar la contraseña. Por ejemplo, si es <a class="reference internal" href="../../02.conbas/05.seguridad/05a.usuarios.html#passwd"><span class="std std-ref">passwd</span></a>, una posible solución (no demasiado elegante, todo sea dicho) es
 <a class="reference download internal" download="" href="../../_downloads/aa97394dc6a55a39fa7a70d1824278a2/passwd"><code class="xref download docutils literal notranslate"><span class="pre">ésta</span></code></a>.</p>
+</div>
+<div class="section" id="cifrado-de-directorio-con-ext4">
+<h3>9.1.3.2.3. Cifrado de directorio (con <em>ext4</em>)<a class="headerlink" href="#cifrado-de-directorio-con-ext4" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Desde la versión <em>4.1</em> del <em>kernel</em> de Linux, <em>ext4</em> soporta el cifrado
+transparente, así que podemos utilizar ls capacidades del proprio sistema de
+ficheros para cifrar de forma transparente uno o alguno de sus directorios.</p>
+<p>En consecuencia:</p>
+<ul class="simple">
+<li>Es el propio sistema de ficheros el que se encarga del cifrado, lo que mejora
+el rendimiento respecto a la solución anterior.</li>
+<li>El sistema de ficheros debe ser forzosamente <em>ext4</em>. Otros sistemas de
+ficheros también pueden soportar cifrado, pero en ese caso, tendremos que
+estudiar cómo se cifra con ellos.</li>
+<li>Como el anterior, es un método apropiado para cifrar datos de usuario.</li>
+</ul>
+<p>Antes de empezar es necesario:</p>
+<ol class="arabic">
+<li><p class="first">Comprobar que el tamaño de página que usa el sistema y el tamaño de bloque
+del sistema de archivos son iguales<a class="footnote-reference" href="#id7" id="id4">[3]</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> getconf PAGE_SIZE
+<span class="go">4096</span>
+<span class="gp">#</span> tune2fs -l /dev/sda5 <span class="p">|</span> awk <span class="s1">&#39;$0 ~ /^Block size:/ {print $NF}&#39;</span>
+<span class="go">4096</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">Suponemos que el sistema de archivos en el que queremos cifrar algunos
+directorios es <code class="file docutils literal notranslate"><span class="pre">/home</span></code> y que éste se encuentra sobre la partición
+<code class="file docutils literal notranslate"><span class="pre">/dev/sda5</span></code></p>
+</div>
+</li>
+<li><p class="first">Habilitar el cifrado para el sistema de archivos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> tune2fs -l /dev/sda5 <span class="p">|</span> grep -q crypt <span class="o">&amp;&amp;</span> <span class="nb">echo</span> <span class="s2">&quot;Habilitado&quot;</span>
+<span class="gp">#</span> tune2fs -O encrypt /dev/sda5
+<span class="gp">#</span> tune2fs -l /dev/sda5 <span class="p">|</span> grep -q crypt <span class="o">&amp;&amp;</span> <span class="nb">echo</span> <span class="s2">&quot;Habilitado&quot;</span>
+<span class="go">Habilitado</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">Instalar el <em>software</em> adecuado:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt install fscrypt libpam-fscrypt
+</pre></div>
+</div>
+<p>En puridad sólo necesitamos el primer paquete, pero el segundo permite
+desbloquear de forma transparente los directorios cifrados al autenticarse el
+usuario en el sistema.</p>
+</li>
+</ol>
+<p class="rubric">Preparación</p>
+<p>Antes de cifrar cualquier directorio es necesario crear las estructuras
+necesarias:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> fscrypt setup
+<span class="gp">#</span> fscrypt setup /
+<span class="gp">#</span> fscrypt setuo /home
+</pre></div>
+</div>
+<p>La primera orden crea la configuración <code class="file docutils literal notranslate"><span class="pre">/etc/fscrypt.conf</span></code>, la segunda es
+necesaria si se quiere usar la contraseña del propio usuario como clave para el
+cifrado; y la tercera se requiere para poder usar otro tipo de claves para el
+cifrado.</p>
+<p class="rubric">Operativa</p>
+<p>Para cifrar un directorio basta con que el usuario haga:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> mkdir ~/privado
+<span class="gp">$</span> fscrypt encrypt ~/privado --source<span class="o">=</span>pam_passphrase
+</pre></div>
+</div>
+<p>que usará como clave su propia contraseña de usuario. Además, de preparar el
+directorio para que se almacenen los datos cifrados, lo <em>desbloquea</em>, lo que
+significa que podremos escribir y leer dentro de él de forma transparente,
+aunque lo datos se guarden cifrados:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> fscrypt status ~/privado
+<span class="go">&quot;/home/usuario/privado/&quot; is encrypted with fscrypt.</span>
+
+<span class="go">Policy:   822664193b8152b4</span>
+<span class="go">Unlocked: Yes</span>
+
+<span class="go">Protected with 1 protector:</span>
+<span class="go">PROTECTOR         LINKED   DESCRIPTION</span>
+<span class="go">1095888ae485002d  Yes (/)  login protector for usuario</span>
+</pre></div>
+</div>
+<p>La ventaja de usar la contraseña de usuario es doble:</p>
+<ul class="simple">
+<li>Al autenticarse en el sistema, todos los directorios cifrados con la
+contraseña de usuario, se desbloquearán automáticamente.</li>
+<li>Al modificar la contraseña de usuario, cambiará solidariamente la clave de
+cifrado de todos esos directorios.</li>
+</ul>
+<p>También puede usarse una clave distinta a la de usuario:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> mkdir ~/secreto
+<span class="gp">$</span> fscrypt encrypt ~/secreto --source<span class="o">=</span>custom_passphrase
+<span class="gp">$</span> fscrypt status ~/secreto
+<span class="go">&quot;/home/usuario/secreto/&quot; is encrypted with fscrypt.</span>
+
+<span class="go">Policy:   2aca13a317cf9195</span>
+<span class="go">Unlocked: Yes</span>
+
+<span class="go">Protected with 1 protector:</span>
+<span class="go">PROTECTOR         LINKED  DESCRIPTION</span>
+<span class="go">9572560fc543c9b5  No      custom protector &quot;1234&quot;</span>
+</pre></div>
+</div>
+<p>En este caso se ha usado una frase personalizada de nombre «1234». En futuros
+reinicios, el directorio estará bloqueadado y habrá que desbloquearlo
+explícitamente proporcionando la contraseña:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> fscrypt unlock ~/secreto
+</pre></div>
+</div>
+<p>Por otro lado, si se quiere cambiar la contraseña, habrá que ejecutar lo
+siguiente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> fscrypt metadata change-passphrase --protector<span class="o">=</span>/home:9572560fc543c9b5
+</pre></div>
+</div>
+<p class="rubric">Cifrado del propio directorio de usuario</p>
+<p>Un caso muy socorrido es cifrar el directorio personal del usuario con la clave
+del propio usuario. Esta tarea debe llevarla a cabo el administrador y es
+conveniente que se lleve a cabo en el proceso de de alta del usuario. En
+cualquier caso, puede obrarse del siguiente modo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkdir /home/usuario.new
+<span class="gp">#</span> chown usuario:usuario /home/usuario.new
+<span class="gp">#</span> fscrypt encrypt /home/usuario.new --user<span class="o">=</span>usuario
+<span class="gp">#</span> cp -aT /home/usuario /home/usuario.new
+<span class="gp">#</span> rm -rf /home/usuario
+<span class="gp">#</span> mv /home/usuario.new /home/usuario
+</pre></div>
+</div>
+<p>El tercer paso exige que el administrador proporcione la contraseña del usuario,
+o sea, que la conozca. Esto en realidad no es problema, porque después de la
+operación, el usuario podrá modificar la contraseña. El quinto paso, en puridad,
+requeriría el uso de una herramienta como <strong class="program">shred</strong> para eliminar todo
+rastro de los ficheros sin cifrar.</p>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">Lo lógico si se desea que los usuarios tengan cifrado su directorio
+es crear un <em>script</em> para que el alta incluya el cifrado de tal directorio.</p>
+</div>
 </div>
 </div>
 <div class="section" id="protocolos-seguros-de-red">
@@ -429,8 +846,8 @@ establecer una comunicación con el protocolo en claro o se escucha para
 establecer un canal seguro. Esa es la razón por la que los servidores web
 escuchan habitualmente en el puerto <strong>80</strong> (<abbr title="HyperText Transfer Protocol">HTTP</abbr>) y en el puerto <strong>443</strong>
 (<abbr title="HyperText Transfer Protocol">HTTP</abbr>s).</p>
-<table border="1" class="starttls docutils" id="id2">
-<caption><span class="caption-text"><strong>Puertos de escucha</strong></span><a class="headerlink" href="#id2" title="Enlace permanente a esta tabla">¶</a></caption>
+<table border="1" class="starttls docutils" id="id8">
+<caption><span class="caption-text"><strong>Puertos de escucha</strong></span><a class="headerlink" href="#id8" title="Enlace permanente a esta tabla">¶</a></caption>
 <colgroup>
 <col width="23%" />
 <col width="21%" />
@@ -625,6 +1042,34 @@ siguiente modo:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> openssl s_client -connect IP.DEL.SERVIDOR:12345 -quiet
 </pre></div>
 </div>
+<p class="rubric">Notas al pie</p>
+<table class="docutils footnote" frame="void" id="id5" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id2">[1]</a></td><td>También puede ser un volumen lógico de <abbr title="Logical Volume Management">LVM</abbr>.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id6" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id3">[2]</a></td><td>Si se observa con atención, la primera partición no empieza en 34.
+Sino más adelante. Es posible, puesto que la parte destinada a la definición
+de particiones puede ser mayor. Sin emabrgo, ese <abbr title="Universal Serial Bus">USB</abbr> procede de una imagen
+híbrida y es probable que empiece después, porque antes se ha situado el
+código de un gestor de arranque. En cualquier, como <abbr title="GUID Partition Table">GPT</abbr> obliga a que como
+mínimo se puedan definir 128 particiones, si escribimos en el sector 34,
+no nos cargaremos nada.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id7" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id4">[3]</a></td><td>Al crear el sistema de archivos, <span class="xref std std-ref">mkfs.ext4</span> escoge un
+tamaño de bloque. Normalmente el tamaño es <strong>4096</strong>, pero puede ser menor, si
+la pertición es my pequeña. En cualquier caso, puede forzarse el tamaño con
+la opción <kbd class="kbd docutils literal notranslate">-b</kbd>.</td></tr>
+</tbody>
+</table>
 </div>
 </div>
 </div>
@@ -640,8 +1085,9 @@ siguiente modo:</p>
 <li><a class="reference internal" href="#">9.1.3. Aplicaciones de la criptografía</a><ul>
 <li><a class="reference internal" href="#firma-digital">9.1.3.1. Firma digital</a></li>
 <li><a class="reference internal" href="#cifrado-de-discos">9.1.3.2. Cifrado de discos</a><ul>
-<li><a class="reference internal" href="#operativa-manual">9.1.3.2.1. Operativa manual</a></li>
-<li><a class="reference internal" href="#operativa-automatizada">9.1.3.2.2. Operativa automatizada</a></li>
+<li><a class="reference internal" href="#cifrado-de-bloques-luks">9.1.3.2.1. Cifrado de bloques (<abbr title="Linux Unified Key Setup">LUKS</abbr>)</a></li>
+<li><a class="reference internal" href="#cifrado-de-directorio-gocrypts">9.1.3.2.2. Cifrado de directorio (<strong class="command">gocrypts</strong>)</a></li>
+<li><a class="reference internal" href="#cifrado-de-directorio-con-ext4">9.1.3.2.3. Cifrado de directorio (con <em>ext4</em>)</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#protocolos-seguros-de-red">9.1.3.3. Protocolos seguros de red</a><ul>
