@@ -166,7 +166,7 @@ Generación de claves: |GnuPG|
 GnuPG_ es una aplicación que implementa el estándar `OpenPGP
 <https://www.openpgp.org/>`_ y que, en consecuencia, muy comúnmente se usa como
 *plugin* de clientes de correo para el cifrado o la firma de mensajes. Por
-ahora, sin embargo, usaremos el ejecutable que proporciona, :command:`pgp`, para
+ahora, sin embargo, usaremos el ejecutable que proporciona, :command:`gpg`, para
 probar la generación de claves.
 
 .. note:: En caso de que hagamos pruebas en una máquina virtual es conveniente
@@ -190,15 +190,15 @@ Basta con instalar el paquete::
 
 Como configuración podemos usar la siguiente::
 
-   # Fichero ~/.gnugpg/gpg.conf
-   keyserver keys.gnupg.net
+   # mkdir -m 700 ~/.gnupg
+   # cat > ~/.gnupg/gpg.conf
+   keyserver hkps://sks-keyservers.net:443
    no-greeting
    armor
 
    personal-digest-preferences SHA512
    cert-digest-algo SHA512
-   default-preference-list SHA512 SHA384 SHA256 SHA224 AES256 AES192 AES CAST5
-   ZLIB BZIP2 ZIP Uncompressed
+   default-preference-list SHA512 SHA384 SHA256 SHA224 AES256 AES192 AES CAST5 ZLIB BZIP2 ZIP Uncompressed
    personal-cipher-preferences AES256 TWOFISH CAMELLIA256 3DES
 
 Con la que seleccionamos cuáles son nuestros algoritmos de cifrado y *hash*
@@ -209,7 +209,7 @@ Si ejecutamos la orden::
 
    $ gpg --version
 
-Podremos consultar cuáles son los algoritmos de cifrado, *hash* y compresión que
+podremos consultar cuáles son los algoritmos de cifrado, *hash* y compresión que
 usa el programa.
 
 Cifrado simétrico
@@ -234,7 +234,7 @@ El fichero podría haberse enviado a otro fichero usando la opción ``--output``
 
    $ gpg -c -o /tmp/otrofichero.asc /tmp/saludo.txt
 
-.. note:: Si se usa como nombre de fichero "-", la salida será la estándar.
+.. note:: Si se usa como nombre de fichero :kbd:`-`, la salida será la estándar.
 
 .. note:: El formato del fichero cifrado, sigue el estándar marcado por
    *OpenPGP*, pero también podríamos haber generado un fichero cifrado que use
@@ -255,34 +255,30 @@ o bien::
    es muy discutible su seguridad, por lo que al menos deberíamos asegurarnos de
    que tal cosa no sucede.
 
-Para descifrar, podemos no usar la orden sin parámetros::
-
-   $ gpg /tmp/saludo.txt.asc
-
-que intentará descifrar con la contraseña que le proporcionemos interactivamente
-y dejar el resultado en el fichero :file:`/tmp/saludo.txt`. Si añadimos la
-opción ``-d``, el resultado se mandará a la pantalla::
+Para descifrar, podemos no usar la opción :kbd:`-d`::
 
    $ gpg -qd /tmp/saludo.txt.asc
    Hola, caracola!!!
 
 .. note:: La opción ``-q`` ejecuta la orden en modo silencioso.
 
-Si nuestra intención es consultar cuáles es el cifrado sin descifrar en
-absoluto, podemos hacer::
+Hay algo, sin embargo, extraño: ¿por qué no se nos pide la clave anteriormente
+suministrada durante la operación de cifrado para descifrar?  La razón es que
+:command:`gpg` levanta automáticamente un demonio que se encarga de recordar
+claves. Si por alguna razón se desea pararlo, puede hacerse::
 
-   $ gpg --list-only -d saludo.txt.asc
+   $ gpgconf --kill gpg-agent
 
-.. note:: :command:`gpg` levanta automáticamente un demonio que se encarga de
-   recordar claves. Si por alguna razón se desea para, puede hacerse::
+.. note:: Si nuestra intención es consultar cuáles es el cifrado sin descifrar
+   en absoluto, podemos hacer::
 
-      $ gpgconf --kill gpg-agent
+      $ gpg --list-only -d saludo.txt.asc
 
 Cifrado asimétrico
 ------------------
-Para la generación de una pareja de claves basta hacer\ [#]_::
+Para la generación de una pareja de claves basta hacer::
 
-   $ gpg --gen-key --default-cert-expire 1y --default-new-key-algo rsa3072
+   $ gpg --gen-key --default-new-key-algo rsa3072
 
 que nos pedirá el nombre de su propietario y la dirección de correo electrónico,
 ya que al estar este *software* orientado a la firma de mensajes de correo, esta
@@ -297,15 +293,34 @@ orden no sólo genera las claves, sino que las almacena en el anillo de
 claves (todo dentro de :file:`~/.gnupg`), con lo que podremos consultar su
 existencia listando cuáles son las claves públicas almacenadas::
 
-   $ gpg --list-keys
+   $ gpg --list-keys --keyid-format short
+   /home/usuario/.gnupg/pubring.kbx
+   --------------------------------
+   pub   rsa3072/B0B83042 2019-11-08 [SC] [caduca: 2021-11-07]
+         F08A6107385FE48775100943E3DCBB0AB0B83042
+   uid      [  absoluta ] Licenciado Cebadilla (cuenta de pruebas) <xxxx@gmail.com>
 
-y cuáles las privadas::
+.. note:: Obsérvese que la clave, tal como se ha generado, sólo sirve para
+   firmar y no para cifrar (no aparece :kbd:`E` dentro de los corchetes). Si
+   nuestra intención es usarla :ref:`también para firmar <gnupg-cif-asi>`
+   entonces deberemos añadir una subclave para cifrado::
+
+      $ gpg  --quick-add-key F08A6107385FE48775100943E3DCBB0AB0B83042
+   
+También podemos comprobar las claves privadas::
 
    $ gpg --list-secret-keys
 
 Por ahora sólo veremos una y una respectivamente. Lo habitual es que
 dispongamos de una única clave privada y muchas públicas, ya que podemos importar
 a nuestro repositorio claves públicas ajenas.
+
+En versiones modernas  de :command:`gpg` existe la opción :kbd:`--full-gen-key` que
+pregunta interactivamente otras opciones como el propio algoritmo o el tiempo de
+vigencia. En cualquier caso, si se quiere alterar algún parámetro, como el
+tiempo de vigencia, puede usarse la opción :kbd:`--edit-key`::
+
+   $ gpg --edit-key xxxx@gmail.com
 
 .. rubric:: Importación/exportación local de claves
 
@@ -346,47 +361,25 @@ orden que importará todas las claves contenidas en el fichero\ [#]_.
 
 Hasta ahora, hemos importado y exportado claves a o desde ficheros. Ahora bien,
 existen **servidores** |PGP| que almacenan claves públicas y que permiten
-importarlas lo que facilita el intercambio de claves. Para exportar una clave
-pública debe escogerse un servidor apropiado como keyservers_::
+importarlas lo que facilita el intercambio de claves. Dependiendo de cuál sea
+el servidor Puede accederse a través de distintos protocolos. El fichero de
+configuración de configuración define un servidor que soporta un protocolo
+seguro por el puerto **443** (lo que puede ayudarnos si estamos dentro de una
+red que restringe el acceso a internet)::
 
-   $ gpg --keyserver pool.sks-keyservers.net --send-keys 00188366
+   $ gpg --send-keys B0B83042
 
 .. warning:: En versiones modernas, para poder hacer esta exportación remota es
-   necesario instalar el paquete *dirmngr*::
-
-       # apt-get install dirmngr
-
-donde el **ID** proporcionado a ``--send-keys`` puede consultarse listado las
-claves:
-
-.. code-block:: console
-   :emphasize-lines: 2
-
-   $ gpg --list-keys  --keyid-format short xxxx@gmail.com
-   pub   2048R/00188366 2018-11-27 [expires: 2020-11-26]
-         4970D58E7E7C356DEC9EACD00B95734D00188366
-   uid                  Licenciado Cebadilla (Una clave para mi cuenta de pruebas) <xxxx@gmail.com>
-   sub   2048R/0FD7EE65 2018-11-27 [expires: 2020-11-26] 
-
-.. note:: La conexión al servidor se hace a través del `protocolo HKP
-   <https://tools.ietf.org/html/draft-shaw-openpgp-hkp-00>`_ por el puerto
-   **11371**. Para redes con tráfico restringido, es posible que no 
-   se pueda realizar la conexión normalmente. En estos redes, el servidor
-   anterior permite la conexión tunelizando con |SSL|::
-
-      gpg --keyserver https://keys.gnupg.net --send-keys 00188366
-
-   `keys.gnupg.net <https://keys.gnupg.net>`_ y `hkps.pool.sks-keyservers.net
-   <https://hkps.pool.sks-keyservers.net>`_ son el mismo servidor.
+   necesario que se encuentre instalado el paquete *dirmngr*.
 
 La importación de claves, por su parte, puede hacerse así::
 
-   $ gpg --keyserver pool.sks-keyservers.net --recv-keys 00188366
+   $ gpg --recv-keys 00188366
 
 si se conoce el **ID** y, si no es así. es posible buscar la clave usado alguna
 porción de la cadena de identificación (p.e. el correo electrónico)::
 
-   $ gpg --keyserver pool.sks-keyservers.net --search-keys xxxx@gmail.com
+   $ gpg --search-keys xxxx@gmail.com
 
 .. rubric:: Revocación
 
@@ -398,15 +391,12 @@ anillo de claves::
    
    [...]
 
-   $ gpg --list-keys xxxx@gmail.com
-   pub   2048R/00188366 2018-11-27 [expires: 2020-11-26]
-         4970D58E7E7C356DEC9EACD00B95734D00188366
-   uid        [revoked] Licenciado Cebadilla (Una clave para mi cuenta de pruebas) <xxxx@gmail.com>
-
 Para revocar también esta clave en el servidor público al que exportamos esta
 clave con anterioridad, basta con exportar la clave ahora revocada de nuevo::
 
-   $ gpg --keyserver pool.sks-keyservers.net --send-keys 00188366
+   $ gpg --send-keys B0B83042
+
+.. _gnupg-cif-asi:
 
 .. rubric:: Cifrado
 
@@ -502,9 +492,6 @@ Con posterioridad, podrá comprobarse la integridad del siguiente modo\ [#]_::
    hardware (/dev/hwrng), pero en la máquina virtual es posible que
    no esté. Para qemu véase
    `su wiki <https://wiki.qemu.org/Features/VirtIORNG>`_
-.. [#] En versiones modernas  de :command:`gpg` existe la opción
-   ``--full-gen-key`` que pregunta interactivamente el tiempo de vigencia y el
-   algoritmo.
 .. [#] El algoritmo elegido utiliza una clave |RSA| de 2048 *bits* tanto para
    cifrado como para firmado. Otro posible algoritmo es *ed25519*.
 .. [#] En nuestro caso, sería una clave pública y su correspondiente privada.
