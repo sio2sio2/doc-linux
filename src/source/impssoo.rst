@@ -11,7 +11,7 @@ Sistermas Informáticos en Red*.
    :maxdepth: 2
    :glob:
 
-   09.apendice/99.virtual/01.virtualbox/index
+   09.apendice/99.virtual/index
    02.conbas/[0-9]*/index 
-   05.discos/01.particionado/index
+   05.discos/01.division/index
    05.discos/06.grub/index

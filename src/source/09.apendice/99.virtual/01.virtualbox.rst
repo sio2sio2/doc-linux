@@ -1,0 +1,144 @@
+Virtualbox
+**********
+:program:`Virtualbox` es un *software* de virtualización de plataforma con
+hipervisor de tipo 2 y aceleración por *hardware*. Posee una versión liberada
+bajo licencia |GPL|, lo que posibilita que se encuentre disponible tanto en
+*Windows* como en los repositorios de cualquier distribución de *Linux*.
+Precisamente por esta disponibilidad, es la plataforma de virtualización que
+hemos elegido para el curso.
+
+Dispone de una interfaz gráfica bastante intuitiva, por lo que bajo este
+epígrafe sólo apuntaremos algunos aspectos que conviene tener claros al
+enfrentarnos a la interfaz.
+
+.. note:: El epígrafe no pretende ser una guía del uso de
+   :program:`Virtualbox`, sino una simple enumeración de aspectos que
+   pueden resultar confusos o insospechables.
+
+Tipo de máquina
+===============
+Al crear una nueva máquina virtual se puede escoger cuál es la plataforma
+(|CPU| + |SO|). La elección del sistema operativo es irrelevante y sólo
+sirve para que :program:`Virtualbox` escoja el icono con el que identificará
+la máquina. En cambio, la |CPU| tiene importancia ya que si escogemos una de
+32 *bits*, se emulará ésta y, en consecuencia, sólo podremos instalar
+software para la plataforma *x86*.
+
+Red
+===
+:program:`Virtualbox` permite definir hasta cuatro interfaces de red para
+una misma máquina virtual. Dependiendo de nuestras intenciones, nos
+convendrá configurar cada una de ellas de una manera distinta. Hay varias
+posibilidades:
+
+* **Desconectada**: La interfaz de red, existe, pero desconectada.
+* **Adaptador puente**: La interfaz de red se encuentra en la misma red
+  que la interfaz real a la que se asocia. Esto nos permite exponer la
+  máquina en la red como si de una máquina real se tratara.
+* **NAT**: La máquina virtual se sitúa en una red interna que accede
+  al exterior a través del propio software de :program:`Virtualbox`, que hace
+  de router |SNAT| y servidor |DHCP|. La red interna , por tanto,
+  es inaccesible desde el exterior o desde otra máquina virtual.
+* **Red NAT**: Parecida a la anterior, pero se permite indicar el nombre
+  de la red interna en la que se encuentra la máquina virtual, de modo
+  que, si al crear una segunda máquina virtual, se configura la red de
+  esta forma y se escoge el mismo nombre de red, ambas máquinas se
+  encontrarán dentro de la misma red y podrán comunicarse entre sí.
+* **Red interna**: Como la anterior, pero :program:`Virtualbox` no
+  hace ninguna labor de encaminamiento, por lo que la red está totalmente
+  aislada del exterior. Podemos comunicarla con el exterior, de todos
+  modos, creando una máquina con dos interfaces de red que haga la labor de
+  *router*: una de las interfaces se coloca en la red interna y la otra
+  en alguna de las modalidades que sí tiene acceso al exterior.
+* **Adaptador solo anfitrión**: Crea una red constituida exclusivamente
+  por el anfitrión y los huéspedes.
+
+* **Controlador genérico**.
+
+Discos
+======
+Lo habitual es que los discos del sistema huésped sean ficheros del sistema
+anfitrión. :program:`Virtualbox` soporta:
+
+* Su formato nativo denominado |VDI|.
+* |VMDK|, que es el formato abierto propio de :program:`VMware`.
+* |VHD|, que es el formato que creo *Microsoft* para su abandonado programa
+  de virtualización `Virtual PC
+  <https://es.wikipedia.org/wiki/Windows_Virtual_PC>`_.
+* *RAW*, que es, simplemente, un fichero que contiene *byte* a *byte* el
+  contenido del disco virtual.
+
+Lo lógico es usar el formato |VDI| por ser el nativo, aunque los cuatro
+enunciados son suficientemente portables a otros sistemas de virtualización.
+Eso sí, al ser el último un formato crudo, su tamaño será siempre igual al
+del disco que virtualiza. mientras que los otros tres son capaces de ocupar
+en disco sólo el espacio que efectivamente ocupan su contenido\ [#]_.
+
+.. note:: Cambiar el formato de un disco (p.e. para usarlo en otro *software*
+   de virtualización distinto) exige utilizar la utilidad
+   :program:`vboxmanage` de línea de comandos. Por ejemplo:
+
+   .. code-block:: console
+
+      $ vboxmanage clonemedium original.vdi destino.vmdk --format VMDK 
+
+   aunque si el original es el formato crudo debe usarse esta otra:
+
+   .. code-block:: console
+
+      $ vboxmanage convertfromraw original.img destino.vdi --format VDI
+
+Formato |VDI|
+=============
+Al utilizar el formato nativo para discos, tendremos acceso a algunas utilidades
+muy interesantes:
+
+* Las **instantáneas**, que permiten guardar el estado de una máquina en un
+  instante preciso, lo cual posibilita volver a él en el futuro.
+
+* Cambiar el **tipo** de disco, que en principio es "Normal". Uno muy
+  interesante es "Multiconexión", que permite utilizar un mismo disco como
+  plantilla para varias máquinas. Esto permite instalar un sistema operativo y
+  utilizar la instalación como base para trabajar con distintas máquinas.
+
+Tanto las instantáneas como los discos derivados de uno *multiconexión* generan
+ficheros |VDI| enlazados con el |VDI| del que proceden (la genealogía puede
+consultarse en la sección "Administrador de medios virtuales"). Cuando se
+quieren mezclar en un sólo fichero |VDI| varios niveles de ficheros enlazados
+basta con:
+
+.. code-block:: console
+
+   $ vboxmanage clonemedium uuid-larguisimo-del-ultimo-nivel.vdi compacto.vdi --format VDI
+
+Arranque
+========
+Por defecto, las máquinas virtuales llevan a cabo, un :ref:`arranque BIOS
+<arranque>`. Es posible también virtualizar un arranque |UEFI| marcando en la
+sección de configuración relativa a la placa base, la opción correspondiente.
+
+Exportación de máquinas
+=======================
+Para facilitar entre sistemas anfitriones la definición de máquinas virtuales
+completas (y no sólo de sus discos virtuales), existe el formato |OVA|. Lo forma
+más sencillas de copiar una máquina para trasladarla a otro ordenador y volver a
+seguir trabajando con ella es exportarla a un fichero |OVA| en el ordenador de
+origen e importarla en el destino desde el fichero.
+
+.. rubric:: Notas al pie
+
+.. [#] Esto no es exactamente cierto, ya que el fichero también necesitará
+   contener su metainformación y su tamaño reflejará espacio antiguamente
+   ocupado, aunque se haya liberado luego.
+
+
+.. |GPL| replace:: :abbr:`GPL (GNU General Public License)`
+.. |CPU| replace:: :abbr:`CPU (Central Processing Unit)`
+.. |SO| replace:: :abbr:`SO (Sistema operativo)`
+.. |SNAT| replace:: :abbr:`SNAT (Source NAT)`
+.. |DHCP| replace:: :abbr:`DHCP (Dynamic Host Configuration Protocol)`
+.. |VDI| replace:: :abbr:`VDI (Virtual Disk Image)`
+.. |VMDK| replace:: :abbr:`VMDK (Virtual Machine DisK)`
+.. |VHD| replace:: :abbr:`VHD (Virtual Hard DisK)`
+.. |OVA| replace:: :abbr:`OVA (Open Virtual Appliance)`
+.. |UEFI| replace:: :abbr:`UEFI (Unified Extensible Firmware Interface)`

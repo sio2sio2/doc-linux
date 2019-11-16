@@ -11,7 +11,7 @@ Informáticos en Red*.
    :maxdepth: 2
    :glob:
 
-   09.apendice/99.virtual/01.virtualbox/index
+   09.apendice/99.virtual/01.virtualbox
    04.servidor/10.ssh/index
    06.infraestructura/02.dhcp/index
    06.infraestructura/03.dns/index

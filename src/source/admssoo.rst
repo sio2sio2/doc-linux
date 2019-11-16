@@ -16,7 +16,7 @@ Sistemas Informáticos en Red*.
    :maxdepth: 2
    :glob:
 
-   09.apendice/99.virtual/01.virtualbox/index
+   09.apendice/99.virtual/index
    05.discos/10.instalacion/index
    03.scripts/index
    04.servidor/0[3-9]*/index

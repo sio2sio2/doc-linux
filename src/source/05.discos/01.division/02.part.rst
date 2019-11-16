@@ -1,0 +1,129 @@
+***********
+Particiones
+***********
+Hay dos sistemas principales de particionado:
+
+- El particionado |DOS| basado en el |MBR|.
+- El particionado |GPT| introducido por la especificación |UEFI|.
+
+Un firmware |UEFI| exige este segundo particionado, mientras que con |BIOS| es
+posible usar ambos.
+
+El epígrafe desarrolla una descripción de:
+
+* El particionado |DOS|.
+* El particionado |GPT|, si el arranque es |BIOS|.
+* El paricionado |GPT|, si el arranque es |UEFI|.
+
+|BIOS|
+******
+El |BIOS| se limita a cargar el código que encuentre en el |MBR|, por lo que en
+el caso de este arranque el punto de carga es único para cada disco. En
+principio, por tanto, sólo es posible arrancar un único sistema operativo del
+disco.
+
+Para salvar esta limitación es indispensable utilizar un :dfn:`cargador de
+arranque` como |LILO|, |NTLDR|. |GRUB| o :program:`Windows Boot Manager`, que es
+el programa cargado a través del *firware* de la placa base, que se encarga de
+dar acceso al arranque de los distintos sistemas operativos instalados.
+Adicionalmente puede servir para cargar un mismos sistema operativo con
+distintos parámetros de arranque (p.e. un modo normal y un modo de pruebas) o
+aplicaciones para labores muy específicas que no requieren sistema operativo
+como `memtest86+ <https://www.memtest.org/>`_ o `HDT (Hardware Detection Tool)
+<https://wiki.syslinux.org/wiki/index.php?title=Hdt_(Hardware_Detection_Tool)>`_.
+
+Como lo habitual es que el sistema disponga de varios dispositivos de
+almacenamiento (sean de estado sólido, magnéticos u ópticos), además de poderse
+definir la secuencia con la que se comprueba si el |MBR| de cada disco contiene
+un código de arranque, también es posible escoger durante cada arranque cuál es
+el dispositivo que se quiere arrancar en esa ocasión\ [#]_.
+
+El |MBR| es el primer sector del disco y contiene lo siguiente:
+
+.. image:: files/mbr.png
+
+- Los primeros 446 *bytes* contiene el código de arranque que carga el |BIOS|.
+- Los 64 *bytes* siguientes sirven para definir la tabla de particiones del disco.
+- los dos últimos *bytes* son una marca de arranque con contiene siempre 
+  ``55AA``.
+
+|DOS|
+=====
+En el particionado |DOS|, la tabla de particiones se define en los 64 *bytes*
+del |MBR|.
+
+Tabla de particiones
+--------------------
+La :dfn:`tabla de particiones` define cuáles son las particiones del disco y
+requiere 16 *bytes* para cada uno, lo cual implica que, en principio, sólo sea
+posible definir cuatro particiones. La información para cada partición es la
+siguiente:
+
+.. table::
+   :class: info-part-dos
+
+   =============== =================================================================
+   Tamaño (bytes)  Descripción
+   =============== =================================================================
+   1               Marca de arrancable (si es arrancable su valor es *0x80*).
+   3               Cilindro, Cabezal, Sector de comienzo.
+   1               Tipo de sistema de ficheros.
+   3               Cilintro, Cabezal, Sector de final.
+   4               Direccionamiento de bloque lógico\ [#]_ de su sector de arranque.
+   4               Longitud de la partición en sectores.
+   =============== =================================================================
+
+A estos datos se pueden hacer algunas aclaraciones y apostillas:
+
+* Sólo puede haber una partición marcada como arrancable. El resto deberán tener
+  todos ese *byte* a *0*.
+* Se pueden identificar 256 tipos de sistemas de ficheros distintos.
+* Como para el direccionamiento se usan 4 *bytes* (32 *bits*) y cada sector es
+  de 512 *bytes*, esto determina cuál es el **tamaño máximo** del disco si se usa
+  este particionado:
+
+  .. math::
+
+     2^{32}*512 \mathit{B} = 2*2^{40} \mathit{B} =2 \mathit{TB}
+
+* El tamaño máximo de una partición, por la misma razón, coincide con el tamaño
+  máximo de disco.
+
+.. note:: A la partición cuya información se recoge en la tabla de
+   particiones se la denomina :dfn:`partición primaria`.
+
+Arranque
+--------
+
+Partición extendida
+-------------------
+
+|GPT|
+=====
+
+|UEFI|
+******
+
+.. https://wiki.archlinux.org/index.php/Arch_boot_process_(Espa%C3%B1ol)
+   https://askubuntu.com/questions/500359/efi-boot-partition-and-biosgrub-partition/501360#501360
+   https://www.slivermetal.org/2016/09/18/how-to-create-an-hybrid-uefi-gpt-bios-gptmbr-boot-usb-disk/
+   https://wiki.archlinux.org/index.php/EFI_system_partition_(Espa%C3%B1ol)
+
+.. rubric:: Notas al pie
+
+.. [#] Bien es cierto que, esto último, sólo en |BIOS| más modernas. En
+   ordenadores muy, muy antiguos la única posibilidad de cambiar el dispositivo
+   de arranque es redefinir la secuencia.
+.. [#] EL direccionamiento de bloque lógico (|LBA| por sus siglas en ingles)
+   consiste simplemente en asignarle un índice consecutivo a cada sector del
+   disco, empezando por 0.
+
+.. |UEFI| replace:: :abbr:`UEFI (Unified Extensible Firmware Interface)`
+.. |DOS| replace:: :abbr:`DOS (Disk Operating System)`
+.. |GPT| replace:: :abbr:`GPT (GUID Partition Table)`
+.. |BIOS| replace:: :abbr:`BIOS (Basic I/O System)`
+.. |MBR| replace:: :abbr:`MBR (Master Boot Record)`
+.. |GRUB| replace:: :abbr:`GRUB (GRand Unified Bootloader)`
+.. |NTLDR| replace:: :abbr:`NTLDR (NT Loader)`
+.. |LILO| replace:: :abbr:`LILO (LInux LOader)`
+.. |LBA| replace:: :abbr:`LBA (Logical Block Addressing)`

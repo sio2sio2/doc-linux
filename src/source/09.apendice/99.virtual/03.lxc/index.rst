@@ -1,2 +1,0 @@
-LXC: Contenedores linux
-=======================
