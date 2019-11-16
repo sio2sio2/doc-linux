@@ -35,7 +35,7 @@ indispensable tener presentes algunos conceptos:
 Hay pues una analogía entre disco físico/partición y disco virtual/partición
 virtual, aunque dos son sus diferencias fundamentales:
 
-- El soporte para la versiones virtuales depende del sistema operativo que
+- El soporte para las versiones virtuales depende del sistema operativo que
   utilicemos. En consecuencia, un disco físico tiene existencia por sí mismo y
   sus divisiones son independientes y se definen de forma que son vistas por
   cualquier sistema operativo, mientras que para definir discos virtuales y
