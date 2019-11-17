@@ -9,6 +9,31 @@ Hay dos sistemas principales de particionado:
 Un firmware |UEFI| exige este segundo particionado, mientras que con |BIOS| es
 posible usar ambos.
 
+.. table:: Herramientas de particionado
+   :class: herr-part
+
+   +---------+------------+---------------+------------------------------+
+   | Suite   | Ejecutable | Soporte       | Interfaz                     |
+   |         |            +-------+-------+                              |
+   |         |            | |DOS| | |GPT| |                              |
+   +=========+============+=======+=======+==============================+
+   | fdisk   | fdisk      |  Sí   |  Sí   | Interactiva con menús        |
+   |         +------------+-------+-------+------------------------------+
+   |         | sfdisk     |  Sí   |  Sí   | Desasistida                  |
+   |         +------------+-------+-------+------------------------------+
+   |         | cfdisk     |  Sí   |  Sí   | Interactiva con ncurses      |
+   +---------+------------+-------+-------+------------------------------+
+   | |gdisk| | gdisk      |  Sí   |  Sí   | Interactiva con menús        |
+   |         +------------+-------+-------+------------------------------+
+   |         | sgdisk     |  Sí   |  Sí   | Desasistida                  |
+   |         +------------+-------+-------+------------------------------+
+   |         | cgdisk     |  Sí   |  Sí   | Interactiva con ncurses      |
+   +---------+------------+-------+-------+------------------------------+
+   | parted_ | parted     |  Sí   |  Sí   | Interactiva, desasistida.    |
+   |         +------------+-------+-------+------------------------------+
+   |         | gparted    |  Sí   |  Sí   | Gráfica.                     |
+   +---------+------------+-------+-------+------------------------------+
+
 El epígrafe desarrolla una descripción de:
 
 * El particionado |DOS|.
@@ -65,9 +90,9 @@ siguiente:
    =============== =================================================================
    Tamaño (bytes)  Descripción
    =============== =================================================================
-   1               Marca de arrancable (si es arrancable su valor es *0x80*).
+   1               Marca de activa (*0x80* es el valor para indicar que es activa).
    3               Cilindro, Cabezal, Sector de comienzo.
-   1               Tipo de sistema de ficheros.
+   1               Tipo de partición (informa de su contenido).
    3               Cilintro, Cabezal, Sector de final.
    4               Direccionamiento de bloque lógico\ [#]_ de su sector de arranque.
    4               Longitud de la partición en sectores.
@@ -75,9 +100,10 @@ siguiente:
 
 A estos datos se pueden hacer algunas aclaraciones y apostillas:
 
-* Sólo puede haber una partición marcada como arrancable. El resto deberán tener
-  todos ese *byte* a *0*.
-* Se pueden identificar 256 tipos de sistemas de ficheros distintos.
+* Sólo puede haber una partición marcada como *activa*. El resto deberán tener
+  todas ese *byte* a *0*.
+* Se pueden identificar `256 tipos de sistemas de ficheros
+  <https://en.wikipedia.org/wiki/Partition_type#List_of_partition_IDs>`_ distintos.
 * Como para el direccionamiento se usan 4 *bytes* (32 *bits*) y cada sector es
   de 512 *bytes*, esto determina cuál es el **tamaño máximo** del disco si se usa
   este particionado:
@@ -94,12 +120,394 @@ A estos datos se pueden hacer algunas aclaraciones y apostillas:
 
 Arranque
 --------
+El |BIOS| de la placa base ejecuta el código del |MBR| que, en principio,
+debería, simplemente, remitir al sector de arranque (|VBR|) de la partición
+marcada como activa. Ahí ya se encontrará el código específico para lograr
+arrancar el sistema operativo.
+
+En cambio, algunos gestores de arranque, como |LILO| o |GRUB|, incluyen en el
+|MBR| el código necesario para continuando cargar más código, ya qye los 446
+*bytes* son escasos, y no atienden a cuál sea la partición marcada como activa.
+
+|GRUB|, en particular, divide su ejecución en tres fases:
+
+- La primera que comprende la ejecución del código incluido en el |MBR|.
+- La segunda que comprende la ejecución del código almacenado en el espacio
+  libre que queda entre el |MBR| y el comienzo de la primera partición.
+- La tercera que comprende la ejecución del resto del código que se encuentra
+  dentro del directorio :file:`/boot/grub` del linux que haya instalado |GRUB|
+  en disco.
+
+Particiones primarias
+---------------------
+Si consideramos todo lo expuesto hasta ahora y que, por ejemplo, se hayan
+definido tres particiones en la tabla de particiones del |MBR|, esquemáticamente
+podríamos representar el estado de las particiones así:
+
+.. image:: files/particiones-pri-dos.png
+
+En principio, aún podría definirse una cuarta partición que debería ocupar todo el
+espacio libre, porque de no hacerlo, el que quedara fuera no sería aprovechable
+al no poderse definir más particiones.
+
+.. note:: Para nombrar las particiones se ha usado la nomenclatura de linux:
+   *sda* por fingir que nos encontramos ante el primer disco y un número
+   correlativo para cada partición.
+
+.. warning:: En sistemas antiguos, la primera partición empezaba al comienzo del
+   segundo cabezal\ [#]_, o sea, en el sector **63**, por lo que el espacio
+   entre ésta y el |MBR| era de 62 sectores. Ese espacio es insuficiente para
+   almacenar el código de la segunda fase de |GRUB|. Las herramientas modernas
+   suelen hacer que el tamaño de las particiones sea múltiplo de 2048 sectores,
+   esto es, 1MiB, por lo que la primera partición empieza en el sector **2048**.
+   `Este artículo <http://jdebp.eu./FGA/disc-partition-alignment.html>`_ que lo
+   lógico es que las particiones estén alineadas en múltiplos de 4KiB (1MiB
+   cumpliría esta regla).
 
 Partición extendida
 -------------------
+Dos son las limitaciones fundamentales del particionado |DOS|:
+
++ El tamaño máximo de *2TiB* para discos y de particiones que es insalvable,
+  aunque sólo ha empezado a cobrar importancia en fechas recientes.bytes.
++ La limitación de sólo poder crear cuatro particiones.
+
+Para paliar esta segunda limitación, *Microsoft* se inventó el concepto de
+partición extendida, como una partición primaria destinada no a contener un
+sistema de ficheros, sino más particiones: en teoría, un número ilimitado. Toda
+partición contenida dentro de una partición extendida se denomina
+:dfn:`partición lógica`. En cada disco sólo puede haber una partición primaria
+marcada como partición extendida.
+
+.. image:: files/particiones-ext-dos.png
+
+EN este caso, hay definidas tres particiones primarias (*sda1*, *sda2* y
+*sda3*), la última de las cuales está marcada como extendida. En consecuencia
+dentro de ella pueden definirse particiones lógicas (*sda5*, *sda6*, *sda7*). En
+el espacio sin asignar de la extendida se podrán aún definir una cantidad
+ilimitado de particiones lógicas; y en el espacio libre fuera de ella una única
+partición primaria más (la *sda4*).
+
+Aunque irrelevantes a efectos prácticos, la partición extendida se implementa
+del siguiente modo:
+
+- La partición primaria que hará de partición extendida se marca como de tipo
+  *0x05*.
+
+- El primer sector de la partición extendida (su |VBR|) se denomina |EBR| y
+  tiene la misma estructura que un |MBR|. En su tabla de particiones se incluyen
+  dos entradas:
+
+  + La primera entrada refiere la descripción de la partición lógica contigua
+    (la primera).
+  + La segunda entrada refiere el sector en el que empieza el segundo |EBR|, que
+    se situará a continuación de la primera partición lógica.
+  + Las dos restantes entradas no se usan.
+
+- El segundo |EBR| es como el primero, pero describiendo la segunda partición
+  lógica y el comienzo del tercer |EBR| y así sucesivamente. En caso de que no
+  existan más particiones lógicas la segunda entrada estará a 0.
+
+.. image:: files/part-ext-ebr.png
+
+En resumen:
+
+- Una tabla de particiones |DOS| es sólo capaz de registrar hasta cuatro
+  particiones primarias.
+- La definición de todas las particiones primarias se encuentra en el |MBR|.
+- Una de las particiones primarias puede marcarse como extendida, lo cual la
+  habilita para contener dentro de ella un número ilimitado de particiones
+  lógicas.
+- La definición de las particiones lógicas se encuentra distribuida a lo largo
+  de la pertición extendida que las contiene.
+
+Práctica
+--------
+Para llevar a cabo el particionado de disco con *Linux*, podemos usar distintas
+herramientas:
+
+* :command:`fdisk`, que es la herramienta tradicional interactiva para interfaz
+  de texto. Es bastante sencilla de utilizar.
+* :command:`sfdisk`. otra herramienta para línea de órdenes que permite su uso
+  desasistido y, en consecuencia, se presta a su inclusión en *scripts*.
+* parted_, que puede ser usada desde línea de órdenes, pero que habitualmente
+  se utiliza a través de su interfaz para |GTK| gparted_. No la trataremos en
+  esta guía.
+
+.. rubric:: Preliminares
+
+Es probable que, para hacer pruebas, no deseemos usar un disco real. En ese
+caso, lo más cómo es crear un fichero y trabajar sobre él. Por ejemplo::
+
+   $ truncate -s 20G disco.raw
+
+Esto creará un `fichero disperso
+<https://es.wikipedia.org/wiki/Archivo_disperso>`_ de 20G, que ocupa de forma
+efectiva sólo el espacio que ocupe su contenido (en principio, nada).
+
+Otro aspecto a tener presente son los permisos de los dispositivos.
+Habitualmente son estos::
+
+   $ ls -l /dev/sda
+   brw-rw---- 1 root disk 8, 0 nov 17 11:49 /dev/sda
+
+En consecuencia, sólo el administrador o un usuario que pertenezca al grupo
+*disk* será capaz de leer y escribir directamente sobre ellos.
+
+.. warning:: Para ilustrar el uso de las órdenes usaremos un usuario sin
+   privilegios y el fichero creado anterirmente y no un dispositivo de
+   almacenamiento. Tenga presente que lo habitual es usar :file:`/dev/sda`,
+   :file:`/dev/sdb`, etc. y que esta labor la lleve a cabo directamente el
+   administrador.
+
+.. rubric:: Consulta
+
+.. note:: Las herramientas son también válidas, aunque utilicemos particionado
+   |GPT|.
+
+Antes de manipular los dispositivos, es útil saber qué herramientas de consulta
+tenemos para conocer cómo se encuentra dividido el disco. Es preciso, además,
+hacer una aclaración: el sistema carga las particiones en memoria y procura
+actualizarlas cuando se produce un cambio. En ocasiones, esta actualización no
+se produce, bien porque el sistema es incapaz de hacerla, bien porque se ha
+llevado a cabo de una manera poco ortodoxa, como por ejemplo, copiando con
+:ref:`dd <dd>` el |MBR| de otro disco.
+
+La primera de ellas es, simplemente, consultar cuáles son las particiones
+registradas en el fichero :file:`/proc/particions`::
+
+   $ cat /proc/particions
+   major minor  #blocks  name
+
+      8        0  117220824 sda
+      8        1      32098 sda1
+      8        2   62109696 sda2
+      8        3          1 sda3
+      8        5   20971520 sda5
+      8        6    2097152 sda6
+      8        7   32006616 sda7
+      8       16  976762584 sdb
+      8       17  976759808 sdb1
+
+La consulta puede llevarla a cabo cualquier usuario y muestra las particiones
+físicas (no los volumenes lógicos) registrados por el sistema.
+
+.. _lsblk:
+.. index:: lsblk
+
+Una alternativa es :command:`lsblk` que muestra más información e incluye
+volúmnes lógicos y el punto de montaje, en caso de que su sistema de ficheros
+esté montado::
+
+   $ /sbin/lsblk /dev/sda
+   NAME              MAJ:MIN RM   SIZE RO TYPE MOUNTPOINT
+   sda                 8:0    0 111,8G  0 disk 
+   ├─sda1              8:1    0  31,4M  0 part /boot/grub
+   ├─sda2              8:2    0  59,2G  0 part 
+   ├─sda3              8:3    0     1K  0 part 
+   ├─sda5              8:5    0    20G  0 part /
+   ├─sda6              8:6    0     2G  0 part [SWAP]
+   └─sda7              8:7    0  30,5G  0 part /home
+
+.. _blkid:
+.. index:: blkid
+
+También puede usarse, aunque como administrador, :command:`blkid` que sirve para
+obtener más información de los sistemas de ficheros de cada división::
+
+   # blkid /dev/sda*
+   /dev/sda: PTUUID="b94dda9b" PTTYPE="dos"
+   /dev/sda1: LABEL="GRUB" UUID="0bdcc04e-e267-4aa4-b8ec-1bea18e83f87" TYPE="ext4" PARTUUID="b94dda9b-01"
+   /dev/sda2: UUID="B0007B1D007AEA2C" TYPE="ntfs" PARTUUID="b94dda9b-02"
+   /dev/sda3: PTTYPE="dos" PARTUUID="b94dda9b-03"
+   /dev/sda5: LABEL="BASE" UUID="38c84f19-da83-4132-9c0c-e8dbd0763d7c" TYPE="ext4" PARTUUID="b94dda9b-05"
+   /dev/sda6: UUID="4b34fe7e-f7fb-4fd5-8e64-49d0d7f9418a" TYPE="swap" PARTUUID="b94dda9b-06"
+   /dev/sda7: LABEL="HOME" UUID="2bee799a-740b-4106-90ad-d9a155d85afe" TYPE="ext4" PARTUUID="b94dda9b-07"
+
+Si no se especifican las divisiones, mostrará todos. La orden, además, permite
+filtrar por valores y manipular la salida. Por ejemplo, la orden::
+
+   # blkid -t TYPE=ext4 -s LABEL -o value /dev/sda*
+   GRUB
+   BASE
+   HOME
+
+muestra de los dispositivos formateados en *ext4*, el valor de su etiqueta.
+Consulte la página del manual para más información.
+
+.. _blockdev:
+.. index:: blockdev
+
+Complementaria de las anteriores es :command:`blockdev`::
+
+   # blockdev --report /dev/sda*
+   RO    RA   SSZ   BSZ   PrimerSec           Tam.   Dispo.
+   rw   256   512  4096          0    120034123776   /dev/sda
+   rw   256   512  1024         63        32868864   /dev/sda1
+   rw   256   512  4096      65536     63600328704   /dev/sda2
+   rw   256   512  1024  124286974            1024   /dev/sda3
+   rw   256   512  4096  124286976     21474836480   /dev/sda5
+   rw   256   512  4096  166232064      2147483648   /dev/sda6
+   rw   256   512  4096  170428416     32774774784   /dev/sda7
+
+que, como la anterior, permite definir la salida. Por ejemplo::
+
+   # blockdev --getsize64 /dev/sda
+   120034123776
+
+devuelve el tamaño del disco en *bytes*. También es útil para forzar al kernel
+a releer la tabla de particiones del dispositivo::
+
+   # blockdev --rereadpt /dev/sda
+
+La última posibilidad es usar las herramientas de manipulación de la tabla de
+particiones (:ref:`fdisk <fdisk>` o :ref:`gdisk <gdisk.i>`) para leerla:
+
+.. code-block:: console
+   :emphasize-lines: 7, 12
+
+   # fdisk -l /dev/sda
+   Disco /dev/sda: 111,81 GiB, 120034123776 bytes, 234441648 sectores
+   Modelo de disco: Intenso  SSD Sat
+   Unidades: sectores de 1 * 512 = 512 bytes
+   Tamaño de sector (lógico/físico): 512 bytes / 512 bytes
+   Tamaño de E/S (mínimo/óptimo): 512 bytes / 512 bytes
+   Tipo de etiqueta de disco: dos
+   Identificador del disco: 0xb94dda9b
+
+   Disposit.  Inicio  Comienzo     Final  Sectores Tamaño Id Tipo
+   /dev/sda1                63     64259     64197  31,4M 83 Linux
+   /dev/sda2  *          65536 124284927 124219392  59,2G  7 HPFS/NTFS/exFAT
+   /dev/sda3         124286974 234441647 110154674  52,5G  5 Extendida
+   /dev/sda5         124286976 166230015  41943040    20G 83 Linux
+   /dev/sda6         166232064 170426367   4194304     2G 82 Linux swap / Solaris
+   /dev/sda7         170428416 234441647  64013232  30,5G 83 Linux
+
+con la que podemos comprobar que :file:`sda` utliza particionado |DOS|.
+
+.. _fdisk:
+.. index:: fdisk
+
+.. rubric:: fdisk
+
+:command:`fdisk` es la orden tradicional para el particionado de discos. Es
+interactiva y exige que el usuario vaya escogiendo qué acción en la que quiere
+hacer. Pese a ello, se puede consultar directamente la tabla de particiones sin
+entrar en su entorno::
+
+   $ /sbin/fdisk -l disco.raw
+   Disco disco.raw: 20 GiB, 21474836480 bytes, 41943040 sectores
+   Unidades: sectores de 1 * 512 = 512 bytes
+   Tamaño de sector (lógico/físico): 512 bytes / 512 bytes
+   Tamaño de E/S (mínimo/óptimo): 512 bytes / 512 bytes
+
+Nuestro dicos (disco-fichero, en realidad) está completamente vacío, por lo que
+no dispone siquiera de una tabla de particiones.
+
+Para manipular las particiones (crearlas en este caso) basta con indicar el
+disco sobre el que se quiere actuar::
+
+   $ /sbin/fdisk disco.raw
+   [...]
+   Orden (m para obtener ayuda):
+
+El uso es bastante sencillo, ya que es totalmente guiado. Creemos una única
+partición que ocupe todo el disco:
+
+.. raw:: html
+
+   <script id="asciicast-89vbH0bhb6NmVsoh7ctooVxIO"
+   src="https://asciinema.org/a/89vbH0bhb6NmVsoh7ctooVxIO.js" async></script>
+
+.. _sfdisk:
+.. index:: sfdisk
+
+.. rubric:: sfdisk
+
+A diferencia de la orden anterior, :command:`sfdisk` se usa directamente
+incorporando argumentos en línea o pasando la tabla de particiones por la
+entrada estándar. Para consultar la tabla de particiones, se utiliza la misma
+sintaxis que :ref:`fdisk <fdisk>`::
+
+   $ /sbin/sfdisk -l disco.raw
+
+La forma más sencilla de crear una tabla de particiones es copiar una ya
+existente de otro disco::
+
+   # sfdisk -d /dev/sda | sfdisk /dev/sdb
+
+Es posible también crear una tabla *ex novo*. Para ello basta con saber que se
+puede incluir líneas iniciales que indican las características del particionado
+y líneas posteriores que definen cada partición. Las iniciales tienen el formato
+"campo: valor"; y las siguientes, cuatro campos separados por espacios o comas:
+
+.. code-block:: none
+
+   sector_inicial,tamaño_en_sectores,codigo_tipo_ficheros,[*|-]
+
+El valor predeterminado para el sector inicial es utilizar el primer sector
+disponible; el del tamaño, ocupar el máximo posible; el valor para el tipo, "L"
+(un alias para partición tipo linux); y el valor para activa, que no lo sea. Por
+ejemplo::
+
+   $ /sbin/sfdisk disco.raw <<EOF
+   label: dos
+   ,$((32*1024**2/512)),L,*
+   ,,E
+   ,$((2*1024**3/512)),7
+   ,$((1*1024**3/512)),82
+   ,,L
+   EOF
+
+Lo que hemos hecho es:
+
+* Generar una primera partición de 32MB de tipo *Linux* que es la activa. Como
+  la alinación es de 1MB y no se ha especificado el sector inicial, este será el
+  2048, que deja justamente 1MB antes.
+* A continuación se crea una partición extendida ("E" es un alias para el código
+  correspondiente) que ocupa el resto del disco.
+* Lo siguiente es una partición lógica de 2GB de tipo NTFS.
+
+  .. note:: Para saber cuáles son los códigos de los tipos de partición puede
+     hacerse::
+
+      $ /sbin/sfdisk -TXdos
+
+* Una partición de 1GB para swap.
+* Una partición que *Linux* que ocupa el resto de la extendida (o sea, el resto
+  del disco).
+
+La salida de la orden nos debería mostrar las particiones resultantes.
+
+Además, de crear tablas completas, podemos modificar la ya existente gracias a
+la opción :kbd:`-N`. Por ejemplo, la orden::
+
+   $ echo ",,L,-" | /sbin/sfdisk -N1 disco.raw
+
+deja todo como está, pero desctivando la partición. También es posible añadir
+más particiones usando como argumento de :kbd:`-N` índices de particiones que no
+existan.
+
+.. note:: Como las últimas versiones de las órdenes :command:`*fdisk` soportan
+   particionado |GPT|, :command:`sfdisk` puede usarse también para crear una
+   tabla de particiones de este tipo::
+
+      $ /sbin/sfdisk disco.raw <<EOF
+      label: gpt
+      ,$((50*1024**2/512)),U,
+      ,$((2*1024**3/512)),L,
+      ,$((1*1024**3/512)),0657FD6D-A4AB-43C4-84E5-0933C84B4F4F,
+      ,,EBD0A0A2-B9E5-4433-87C0-68B6B72699C7,
+      EOF
+   
+   Ciertamente los códigos en particiones |GPT| son bastante complicados. No
+   daremos más explicaciones porque aún no hemos discutido cómo son estas
+   particiones.
 
 |GPT|
 =====
+
+.. _gdisk.i:
 
 |UEFI|
 ******
@@ -117,6 +525,11 @@ Partición extendida
 .. [#] EL direccionamiento de bloque lógico (|LBA| por sus siglas en ingles)
    consiste simplemente en asignarle un índice consecutivo a cada sector del
    disco, empezando por 0.
+.. [#] El direccionamiento en los discos antiguos era |CHS| y cada cabezal
+   contenía 63 sectores, por lo que el primer sector del segunda cabezal es el
+   **63** (se empieza a numerar en **0**). Échele un ojo si tiene curiosidad
+   a `este artículo de la Wikipedia
+   <https://es.wikipedia.org/wiki/Unidad_de_disco_duro#Estructura_f%C3%ADsica>`_.
 
 .. |UEFI| replace:: :abbr:`UEFI (Unified Extensible Firmware Interface)`
 .. |DOS| replace:: :abbr:`DOS (Disk Operating System)`
@@ -127,3 +540,12 @@ Partición extendida
 .. |NTLDR| replace:: :abbr:`NTLDR (NT Loader)`
 .. |LILO| replace:: :abbr:`LILO (LInux LOader)`
 .. |LBA| replace:: :abbr:`LBA (Logical Block Addressing)`
+.. |VBR| replace:: :abbr:`VBR (Volume Boot Record)`
+.. |CHS| replace:: :abbr:`CHS (Cylinder-Head-Sector)`
+.. |EBR| replace:: :abbr:`EBR (Entended Boot Record)`
+.. |GTK| replace:: :abbr:`GTK (Gimp ToolKit)`
+.. |gdisk| replace:: :ref:`gdisk <gdisk.i>`
+
+.. _parted: https://www.gnu.org/software/parted/manual/parted.html
+.. _gparted: https://gparted.org/
+.. _gdisk: http://www.rodsbooks.com/gdisk
