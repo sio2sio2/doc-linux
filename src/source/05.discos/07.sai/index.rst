@@ -252,8 +252,8 @@ poca carga que consume unos 40W de potencia la autonomía en minutos es:
    t = \dfrac{7*(1*12)}{40}* 0,8 * 60 \approx 100
 
 .. note:: En este caso, sin embargo, para el cálculo de la autonomía, lo más
-   lógico es utilizar las potencias que normal consumen los dispositivos, no las
-   máximas.
+   lógico es utilizar las potencias que normalmente consumen los dispositivos,
+   no las máximas.
 
 .. https://ehomerecordingstudio.com/uninterruptible-power-supply/
 
@@ -284,6 +284,9 @@ del que el enlace proporciona alguna información y `un manual
 <https://www.salicru.com/files/documentacion/ek80800(1).pdf>`_ con información
 técnica bastante relevante, como que el modelo de 500 |VA| incorpora una única
 batería de 4,5 Ah\ [#]_.
+
+.. warning:: Si no dispone de |SAI| alguno, aún :ref:`puede probar la
+   configuración <sin-sai>`.
 
 Maestro
 -------
@@ -451,6 +454,15 @@ y podemos comprobar el estado del |SAI| con la orden::
    ups.type: offline / line interactive
    ups.vendorid: 0665
 
+.. note:: Como el |SAI| altera los valores de estas variables (p.e. si se piede
+   el suministro eléctrico el estado pasará a *OB*) es muy útil en estos casos
+   la orden :ref:`watch <watch>`::
+
+      # watch -dn1 "upsc salicru@localhost | grep -E '^(battery|ups)\.'"
+
+   que mostrará solamente las variables *battery.\** y *ups.\** y refrescará
+   automáticamente sus valores cada segundo.
+
 Hay muchísimas otras variables que pueden consultarse en `la documentación de
 Nut <https://networkupstools.org/docs/user-manual.chunked/apcs01.html>`_), pero
 de las que este |SAI| no informa. De entre las que devuelve son interesantes:
@@ -515,10 +527,46 @@ suponiendo que *192.168.0.2* sea la |IP| del *maestro*. Todo lo referente a la
 monitorización en el *maestro* (como el *script* de aviso o la orden
 :command:`upsc`), es aplicable al *esclavo*.
 
-Ajuste de parámetros
---------------------
+.. _sin-sai:
 
-.. todo:: Por hacer
+¿Qué narices hago sin |SAI|?
+----------------------------
+Si no se dispone de un |SAI|, puede probarse la configuración gracias al `driver
+dummy-ups <https://networkupstools.org/docs/man/dummy-ups.html>`_. Basta con
+descargar un fichero que contiene los parámetros del router que pretendemos
+comprar. Por ejemplo, en `esta página
+<https://networkupstools.org/ddl/Salicru/SPS_One_700VA.html>`_ hay un par de ellos y definir el |SAI| del siguiente modo:
+
+.. code-block:: ini
+
+   [dummy]
+   driver = dummy-ups
+   port = /usr/local/share/nut/SPS_One_700VA.dev
+   desc = "Salicru imaginario SPS One 700VA"
+
+donde :kbd:`port` indica la ruta donde hemos guardado el fichero. La restante
+configuración es idéntica a la hecha para cuando el |SAI| es real.
+
+El *driver* relee el fichero cada cierto tiempo con lo que tenemos dos opciones
+si queremos simular que nuestro |SAI| imaginario cambia su estado:
+
+- Una engorrosa que consiste en alterar directamente el fichero.
+- La recomendable que consiste en alargar el tiempo de relectura del fichero
+  (a 5 minutos, por ejemplo)::
+
+     # echo "TIMER 300" >> /usr/local/share/nut/SPS_One_700VA.dev
+
+  y usar el comando :command:`upsrw` para alterar sobre la marcha los valores::
+
+     # upsrw -s ups.load=15 -u admin dummy
+
+  que nos pedirá la contraseña del usuario *admin* que definimos anteriormente
+  con permisos para alterar variables. Durante cinco minutos podremos ir
+  haciendo cambios sin que el driver vuelva a recargar los valores originales
+  del fichero. Incluso podemos simular que el |SAI| está en las últimas para
+  que el ordenador tome la determináción de apagarse::
+
+     # upsrw -s ups.status="OB LB" -u admin dummy
 
 Enlaces de interés
 ==================
