@@ -38,12 +38,17 @@ El epígrafe desarrolla una descripción de:
 
 * El particionado |DOS|.
 * El particionado |GPT|, si el arranque es |BIOS|.
-* El paricionado |GPT|, si el arranque es |UEFI|.
+* El particionado |GPT|, si el arranque es |UEFI|.
 
-|BIOS|
-******
-El |BIOS| se limita a cargar el código que encuentre en el |MBR|, por lo que en
-el caso de este arranque el punto de carga es único para cada disco. En
+|DOS|
+*****
+Antes de pasar propiamente a describir el particionado |DOS| es conveniente
+entender cómo actúa el |BIOS| al comenzar el proceso de carga del disco duro.
+
+El |BIOS| y el |MBR|
+====================
+El |BIOS| se limita en cargar el código que encuentre en el |MBR|, por lo que
+en el caso de este arranque el punto de carga es único para cada disco. En
 principio, por tanto, sólo es posible arrancar un único sistema operativo del
 disco.
 
@@ -51,7 +56,7 @@ Para salvar esta limitación es indispensable utilizar un :dfn:`cargador de
 arranque` como |LILO|, |NTLDR|. |GRUB| o :program:`Windows Boot Manager`, que es
 el programa cargado a través del *firware* de la placa base, que se encarga de
 dar acceso al arranque de los distintos sistemas operativos instalados.
-Adicionalmente puede servir para cargar un mismos sistema operativo con
+Adicionalmente puede servir para cargar un mismo sistema operativo con
 distintos parámetros de arranque (p.e. un modo normal y un modo de pruebas) o
 aplicaciones para labores muy específicas que no requieren sistema operativo
 como `memtest86+ <https://www.memtest.org/>`_ o `HDT (Hardware Detection Tool)
@@ -72,13 +77,11 @@ El |MBR| es el primer sector del disco y contiene lo siguiente:
 - los dos últimos *bytes* son una marca de arranque con contiene siempre 
   ``55AA``.
 
-|DOS|
-=====
+Descripción
+===========
 En el particionado |DOS|, la tabla de particiones se define en los 64 *bytes*
 del |MBR|.
 
-Tabla de particiones
---------------------
 La :dfn:`tabla de particiones` define cuáles son las particiones del disco y
 requiere 16 *bytes* para cada uno, lo cual implica que, en principio, sólo sea
 posible definir cuatro particiones. La información para cada partición es la
@@ -93,7 +96,7 @@ siguiente:
    1               Marca de activa (*0x80* es el valor para indicar que es activa).
    3               Cilindro, Cabezal, Sector de comienzo.
    1               Tipo de partición (informa de su contenido).
-   3               Cilintro, Cabezal, Sector de final.
+   3               Cilindro, Cabezal, Sector de final.
    4               Direccionamiento de bloque lógico\ [#]_ de su sector de arranque.
    4               Longitud de la partición en sectores.
    =============== =================================================================
@@ -104,6 +107,9 @@ A estos datos se pueden hacer algunas aclaraciones y apostillas:
   todas ese *byte* a *0*.
 * Se pueden identificar `256 tipos de sistemas de ficheros
   <https://en.wikipedia.org/wiki/Partition_type#List_of_partition_IDs>`_ distintos.
+
+.. _tam-max-part-dos:
+
 * Como para el direccionamiento se usan 4 *bytes* (32 *bits*) y cada sector es
   de 512 *bytes*, esto determina cuál es el **tamaño máximo** del disco si se usa
   este particionado:
@@ -119,14 +125,14 @@ A estos datos se pueden hacer algunas aclaraciones y apostillas:
    particiones se la denomina :dfn:`partición primaria`.
 
 Arranque
---------
+========
 El |BIOS| de la placa base ejecuta el código del |MBR| que, en principio,
 debería, simplemente, remitir al sector de arranque (|VBR|) de la partición
 marcada como activa. Ahí ya se encontrará el código específico para lograr
 arrancar el sistema operativo.
 
 En cambio, algunos gestores de arranque, como |LILO| o |GRUB|, incluyen en el
-|MBR| el código necesario para continuando cargar más código, ya qye los 446
+|MBR| el código necesario para continuando cargar más código, ya que los 446
 *bytes* son escasos, y no atienden a cuál sea la partición marcada como activa.
 
 |GRUB|, en particular, divide su ejecución en tres fases:
@@ -138,6 +144,8 @@ En cambio, algunos gestores de arranque, como |LILO| o |GRUB|, incluyen en el
   dentro del directorio :file:`/boot/grub` del linux que haya instalado |GRUB|
   en disco.
 
+Tipos de particiones
+====================
 Particiones primarias
 ---------------------
 Si consideramos todo lo expuesto hasta ahora y que, por ejemplo, se hayan
@@ -150,8 +158,8 @@ En principio, aún podría definirse una cuarta partición que debería ocupar t
 espacio libre, porque de no hacerlo, el que quedara fuera no sería aprovechable
 al no poderse definir más particiones.
 
-.. note:: Para nombrar las particiones se ha usado la nomenclatura de linux:
-   *sda* por fingir que nos encontramos ante el primer disco y un número
+.. note:: Para nombrar las particiones se ha usado la nomenclatura de *Linux*
+   :file:`sda` por fingir que nos encontramos ante el primer disco y un número
    correlativo para cada partición.
 
 .. warning:: En sistemas antiguos, la primera partición empezaba al comienzo del
@@ -164,7 +172,7 @@ al no poderse definir más particiones.
    lógico es que las particiones estén alineadas en múltiplos de 4KiB (1MiB
    cumpliría esta regla).
 
-Partición extendida
+Particiones lógicas
 -------------------
 Dos son las limitaciones fundamentales del particionado |DOS|:
 
@@ -219,10 +227,26 @@ En resumen:
   habilita para contener dentro de ella un número ilimitado de particiones
   lógicas.
 - La definición de las particiones lógicas se encuentra distribuida a lo largo
-  de la pertición extendida que las contiene.
+  de la partición extendida que las contiene.
+
+Limitaciones
+============
+Concentremos juntas las limitaciones de este sistema de particionado:
+
+#. Los escasos 64 *bytes* para codificar toda la tabla de particiones, provocan
+   que en principio sólo se puedan definir 4 particiones.
+#. Para burlar la limitación anterior, se idea la argucia de la partición
+   extendida, pero no deja de ser una chapuza que provoca que la definición de la
+   tabla de particiones no esté concentrada en un solo punto, sino desperdigada a
+   lo largo de todo el disco.
+#. Sólo se usa un *byte* para codificar el tipo de partición, lo que ha
+   propiaciado que algunos códigos identifique a sistemas de ficheros distintos.
+   Por ejemplo, *0x07* identifica a |NTFS|, pero también al |HPFS| de OS/2.
+#. Por :ref:`lo ya expuesto <tam-max-part-dos>`, los discos no pueden ser
+   mayores a *2TiB*.
 
 Práctica
---------
+========
 Para llevar a cabo el particionado de disco con *Linux*, podemos usar distintas
 herramientas:
 
@@ -255,7 +279,7 @@ En consecuencia, sólo el administrador o un usuario que pertenezca al grupo
 *disk* será capaz de leer y escribir directamente sobre ellos.
 
 .. warning:: Para ilustrar el uso de las órdenes usaremos un usuario sin
-   privilegios y el fichero creado anterirmente y no un dispositivo de
+   privilegios y el fichero creado anteriormente y no un dispositivo de
    almacenamiento. Tenga presente que lo habitual es usar :file:`/dev/sda`,
    :file:`/dev/sdb`, etc. y que esta labor la lleve a cabo directamente el
    administrador.
@@ -290,13 +314,13 @@ registradas en el fichero :file:`/proc/particions`::
       8       17  976759808 sdb1
 
 La consulta puede llevarla a cabo cualquier usuario y muestra las particiones
-físicas (no los volumenes lógicos) registrados por el sistema.
+físicas (no los volúmenes lógicos) registrados por el sistema.
 
 .. _lsblk:
 .. index:: lsblk
 
 Una alternativa es :command:`lsblk` que muestra más información e incluye
-volúmnes lógicos y el punto de montaje, en caso de que su sistema de ficheros
+volúmenes lógicos y el punto de montaje, en caso de que su sistema de ficheros
 esté montado::
 
    $ /sbin/lsblk /dev/sda
@@ -401,7 +425,7 @@ entrar en su entorno::
    Tamaño de sector (lógico/físico): 512 bytes / 512 bytes
    Tamaño de E/S (mínimo/óptimo): 512 bytes / 512 bytes
 
-Nuestro dicos (disco-fichero, en realidad) está completamente vacío, por lo que
+Nuestro disco (disco-fichero, en realidad) está completamente vacío, por lo que
 no dispone siquiera de una tabla de particiones.
 
 Para manipular las particiones (crearlas en este caso) basta con indicar el
@@ -505,12 +529,152 @@ existan.
    particiones.
 
 |GPT|
-=====
+*****
+.. note:: En realidad, las particiones son particiones |GUID| y |GPT| es
+   acrónimo para referirse a la tabla de particiones: *GUID Partition Table*. En
+   el texto, se usa *incorrectamente* en ocasiones el término |GPT|.
+
+Las particiones |GUID| se idearon para el firmware |UEFI|, aunque dada su versatilidad es posible usarlas aun cuando la placa base utilice |BIOS|. Haremos
+primero una descripción de este sistema de particionado y veremos después como aplicarlo tanto a |BIOS| como a |UEFI|.
+
+Descripción
+===========
+El particionado |GPT| lo compone:
+
+* Un |MBR|, en principio, de mera protección, ya que no se utiliza en |UEFI|,
+  pero que se reserva por si un usuario maneja una herramienta de particionado
+  sin soporte para particiones |GUID|. La zona correspondiente al sector de
+  arranque no se usa, y la parte dedicada a la tabla de particiones |DOS| define
+  una única partición de tipo *0xEE* (esto es, |GPT|) que ocupa todo el disco.
+  Esta información no tiene ninguna utilidad, pero pone en sobreaviso al
+  usuario: si usa una herramienta que ignora |GPT|, tal herramienta no verá un
+  |MBR| con basura (código incomprensible) sino un tabla de particiones para él
+  válida.  Esto evita que nos sugiera crear un |MBR| válido e impide que el
+  usuario inconscientemente se cargue un particionado ya hecho.
+
+* El segundo sector compone la cabecera |GPT| en la que se inscribe un
+  identificador único para el disco, el número de particiones definidas y
+  algunos otros datos más.
+
+* Los siguientes sectores se dedican a guardar la información sobre cada partición
+  a razón de cuatro particiones por cada sector. En consecuencia, la definición
+  de cada partición ocupa 128 *bytes*. Como mínimo se establece que la tabla de
+  particiones ocupe 16KiB, lo que significa que pueden almacenarse al menos
+  :math:`16*2*4 = 128` particiones. No obstante, la tabla puede hacerse mayor,
+  en caso de que sean necesarias más particiones. En consecuencia, no hay límite
+  en el número de particiones y deja de tener sentido la distinción entre
+  particiones primarias y lógicas, ya que todas están definidas en la tabla de
+  particiones.
+
+  La definición de cada partición es la siguiente:
+
+  .. table::
+     :class: part-gpt
+
+     =============== ==================================
+     Tamaño (bytes)   Descripción
+     =============== ==================================
+     16              Tipo de partición |GUID|.
+     16              GUID único de partición.
+     8               |LBA| del primer sector.
+     8               |LBA| del último sector.
+     8               Indicadores.
+     72              Nombre de la partición (|UTF|-16).
+     =============== ==================================
+
+* La estructura se copia también al final del disco para que exista redundancia.
+
+* La primera partición empezará en aquel sector que determine la alineación.
+  Como las herramientas suelen establecerla en 1MiB, la primera partición
+  habitualmente empieza en el sector *2048*.
+
+.. image:: files/gpt.png
+
+|BIOS|
+======
+Para que este particionado funcione con |BIOS| es necesario que el |MBR|
+contenga el código de arranque, lo cual es posible gracias a que |UEFI| tiene la
+prevención de no usar ese primer sector. En consecuencia, un gestor de arranque
+como |GRUB| será capaz de gestionar un particionado |GPT| con un firmware
+|BIOS|. El *quid* del asunto está, básicamente, en la segunda fase del gestor:
+en particionado |DOS| se instala en el espacio entre el |MBR| y la primera
+partición; pero en este caso, aunque puede haber ese espacio según sea la
+alineación, se debe definir una partición |GUID| específica que recibe el nombre
+de "BIOS Boot Partition" cuyo identificador en las herramientas suele ser
+*0xEF02*.
+
+.. note:: Forzar la alineación en las particiones se hace para mejorar el
+   rendimiento en las operaciones de lectura y escritura. Como esta partición
+   sólo se lee al arrancar el ordenador y rara vez se escribe, es una buena
+   argucia, forzar la herramienta de particionado para que se salte la
+   alineación predefinida al crear esta partición y situarla entre el final
+   de la |GPT| y el comienzo de la primera (segunda) partición sí alineada
+   (sector 2048). Esta será la estrategia que sigamos en esta guía.
+
+En consecuencia, podemos definir una |GPT| así:
+
+.. image:: files/part-gpt-bios.png
+
+donde :file:`sda1` es una partición "BIOS Boot Partition" entre el final de la
+|GPT| y el comienzo de la segunda partición, a partir de la cuál sí alinearemos
+siguiendo el criterio predeterminado de la herramienta (1MiB).
+
+|UEFI|
+======
+Esta *firmware* no utiliza el |MBR|, sino que, como es capaz de entender el
+particionado y algunos sistemas de ficheros, busca los arranques en una
+partición de tipo |EFI| (código *0xEF00*) que ha debido de ser creada para ese
+fin y formateada como |FAT|.
+
+La especificación establece que en dicha partición debe existir un directorio
+llamado :file:`/EFI` dentro del cual cada sistema operativo instalado cree un
+directorio con ficheros necesarios para llevar a cabo su propio arranque:
+
+.. code-block:: none
+
+   /
+   +-- EFI/
+   |    +-- NvVars
+   |    +-- debian/
+   |    +-- Windows/
+   |    +-- etc.
+   |
+   +-- NvVars
+
+De este modo, los arranques de los distintos sistemas operativos pueden
+coexistir sin problemas. Hay, además, un fichero llamado :file:`NvVars` que
+indica el orden en que debe intentarse arrancar estos sistemas, con lo que
+definir cuál es el sistema de arranque predeterminado se reduce a hacer que sea
+el primero de la lista. Es probable que el entorno de configuración de la |UEFI|
+permita la edición gráfico de este fichero;  y, en cualquier caso, la *shell* de
+|UEFI| también lo permitirá a través del comando :command:`bcfg`. Además, la
+|UEFI| también dispondrá de un menú para escoger el arranque que incluirá como
+entradas no los dispositivos de almacenamiento, como hace |BIOS|, sino todos los
+arranques encontrandos en todas las particiones |EFI| de todos los
+dispositivos.
+
+Dadas las posibilidades que ofrece |UEFI|, podríamos prescindir del gestor de
+arranque\ [#]_ incluso aun cuando disposiéramos de varios sistemas operativos en
+un único dispositivo. Sin embargo, un gestor de arranque como |GRUB| puede
+seguir usando: basta con que se instale como unos de los posibles arranques y
+que sitúe como el primero de la lista de :file:`NvVars`.
+
+.. seealso:: La wiki de Archlinux tiene un muy completo `artículo sobre UEFI
+   <https://wiki.archlinux.org/index.php/Unified_Extensible_Firmware_Interface_(Espa%C3%B1ol)>`_.
+
+.. image:: files/part-gpt-uefi.png
 
 .. _gdisk.i:
 
-|UEFI|
-******
+Práctica
+========
+Para manejar |GPT| usaremos las herramientas de las suite :program:`gdisk`,
+aunque desde hace un tiempo las de la suite :program:`fdisk` también son
+compatibles.
+
+.. index:: gdisk
+
+.. rubric:: gdisk
 
 .. https://wiki.archlinux.org/index.php/Arch_boot_process_(Espa%C3%B1ol)
    https://askubuntu.com/questions/500359/efi-boot-partition-and-biosgrub-partition/501360#501360
@@ -530,8 +694,12 @@ existan.
    **63** (se empieza a numerar en **0**). Échele un ojo si tiene curiosidad
    a `este artículo de la Wikipedia
    <https://es.wikipedia.org/wiki/Unidad_de_disco_duro#Estructura_f%C3%ADsica>`_.
+.. [#] Para que un kernel de linux pueda arrancarse directamente es necesario
+   que se compilase con la opción `EFIstub
+   <https://wiki.archlinux.org/index.php/EFISTUB>`_.
 
 .. |UEFI| replace:: :abbr:`UEFI (Unified Extensible Firmware Interface)`
+.. |EFI| replace:: :abbr:`EFI (Extensible Firmware Interface)`
 .. |DOS| replace:: :abbr:`DOS (Disk Operating System)`
 .. |GPT| replace:: :abbr:`GPT (GUID Partition Table)`
 .. |BIOS| replace:: :abbr:`BIOS (Basic I/O System)`
@@ -545,6 +713,11 @@ existan.
 .. |EBR| replace:: :abbr:`EBR (Entended Boot Record)`
 .. |GTK| replace:: :abbr:`GTK (Gimp ToolKit)`
 .. |gdisk| replace:: :ref:`gdisk <gdisk.i>`
+.. |GUID| replace:: :abbr:`GUID (Globally Unique Identifier)`
+.. |HPFS| replace:: :abbr:`HPFS (High Performance File System)`
+.. |NTFS| replace:: :abbr:`NTFS (NT File System)`
+.. |UTF| replace:: :abbr:`UTF (Unicode Transformation Format)`
+.. |FAT| replace:: :abbr:`FAT (File Allocation Table)`
 
 .. _parted: https://www.gnu.org/software/parted/manual/parted.html
 .. _gparted: https://gparted.org/

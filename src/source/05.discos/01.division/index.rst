@@ -17,7 +17,7 @@ indispensable tener presentes algunos conceptos:
    operativos entienden las divisiones y las tratan como si trataran discos
    independientes.
 
-   El particionado está intimamente ligado con el proceso de arranque, por lo
+   El particionado está íntimamente ligado con el proceso de arranque, por lo
    que también lo trataremos bajo este epígrafe.
 
 **Disco virtual** (terminología propia)
