@@ -92,7 +92,7 @@ hay dos métodos:
       # setquota -u nombre_usuario  1024  1024   0  0  /home
 
    Los dos primeros números están expresados en bloques de **1K** y significan
-   el límite de ocupación, mientras que los dos segundosn expresan el número
+   el límite de ocupación, mientras que los dos segundos expresan el número
    áximo de ficheros que se le permite crear al usuario "nombre_usuario" en el
    sistema de fichero :file:`/home`. El hecho de que existan dos límites se debe
    a que el primero es un límite blando, que puede sobrepasarse durante un

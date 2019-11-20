@@ -4,8 +4,8 @@
 *****
 Un |SAI| (o |UPS|, si utilizamos las siglas en inglés) es un dispositivo que
 permite proteger a los equipos conectados a través de él de
-irregularidades en el sumnistro eléctrico, como es el caso de los apagones
-gracias a las baterias que incorpora, En consecuencia, el
+irregularidades en el suministro eléctrico, como es el caso de los apagones
+gracias a las baterías que incorpora, En consecuencia, el
 servidor no llega a apagarse y puede continuar dando servicio durante el corte
 y tras éste, si el corte no supera el tiempo de la batería. Obviamente, las
 baterías serán capaces de alimentar sólo durante un tiempo limitado a los
@@ -40,7 +40,7 @@ en el suministro, de los cuales pueden distinguirse nueve distintos:
    | Anomalía             | Descripción                 | Efecto                   | Causas frecuente          |
    +===+==================+=============================+==========================+===========================+
    | 1 | Corte (o apagón) | Interrupción total del      | - Pérdida de info en RAM | - Fallo en el suministro. |
-   |   |                  | suministro.                 | - Corripción de datos,   | - Fallo en la red interna.|
+   |   |                  | suministro.                 | - Corrupción de datos,   | - Fallo en la red interna.|
    +---+------------------+-----------------------------+--------------------------+---------------------------+
    | 2 | Microcorte       | Bajada momentánea de tensión| - Daño en componentes    | - Encendido de un aparato |
    |   |                  | durante un breve tiempo     |   físicos sensibles.     |   de alto consumo (p.e.   |
@@ -53,7 +53,7 @@ en el suministro, de los cuales pueden distinguirse nueve distintos:
    |   |                  | 110% de la tensión nominal. |                          |                           |
    +---+------------------+-----------------------------+--------------------------+---------------------------+
    | 4 | Bajada de tensión| Bajada sostenida de la      | - Funcionamiento         | - Cercanía o lejanía a la |
-   |   |                  | tensión a partir del munuto.|   incorrecto.            |   subestación eléctrica   |
+   |   |                  | tensión a partir del minuto.|   incorrecto.            |   subestación eléctrica   |
    +---+------------------+-----------------------------+--------------------------+   (sobre todo en zonas    |
    | 5 | Subida de tensión| Subida sostenida de la      | - Daño en componentes    |   rurales).               |
    |   |                  | tensión a partir del munuto.|   físicos.               |                           |
@@ -93,7 +93,7 @@ Hay tres tipos de |SAI|:
    + Sólo es capaz de proteger de los tres primeros tipos de anomalía.
    + Cuando falla el suministro de red, existe un tiempo mínimo de conmutación
      para que sean las baterías las que se hagan cargo de suministrar la
-     energía, por lo que en la práctica no proprocionan un suministro
+     energía, por lo que en la práctica no proporcionan un suministro
      ininterrumpido. Es decir, en estos |SAI|\ s, un fallo de tipo 1, se traduce
      en fallo de tipo 7. Lo conveniente es que este tiempo sea menor a los 5 ms,
      tiempo que son capaces de tolerar los ordenadores habituales.
@@ -237,7 +237,7 @@ baterías:
   podemos estimar del 80%.
 
 El |SAI| puede tener varias baterías dispuestas en serie. La fórmula
-general para obteher (en minutos) la autonomía del |SAI| es:
+general para obtener (en minutos) la autonomía del |SAI| es:
 
 .. math::
 
@@ -264,7 +264,7 @@ alguna, ahora bien, si queremos que los equipos atiendan sus alarmas y obren en
 consecuencia, sí es preciso configurar el servidor. Es común que para este
 propósito el propio |SAI| proporcione *software*, incluso con versión para
 Linux, pero lo conveniente es procurarse uno para el que tenga soporte Nut_,
-que tiene paquete en las principàles distribuciones.
+que tiene paquete en las principales distribuciones.
 
 Por lo general, los |SAI|\ s disponen de un conexión serie o |USB| a través de
 la cual pueden conectarse a un equipo que recibe los avisos en sus cambios de
