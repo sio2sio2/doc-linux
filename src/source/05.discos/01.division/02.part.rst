@@ -692,10 +692,141 @@ utilizando argumentos en la línea de órdenes, por lo que su filosofia es la
 misma que la de :ref:`sfdisk <sfdisk>`. Pese a ello, tiene una sintaxis
 totalmente distinta.
 
-.. https://wiki.archlinux.org/index.php/Arch_boot_process_(Espa%C3%B1ol)
-   https://askubuntu.com/questions/500359/efi-boot-partition-and-biosgrub-partition/501360#501360
+Para ilustrar su uso, recrearemos dos veces la tabla de particiones que hicimos
+con :ref:`sfdisk <sfdisk>`, aunque con algunas variantes:
+
+- Una primera vez, prepararemos el disco para que sea arrancable mediante
+  |BIOS|. Para ello añadiremos una primera partición de tipo "BIOS Boot
+  Particion" para que pueda instalarse |GRUB|.  Por supuesto, no tiene sentido
+  la marca de activa, ni la partición extendida.
+
+- La segunda vez, prepararemos el disco para |UEFI| con lo que también tendremos
+  que añadir una primera partición, pero |EFI| en este caso.
+
+.. todo:: Cuadtro resumen.
+
+Empecemos, simplemente, por consultar la tabla de particiones\ [#]_::
+
+   $ /sbin/sgdisk -p /tmp/disco.raw
+   Creating new GPT entries in memory.
+   Disk /tmp/disco.raw: 41943040 sectors, 20.0 GiB
+   Sector size (logical): 512 bytes
+   Disk identifier (GUID): 97F6B136-94D6-4393-9348-47F3F5DB70F6
+   Partition table holds up to 128 entries
+   Main partition table begins at sector 2 and ends at sector 33
+   First usable sector is 34, last usable sector is 41943006
+   Partitions will be aligned on 2048-sector boundaries
+   Total free space is 41942973 sectors (20.0 GiB)
+
+   Number  Start (sector)    End (sector)  Size       Code  Name
+
+El disco no tiene aún ninguna tabla, por lo que aparece vacía. Es interesante de
+la información lo siguiente:
+
+- :command:`sgdisk` de crear una tabla la crearía del modo estándar que
+  describimos anteriormente por lo que será capaz de describir 128 particiones.
+- Teóricamente el primer sector para incluirlo dentro de una partición es el 34,
+  ya que eso deja 17KiB por delante que es lo necesario para almacenar el |MBR|
+  (512 *bytes*), la cabecera |GPT| (otros 512 *bytes*) y la propia |GPT|
+  (16KiB)::
+
+   $ /sbin/sgdisk -f /tmp/disco.raw
+   Creating new GPT entries in memory.
+   34
+
+
+- La alineación si no se cambia, será de 1MiB (2048 sectores)::
+
+   $ /sbin/sgdisk -D /tmp/disco.raw
+   Creating new GPT entries in memory.
+   2048
+ 
+  lo que determina que en realidad la primera partición empiece en el sector
+  2048::
+
+   $ /sbin/sgdisk -F /tmp/disco.raw
+   Creating new GPT entries in memory.
+   2048
+
+La tabla de particiones GPT compatible con |BIOS| podemos definirla así::
+
+   $ /sbin/sgdisk -a 8 -n "0:40:2047" -t "0:0xef02" \
+                  -a 2048 -n "0:+0:+32M" -c "0:UNO" \
+                          -n "0:+0:+2G" -t "0:0x0700" -c "0:DOS" \
+                          -n "0:+0:+1G" -c "0:TRES" /tmp/disco.raw
+
+en donde:
+
+* Creamos la primera partición en el espacio entre el final de la |GPT| y
+  la segunda partición que realmente necesitamos y que sí estará
+  convenientemente alineada. Sólo se leerá esta primera partición al arrancar el
+  disco y se escribirá al reinstalar |GRUB| con lo cual no es muy importante su
+  alineamiento. Aún así la hacemos cumpliendo la alineación de 4KiB. Para
+  cambiar la alineación usamos la opción :kbd:`-a`.
+
+* Se definen las particiones añadiendo sendas opciones :kbd:`-n` para indicar el
+  comienzo y fin de la partición, :kbd:`-c` para indicar un nombre de etiqueta
+  y, si la partición no es *Linux* (*0x8300*), :kbd:`-t`.
+
+* Las opciones anteriores necesitan que se especifique el número de la
+  partición, pero "0" representa el primer número disponible.
+
+* Los números para comienzos y finales sin indicar unidad son sectores; y es
+  lícito anteponerles un signo "+" para representar número relativos al
+  anterior.
+
+* Las definiciones no sobreescriben una tabla anterior, de modo que si
+  hiciéramos::
+
+   $ /sbin/sgdisk -N 0 -c "O:RESTO"
+
+  añadiríamos a continuación una quinta partición que ocuparía lo que quede de
+  disco, ya que :kbd:`-N` tiene ese efecto.
+
+Por su parte, la tabla de particiones |GPT| compatible con |UEFI| podemos
+hacerla así::
+
+   $ /sbin/sgdisk -n "0:2048:+50M" -t "0:0xef00" \
+                  -n "0:+0:+32M" -c "0:UNO" \
+                  -n "0:+0:+2G" -t "0:0x0700" -c "0:DOS" \
+                  -n "0:+0:+1G" -c "0:TRES" /tmp/disco.raw
+
+En este caso, la partición |EFI| debe ser lo suficientemente grande para
+albergar los arranques de los sistemas operativos que pretendeamos instalar. En
+principio, con 50M o 100M debería bastar. Dado el tamaño de esta partición, no
+nos molestamos siquiera en aprovechar el espacio anterior al sector 2048.
+
+Otras acciones recurrentes con :command:`sgdisk` son:
+
+#. Copiar la |GPT| al final del disco, que puede sernos útil cuando hacemos una
+   copia cruda de un disco más pequeño en uno mayor::
+
+      $ /sbin/sgdisk -e /tmp/disco.raw
+
+#. Copiar la tabla de particiones en un nuevo disco::
+
+      $ /sbin/sgdisk -R /tmp/nuevo.raw /tmp/disco.raw
+      $ /sbin/sgdisk -G /tmp/nuevo.raw
+
+   La segunda instrucción es necesaria para que cambien los UIDs de las
+   particiones en el segundo disco, ya que la copia que se hace de la |GPT| es
+   exacta.
+
+#. Copiar la |GPT| en un fichero llamado :file:`GPT`::
+
+      $ /sbin/sgdisk -b GPT /tmp/disco.raw
+
+   Y si se quiere restaurar en disco::
+
+      $ /sbin/sgdisk -l GPT /tmp/disco.raw
+
+Arranque híbrido
+================
+
+.. todo:: Por escribir
+
+.. https://askubuntu.com/questions/500359/efi-boot-partition-and-biosgrub-partition/501360#501360
    https://www.slivermetal.org/2016/09/18/how-to-create-an-hybrid-uefi-gpt-bios-gptmbr-boot-usb-disk/
-   https://wiki.archlinux.org/index.php/EFI_system_partition_(Espa%C3%B1ol)
 
 .. rubric:: Notas al pie
 
@@ -713,6 +844,8 @@ totalmente distinta.
 .. [#] Para que un kernel de linux pueda arrancarse directamente es necesario
    que se compilase con la opción `EFIstub
    <https://wiki.archlinux.org/index.php/EFISTUB>`_.
+.. [#] Utilizaremos el fichero de 20G que propusimos crear anteriormente para
+   estas pruebas.
 
 .. |UEFI| replace:: :abbr:`UEFI (Unified Extensible Firmware Interface)`
 .. |EFI| replace:: :abbr:`EFI (Extensible Firmware Interface)`
