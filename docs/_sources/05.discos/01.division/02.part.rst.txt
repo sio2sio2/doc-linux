@@ -623,12 +623,20 @@ donde :file:`sda1` es una partición "BIOS Boot Partition" entre el final de la
 |GPT| y el comienzo de la segunda partición, a partir de la cuál sí alinearemos
 siguiendo el criterio predeterminado de la herramienta (1MiB).
 
+.. seealso:: Si somo previsiones, es probable que queramos dejar preparado el
+   sistema para la conversión al arranque |UEFI|.sea lo menos traumática
+   posible.  Consulte, en la parte dedicada al :ref:`arranque híbrido
+   <hybrid-boot>`.
+
+.. _part-gpt-uefi:
+
 |UEFI|
 ======
 Esta *firmware* no utiliza el |MBR|, sino que, como es capaz de entender el
 particionado y algunos sistemas de ficheros, busca los arranques en una
 partición de tipo |EFI| (código *0xEF00*) que ha debido de ser creada para ese
-fin y formateada como |FAT|.
+fin y formateada como |FAT|. Para referirse a esta partición |EFI| suele
+utilizarse el acrónimo inglés |ESP|.
 
 La especificación establece que en dicha partición debe existir un directorio
 llamado :file:`/EFI` dentro del cual cada sistema operativo instalado cree un
@@ -648,30 +656,58 @@ directorio con ficheros necesarios para llevar a cabo su propio arranque:
 De este modo, los arranques de los distintos sistemas operativos pueden
 coexistir sin problemas. Hay, además, un fichero llamado :file:`NvVars` que
 indica el orden en que debe intentarse arrancar estos sistemas, con lo que
-definir cuál es el sistema de arranque predeterminado se reduce a hacer que sea
-el primero de la lista. Es probable que el entorno de configuración de la |UEFI|
-permita la edición gráfico de este fichero;  y, en cualquier caso, la *shell* de
-|UEFI| también lo permitirá a través del comando :command:`bcfg`. Además, la
-|UEFI| también dispondrá de un menú para escoger el arranque que incluirá como
-entradas no los dispositivos de almacenamiento, como hace |BIOS|, sino todos los
-arranques encontrados en todas las particiones |EFI| de todos los
-dispositivos.
+definir cuál es el sistema de arranque predeterminado se reduce a definir cuál
+es el orden de cada elemento de la lista. Para ello hay varias posibilidades:
+
+- Quizás el entorno de configuración de la |UEFI| permita la edición gráfico de
+  este fichero.
+- La *shell* de |UEFI| lo permite a través del comando :command:`bcfg`.
+- Desde el propio sistema operativo suele haber herramientas para manipular el
+  archivo. En linux, este comando es :command:`efibootmgr`
+
+Además, la |UEFI| también dispondrá de un menú para escoger en cada arranque
+cuál es la entrada a probar primero. A diferencia del menú |BIOS| este arranque
+no se limita a ofrecer dispositivos, sino que ofrecerá directamente los
+arranques encontrados en la |ESP|, que pueden gestores de arranque o
+directamente sistemas operativos.
 
 Dadas las posibilidades que ofrece |UEFI|, podríamos prescindir del gestor de
 arranque\ [#]_ incluso aun cuando dispusiéramos de varios sistemas operativos en
 un único dispositivo. Sin embargo, un gestor de arranque como |GRUB| puede
-seguir usando: basta con que se instale como unos de los posibles arranques y
-que sitúe como el primero de la lista de :file:`NvVars`.
+seguirse usando: basta con que se instale como unos de los posibles arranques y
+que sitúe como el primero en el orden de arranque.
 
 .. seealso:: La wiki de Archlinux tiene un muy completo `artículo sobre UEFI
    <https://wiki.archlinux.org/index.php/Unified_Extensible_Firmware_Interface_(Espa%C3%B1ol)>`_.
 
 .. image:: files/part-gpt-uefi.png
 
+.. _hybrid-boot:
+
+Arranque híbrido
+================
+No resulta excesivamente útil hacer que nuestro sistema de servidor sea capaz de
+arrancar tanto en modo |UEFI| como en modo |BIOS|, pero sí que un sistema
+originalmente pensado para arrancar en |BIOS| acabe arrancado en |UEFI|, por
+ejemplo, por un cambio en el *hardware*. En este caso, un particionado previsor
+es, simplemente, aquel que dispone las dos particiones de arranque: la "Bios Boot
+Partition" (*0xef02*) y la EFI (*0xef00*). Como entre esta última y la anterior
+existe espacio sin particionar de casi 1MiB de tamaño, podemos aprovecharlo para
+incluirla ahí:
+
+.. image:: files/part-hibrida.png
+
 .. _gdisk.i:
 
 Práctica
 ========
+.. warning:: Las particiones "*UNO*", "*DOS*", "*TRES*" que aparecen en los
+   ejemplos son absolutamente inútiles en un sistema real y sirven tan sólo para
+   ilustrar el uso de las herramiestas. Más allá de las particiones de arranque,
+   deberá ser usted quién decida cómo debe particionar el sistema. Una propuesta
+   se encuentra el el epígrafe dedicado a la :ref:`instalación del servidor
+   <inst-servidor>`.
+
 Para manejar |GPT| usaremos las herramientas de las suite :program:`gdisk`,
 aunque desde hace un tiempo las de la suite :program:`fdisk` también son
 compatibles.
@@ -682,6 +718,8 @@ compatibles.
 
 La herramienta es prácticamente clónica de :ref:`fdisk <fdisk>`, aunque incluye
 algunas posibilidades más para |GPT| en las opciones avanzadas.
+
+.. _sgdisk:
 
 .. index:: sgdisk
 
@@ -748,53 +786,71 @@ la información lo siguiente:
    Creating new GPT entries in memory.
    2048
 
-La tabla de particiones GPT compatible con |BIOS| podemos definirla así::
+Se nos pueden presentar tres casos de particionado:
 
-   $ /sbin/sgdisk -a 8 -n "0:40:2047" -t "0:0xef02" \
-                  -a 2048 -n "0:+0:+32M" -c "0:UNO" \
-                          -n "0:+0:+2G" -t "0:0x0700" -c "0:DOS" \
-                          -n "0:+0:+1G" -c "0:TRES" /tmp/disco.raw
+a. |GPT| exclusivamente compatible con |BIOS|, que podemos definir así::
 
-en donde:
+      $ /sbin/sgdisk -a 8 -n "0:40:2047" -t "0:0xef02" -c "0:BOOTBIOS" \
+                     -a 2048 -n "0:+0:+32M" -c "0:UNO" \
+                             -n "0:+0:+2G" -t "0:0x0700" -c "0:DOS" \
+                             -n "0:+0:+1G" -c "0:TRES" /tmp/disco.raw
 
-* Creamos la primera partición en el espacio entre el final de la |GPT| y
-  la segunda partición que realmente necesitamos y que sí estará
-  convenientemente alineada. Sólo se leerá esta primera partición al arrancar el
-  disco y se escribirá al reinstalar |GRUB| con lo cual no es muy importante su
-  alineamiento. Aún así la hacemos cumpliendo la alineación de 4KiB. Para
-  cambiar la alineación usamos la opción :kbd:`-a`.
+   en donde:
 
-* Se definen las particiones añadiendo sendas opciones :kbd:`-n` para indicar el
-  comienzo y fin de la partición, :kbd:`-c` para indicar un nombre de etiqueta
-  y, si la partición no es *Linux* (*0x8300*), :kbd:`-t`.
+   * Creamos la primera partición en el espacio entre el final de la |GPT| y
+     la segunda partición que realmente necesitamos y que sí estará
+     convenientemente alineada. Sólo se leerá esta primera partición al arrancar el
+     disco y se escribirá al reinstalar |GRUB| con lo cual no es muy importante su
+     alineamiento. Aún así la hacemos cumpliendo la alineación de 4KiB. Para
+     cambiar la alineación usamos la opción :kbd:`-a`.
 
-* Las opciones anteriores necesitan que se especifique el número de la
-  partición, pero "0" representa el primer número disponible.
+   * Se definen las particiones añadiendo sendas opciones :kbd:`-n` para indicar el
+     comienzo y fin de la partición, :kbd:`-c` para indicar un nombre de etiqueta
+     y, si la partición no es *Linux* (*0x8300*), :kbd:`-t`.
 
-* Los números para comienzos y finales sin indicar unidad son sectores; y es
-  lícito anteponerles un signo "+" para representar número relativos al
-  anterior.
+   * Las opciones anteriores necesitan que se especifique el número de la
+     partición, pero "0" representa el primer número disponible.
 
-* Las definiciones no sobreescriben una tabla anterior, de modo que si
-  hiciéramos::
+   * Los números para comienzos y finales sin indicar unidad son sectores; y es
+     lícito anteponerles un signo "+" para representar número relativos al
+     anterior.
 
-   $ /sbin/sgdisk -N 0 -c "O:RESTO"
+   * Las definiciones no sobreescriben una tabla anterior, de modo que si
+     hiciéramos::
 
-  añadiríamos a continuación una quinta partición que ocuparía lo que quede de
-  disco, ya que :kbd:`-N` tiene ese efecto.
+      $ /sbin/sgdisk -N 0 -c "O:RESTO"
 
-Por su parte, la tabla de particiones |GPT| compatible con |UEFI| podemos
-hacerla así::
+     añadiríamos a continuación una quinta partición que ocuparía lo que quede de
+     disco, ya que :kbd:`-N` tiene ese efecto.
 
-   $ /sbin/sgdisk -n "0:2048:+50M" -t "0:0xef00" \
-                  -n "0:+0:+32M" -c "0:UNO" \
-                  -n "0:+0:+2G" -t "0:0x0700" -c "0:DOS" \
-                  -n "0:+0:+1G" -c "0:TRES" /tmp/disco.raw
+   .. warning:: Sopese utilizar el esquema propuesto para que sea compatible
+      también con |UEFI|, por si se produce un cambio en el *hardware*.
 
-En este caso, la partición |EFI| debe ser lo suficientemente grande para
-albergar los arranques de los sistemas operativos que pretendeamos instalar. En
-principio, con 50M o 100M debería bastar. Dado el tamaño de esta partición, no
-nos molestamos siquiera en aprovechar el espacio anterior al sector 2048.
+#. Tabla de particiones |GPT| exclusivamente compatible con |UEFI|::
+
+      $ /sbin/sgdisk -n "0:2048:+50M" -t "0:0xef00" -c "0:EFI" \
+                     -n "0:+0:+32M" -c "0:UNO" \
+                     -n "0:+0:+2G" -t "0:0x0700" -c "0:DOS" \
+                     -n "0:+0:+1G" -c "0:TRES" /tmp/disco.raw
+
+   En este caso, la partición |EFI| debe ser lo suficientemente grande para
+   albergar los arranques de los sistemas operativos que pretendeamos instalar. En
+   principio, con 50M o 100M debería bastar. Dado el tamaño de esta partición, no
+   nos molestamos siquiera en aprovechar el espacio anterior al sector 2048.
+
+#. Tabla de particiones |GPT| compatible tanto con |BIOS| como con |UEFI|::
+
+      $ /sbin/sgdisk -a 8 -n "0:40:2047" -t "0:0xef02" -c "0:BOOTBIOS" \
+                     -a 2048 -n "0:2048:+50M" -t "0:0xef00" -c "0:EFI" \
+                             -n "0:+0:+32M" -c "0:UNO" \
+                             -n "0:+0:+2G" -t "0:0x0700" -c "0:DOS" \
+                             -n "0:+0:+1G" -c "0:TRES" /tmp/disco.raw
+
+   En este caso, la finalidad no es tanto que el sistema sea capaz de arrancar
+   con ambos *firmwares* (cosa que también se puede hacer) como que arrancando
+   en |BIOS| pueda hacer una migración sencilla a arranque |UEFI|. Para lograr
+   esto último, consulte el :ref:`último apartado sobre migración a UEFI
+   <bios-uefi>`.
 
 Otras acciones recurrentes con :command:`sgdisk` son:
 
@@ -820,13 +876,103 @@ Otras acciones recurrentes con :command:`sgdisk` son:
 
       $ /sbin/sgdisk -l GPT /tmp/disco.raw
 
-Arranque híbrido
-================
+.. _bios-uefi:
 
-.. todo:: Por escribir
+Migración a |UEFI|
+==================
+Remataremos la exposición sobre particionado, describiendo cómo convertir
+nuestro arranque |BIOS| en arranque |UEFI| si tuvimos la previsión desde un
+principio de crear particiones |GUID| e incluimos tanto la partición
+"BIOS Boot Partiticion" como la |ESP|\ [#]_. Si no fue así, tendremos que
+preparar nuestro particionado para llegar a este punto, lo cual muy
+probablemente incluya:
 
-.. https://askubuntu.com/questions/500359/efi-boot-partition-and-biosgrub-partition/501360#501360
-   https://www.slivermetal.org/2016/09/18/how-to-create-an-hybrid-uefi-gpt-bios-gptmbr-boot-usb-disk/
+- La conversión de un particionado en otro (tanto :ref:`gdisk <gdisk.i>` como
+  :ref:`sgdisk <sgdisk>` lo permiten).
+- La creación de la |ESP|, lo cual, suponga hacer hueco redimensinando alguna de
+  las particiones.
+
+Sea como sea, llegamos al punto en que disponemos de un particionado |GPT| con
+particiones "Bios Boot Partition" (la cual supondremos :file:`sda1`) y |EFI|
+(:file:`sda2`) y un sistema que se instaló en modo |BIOS| y, en consecuencia,
+tiene inoperativa aún la partición |EFI|.
+
+Un procedimiento medianmente sencillo para lograr hacer que el sistema arranque
+en modo |EFI| es el siguiente:
+
+#. Arrancar el sistema en modo |BIOS| para:
+
+   a. Preparar la |ESP|::
+
+      # apt install dosfstools
+      # mkfs.fat -F32 /dev/sda2
+      # mkdir /boot/efi
+      # echo "/dev/sda2 /boot/efi vfat defaults 0 2" >> /etc/fstab
+
+   #. Instalar el grub compatible con |EFI|::
+
+      # apt install grub.efi
+
+#. Reiniciar en modo |UEFI| usando un instalador moderno de debian y obtener una
+   consola:
+
+   a. Escoger "Opciones avanzadas" y dentro de ellas "Rescate".
+   #. Contestar las distintas preguntas y al llegar a la de elegir el sistema de
+      ficheros raíz, contestar que ninguno.
+   #. Escoger la opción para abrir la terminal.
+
+#. Hacer un :ref:`chroot <chroot>` a la debian instalada en el disco duro,
+   preparando previamente el sistema:
+
+   a. Si es necesario para nuestro sistema, preparar |RAID|\ s, cargar volúmenes
+      lógicos, descrifar sistemas cifrados, etc. En caso de que hayamos seguido
+      las recomendaciones para la :ref:`instalación de un servidor
+      <inst-servidor>`, deberemos hacer lo siguiente::
+
+         # mdadm --assemble /dev/md0 /dev/sda3
+         # vgchange -ay VGbuster
+
+   #. Montar al menos el sistema raíz y la |ESP|::
+
+         # mount /dev/VGbuster/rauz /mnt
+         # mount /dev/sda2 /mnt/boot/efi
+
+      Si nuestro sistema se compone de otras particiones, podemos montarlas
+      también, aunque no es imprescindible. Por ejemplo, para nuestra propuesta
+      de servidor::
+
+         # mount /dev/VGbuster/log /mnt/var/log
+         # mount /dev/VGbuster/mysql /mnt/var/lib/mysql
+         # mount /dev/VGbuster/srv /mnt/srv
+         # mount /dev/VGbuster/home /mnt/home
+
+   #. Montar los sistemas especiales sobre el sistema de disco::
+
+         # mount -t devtmpfs none /mnt/dev
+         # mount -t devpts none /mnt/dev/pts
+         # mount -t proc none /mnt/procs
+         # mount -t sysfs none /mnt/sys
+
+   #. Entrar en la jaula::
+
+         # chroot /mnt bash
+
+#. Instalar grub para el arranque |EFI|::
+
+      # grub-install --recheck
+
+   Al estar montada la |ESP| en :file:`/boot/efi`, :program:`grub` será capaz de
+   usarla sin necesidar de especiar nada más.
+
+#. Comprobar que la entrada para |GRUB| aparece como primera opción de
+   arranque::
+
+      # efibootmgr
+
+#. Salir,y reiniciar\ [#]_::
+
+      # exit
+      # reboot
 
 .. rubric:: Notas al pie
 
@@ -846,6 +992,11 @@ Arranque híbrido
    <https://wiki.archlinux.org/index.php/EFISTUB>`_.
 .. [#] Utilizaremos el fichero de 20G que propusimos crear anteriormente para
    estas pruebas.
+.. [#] En realidad, si nuestra intención es arrancar mediante |UEFI| y partimos
+   de un particionado |DOS|, la "Bios Boot Partition" es ya absolutamente
+   irrelevante y podemos prescindir de ella.
+.. [#] Al menos en la máquina virtual en la que se han hecho las pruebas, si el
+   equipo se apaga tras el cambio, no se guarda la nueva entrada.
 
 .. |UEFI| replace:: :abbr:`UEFI (Unified Extensible Firmware Interface)`
 .. |EFI| replace:: :abbr:`EFI (Extensible Firmware Interface)`
@@ -869,6 +1020,7 @@ Arranque híbrido
 .. |FAT| replace:: :abbr:`FAT (File Allocation Table)`
 .. |SSD| replace:: :abbr:`SSD (Solid-State Drive)`
 .. |RAID| replace:: :abbr:`RAID (Redundant Array of Independent Disks)`
+.. |ESP| replace:: :abbr:`ESP (EFI System Partition)`
 
 .. _parted: https://www.gnu.org/software/parted/manual/parted.html
 .. _gparted: https://gparted.org/

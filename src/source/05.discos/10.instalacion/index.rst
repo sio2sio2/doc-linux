@@ -1,3 +1,5 @@
+.. _inst-servidor:
+
 Instalación del servidor
 ************************
 
