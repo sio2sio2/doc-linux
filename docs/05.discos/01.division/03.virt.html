@@ -98,8 +98,96 @@ Lo habitual es que haya un grupo de volúmenes.</li>
 capaz de arrancar un <em>Linux</em> aunque los ficheros de su fase 3 y el kernel se
 encuentren dentro de volúmenes lógicos.</p>
 </div>
+<p>Es muy probable que el <em>software</em> para gestionar volúmenes lógicos ya se
+encuentre instalado, pero si no es así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt install lvm2
+</pre></div>
+</div>
 <div class="section" id="creacion">
 <h2>5.1.3.1. Creación<a class="headerlink" href="#creacion" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Dentro del grupo de volúmenes podemos incluir todas las particiones que deseemos
+crear, excepto aquellas necesarias para el arranque del disco. Por tanto, un
+particionado físico del disco apropiado para crear volúmenes lógicos puede ser
+el siguiente:</p>
+<img alt="../../_images/part-lvm.png" src="../../_images/part-lvm.png" />
+<p>que usando <a class="reference internal" href="02.part.html#sgdisk"><span class="std std-ref">sgdisk</span></a> puede realizarse de esta forma:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> sgdisk -a <span class="m">8</span> -n <span class="s2">&quot;0:40:2047&quot;</span> -t <span class="s2">&quot;0:0xef02&quot;</span> -c <span class="s2">&quot;0:BOOTBIOS&quot;</span> <span class="se">\</span>
+         -a <span class="m">2048</span> -n <span class="s2">&quot;0:2048:+50M&quot;</span> -t <span class="s2">&quot;0:0xef00&quot;</span> -c <span class="s2">&quot;0:EFI&quot;</span> <span class="se">\</span>
+         -N <span class="m">0</span> -t <span class="s2">&quot;3:0x8e00&quot;</span> -c <span class="s2">&quot;3:LVM&quot;</span> /tmp/disco.raw
+</pre></div>
+</div>
+<p>de forma que creamos las dos particiones necesarias para el arranque aparte,
+y una tercera partición destinanda a ser el volumen físico que constituya el
+grupo de volúmenes.</p>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">Por supuesto, podemos crear volúmenes lógicos partiendo también de un
+particionado <abbr title="Disk Operating System">DOS</abbr></p>
+</div>
+<p>Como estamos particionando un fichero, no podemos acceder
+directamente a sus particiones como sí sería posible si particionáramos un disco
+(p.e. de <code class="file docutils literal notranslate"><span class="pre">/dev/sda</span></code> aparecerían <code class="file docutils literal notranslate"><span class="pre">/dev/sda1</span></code>, file:<cite>/dev/sda2</cite>,
+etc.). Para hacerlas accesibles es necesario asegurarse de que está cargado el
+módulo <em>loop</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> modprobe loop
+</pre></div>
+</div>
+<p>y usar <strong class="command">losetup</strong> para asociar/desasociar el fichero a un dispositivo de
+bucle:</p>
+<span class="target" id="losetup"></span><div class="highlight-console notranslate" id="index-0"><div class="highlight"><pre><span></span><span class="gp">#</span> losetup /dev/loop0 /tmp/disco.raw
+<span class="gp">#</span> losetup
+<span class="go">NAME       SIZELIMIT OFFSET AUTOCLEAR RO BACK-FILE      DIO LOG-SEC</span>
+<span class="go">/dev/loop0         0      0         0  0 /tmp/disco.raw   0     512</span>
+<span class="gp">#</span> losetup -d /dev/loop0
+</pre></div>
+</div>
+<p>Con todo, asociar el fichero al dispositivo no provoca que aparezcan las
+particiones, para ello es necesario usar <strong class="command">partx</strong></p>
+<span class="target" id="partx"></span><div class="highlight-console notranslate" id="index-1"><div class="highlight"><pre><span></span><span class="gp">#</span> partx -a /dev/loop0
+<span class="gp">#</span> ls -1 /dev/loop0*
+<span class="go">/dev/loop0</span>
+<span class="go">/dev/loop0p1</span>
+<span class="go">/dev/loop0p2</span>
+<span class="go">/dev/loop0p3</span>
+<span class="gp">#</span> partx -d /dev/loop0
+<span class="gp">#</span> ls -1 /dev/loop0*
+<span class="go">/dev/loop0</span>
+</pre></div>
+</div>
+<p>Hecho el particionado y expuestas las particiones, lo primero es declarar que la
+tercera partición es un volumen físico:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> pvcreate /dev/loop0p3
+</pre></div>
+</div>
+<p>tras lo cual ya puede constituirse un grupo de volúmenes llamado «VGdebian» con
+este volumen físico:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> vgcreate VGdebian /dev/loop0p3
+<span class="gp">#</span> vgs VGdebian
+<span class="go">  VG       #PV #LV #SN Attr   VSize    VFree</span>
+<span class="go">  VGdebian   1   0   0 wz--n-  &lt;19,95g &lt;19,95g</span>
+</pre></div>
+</div>
+<p>Esta última acción permite empezar a crear particiones lógicas con la orden
+<strong class="command">lvcreate</strong>. Por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvcreate -L 2G VGdebian -n primera
+<span class="gp">#</span> lvcreate -L 5G VGdebian -n segunda
+<span class="gp">#</span> vgs VGdebian
+<span class="go">  VG       #PV #LV #SN Attr   VSize    VFree</span>
+<span class="go">  VGdebian   1   0   0 wz--n-  &lt;19,95g &lt;12,95g</span>
+<span class="gp">#</span> lvs VGdebian
+<span class="go">  LV      VG    Attr       LSize Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert</span>
+<span class="go">  primera VGxxx -wi-a----- 2,00g</span>
+<span class="go">  segunda VGxxx -wi-a----- 5,00g</span>
+</pre></div>
+</div>
+<p>Estas acciones han particionado 7 de los 20GB del grupo de volúmenes y crean dos
+dispostivos virtuales, <code class="file docutils literal notranslate"><span class="pre">/dev/VGdebian/primera</span></code> y
+<code class="file docutils literal notranslate"><span class="pre">/dev/VGdebian/segunda</span></code> que podemos tratar como si de particiones fisicas
+se tratasen. Por ejemplo, podemos dotarlas de un sistema de ficheros:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkfs.ext4 -L PRIMERA /dev/VGdebian/primera
+<span class="gp">#</span> mkfs.ext4 -L SEGUNDA /dev/VGdebian/primera
+</pre></div>
+</div>
 </div>
 <div class="section" id="disponibilidad">
 <h2>5.1.3.2. Disponibilidad<a class="headerlink" href="#disponibilidad" title="Enlazar permanentemente con este título">¶</a></h2>

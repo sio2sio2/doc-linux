@@ -52,8 +52,106 @@ En la tarea de constituir volúmenes lógicos:
    capaz de arrancar un *Linux* aunque los ficheros de su fase 3 y el kernel se
    encuentren dentro de volúmenes lógicos.
 
+Es muy probable que el *software* para gestionar volúmenes lógicos ya se
+encuentre instalado, pero si no es así::
+
+   # apt install lvm2
+
 Creación
 ========
+Dentro del grupo de volúmenes podemos incluir todas las particiones que deseemos
+crear, excepto aquellas necesarias para el arranque del disco. Por tanto, un
+particionado físico del disco apropiado para crear volúmenes lógicos puede ser
+el siguiente:
+
+.. image:: files/part-lvm.png
+
+que usando :ref:`sgdisk <sgdisk>` puede realizarse de esta forma::
+
+   $ sgdisk -a 8 -n "0:40:2047" -t "0:0xef02" -c "0:BOOTBIOS" \
+            -a 2048 -n "0:2048:+50M" -t "0:0xef00" -c "0:EFI" \
+            -N 0 -t "3:0x8e00" -c "3:LVM" /tmp/disco.raw
+
+de forma que creamos las dos particiones necesarias para el arranque aparte,
+y una tercera partición destinanda a ser el volumen físico que constituya el
+grupo de volúmenes.
+
+.. note:: Por supuesto, podemos crear volúmenes lógicos partiendo también de un
+   particionado |DOS|
+
+Como estamos particionando un fichero, no podemos acceder
+directamente a sus particiones como sí sería posible si particionáramos un disco
+(p.e. de :file:`/dev/sda` aparecerían :file:`/dev/sda1`, file:`/dev/sda2`,
+etc.). Para hacerlas accesibles es necesario asegurarse de que está cargado el
+módulo *loop*::
+
+   # modprobe loop
+
+y usar :command:`losetup` para asociar/desasociar el fichero a un dispositivo de
+bucle:
+
+.. _losetup:
+.. index:: losetup
+
+::
+
+   # losetup /dev/loop0 /tmp/disco.raw
+   # losetup
+   NAME       SIZELIMIT OFFSET AUTOCLEAR RO BACK-FILE      DIO LOG-SEC
+   /dev/loop0         0      0         0  0 /tmp/disco.raw   0     512
+   # losetup -d /dev/loop0
+
+Con todo, asociar el fichero al dispositivo no provoca que aparezcan las
+particiones, para ello es necesario usar :command:`partx`
+
+.. _partx:
+.. index:: partx
+
+::
+
+   # partx -a /dev/loop0
+   # ls -1 /dev/loop0*
+   /dev/loop0
+   /dev/loop0p1
+   /dev/loop0p2
+   /dev/loop0p3
+   # partx -d /dev/loop0
+   # ls -1 /dev/loop0*
+   /dev/loop0
+
+Hecho el particionado y expuestas las particiones, lo primero es declarar que la
+tercera partición es un volumen físico::
+
+   # pvcreate /dev/loop0p3
+
+tras lo cual ya puede constituirse un grupo de volúmenes llamado "VGdebian" con
+este volumen físico::
+
+   # vgcreate VGdebian /dev/loop0p3
+   # vgs VGdebian
+     VG       #PV #LV #SN Attr   VSize    VFree  
+     VGdebian   1   0   0 wz--n-  <19,95g <19,95g
+
+Esta última acción permite empezar a crear particiones lógicas con la orden
+:command:`lvcreate`. Por ejemplo::
+
+   # lvcreate -L 2G VGdebian -n primera
+   # lvcreate -L 5G VGdebian -n segunda
+   # vgs VGdebian
+     VG       #PV #LV #SN Attr   VSize    VFree  
+     VGdebian   1   0   0 wz--n-  <19,95g <12,95g
+   # lvs VGdebian
+     LV      VG    Attr       LSize Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+     primera VGxxx -wi-a----- 2,00g                                                    
+     segunda VGxxx -wi-a----- 5,00g
+
+Estas acciones han particionado 7 de los 20GB del grupo de volúmenes y crean dos
+dispostivos virtuales, :file:`/dev/VGdebian/primera` y
+:file:`/dev/VGdebian/segunda` que podemos tratar como si de particiones fisicas
+se tratasen. Por ejemplo, podemos dotarlas de un sistema de ficheros::
+
+   # mkfs.ext4 -L PRIMERA /dev/VGdebian/primera
+   # mkfs.ext4 -L SEGUNDA /dev/VGdebian/primera
 
 Disponibilidad
 ==============
@@ -68,6 +166,7 @@ Modificación
 .. |LV| replace:: :abbr:`LV (Logical Volume)`
 .. |PV| replace:: :abbr:`PV (Physical Volume)`
 .. |VG| replace:: :abbr:`PV (Volume Group)`
+.. |DOS| replace:: :abbr:`DOS (Disk Operating System)`
 .. |GRUB| replace:: :abbr:`GRUB (GRand Unified Bootloader)`
 
 .. _btrfs: https://es.wikipedia.org/wiki/Btrfs
