@@ -57,6 +57,12 @@ encuentre instalado, pero si no es así::
 
    # apt install lvm2
 
+.. _pvcreate:
+.. _vgcreate:
+.. _lvcreate:
+
+.. index:: pvcreate, lvcreate, vgcreate
+
 Creación
 ========
 Dentro del grupo de volúmenes podemos incluir todas las particiones que deseemos
@@ -124,40 +130,151 @@ tercera partición es un volumen físico::
 
    # pvcreate /dev/loop0p3
 
-tras lo cual ya puede constituirse un grupo de volúmenes llamado "VGdebian" con
+tras lo cual ya puede constituirse un grupo de volúmenes llamado "VGtest" con
 este volumen físico::
 
-   # vgcreate VGdebian /dev/loop0p3
-   # vgs VGdebian
+   # vgcreate VGtest /dev/loop0p3
+   # vgs VGtest
      VG       #PV #LV #SN Attr   VSize    VFree  
-     VGdebian   1   0   0 wz--n-  <19,95g <19,95g
+     VGtest   1   0   0 wz--n-  <19,95g <19,95g
 
 Esta última acción permite empezar a crear particiones lógicas con la orden
 :command:`lvcreate`. Por ejemplo::
 
-   # lvcreate -L 2G VGdebian -n primera
-   # lvcreate -L 5G VGdebian -n segunda
-   # vgs VGdebian
+   # lvcreate -L 2G VGtest -n primera
+   # lvcreate -L 5G VGtest -n segunda
+   # vgs VGtest
      VG       #PV #LV #SN Attr   VSize    VFree  
-     VGdebian   1   0   0 wz--n-  <19,95g <12,95g
-   # lvs VGdebian
+     VGtest   1   0   0 wz--n-  <19,95g <12,95g
+   # lvs VGtest
      LV      VG    Attr       LSize Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
      primera VGxxx -wi-a----- 2,00g                                                    
      segunda VGxxx -wi-a----- 5,00g
 
 Estas acciones han particionado 7 de los 20GB del grupo de volúmenes y crean dos
-dispostivos virtuales, :file:`/dev/VGdebian/primera` y
-:file:`/dev/VGdebian/segunda` que podemos tratar como si de particiones fisicas
+dispostivos virtuales, :file:`/dev/VGtest/primera` y
+:file:`/dev/VGtest/segunda` que podemos tratar como si de particiones fisicas
 se tratasen. Por ejemplo, podemos dotarlas de un sistema de ficheros::
 
-   # mkfs.ext4 -L PRIMERA /dev/VGdebian/primera
-   # mkfs.ext4 -L SEGUNDA /dev/VGdebian/primera
+   # mkfs.ext4 -L PRIMERA /dev/VGtest/primera
+   # mkfs.ext4 -L SEGUNDA /dev/VGtest/primera
 
 Disponibilidad
 ==============
+Habitualmente la aparición de los volúmenes lógicos es automática al hacer
+disponibles los volúmenes que constituyen el grupo de volúmenes. Si no es así,
+pueden habilitar con la orden::
+
+   # vgchange -ay VGtest
+
+Lo que es más útil es deshabilitar los volúmenes lógicos::
+
+   # vgchange -an VGtest
+
+ya que es indispensable hacerlo si queremos hacer desaparecer los volúmenes
+físicos sobre los que se asientan. Por ejemplo, para el caso que nos ocupa, en
+que hacemos pruebas con un fichero, la única forma de usar :ref:`partx <losetup>` y
+:ref:`losetup <losetup>` para desasociar el fichero al dispositivo de bucle es
+deshabilitar los volúmenes lógicos porque de lo contrario, fallará::
+
+   # partx -d /dev/loop
+
+al encontrar la partición :file:`/dev/loop03` ocupada.
+
+.. _pvs:
+.. _vgs:
+.. _lvs:
+
+.. index:: pvs
+
+.. index:: vgs
+
+.. index:: lvs
 
 Consulta
 ========
+Hay tres tipos de entidades (volúmenes físicos, grupos de volúmenes y volúmenes
+lógicos) y dos tipos de consultas sobre ellas: la resumida y la extensa, por lo
+que podemos llegar a hacer seis consultas distintas. En los seis casos, puede
+añadirse como argumento una entidad concreta (|PV|, |VG| o |LV|) para recibir
+información exclusivamente de ella o no añadir ninguna y recibir información de
+todas.
+
+Para volúmenes físicos, las órdenes son::
+
+   # pvs
+     PV           VG       Fmt  Attr PSize   PFree  
+     /dev/sdc2    vgdebian lvm2 a--  <465,70g  79,39g
+     /dev/loop0p3 VGtest   lvm2 a--  <19,95g <12,95g
+   # pvdisplay /dev/loop0p3
+     --- Physical volume ---
+     PV Name               /dev/loop0p3
+     VG Name               VGtest
+     PV Size               19,95 GiB / not usable 4,98 MiB
+     Allocatable           yes 
+     PE Size               4,00 MiB
+     Total PE              5106
+     Free PE               3314
+     Allocated PE          1792
+     PV UUID               36SmEX-lPxG-qFW2-iMGl-1c5T-CLlb-LqLY1
+
+Para grupos de volúmenes::
+
+   # vgs
+     VG       #PV #LV #SN Attr   VSize    VFree  
+     VGtest     1   2   0 wz--n-  <19,95g <12,95g
+     vgdebian   1   4   0 wz--n- <465,70g  79,39g
+
+   # vgdisplay VGtest
+     --- Volume group ---
+     VG Name               VGtest
+     System ID             
+     Format                lvm2
+     Metadata Areas        1
+     Metadata Sequence No  3
+     VG Access             read/write
+     VG Status             resizable
+     MAX LV                0
+     Cur LV                2
+     Open LV               0
+     Max PV                0
+     Cur PV                1
+     Act PV                1
+     VG Size               <19,95 GiB
+     PE Size               4,00 MiB
+     Total PE              5106
+     Alloc PE / Size       1792 / 7,00 GiB
+     Free  PE / Size       3314 / <12,95 GiB
+     VG UUID               P3dDgq-AeHA-7Vur-Jy48-fzlm-wnC1-jf0x85
+
+Y para volúmenes lógicos::
+
+   # lvs
+     LV      VG       Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+     primera VGtest   -wi-a-----   2,00g                                                    
+     segunda VGtest   -wi-a-----   5,00g                                                    
+     home    vgdebian -wi-a----- 370,00g                                                    
+     lxc     vgdebian -wi-a-----   2,00g                                                    
+     raiz    vgdebian -wi-a----- <12,45g                                                    
+     swap    vgdebian -wc-a-----  <1,86g
+
+   # lvdisplay /dev/VGtest/primera
+     --- Logical volume ---
+     LV Path                /dev/VGtest/primera
+     LV Name                primera
+     VG Name                VGtest
+     LV UUID                KBMwih-Mctp-rOcv-W3aK-iqTG-2vXo-KlpQxs
+     LV Write Access        read/write
+     LV Creation host, time choquereta, 2019-11-27 07:40:59 +0100
+     LV Status              available
+     # open                 0
+     LV Size                2,00 GiB
+     Current LE             512
+     Segments               1
+     Allocation             inherit
+     Read ahead sectors     auto
+     - currently set to     256
+     Block device           253:4
 
 Modificación
 ============
