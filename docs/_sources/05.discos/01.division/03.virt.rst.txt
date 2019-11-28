@@ -80,7 +80,8 @@ que usando :ref:`sgdisk <sgdisk>` puede realizarse de esta forma::
 
 de forma que creamos las dos particiones necesarias para el arranque aparte,
 y una tercera partición destinanda a ser el volumen físico que constituya el
-grupo de volúmenes.
+grupo de volúmenes. La partición destinada para este fin se nota con el código
+*0x8E00*.
 
 .. note:: Por supuesto, podemos crear volúmenes lógicos partiendo también de un
    particionado |DOS|
@@ -184,12 +185,7 @@ al encontrar la partición :file:`/dev/loop03` ocupada.
 .. _pvs:
 .. _vgs:
 .. _lvs:
-
-.. index:: pvs
-
-.. index:: vgs
-
-.. index:: lvs
+.. index:: pvs, vgs, lvs
 
 Consulta
 ========
@@ -276,8 +272,79 @@ Y para volúmenes lógicos::
      - currently set to     256
      Block device           253:4
 
+.. _vgextend:
+.. _lvextend:
+.. _lvreduce:
+.. _vgreduce:
+.. index:: vgextend, lvextend, lvreduce, vgreduce
+
 Modificación
 ============
+La ventaja fundamental de las volúmenes lógicos es que podemos ampliarlos a
+voluntad sin que el espacio tenga que ser contiguo. Por ejemplo::
+
+   # lvextend -L 3G /dev/VGtest/primera
+
+Aumenta hasta 3GiB el primer volumen lógico, aunque no el sistema de ficheros
+contenido, por lo que el espacio ocupable seguirá siendo de 2GiB. Para ampliar
+también el sistema de fichero es necesario, en este caso::
+
+   # resize2fs /dev/Vgtest/primera
+
+No obstante, podemos incluir la opción :kbd:`-r` y :command:`lvextend` se
+encargará de comprobar cuál el sistema de ficheros y aplicar el comando
+adecuando para que éste colonice el nuevo espacio disponible. En consecuencia
+las dos órdenes anteriores son equivalente a::
+
+   # lvextend -r -L 3G /dev/VGtest/primera
+
+También puede indicarse, en vez de el nuevo tamaño, el incremento. Esta orden::
+
+   # lvextend -r -L +1G /dev/VGtest/segunda
+
+aumenta hasta los 6GiB el volumen lógico cuyo anterior tamaño era 5GiB. Es
+posible también usar porcentajes en vez de tamaños o incrementos absolutos a
+través de la opción :kbd:`-l`\ [#]_::
+
+   # lvcreate -l 100%FREE VGtest -n tercera
+
+De esta manera, la nueva partición ocupará todo el espacio libre que uqede en el
+grupo de volúmenes. El disco físico se ha acabado, pero si "compráramos" otro,
+podríamos añadirlo como volumen lógico a *VGtest* y volveríamos a disponer de
+espacio libre::
+
+   # truncate -s 10G /tmp/otrodisco.raw
+   # losetup /dev/loop1 /tmp/otrodisco.raw
+   # pvcreate /dev/loop1
+   # vgextend VGtest /dev/loop1
+   # vgs VGtest
+     VG     #PV #LV #SN Attr   VSize  VFree 
+     VGtest   2   2   0 wz--n- 29,94g  9,94g
+   
+Ahora el grupo de volúmenes tiene 30GiB, ya que hemos añadido 10GiB más.
+
+Todas estas operaciones son de incremento y no requieren siquiera que
+desmontemos los sistemas de ficheros para ser llevadas a cabo. En cambio, las
+operaciones de reducción son más traumáticas ya que, por lo general, requieren
+dejar hueco y en el caso de reducir particiones lógicas, desmontar previamente
+el sistema de ficheros que contiene. Por lo demás, el procedimiento es
+semejante::
+
+   # lvresize -r -L -2G /dev/VGtest/segunda
+   # lvs /dev/VGtest/segunda
+     LV      VG     Attr       LSize Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+     segunda VGtest -wi-a----- 4,00g 
+   # lvreduce -r -l -25%LV /dev/VGtest/segunda
+   # lvs /dev/VGtest/segunda
+     LV      VG     Attr       LSize Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+     segunda VGtest -wi-a----- 3,00g
+
+.. rubric:: Notas al pie
+
+.. [#] Los porcentajes puede referise al espacio libre (:kbd:`FREE`) en el grupo
+   de volúmenes, al espacio del volúmen lógico (:kbd:`LV`), al espacio del grupo
+   de volúmenes (:kbd:`VG`) y algún otro.
+
 
 .. |LVM| replace:: :abbr:`LVM (Logical Volume Management)`
 .. |LV| replace:: :abbr:`LV (Logical Volume)`
