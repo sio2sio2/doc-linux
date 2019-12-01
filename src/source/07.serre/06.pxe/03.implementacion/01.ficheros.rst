@@ -18,16 +18,11 @@ La estructura de ficheros en nuestro disco será esta:
           |     |
           |     +--- lpxelinux.0
           |     +--- syslinux
-          |     |       |
-          |     |       +--- ldlinux.c32
-          |     |       +--- pxechn.c32
-          |     |       +--- menu.c32
-          |     |       +--- reboot.c32
-          |     |       +--- ... otros módulos ...
-          |     |
-          |     +--- pxelinux.cfg
           |             |
-          |             +--- default
+          |             +--- ldlinux.c32
+          |             +--- menu.c32
+          |             +--- reboot.c32
+          |             +--- ... otros módulos ...
           |
           +--- ssoo
           |     |
@@ -95,41 +90,18 @@ Nuestra estrategia para las descargas es la siguiente:
 #. El cliente |PXE| descargará por |TFTP| el |NBP| correspondiente
    (:program:`lpxelinux.0` en arquitecturas con |BIOS|).
 
-#. El |NBP| ya es capaz de descargar por |HTTP|, pero ello exige que definamos la
-   opción |DHCP| **210**. Sin embargo, queremos usar una estrategia universal y en
-   :ref:`el tercer escenario <pxe-dhcp-separados>` podría ocurrir que no seamos
-   capaces, así que lo que hacemos es dejar que el |NBP| descargue
-   :file:`ldlinux.c32` y :file:`pxelinux.cfg/default` también por |TFTP|.
-
-.. _pxe-cambio-a-http:
-
-#. El contenido de :file:`pxelinux.cfg/default` será el siguiente:
-
-   .. literalinclude:: files/default.cfg
-
-   La configuración descarga por |TFTP| sin esperas y sin posibilidad de
-   selección el módulo :file:`pxechn.c32` que nos permite cargar un nuevo |NBP|
-   pero con la posibilidad de pasarle un valor que haga las veces de opción
-   |DHCP| **210**. Así que lo usamos y aprovechamos para cambiar el protocolo y
-   empezar a usar |HTTP|.
-
-   .. warning:: Obviamente, habrá que sustituir "*bios*" por "*efi32*" o
-      "*efi64*" en los ficheros de configuración de las arquitecturas
-      respectivas.
-
-#. A partir de ahora los módulos y las configuraciones se descargarán por |HTTP|
-   y ya explicaremos :ref:`al llegar a él <pxe-http>` qué estrategia seguimos.
-
-.. note:: Obviamente, si tenemos posibilidad de configurar el servidor |DHCP|
-   para que envíe la opción, podríamos darle en su configuración como valor 
-   el mismo que hemos declarado en :file:`pxelinux.cfg/default`::
+#. El |NBP| ya es capaz de descargar por |HTTP|, pero ello exige enviar al
+   cliente la opción |DHCP| **210**, que en :program:`dnsmasq` se haría del
+   siguiente modo::
 
       dhcp-option-force=210,http://192.168.255.1/boot/bios/
 
-   con lo que el proceso de arranque utilizará directamente el servicio |HTTP| y
-   saltará directamente al punto 4., sin llegar a descargar
-   :file:`pxelinux.cfg/default` y, consecuentemente, sin ejecutar por segunda
-   vez :program:`lpxelinux.0`.
+   o, mejor aún, encapsulándola en la opción **43**::
+
+      dhcp-option=encap:43,210,http://192.168.255.1/boot/bios/
+
+#. A partir de ahora los módulos y las configuraciones se descargarán por |HTTP|
+   y ya explicaremos :ref:`al llegar a él <pxe-http>` qué estrategia seguimos.
 
 .. warning:: Aunque la estructura se ha creado para poder soportar el arranque
    tanto desde |BIOS| como desde |UEFI| las explicaciones sobre el servicio
@@ -138,12 +110,30 @@ Nuestra estrategia para las descargas es la siguiente:
    capaz de :ref:`soportar las tres arquitecturas <pxe-multiarch>`.
 
 .. note:: Si decidimos prescindir de un servidor |HTTP| y realizar todas las
-   descargas |TFTP|, es obvio que :file:`pxelinux.cfg/default` no debe tener el
-   contenido sugerido. En ese caso, bastaría con que tal fichero fuera un enlace
-   simbólico a :file:`/srv/tftp/cfg/default`, que es el nombre que hemos
-   elegido para una :ref:`configuración estática <pxe-http-estatica>`. Y a
-   partir de aquí toda la configuración sería exactamente igual que para ese
-   caso.
+   descargas |TFTP| es obvio que necesitaremos incluir dentro de la estructura
+   de directorios del servidor |TFTP| un fichero de configuración para
+   :program:`syslinux`:
+
+   .. code-block:: none
+
+      +-- /srv/tftp
+             |
+             +--- bios
+             |     |
+             |     +--- lpxelinux.0
+             |     +--- syslinux
+             |     |       |
+             |     |       +--- ... modulos ...
+             |     |
+             |     +--- pxelinux.cfg
+             |             |
+             |             +--- default
+             |
+             +--- ssoo (estructura referida más arriba)
+             +--- efi32 (misma estructura que bios)
+             +--- efi64 (misma estructura que bios)
+
+
 
 .. _pxe-tftp:
 

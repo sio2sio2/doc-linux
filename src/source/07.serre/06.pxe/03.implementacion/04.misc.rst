@@ -6,30 +6,37 @@ Particularidades
 Soporte multiarquitectura
 -------------------------
 
-.. warning:: El soporte para |UEFI| de :program:`syslinux` es bastante
-   deficiente. Ni la versión estable **6.03** que trae *debian* ni la versión
-   **6.04pre1**, última publicada a fecha de redacción, funcionan correctamente.
-   Sólo la versión *master* de desarrollo, pero aplicando algunos parches para
-   poder compilarla\ [#]_, funcionan. Aun así, el módulo :file:`pxechn.c32` no
-   está portando a arquitectura |UEFI| con lo que nuestra propuesta sólo puede
-   implementarse en el primer escenario, gracias a que podemos saltar la carga
-   de este módulo enviando la opción **210**. Por si fuera poco, tampoco
-   funciona muy bien el módulo :file:`menu.c32`\ [#]_.
+.. warning:: Dicutiremos una solución para soportar |BIOS| y |UEFI|, aunque
+   este último arranque siempre ha sido un poco problemático con
+   :program:`syslinux`. En principio, debe funcionar, aunque depende mucho de
+   que la implementación |PXE| del firmware |UEFI| de la placa base no sea
+   deficiente, como pasa en muchas ocasiones. La configuración se ha comprobado
+   con `OVMF <https://github.com/tianocore/tianocore.github.io/wiki/OVMF>`_ que
+   es una implementación de |UEFI| que utilizan :ref:`Virtualbox <virtualbox>` o
+   :ref:`QEmu <qemu>`.
+
+.. note:: Si se quieren hacer pruebas con máquinas virtuales, deberá saber cómo
+   arrancarlas en |UEFI|. Si se utiliza :ref:`QEmu <qemu>` es necesario:
+
+   - Instalar el paquete *qemu-efi*.
+   - Utilizar como tarjeta de red *virtio-net*.
+   - Añadir al ejecutable de :program:`qemu` la opción :kbd:`-bios
+     /usr/share/ovmf/OVMF.fd`.
 
 Ya se ha comentado que un ordenador puede disponer de |BIOS|, si es más antiguo,
 o de |UEFI|, si más moderno. Tal es así que nuestra :ref:`estructura de ficheros
 <pxe-ficheros>` está pensada para atender esta circunstancia. Sin embargo, en la
 configuración propuesta se carga de manera incondicional
 :file:`bios/pxelinux.0`, por lo que sólo somos capaces de dar soporte a clientes
-|PXE| con |BIOS| o, si son |UEFI|, emulando a la |BIOS|. Sin embargo, empiezan a
-salir placas sin esta compatibilidad, por lo que sólo dar soporte a clientes
-|BIOS| empieza a no ser adminisible.
+|PXE| con |BIOS| o, si son |UEFI|, en modo compatibilidad con |BIOS| (*Legacy*).
+Sin embargo, comienzan a aparecer placas sin esta compatibilidad, por lo que sólo
+dar soporte a clientes |BIOS| empieza a no ser adminisible.
 
 La solución, no obstante, es conceptualmente bastante sencilla: detectar de qué
 tipo de arquitectura es el cliente y enviar el fichero adecuado:
 :file:`bios/lpxelinux.0`, :file:`efi32/syslinux.efi` o
 :file:`efi64/syslinux.efi`. Al determinar éste cuál es el *directorio de
-trabajo*, el resto de módulos necesarios también sera de la arquitectura
+trabajo*, el resto de módulos necesarios también será de la arquitectura
 apropiada. Así pues, el objetivo es modificar la configuración del servidor
 |DHCP| (o del |PXE| dependiendo del escenario).
 
@@ -62,23 +69,6 @@ Dependiendo de si el servicio |PXE| es independiente (segundo y tercer
 escenarios) o está incluido en el |DHCP| (1º escenario), habrá que hacer una
 cosa u otra.
 
-|PXE|
-"""""
-Recordemos que dijimos que la forma de prestar el servicio era incluir esta
-línea::
-
-   pxe-service=x86PC,"Servicio de clonaciones",bios/lpxelinux.0
-
-pero sin dar demasiadas explicaciones. El primer argumento es el tipo de
-arquitectura del cliente y la línea solamente se envía si el tipo de la línea
-coincide con el del cliente. Por tanto, nos basta con repetir la línea para las
-distintas arquitecturas que soportemos::
-
-   pxe-service=x86PC,"Servicio de clonaciones",bios/lpxelinux.0
-   pxe-service=IA32_EFI,"Servicio de clonaciones",efi32/syslinux.efi
-   pxe-service=BC_EFI,"Servicio de clonaciones",efi64/syslinux.efi
-   pxe-service=x86-64_EFI,"Servicio de clonaciones",efi64/syslinux.efi
-
 |DHCP|
 """"""
 Si la información de red la facilita directamente el servidor |DHCP| entonces
@@ -88,22 +78,23 @@ tendremos explícitamente que analizar la opción **93**.
 ''''''''''''''''''
 ::
 
-   dhcp-match=x86,93,0
+   dhcp-match=bios,93,0
    dhcp-match=efi32,93,6
    dhcp-match=efi64,93,7
    dhcp-match=efi64,93,9
 
-   dhcp-boot=tag:x86,bios/lpxelinux.0
+   dhcp-boot=tag:bios,bios/lpxelinux.0
    dhcp-boot=tag:efi32,efi32/syslinux.efi
    dhcp-boot=tag:efi64,efi64/syslinux.efi
 
-.. note:: Recuérdese que en el primer escenario, podemos cambiar directamente al
-   protocolo |HTTP|, proporcionando la opción **210** y nos ahorramos el paso
-   por el módulo :file:`pxechn.c32`::
+Y, si queremos que generar :ref:`configuraciones dinámicas <pxe-http>`, esto es,
+menús de arranque cuyas entradas dependan del cliente que realiza la petición,
+entonces tendremos que obtener el fichero de configuración a través del
+protocolo |HTTP|::
 
-      dhcp-option=x86,encap:43,210,http://192.168.255.1/boot/bios/
-      dhcp-option=efi32,encap:43,210,http://192.168.255.1/boot/efi32/
-      dhcp-option=efi64,encap:43,210,http://192.168.255.1/boot/efi64/
+   dhcp-option=bios,encap:43,210,http://192.168.255.1/boot/bios/
+   dhcp-option=efi32,encap:43,210,http://192.168.255.1/boot/efi32/
+   dhcp-option=efi64,encap:43,210,http://192.168.255.1/boot/efi64/
 
 Servidor del |ISC|
 ''''''''''''''''''
@@ -123,6 +114,68 @@ es algo más verborreica::
 Adicionalmente, podemos enviar la opción **210** para adelantar un paso del
 proceso de arranque.
 
+|PXE|
+"""""
+Recordemos que dijimos que la forma de prestar el servicio era incluir esta
+línea::
+
+   pxe-service=x86PC,"Servicio de clonaciones",bios/lpxelinux.0
+
+pero sin dar demasiadas explicaciones. El primer argumento es el tipo de
+arquitectura del cliente y la línea solamente se envía si el tipo de la línea
+coincide con el del cliente. Por tanto, nos basta con repetir la línea para las
+distintas arquitecturas que soportemos::
+
+   pxe-service=x86PC,"Servicio de clonaciones",bios/lpxelinux.0
+   pxe-service=IA32_EFI,"Servicio de clonaciones",efi32/syslinux.efi
+   pxe-service=BC_EFI,"Servicio de clonaciones",efi64/syslinux.efi
+   pxe-service=x86-64_EFI,"Servicio de clonaciones",efi64/syslinux.efi
+
+Ahora bien, esta configuración no envía la opción **210** y en consecuencia, no
+podremos descargar por |HTTP| la configuracióni de :program:`syslinux`. Para
+hacerlo necesitamos enriquecer la configuración::
+
+   dhcp-match=bios,93,0
+   dhcp-match=efi32,93,6
+   dhcp-match=efi64,93,7
+   dhcp-match=efi64,93,9
+
+   # Configuración para BIOS
+   pxe-service=x86PC,"Servicio de clonaciones",bios/lpxelinux.0
+   dhcp-option=tag:bios,encap:43,vendor:PXEClient,210,http://192.168.255.2/boot/bios/
+
+   pxe-prompt="Leyenda escondida...",0
+
+   # Configuración para EFI32
+   pxe-service=IA32_EFI,"Servicio de clonaciones",efi32/syslinux.efi
+   pxe-service=IA32_EFI,"Servicio de clonaciones",efi32/syslinux.efi
+   dhcp-option=tag:efi32,encap:43,vendor:PXEClient,210,http://192.168.255.2/boot/efi32/
+
+   # Configuración para EFI64
+   pxe-service=BC_EFI,"Servicio de clonaciones",efi64/syslinux.efi
+   pxe-service=BC_EFI,"Servicio de clonaciones",efi64/syslinux.efi
+   pxe-service=x86-64_EFI,"Servicio de clonaciones",efi64/syslinux.efi
+   pxe-service=x86-64_EFI,"Servicio de clonaciones",efi64/syslinux.efi
+   dhcp-option=tag:efi64,encap:43,vendor:PXEClient,210,http://192.168.255.2/boot/efi64/
+
+La configuración requiere una aclaración. En principio, para cada arquitectura
+basta con encapsular la opción **210** en la **43** como se hace para la
+arquitectura |BIOS|, esto es, añadir una línea más. Sin embargo, para |UEFI|
+esto no basta, ya que para mejorar la compatibilidad con implementaciones
+deficientes de |PXE| en algunos *firmwares* |UEFI|, desde la versión 2.76 (véase
+las notas para esta versión en el `changelog
+<http://www.thekelleys.org.uk/dnsmasq/CHANGELOG>`_) cuando se envía una sola
+línea de menú |PXE|, en vez de enviar un menú de una sola línea, se envía
+directamente la |IP| del servidor |TFTP| y el nombre del fichero\ [#]_. Esto
+provoca que no se envíe la opción **43** y no haya forma de informar a
+:program:`syslinux` de que descargue a través de |HTTP| la configuración.
+
+Para evitar este inconveniente (a costa por supuesto de perder compatibilidad
+con *firmwares* defectuosos) duplicamos las líneas de menú y añadimos la
+directiva *pxe-prompt* para reducir la temporización a 0. De este modo, se envía
+menú (pero sin percatarnomos de ello) y, como efecto secundario, sí se envía la
+opción **210**.
+
 .. _pxe-dns:
 
 Soporte para varias redes
@@ -138,16 +191,8 @@ el arranque para cada red.
 
 Ahora bien, hemos dicho *casi* y no completamente, porque hay un punto de nuestra
 configuración que la hemos hecho depender de la |IP| del servidor y, por tanto,
-de la red en la que esté. Este punto es la configuración en la que se cambia el
-protocolo de |TFTP| a |HTTP|:
-
-* En el fichero :file:`pxelinux.cfg/default`:
-
-  .. literalinclude:: files/default.cfg
-     :emphasize-lines: 6
-
-* En el primer escenario en la configuración del servidor |DHCP| al
-  establecer el valor de la opción **210**::
+de la red en la que esté. Este punto es el envío de la opción **210** para
+cambiar del protocolo de |TFTP| a |HTTP|::
 
    dhcp-option=encap:43,210,http://192.168.255.1/boot/bios/
       
@@ -197,7 +242,7 @@ Requiere dos ficheros:
 * :file:`modules.ali`, que es una copia de :file:`modules.alias`, sito en
   :file:`/lib/modules/$(uname -r)`.
 
-Ambos ficheros pueden compromirse con :ref:`gzip <gzip>`, para hacer más ligera
+Ambos ficheros pueden comprimirse con :ref:`gzip <gzip>`, para hacer más ligera
 la descarga.
 
 .. _pxe-syslinux-display:
@@ -246,6 +291,28 @@ facilita el propio :program:`syslinux` (en *debian* se encuentra en el paquete
 
 Arranque con |iPXE|
 -------------------
+Aunque no hemos profundizado en la configuración de |iPXE|, éste puede usarse
+como trampolín para la carga de otro |NBP| o, mediante la escritura de un
+*script*, para presentar directamente un menú de arranque. Bajo este epígrafe
+nos limitaremos a exponer cómo usarlo, aunque no sea el *firmware* de arranque
+por red que use nuestra tarjeta.
+
+En :program:`dnsmasq` la configuración para el primer escenario (para el segundo
+y tercero basta con usar la versión con *pxe-service*) puede ser esta::
+
+   dhcp-match=ipxe,175
+
+   dhcp-boot=tag:!ipxe,ipxe.pxe
+   dhcp-boot=tag:ipxe,start.ipxe
+
+donde :file:`start.ipxe` es un `script de iPXE <http://ipxe.org/scripting>`_. La
+configuración es tal que, cuando se arranca con un firmware |PXE| que no es |iPXE|,
+se lanzará |iPXE| y, cuando se arranca con |iPXE|, se obtiene el *script* para
+|iPXE|. La desventaja de este método es que, por lo general, se necesita obtener
+|IP| dos veces, una al obtener el fichero :file:`ipxe.pxe` y otra al obtener
+posteriormente :file:`start.ipxe`. Puede evitarse esto, incrustando el script
+:file:`start.ipxe` dentro de :file:`ipxe.pxe`, pero ello exige `recompilar el
+programa <http://ipxe.org/embed>`_.
 
 .. Cosas interesantes:
    + https://www.syslinux.org/wiki/index.php?title=Cmd.c32, para crear varias entradas
@@ -254,6 +321,10 @@ Arranque con |iPXE|
 
 
 .. rubric:: Notas al pie
+
+.. [#] Este comportamiento deriva de `este mensaje de la lista de discusión del
+   programa
+   <http://lists.thekelleys.org.uk/pipermail/dnsmasq-discuss/2015q4/009960.html>`_.
 
 .. [#] El mayor éxito se logró obteniendo:
 
@@ -284,3 +355,4 @@ Arranque con |iPXE|
 .. |PHP| replace:: :abbr:`PHP (PHP Hypertext Preprocessor)`
 .. |TFTP| replace:: :abbr:`TFTP (Trivial FTP)`
 .. |URL| replace:: :abbr:`URL (Uniform Resource Locator)`
+.. |NBP| replace:: :abbr:`NBP (Network Bootstrap Program)`

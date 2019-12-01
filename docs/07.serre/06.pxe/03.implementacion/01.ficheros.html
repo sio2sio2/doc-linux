@@ -64,16 +64,11 @@ el <abbr title="Network Bootstrap Program">NBP</abbr> como un servidor <abbr tit
        |     |
        |     +--- lpxelinux.0
        |     +--- syslinux
-       |     |       |
-       |     |       +--- ldlinux.c32
-       |     |       +--- pxechn.c32
-       |     |       +--- menu.c32
-       |     |       +--- reboot.c32
-       |     |       +--- ... otros módulos ...
-       |     |
-       |     +--- pxelinux.cfg
        |             |
-       |             +--- default
+       |             +--- ldlinux.c32
+       |             +--- menu.c32
+       |             +--- reboot.c32
+       |             +--- ... otros módulos ...
        |
        +--- ssoo
        |     |
@@ -135,54 +130,25 @@ basta con hacer enlaces simbólicos. Por ejemplo:</p>
 </pre></div>
 </div>
 <p>Nuestra estrategia para las descargas es la siguiente:</p>
-<ol class="arabic simple">
-<li>El cliente <abbr title="Preboot eXecution Environment">PXE</abbr> descargará por <abbr title="Trivial FTP">TFTP</abbr> el <abbr title="Network Bootstrap Program">NBP</abbr> correspondiente
-(<strong class="program">lpxelinux.0</strong> en arquitecturas con <abbr title="Basic Input/Output System">BIOS</abbr>).</li>
-<li>El <abbr title="Network Bootstrap Program">NBP</abbr> ya es capaz de descargar por <abbr title="HyperText Transfer Protocol">HTTP</abbr>, pero ello exige que definamos la
-opción <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> <strong>210</strong>. Sin embargo, queremos usar una estrategia universal y en
-<a class="reference internal" href="02.escenarios.html#pxe-dhcp-separados"><span class="std std-ref">el tercer escenario</span></a> podría ocurrir que no seamos
-capaces, así que lo que hacemos es dejar que el <abbr title="Network Bootstrap Program">NBP</abbr> descargue
-<code class="file docutils literal notranslate"><span class="pre">ldlinux.c32</span></code> y <code class="file docutils literal notranslate"><span class="pre">pxelinux.cfg/default</span></code> también por <abbr title="Trivial FTP">TFTP</abbr>.</li>
-</ol>
-<ol class="arabic" id="pxe-cambio-a-http">
-<li><p class="first">El contenido de <code class="file docutils literal notranslate"><span class="pre">pxelinux.cfg/default</span></code> será el siguiente:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">PROMPT 0</span>
-<span class="go">DEFAULT chain</span>
-
-<span class="go">LABEL chain</span>
-<span class="go">   MENU LABEL chain</span>
-<span class="go">   KERNEL pxechn.c32 lpxelinux.0 -p http://192.168.255.1/boot/bios/</span>
+<ol class="arabic">
+<li><p class="first">El cliente <abbr title="Preboot eXecution Environment">PXE</abbr> descargará por <abbr title="Trivial FTP">TFTP</abbr> el <abbr title="Network Bootstrap Program">NBP</abbr> correspondiente
+(<strong class="program">lpxelinux.0</strong> en arquitecturas con <abbr title="Basic Input/Output System">BIOS</abbr>).</p>
+</li>
+<li><p class="first">El <abbr title="Network Bootstrap Program">NBP</abbr> ya es capaz de descargar por <abbr title="HyperText Transfer Protocol">HTTP</abbr>, pero ello exige enviar al
+cliente la opción <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> <strong>210</strong>, que en <strong class="program">dnsmasq</strong> se haría del
+siguiente modo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-option-force=210,http://192.168.255.1/boot/bios/</span>
 </pre></div>
 </div>
-<p>La configuración descarga por <abbr title="Trivial FTP">TFTP</abbr> sin esperas y sin posibilidad de
-selección el módulo <code class="file docutils literal notranslate"><span class="pre">pxechn.c32</span></code> que nos permite cargar un nuevo <abbr title="Network Bootstrap Program">NBP</abbr>
-pero con la posibilidad de pasarle un valor que haga las veces de opción
-<abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> <strong>210</strong>. Así que lo usamos y aprovechamos para cambiar el protocolo y
-empezar a usar <abbr title="HyperText Transfer Protocol">HTTP</abbr>.</p>
-<div class="admonition warning">
-<p class="first admonition-title">Advertencia</p>
-<p class="last">Obviamente, habrá que sustituir «<em>bios</em>» por «<em>efi32</em>» o
-«<em>efi64</em>» en los ficheros de configuración de las arquitecturas
-respectivas.</p>
+<p>o, mejor aún, encapsulándola en la opción <strong>43</strong>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-option=encap:43,210,http://192.168.255.1/boot/bios/</span>
+</pre></div>
 </div>
 </li>
 <li><p class="first">A partir de ahora los módulos y las configuraciones se descargarán por <abbr title="HyperText Transfer Protocol">HTTP</abbr>
 y ya explicaremos <a class="reference internal" href="#pxe-http"><span class="std std-ref">al llegar a él</span></a> qué estrategia seguimos.</p>
 </li>
 </ol>
-<div class="admonition note">
-<p class="first admonition-title">Nota</p>
-<p>Obviamente, si tenemos posibilidad de configurar el servidor <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr>
-para que envíe la opción, podríamos darle en su configuración como valor
-el mismo que hemos declarado en <code class="file docutils literal notranslate"><span class="pre">pxelinux.cfg/default</span></code>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-option-force=210,http://192.168.255.1/boot/bios/</span>
-</pre></div>
-</div>
-<p class="last">con lo que el proceso de arranque utilizará directamente el servicio <abbr title="HyperText Transfer Protocol">HTTP</abbr> y
-saltará directamente al punto 4., sin llegar a descargar
-<code class="file docutils literal notranslate"><span class="pre">pxelinux.cfg/default</span></code> y, consecuentemente, sin ejecutar por segunda
-vez <strong class="program">lpxelinux.0</strong>.</p>
-</div>
 <div class="admonition warning">
 <p class="first admonition-title">Advertencia</p>
 <p class="last">Aunque la estructura se ha creado para poder soportar el arranque
@@ -193,13 +159,28 @@ capaz de <a class="reference internal" href="04.misc.html#pxe-multiarch"><span c
 </div>
 <div class="admonition note">
 <p class="first admonition-title">Nota</p>
-<p class="last">Si decidimos prescindir de un servidor <abbr title="HyperText Transfer Protocol">HTTP</abbr> y realizar todas las
-descargas <abbr title="Trivial FTP">TFTP</abbr>, es obvio que <code class="file docutils literal notranslate"><span class="pre">pxelinux.cfg/default</span></code> no debe tener el
-contenido sugerido. En ese caso, bastaría con que tal fichero fuera un enlace
-simbólico a <code class="file docutils literal notranslate"><span class="pre">/srv/tftp/cfg/default</span></code>, que es el nombre que hemos
-elegido para una <a class="reference internal" href="#pxe-http-estatica"><span class="std std-ref">configuración estática</span></a>. Y a
-partir de aquí toda la configuración sería exactamente igual que para ese
-caso.</p>
+<p>Si decidimos prescindir de un servidor <abbr title="HyperText Transfer Protocol">HTTP</abbr> y realizar todas las
+descargas <abbr title="Trivial FTP">TFTP</abbr> es obvio que necesitaremos incluir dentro de la estructura
+de directorios del servidor <abbr title="Trivial FTP">TFTP</abbr> un fichero de configuración para
+<strong class="program">syslinux</strong>:</p>
+<div class="last highlight-none notranslate"><div class="highlight"><pre><span></span>+-- /srv/tftp
+       |
+       +--- bios
+       |     |
+       |     +--- lpxelinux.0
+       |     +--- syslinux
+       |     |       |
+       |     |       +--- ... modulos ...
+       |     |
+       |     +--- pxelinux.cfg
+       |             |
+       |             +--- default
+       |
+       +--- ssoo (estructura referida más arriba)
+       +--- efi32 (misma estructura que bios)
+       +--- efi64 (misma estructura que bios)
+</pre></div>
+</div>
 </div>
 </div>
 <div class="section" id="tftp">

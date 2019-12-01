@@ -56,28 +56,38 @@
 <span id="pxe-multiarch"></span><h2>7.6.3.4.1. Soporte multiarquitectura<a class="headerlink" href="#soporte-multiarquitectura" title="Enlazar permanentemente con este título">¶</a></h2>
 <div class="admonition warning">
 <p class="first admonition-title">Advertencia</p>
-<p class="last">El soporte para <abbr title="Unified Extensible Firmware Interface">UEFI</abbr> de <strong class="program">syslinux</strong> es bastante
-deficiente. Ni la versión estable <strong>6.03</strong> que trae <em>debian</em> ni la versión
-<strong>6.04pre1</strong>, última publicada a fecha de redacción, funcionan correctamente.
-Sólo la versión <em>master</em> de desarrollo, pero aplicando algunos parches para
-poder compilarla<a class="footnote-reference" href="#id4" id="id1">[1]</a>, funcionan. Aun así, el módulo <code class="file docutils literal notranslate"><span class="pre">pxechn.c32</span></code> no
-está portando a arquitectura <abbr title="Unified Extensible Firmware Interface">UEFI</abbr> con lo que nuestra propuesta sólo puede
-implementarse en el primer escenario, gracias a que podemos saltar la carga
-de este módulo enviando la opción <strong>210</strong>. Por si fuera poco, tampoco
-funciona muy bien el módulo <code class="file docutils literal notranslate"><span class="pre">menu.c32</span></code><a class="footnote-reference" href="#id5" id="id2">[2]</a>.</p>
+<p class="last">Dicutiremos una solución para soportar <abbr title="Basic Input/Output System">BIOS</abbr> y <abbr title="Unified Extensible Firmware Interface">UEFI</abbr>, aunque
+este último arranque siempre ha sido un poco problemático con
+<strong class="program">syslinux</strong>. En principio, debe funcionar, aunque depende mucho de
+que la implementación <abbr title="Preboot eXecution Environment">PXE</abbr> del firmware <abbr title="Unified Extensible Firmware Interface">UEFI</abbr> de la placa base no sea
+deficiente, como pasa en muchas ocasiones. La configuración se ha comprobado
+con <a class="reference external" href="https://github.com/tianocore/tianocore.github.io/wiki/OVMF">OVMF</a> que
+es una implementación de <abbr title="Unified Extensible Firmware Interface">UEFI</abbr> que utilizan <a class="reference internal" href="../../../09.apendice/99.virtual/01.virtualbox.html#virtualbox"><span class="std std-ref">Virtualbox</span></a> o
+<a class="reference internal" href="../../../09.apendice/99.virtual/02.kvm.html#qemu"><span class="std std-ref">QEmu</span></a>.</p>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p>Si se quieren hacer pruebas con máquinas virtuales, deberá saber cómo
+arrancarlas en <abbr title="Unified Extensible Firmware Interface">UEFI</abbr>. Si se utiliza <a class="reference internal" href="../../../09.apendice/99.virtual/02.kvm.html#qemu"><span class="std std-ref">QEmu</span></a> es necesario:</p>
+<ul class="last simple">
+<li>Instalar el paquete <em>qemu-efi</em>.</li>
+<li>Utilizar como tarjeta de red <em>virtio-net</em>.</li>
+<li>Añadir al ejecutable de <strong class="program">qemu</strong> la opción <kbd class="kbd docutils literal notranslate">-bios
+/usr/share/ovmf/OVMF.fd</kbd>.</li>
+</ul>
 </div>
 <p>Ya se ha comentado que un ordenador puede disponer de <abbr title="Basic Input/Output System">BIOS</abbr>, si es más antiguo,
 o de <abbr title="Unified Extensible Firmware Interface">UEFI</abbr>, si más moderno. Tal es así que nuestra <a class="reference internal" href="01.ficheros.html#pxe-ficheros"><span class="std std-ref">estructura de ficheros</span></a> está pensada para atender esta circunstancia. Sin embargo, en la
 configuración propuesta se carga de manera incondicional
 <code class="file docutils literal notranslate"><span class="pre">bios/pxelinux.0</span></code>, por lo que sólo somos capaces de dar soporte a clientes
-<abbr title="Preboot eXecution Environment">PXE</abbr> con <abbr title="Basic Input/Output System">BIOS</abbr> o, si son <abbr title="Unified Extensible Firmware Interface">UEFI</abbr>, emulando a la <abbr title="Basic Input/Output System">BIOS</abbr>. Sin embargo, empiezan a
-salir placas sin esta compatibilidad, por lo que sólo dar soporte a clientes
-<abbr title="Basic Input/Output System">BIOS</abbr> empieza a no ser adminisible.</p>
+<abbr title="Preboot eXecution Environment">PXE</abbr> con <abbr title="Basic Input/Output System">BIOS</abbr> o, si son <abbr title="Unified Extensible Firmware Interface">UEFI</abbr>, en modo compatibilidad con <abbr title="Basic Input/Output System">BIOS</abbr> (<em>Legacy</em>).
+Sin embargo, comienzan a aparecer placas sin esta compatibilidad, por lo que sólo
+dar soporte a clientes <abbr title="Basic Input/Output System">BIOS</abbr> empieza a no ser adminisible.</p>
 <p>La solución, no obstante, es conceptualmente bastante sencilla: detectar de qué
 tipo de arquitectura es el cliente y enviar el fichero adecuado:
 <code class="file docutils literal notranslate"><span class="pre">bios/lpxelinux.0</span></code>, <code class="file docutils literal notranslate"><span class="pre">efi32/syslinux.efi</span></code> o
 <code class="file docutils literal notranslate"><span class="pre">efi64/syslinux.efi</span></code>. Al determinar éste cuál es el <em>directorio de
-trabajo</em>, el resto de módulos necesarios también sera de la arquitectura
+trabajo</em>, el resto de módulos necesarios también será de la arquitectura
 apropiada. Así pues, el objetivo es modificar la configuración del servidor
 <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> (o del <abbr title="Preboot eXecution Environment">PXE</abbr> dependiendo del escenario).</p>
 <p>De acuerdo con el <span class="target" id="index-0"></span><a class="rfc reference external" href="https://tools.ietf.org/html/rfc4578.html"><strong>RFC 4578</strong></a>, el cliente <abbr title="Preboot eXecution Environment">PXE</abbr> debe enviar la opción <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr>
@@ -152,54 +162,34 @@ sucesivamente.</p>
 <p>Dependiendo de si el servicio <abbr title="Preboot eXecution Environment">PXE</abbr> es independiente (segundo y tercer
 escenarios) o está incluido en el <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> (1º escenario), habrá que hacer una
 cosa u otra.</p>
-<div class="section" id="pxe">
-<h3>7.6.3.4.1.1. <abbr title="Preboot eXecution Environment">PXE</abbr><a class="headerlink" href="#pxe" title="Enlazar permanentemente con este título">¶</a></h3>
-<p>Recordemos que dijimos que la forma de prestar el servicio era incluir esta
-línea:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">pxe-service=x86PC,&quot;Servicio de clonaciones&quot;,bios/lpxelinux.0</span>
-</pre></div>
-</div>
-<p>pero sin dar demasiadas explicaciones. El primer argumento es el tipo de
-arquitectura del cliente y la línea solamente se envía si el tipo de la línea
-coincide con el del cliente. Por tanto, nos basta con repetir la línea para las
-distintas arquitecturas que soportemos:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">pxe-service=x86PC,&quot;Servicio de clonaciones&quot;,bios/lpxelinux.0</span>
-<span class="go">pxe-service=IA32_EFI,&quot;Servicio de clonaciones&quot;,efi32/syslinux.efi</span>
-<span class="go">pxe-service=BC_EFI,&quot;Servicio de clonaciones&quot;,efi64/syslinux.efi</span>
-<span class="go">pxe-service=x86-64_EFI,&quot;Servicio de clonaciones&quot;,efi64/syslinux.efi</span>
-</pre></div>
-</div>
-</div>
 <div class="section" id="dhcp">
-<h3>7.6.3.4.1.2. <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr><a class="headerlink" href="#dhcp" title="Enlazar permanentemente con este título">¶</a></h3>
+<h3>7.6.3.4.1.1. <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr><a class="headerlink" href="#dhcp" title="Enlazar permanentemente con este título">¶</a></h3>
 <p>Si la información de red la facilita directamente el servidor <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> entonces
 tendremos explícitamente que analizar la opción <strong>93</strong>.</p>
 <div class="section" id="dnsmasq">
-<h4>7.6.3.4.1.2.1. <strong class="program">dnsmasq</strong><a class="headerlink" href="#dnsmasq" title="Enlazar permanentemente con este título">¶</a></h4>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-match=x86,93,0</span>
+<h4>7.6.3.4.1.1.1. <strong class="program">dnsmasq</strong><a class="headerlink" href="#dnsmasq" title="Enlazar permanentemente con este título">¶</a></h4>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-match=bios,93,0</span>
 <span class="go">dhcp-match=efi32,93,6</span>
 <span class="go">dhcp-match=efi64,93,7</span>
 <span class="go">dhcp-match=efi64,93,9</span>
 
-<span class="go">dhcp-boot=tag:x86,bios/lpxelinux.0</span>
+<span class="go">dhcp-boot=tag:bios,bios/lpxelinux.0</span>
 <span class="go">dhcp-boot=tag:efi32,efi32/syslinux.efi</span>
 <span class="go">dhcp-boot=tag:efi64,efi64/syslinux.efi</span>
 </pre></div>
 </div>
-<div class="admonition note">
-<p class="first admonition-title">Nota</p>
-<p>Recuérdese que en el primer escenario, podemos cambiar directamente al
-protocolo <abbr title="HyperText Transfer Protocol">HTTP</abbr>, proporcionando la opción <strong>210</strong> y nos ahorramos el paso
-por el módulo <code class="file docutils literal notranslate"><span class="pre">pxechn.c32</span></code>:</p>
-<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-option=x86,encap:43,210,http://192.168.255.1/boot/bios/</span>
+<p>Y, si queremos que generar <a class="reference internal" href="01.ficheros.html#pxe-http"><span class="std std-ref">configuraciones dinámicas</span></a>, esto es,
+menús de arranque cuyas entradas dependan del cliente que realiza la petición,
+entonces tendremos que obtener el fichero de configuración a través del
+protocolo <abbr title="HyperText Transfer Protocol">HTTP</abbr>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-option=bios,encap:43,210,http://192.168.255.1/boot/bios/</span>
 <span class="go">dhcp-option=efi32,encap:43,210,http://192.168.255.1/boot/efi32/</span>
 <span class="go">dhcp-option=efi64,encap:43,210,http://192.168.255.1/boot/efi64/</span>
 </pre></div>
 </div>
 </div>
-</div>
 <div class="section" id="servidor-del-isc">
-<h4>7.6.3.4.1.2.2. Servidor del <abbr title="Internet Systems Consortium">ISC</abbr><a class="headerlink" href="#servidor-del-isc" title="Enlazar permanentemente con este título">¶</a></h4>
+<h4>7.6.3.4.1.1.2. Servidor del <abbr title="Internet Systems Consortium">ISC</abbr><a class="headerlink" href="#servidor-del-isc" title="Enlazar permanentemente con este título">¶</a></h4>
 <p>Hay que hacer exactamente lo mismo que en <strong class="program">dnsmasq</strong>, aunque la sintaxis
 es algo más verborreica:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">option arch code 93 = unsigned integer 16;</span>
@@ -217,6 +207,66 @@ es algo más verborreica:</p>
 proceso de arranque.</p>
 </div>
 </div>
+<div class="section" id="pxe">
+<h3>7.6.3.4.1.2. <abbr title="Preboot eXecution Environment">PXE</abbr><a class="headerlink" href="#pxe" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Recordemos que dijimos que la forma de prestar el servicio era incluir esta
+línea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">pxe-service=x86PC,&quot;Servicio de clonaciones&quot;,bios/lpxelinux.0</span>
+</pre></div>
+</div>
+<p>pero sin dar demasiadas explicaciones. El primer argumento es el tipo de
+arquitectura del cliente y la línea solamente se envía si el tipo de la línea
+coincide con el del cliente. Por tanto, nos basta con repetir la línea para las
+distintas arquitecturas que soportemos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">pxe-service=x86PC,&quot;Servicio de clonaciones&quot;,bios/lpxelinux.0</span>
+<span class="go">pxe-service=IA32_EFI,&quot;Servicio de clonaciones&quot;,efi32/syslinux.efi</span>
+<span class="go">pxe-service=BC_EFI,&quot;Servicio de clonaciones&quot;,efi64/syslinux.efi</span>
+<span class="go">pxe-service=x86-64_EFI,&quot;Servicio de clonaciones&quot;,efi64/syslinux.efi</span>
+</pre></div>
+</div>
+<p>Ahora bien, esta configuración no envía la opción <strong>210</strong> y en consecuencia, no
+podremos descargar por <abbr title="HyperText Transfer Protocol">HTTP</abbr> la configuracióni de <strong class="program">syslinux</strong>. Para
+hacerlo necesitamos enriquecer la configuración:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-match=bios,93,0</span>
+<span class="go">dhcp-match=efi32,93,6</span>
+<span class="go">dhcp-match=efi64,93,7</span>
+<span class="go">dhcp-match=efi64,93,9</span>
+
+<span class="gp">#</span> Configuración para BIOS
+<span class="go">pxe-service=x86PC,&quot;Servicio de clonaciones&quot;,bios/lpxelinux.0</span>
+<span class="go">dhcp-option=tag:bios,encap:43,vendor:PXEClient,210,http://192.168.255.2/boot/bios/</span>
+
+<span class="go">pxe-prompt=&quot;Leyenda escondida...&quot;,0</span>
+
+<span class="gp">#</span> Configuración para EFI32
+<span class="go">pxe-service=IA32_EFI,&quot;Servicio de clonaciones&quot;,efi32/syslinux.efi</span>
+<span class="go">pxe-service=IA32_EFI,&quot;Servicio de clonaciones&quot;,efi32/syslinux.efi</span>
+<span class="go">dhcp-option=tag:efi32,encap:43,vendor:PXEClient,210,http://192.168.255.2/boot/efi32/</span>
+
+<span class="gp">#</span> Configuración para EFI64
+<span class="go">pxe-service=BC_EFI,&quot;Servicio de clonaciones&quot;,efi64/syslinux.efi</span>
+<span class="go">pxe-service=BC_EFI,&quot;Servicio de clonaciones&quot;,efi64/syslinux.efi</span>
+<span class="go">pxe-service=x86-64_EFI,&quot;Servicio de clonaciones&quot;,efi64/syslinux.efi</span>
+<span class="go">pxe-service=x86-64_EFI,&quot;Servicio de clonaciones&quot;,efi64/syslinux.efi</span>
+<span class="go">dhcp-option=tag:efi64,encap:43,vendor:PXEClient,210,http://192.168.255.2/boot/efi64/</span>
+</pre></div>
+</div>
+<p>La configuración requiere una aclaración. En principio, para cada arquitectura
+basta con encapsular la opción <strong>210</strong> en la <strong>43</strong> como se hace para la
+arquitectura <abbr title="Basic Input/Output System">BIOS</abbr>, esto es, añadir una línea más. Sin embargo, para <abbr title="Unified Extensible Firmware Interface">UEFI</abbr>
+esto no basta, ya que para mejorar la compatibilidad con implementaciones
+deficientes de <abbr title="Preboot eXecution Environment">PXE</abbr> en algunos <em>firmwares</em> <abbr title="Unified Extensible Firmware Interface">UEFI</abbr>, desde la versión 2.76 (véase
+las notas para esta versión en el <a class="reference external" href="http://www.thekelleys.org.uk/dnsmasq/CHANGELOG">changelog</a>) cuando se envía una sola
+línea de menú <abbr title="Preboot eXecution Environment">PXE</abbr>, en vez de enviar un menú de una sola línea, se envía
+directamente la <abbr title="Internet Protocol">IP</abbr> del servidor <abbr title="Trivial FTP">TFTP</abbr> y el nombre del fichero<a class="footnote-reference" href="#id3" id="id1">[1]</a>. Esto
+provoca que no se envíe la opción <strong>43</strong> y no haya forma de informar a
+<strong class="program">syslinux</strong> de que descargue a través de <abbr title="HyperText Transfer Protocol">HTTP</abbr> la configuración.</p>
+<p>Para evitar este inconveniente (a costa por supuesto de perder compatibilidad
+con <em>firmwares</em> defectuosos) duplicamos las líneas de menú y añadimos la
+directiva <em>pxe-prompt</em> para reducir la temporización a 0. De este modo, se envía
+menú (pero sin percatarnomos de ello) y, como efecto secundario, sí se envía la
+opción <strong>210</strong>.</p>
+</div>
 </div>
 <div class="section" id="soporte-para-varias-redes">
 <span id="pxe-dns"></span><h2>7.6.3.4.2. Soporte para varias redes<a class="headerlink" href="#soporte-para-varias-redes" title="Enlazar permanentemente con este título">¶</a></h2>
@@ -230,26 +280,11 @@ cliente con lo que conocerá la red de origen, si es que queremos particularizar
 el arranque para cada red.</p>
 <p>Ahora bien, hemos dicho <em>casi</em> y no completamente, porque hay un punto de nuestra
 configuración que la hemos hecho depender de la <abbr title="Internet Protocol">IP</abbr> del servidor y, por tanto,
-de la red en la que esté. Este punto es la configuración en la que se cambia el
-protocolo de <abbr title="Trivial FTP">TFTP</abbr> a <abbr title="HyperText Transfer Protocol">HTTP</abbr>:</p>
-<ul>
-<li><p class="first">En el fichero <code class="file docutils literal notranslate"><span class="pre">pxelinux.cfg/default</span></code>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">PROMPT 0</span>
-<span class="go">DEFAULT chain</span>
-
-<span class="go">LABEL chain</span>
-<span class="go">   MENU LABEL chain</span>
-<span class="hll"><span class="go">   KERNEL pxechn.c32 lpxelinux.0 -p http://192.168.255.1/boot/bios/</span>
-</span></pre></div>
-</div>
-</li>
-<li><p class="first">En el primer escenario en la configuración del servidor <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> al
-establecer el valor de la opción <strong>210</strong>:</p>
+de la red en la que esté. Este punto es el envío de la opción <strong>210</strong> para
+cambiar del protocolo de <abbr title="Trivial FTP">TFTP</abbr> a <abbr title="HyperText Transfer Protocol">HTTP</abbr>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-option=encap:43,210,http://192.168.255.1/boot/bios/</span>
 </pre></div>
 </div>
-</li>
-</ul>
 <div class="admonition note">
 <p class="first admonition-title">Nota</p>
 <p class="last">De hecho, si nuestro escenario es el tercero, debíamos cambiar esta
@@ -260,7 +295,7 @@ una para cada red y, aunque tomar una de ellas funciona, podría aparecer
 algún problema si decidimos mantener totalmente separadas las redes impidiendo
 el acceso mediante cortafuegos de una al resto.</p>
 <p>Una excelente solución es valernos del <abbr title="Domain Name Server">DNS</abbr>, ya que <strong class="program">pxelinux</strong> lo
-soporta y convertir la <abbr title="Uniform Resource Locator">URL</abbr><a class="footnote-reference" href="#id6" id="id3">[3]</a>:</p>
+soporta y convertir la <abbr title="Uniform Resource Locator">URL</abbr><a class="footnote-reference" href="#id4" id="id2">[2]</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">http://192.168.255.1/boot/bios/</span>
 </pre></div>
 </div>
@@ -294,7 +329,7 @@ de <a class="reference external" href="http://pci-ids.ucw.cz">aquí</a>.</li>
 <li><code class="file docutils literal notranslate"><span class="pre">modules.ali</span></code>, que es una copia de <code class="file docutils literal notranslate"><span class="pre">modules.alias</span></code>, sito en
 <code class="file docutils literal notranslate"><span class="pre">/lib/modules/$(uname</span> <span class="pre">-r)</span></code>.</li>
 </ul>
-<p>Ambos ficheros pueden compromirse con <a class="reference internal" href="../../../02.conbas/11.backup/01.compresion.html#gzip"><span class="std std-ref">gzip</span></a>, para hacer más ligera
+<p>Ambos ficheros pueden comprimirse con <a class="reference internal" href="../../../02.conbas/11.backup/01.compresion.html#gzip"><span class="std std-ref">gzip</span></a>, para hacer más ligera
 la descarga.</p>
 </div>
 <div class="section" id="graficos-sin-menu">
@@ -345,11 +380,39 @@ cuenta al crear el logo original.</p>
 </div>
 <div class="section" id="arranque-con-ipxe">
 <span id="pxe-ipxe"></span><h2>7.6.3.4.5. Arranque con <strong class="program">iPXE</strong><a class="headerlink" href="#arranque-con-ipxe" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Aunque no hemos profundizado en la configuración de <strong class="program">iPXE</strong>, éste puede usarse
+como trampolín para la carga de otro <abbr title="Network Bootstrap Program">NBP</abbr> o, mediante la escritura de un
+<em>script</em>, para presentar directamente un menú de arranque. Bajo este epígrafe
+nos limitaremos a exponer cómo usarlo, aunque no sea el <em>firmware</em> de arranque
+por red que use nuestra tarjeta.</p>
+<p>En <strong class="program">dnsmasq</strong> la configuración para el primer escenario (para el segundo
+y tercero basta con usar la versión con <em>pxe-service</em>) puede ser esta:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-match=ipxe,175</span>
+
+<span class="go">dhcp-boot=tag:!ipxe,ipxe.pxe</span>
+<span class="go">dhcp-boot=tag:ipxe,start.ipxe</span>
+</pre></div>
+</div>
+<p>donde <code class="file docutils literal notranslate"><span class="pre">start.ipxe</span></code> es un <a class="reference external" href="http://ipxe.org/scripting">script de iPXE</a>. La
+configuración es tal que, cuando se arranca con un firmware <abbr title="Preboot eXecution Environment">PXE</abbr> que no es <strong class="program">iPXE</strong>,
+se lanzará <strong class="program">iPXE</strong> y, cuando se arranca con <strong class="program">iPXE</strong>, se obtiene el <em>script</em> para
+<strong class="program">iPXE</strong>. La desventaja de este método es que, por lo general, se necesita obtener
+<abbr title="Internet Protocol">IP</abbr> dos veces, una al obtener el fichero <code class="file docutils literal notranslate"><span class="pre">ipxe.pxe</span></code> y otra al obtener
+posteriormente <code class="file docutils literal notranslate"><span class="pre">start.ipxe</span></code>. Puede evitarse esto, incrustando el script
+<code class="file docutils literal notranslate"><span class="pre">start.ipxe</span></code> dentro de <code class="file docutils literal notranslate"><span class="pre">ipxe.pxe</span></code>, pero ello exige <a class="reference external" href="http://ipxe.org/embed">recompilar el
+programa</a>.</p>
 <p class="rubric">Notas al pie</p>
+<table class="docutils footnote" frame="void" id="id3" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td>Este comportamiento deriva de <a class="reference external" href="http://lists.thekelleys.org.uk/pipermail/dnsmasq-discuss/2015q4/009960.html">este mensaje de la lista de discusión del
+programa</a>.</td></tr>
+</tbody>
+</table>
 <table class="docutils footnote" frame="void" id="id4" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td><p class="first">El mayor éxito se logró obteniendo:</p>
+<tr><td class="label"><a class="fn-backref" href="#id2">[2]</a></td><td><p class="first">El mayor éxito se logró obteniendo:</p>
 <ul class="last simple">
 <li>Tomando la última versión disponible (de 23/11/2017) del <a class="reference external" href="http://repo.or.cz/syslinux.git">repositorio git</a>.</li>
 <li>Añadiendo al subdirectorio <code class="file docutils literal notranslate"><span class="pre">gnu-efi</span></code> de las fuentes el
@@ -363,7 +426,7 @@ La versión <em>3.0.8</em> en concreto, pero renombrando el directorio raíz a <
 <table class="docutils footnote" frame="void" id="id5" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id2">[2]</a></td><td>En cualquier caso, se desarrolla cómo dotar de soporte, porque ilustra el
+<tr><td class="label">[3]</td><td>En cualquier caso, se desarrolla cómo dotar de soporte, porque ilustra el
 modo de distinguir las distintos clientes en el servidor y porque el
 procedimiento será válido, si en algún momento <strong class="program">syslinux</strong> ofrece un
 soporte aceptable.</td></tr>
@@ -372,7 +435,7 @@ soporte aceptable.</td></tr>
 <table class="docutils footnote" frame="void" id="id6" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id3">[3]</a></td><td>Como pasamos a usar un nonbre específico para este servicio, podríamos
+<tr><td class="label">[4]</td><td>Como pasamos a usar un nonbre específico para este servicio, podríamos
 prescindir de añadir a la <abbr title="Uniform Resource Locator">URL</abbr> <code class="file docutils literal notranslate"><span class="pre">/boot/</span></code> cambiando mínimamente la
 configuración de <strong class="program">nginx</strong>.</td></tr>
 </tbody>
@@ -390,12 +453,12 @@ configuración de <strong class="program">nginx</strong>.</td></tr>
   <ul>
 <li><a class="reference internal" href="#">7.6.3.4. Particularidades</a><ul>
 <li><a class="reference internal" href="#soporte-multiarquitectura">7.6.3.4.1. Soporte multiarquitectura</a><ul>
-<li><a class="reference internal" href="#pxe">7.6.3.4.1.1. <abbr title="Preboot eXecution Environment">PXE</abbr></a></li>
-<li><a class="reference internal" href="#dhcp">7.6.3.4.1.2. <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr></a><ul>
-<li><a class="reference internal" href="#dnsmasq">7.6.3.4.1.2.1. <strong class="program">dnsmasq</strong></a></li>
-<li><a class="reference internal" href="#servidor-del-isc">7.6.3.4.1.2.2. Servidor del <abbr title="Internet Systems Consortium">ISC</abbr></a></li>
+<li><a class="reference internal" href="#dhcp">7.6.3.4.1.1. <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr></a><ul>
+<li><a class="reference internal" href="#dnsmasq">7.6.3.4.1.1.1. <strong class="program">dnsmasq</strong></a></li>
+<li><a class="reference internal" href="#servidor-del-isc">7.6.3.4.1.1.2. Servidor del <abbr title="Internet Systems Consortium">ISC</abbr></a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#pxe">7.6.3.4.1.2. <abbr title="Preboot eXecution Environment">PXE</abbr></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#soporte-para-varias-redes">7.6.3.4.2. Soporte para varias redes</a></li>
