@@ -328,8 +328,8 @@ escuchará el servidor:
 
 .. code-block:: nginx
 
-   LISTEN 127.0.0.1 3499  # Para modo standalone (primer caso)
-   #LISTEN 0.0.0.0 3499   # Para modo netserver (primer caso)
+   LISTEN 127.0.0.1 3493  # Para modo standalone (primer caso)
+   #LISTEN 0.0.0.0 3493   # Para modo netserver (primer caso)
 
 Además, es preciso definir los usuarios con permisos en :file:`upsd.users`:
 
