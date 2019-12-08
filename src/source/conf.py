@@ -365,7 +365,6 @@ rst_epilog = """
 .. |SMTP| replace:: :abbr:`SMTP (Simple Mail Transfer Protocol)`
 .. |IMAP| replace:: :abbr:`IMAP (Internet Message Access Protocol)`
 .. |IP| replace:: :abbr:`IP (Internet Protocol)`
-.. |MAC| replace:: :abbr:`MAC (Media Access Control)`
 .. |VPN| replace:: :abbr:`VPN (Virtual Private Network)`
 """
 

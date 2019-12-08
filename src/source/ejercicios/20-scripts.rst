@@ -478,3 +478,5 @@ el sistema y las herramientas que existen en él.
    .. rst-class:: sol-script
 
       :download:`Solución propuesta </ejercicios/soluciones/discover.sh>`
+
+.. |MAC| replace:: :abbr:`MAC (Media Access Control)`
