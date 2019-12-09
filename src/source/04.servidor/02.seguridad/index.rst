@@ -77,7 +77,7 @@ accesos:
    Aunque no sea el ejemplo de un sistema operativo, la plataforma Moodle_
    implementa un control de accesos basado en roles.
    
-Trataremos en con más profundidad:
+Trataremos en más profundidad:
 
 .. rubric:: Contenidos
 
