@@ -1,3 +1,5 @@
+.. _disk-div:
+
 División del disco
 ******************
 Una de las principales tareas en la instalación de un sistema operativo es el

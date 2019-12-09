@@ -1,3 +1,5 @@
+.. _virtual:
+
 Virtualización
 **************
 La :dfn:`virtualización`, a grandes rasgos, puede definirse como la recreación
