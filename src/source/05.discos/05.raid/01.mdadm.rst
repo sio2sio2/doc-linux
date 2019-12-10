@@ -1,0 +1,390 @@
+.. _mdadm:
+.. index:: mdadm
+
+:command:`mdadm`
+================
+
+Creación
+--------
+Crearemos un |RAID| 1, ya que disponemos de dos discos. La creación de otros
+tipos de |RAID| suele limitarse, simplemente, a cambiar el nivel::
+
+   # mdadm --create /dev/md0 --metadata=1 --homehost=any --name=0 --verbose \
+           --level=1 --raid-devices=2 --assume-clean /dev/loop0p3 /dev/loop1p3
+
+Que creará un |RAID| 1 (:kbd:`--level`) con dos dispositivos físicos. El
+dispositivo virtual que representará al |RAID| hemos prescrito que se llame
+:file:`/dev/md0`. Además, incluimos la opción :kbd:`--assume-clean` para que el
+*software* no intente sincronizar el contenido de ambos discos. En este caso,
+la sincronización es una operación absurda, ya que creamos *ex novo* el |RAID|
+y, en consecuencia, los discos físicos están vacíos.i
+
+.. rubric:: Nombre del dispositivo virtual
+
+Como hemos prescrito que sea :file:`/dev/md0` por esta vez se denominará así.
+Sin embargo, cuando el sistema se monte automáticamente el nombre no tiene por
+qué conservarse:
+
+- En ausencia de configuración alguna, será :file:`/dev/md127`\ [#]_.
+- Si se incluye la opción :kbd:`--name` durante la creación y como valor se le
+  asigna un número, entonces se creará el dispositivo :file:`/dev/mdN` y el
+  enlace simbólico :file:`/dev/md/N`.
+- Ahora bien, la opción de creación :kbd:`--homehost` determina cuál es el
+  nombre de la máquina que debe hospedar al |RAID|. Si su valor es *any* o
+  coincide con el nombre de la máquina, entonces se cumple lo indicado en el
+  punto anterior. En cambio, si no coincide, se utilizará el dispositivo
+  predeterminado (:file:`/dev/md127`) y se creará el enlace simbólico
+  :file:`/dev/md/nombre:N`. No indicar la opción durante la creación provoca
+  que :command:`mdadm` tome como valor el nombre actual de la máquina. Por
+  último, el nombre de la máquina es el que se puede obtener con la orden
+  :ref:`hostname <hostname>`, porque en el fichero de configuración
+  :file:`/etc/mdadm/mdadm.conf` así se prescribe:
+
+  .. code-block:: none
+
+     HOMEHOST <system>
+
+  Sin embargo puede fijarse otro nombre la configuración y ese será el nombre que tome
+  en consideración :command:`mdadm`.
+
+  .. warning:: Hay otro consecuencia de que no coincidan el nombre de la máquina
+     con el "*homehost*" del |RAID|: que el automontaje hará que el dispositivo
+     se monte en sólo lectura.
+
+- Con independencia de todo lo anterior, en :file:`/etc/mdadm/mdadm.conf` puede
+  establecerse cuál es el dispositivo que quiere asociarse al |RAID|. Para ello
+  basta con hacer::
+
+   # mdadm --detail --scan
+   ARRAY /dev/md/xxx:1 metadata=1.2 name=xxx:1 UUID=58fb8eec:f831093a:f521de2d:9c6943a4
+
+  añadir la salida al fichero y corregir el nombre del dispositivo para que
+  se ajuste a nuestro gusto (p.e. :file:`/dev/md/0`). De este modo, podemos
+  ahorrarnos el prever cómo denominará el *software* al |RAID|.
+
+.. note:: Para forzar el montaje automático del |RAID| podemos pararlo::
+
+      # mdadm --stop /dev/md0
+
+   y probar a ensamblarlo automáticamente::
+
+      # mdadm --assemble --scan
+
+   Si esto no funciona, aún podemos hacer desaparecer las particiones que forman
+   el |RAID| y hacerlas aparecer de nuevo::
+
+      # partx -d /dev/loop0
+      # partx -d /dev/loop1
+      # partx -a /dev/loop0
+      # partx -a /dev/loop1
+
+.. _raid1-hot-spare:
+
+.. rubric:: Disco de reserva (*hot spare*)
+
+Podemos también crear el |RAID| incorporando un :ref:`disco de reserva
+<hot-spare>`. Así, suponiendo que hubiéramos creado un fichero-disco más y
+lo hubiéramos asociado a :file:`/dev/loop2`::
+
+   # mdadm --create /dev/md0 --metadata=1 --homehost=any --name=0 --verbose \
+           --level=1 --raid-devices=2 --spare-devices=1 --assume-clean
+           /dev/loop0p3 /dev/loop1p3 /dev/loop2p3
+
+De esta forma dos discos formarán el |RAID| espejo y el tercero quedará en
+reserva esperando a que uno de los otros falle. En cuanto esto ocurra, se
+añadirça automática al |RAID| sincronizándose con el disco sobreviviente.
+
+.. rubric:: |RAID| 1 sin redundancia
+
+Es posible forzar a :command:`mdadm` a crear un |RAID| 1 con un único disco lo
+cual es, en principio, absurdo, ya que no existe redundancia. Sin embargo, es
+una buena forma de comenzar a instalar un sistema que se prevé que acabe
+funcionado sobre un |RAID|. De esta forma, las estructuras ya están creadas y
+sólo es necesario modificar el |RAID| para añadir otros ficheros::
+
+   # mdadm --create /dev/md0 --metadata=1 --homehost=any --name=0 --verbose \
+           --level=1 --raid-devices=1 --force --assume-clean /dev/loop0p3
+
+Consulta
+--------
+El modo más simple de consultar el funcionamiento de un |RAID|, es mirar el
+contenido de :file:`/proc/mdstat`. Por ejemplo, en el caso del |RAID| 1 con dos
+discos, veremos:
+
+.. code-block:: console
+   :emphasize-lines: 3,4
+
+   # cat /proc/mdstat 
+   Personalities : [raid1] [linear] [multipath] [raid0] [raid6] [raid5] [raid4] [raid10] 
+   md0 : active raid1 loop1p3[1] loop0p3[0]
+         458688 blocks super 1.2 [2/2] [UU]
+
+En cuya salida podemos ver nuestro |RAID| de nivel **1** constituido por dos
+dispositivos perfectamente sincronizados (ambos **U**\ [pdated]). En el caso del
+|RAID| 1 sin redundancia, la salida sería esta::
+
+   # cat /proc/mdstat
+   Personalities : [raid1] [linear] [multipath] [raid0] [raid6] [raid5] [raid4] [raid10] 
+   md0 : active raid1 loop0p3[0]
+         458688 blocks super 1.2 [1/1] [U]
+
+Y en el caso del |RAID| 1 de dos discos con otro de reserva::
+
+   # cat /proc/mdstat 
+   Personalities : [raid1] [linear] [multipath] [raid0] [raid6] [raid5] [raid4] [raid10] 
+   md0 : active raid1 loop2p3[2](S) loop1p3[1] loop0p3[0]
+         458688 blocks super 1.2 [2/2] [UU]
+
+Además, de ser muy ilustrativa, lo interesante de esta salida es que, cuando el
+|RAID| se encuentra sincronizando discos (p.e. tras incorporar uno nuevo al
+|RAID|), nos informará de ello y de cuál es su porcentaje de sincronización. Más
+adelante, al manipular los |RAID| volveremos sobre esta salida.
+
+Otras consultas más detalladas son::
+
+   # mdadm --detail /dev/md0
+   /dev/md0:
+              Version : 1.2
+        Creation Time : Mon Dec  9 22:08:29 2019
+           Raid Level : raid1
+           Array Size : 458688 (447.94 MiB 469.70 MB)
+        Used Dev Size : 458688 (447.94 MiB 469.70 MB)
+         Raid Devices : 2
+        Total Devices : 2
+          Persistence : Superblock is persistent
+
+          Update Time : Mon Dec  9 22:08:29 2019
+                State : clean 
+       Active Devices : 2
+      Working Devices : 2
+       Failed Devices : 0
+        Spare Devices : 0
+
+   Consistency Policy : resync
+
+                 Name : any:0
+                 UUID : 8597a136:4199ae3e:897e9269:97cd0c37
+               Events : 0
+
+       Number   Major   Minor   RaidDevice State
+          0     259        2        0      active sync   /dev/loop0p3
+          1     259        5        1      active sync   /dev/loop1p3
+
+o :kbd:`--examine` que permite consultar cada componente del |RAID|::
+
+   # mdadm --examine /dev/loop0p3
+   /dev/loop0p3:
+             Magic : a92b4efc
+           Version : 1.2
+       Feature Map : 0x0
+        Array UUID : 8597a136:4199ae3e:897e9269:97cd0c37
+              Name : any:0
+     Creation Time : Mon Dec  9 22:08:29 2019
+        Raid Level : raid1
+      Raid Devices : 2
+
+    Avail Dev Size : 917471 (447.98 MiB 469.75 MB)
+        Array Size : 458688 (447.94 MiB 469.70 MB)
+     Used Dev Size : 917376 (447.94 MiB 469.70 MB)
+       Data Offset : 2048 sectors
+      Super Offset : 8 sectors
+      Unused Space : before=1968 sectors, after=95 sectors
+             State : clean
+       Device UUID : 4a4685b3:2d2c868d:674d24ad:f76d4eea
+
+       Update Time : Mon Dec  9 22:08:29 2019
+     Bad Block Log : 512 entries available at offset 16 sectors
+          Checksum : 8e14dfe2 - correct
+            Events : 0
+
+
+      Device Role : Active device 0
+      Array State : AA ('A' == active, '.' == missing, 'R' == replacing)
+
+Ensamblaje
+----------
+Para ensamblar a mano un |RAID| que no ha sido ensamblado automáticamente, basta
+con::
+
+   # mdadm --assemble /dev/md0 /dev/loop0p3 /dev/loop1p3
+
+y para desensamblarlo, basta usar :kbd:`--stop` haciendo referencia al
+dispositivo virtual que representa al |RAID|::
+
+   # mdadm --stop /dev/md0
+
+Desconexión
+-----------
+Tendremos que desconectar un disco del |RAID| cuando falle. Supongamos que hemos
+configurado un `RAID 1 con un disco de reserva <raid1-hot-spare>`_, con lo cual,
+en ausencia de fallo, veríamos lo siguiente::
+
+    # cat /proc/mdstat 
+    Personalities : [raid1] [linear] [multipath] [raid0] [raid6] [raid5] [raid4] [raid10] 
+    md0 : active raid1 loop2p3[2](S) loop1p3[1] loop0p3[0]
+          458688 blocks super 1.2 [2/2] [UU]
+
+Si en un determinado momento falla el disco 0, lo cual podemos simular marcándo
+el dispositivo como erróneo::
+
+   # mdadm --fail /dev/md0 /dev/loop0p3
+
+se incorporá automáticamente al |RAID| el disco de reserva::
+
+   # cat /proc/mdstat 
+   Personalities : [raid1] [linear] [multipath] [raid0] [raid6] [raid5] [raid4] [raid10] 
+   md0 : active raid1 loop2p3[2] loop1p3[1] loop0p3[0](F)
+         458688 blocks super 1.2 [2/1] [_U]
+         [=====>...............]  recovery = 25.0% (114688/458688) finish=0.0min speed=114688K/sec
+
+La incorporación supone que haya que sincronizar el disco con el disco 1, por lo
+que la consulta muestra el proceso. En esta situación es muy útil el uso de
+:ref:`watch <watch>`::
+
+   # watch -n1 "cat /proc/mdstat"
+
+que permitirá que veamos progresar la barra. Hasta que se complete el proceso,
+el |RAID| no es tolerante a fallos. La ventaja de haber dispuesto un disco de
+reserva, es que se minimiza el tiempo de no-redundancia, que se reduce
+exclusivamente al tiempo de sincronización. Finalmente::
+
+   # cat /proc/mdstat 
+   Personalities : [raid1] [linear] [multipath] [raid0] [raid6] [raid5] [raid4] [raid10] 
+   md0 : active raid1 loop2p3[2] loop1p3[1] loop0p3[0](F)
+         458688 blocks super 1.2 [2/2] [UU]
+
+Volveremos a tener un |RAID| de dos discos, pero sin reserva, puesto que el
+tercer disco está roto. Para extraerlo::
+
+   # mdadm --remove /dev/md0 /dev/loop0p3
+   # cat /proc/mdstat 
+   Personalities : [raid1] [linear] [multipath] [raid0] [raid6] [raid5] [raid4] [raid10] 
+   md1 : active raid1 loop2p3[2] loop1p3[1]
+         458688 blocks super 1.2 [2/2] [UU]
+
+.. note:: El disco roto, si realmente lo estuviera, habria que desecharlo. Como
+   no lo está, podriamos reengancharlo::
+
+      # mdadm --re-add /dev/md0 /dev/loop0p3
+
+   en cuyo caso, pasará a ser un disco de reserva, porque el |RAID| lo definimos
+   como de dos discos y esta característica no se ha modificado. Otra
+   alternativa es limpiar todas las estrcuturas de metadatos::
+
+      # mdadm --zero-superblock /dev/loop0p3
+
+   y dedicar el disco a otra cosa.
+
+.. rubric:: Sustitución de disco
+
+Como corolario a la desconexión, podemos describir las pautas que deben seguirse
+cuando se sustituye un disco. Para lo cual, partiendo del último supuesto en que
+tenemos el |RAID| 1 con dos dispositivos (el disco 1 y el disco 2) y sin disco
+de reserva, suponemos que se rompe el disco 2 y que lo sustituimos por el disco
+0 (que ahora mismo tenemos libre). Antes de empezar, el proceso tenemos que
+dejar sin metadatos el disco 0 (para que luego no incordie) y simular el fallo
+del disco 2::
+
+   # mdadm --zero-superblock /dev/loop0p3
+   # mdadm --fail /dev/md0 /dev/loop2p3
+
+Lo adecuado es que, cuando se produzca un fallo, se envíe un aviso al
+administrador del sistema. Este aviso es un correo elecrónico dirigido a::
+
+   # grep ^MAILADDR /etc/mdadm/mdadm.conf
+   MAILADDR root
+
+a la cuenta del administrador. Podemos incluir aquí cualquier otra dirección de
+correo válida, pero se usará el servidor de correo local para enviarla, por lo
+que es indispensable que este esté convenientemente configurado.
+
+.. seealso:: Tiene información sobre :ref:`cómo configurar un servidor de correo
+   <smtp>`.
+
+En la situación descrita tenemos el |RAID| en precario::
+
+   # cat /proc/mdstat 
+   Personalities : [raid1] [linear] [multipath] [raid0] [raid6] [raid5] [raid4] [raid10] 
+   md1 : active (auto-read-only) raid1 loop2p3[2](F) loop1p3[1]
+         458688 blocks super 1.2 [2/1] [_U]
+
+y habrá que retirar del |RAID| el disco defectuoso::
+
+   # mdadm --remove /dev/md0 /dev&loop2p3
+
+Para a continuación añadir el nuevo disco. Si embargo, esta acción no es
+inmediata, ya que antes hay que preparar sus particiones, para lo cual copiamos
+la del disco superviviente del |RAID|::
+
+   # sgdisk -R /dev/loop0 /dev/loop1
+   # sgdisk -G /dev/loop1
+   # mdadm --add /dev/md0 /dev/loop0p3
+   # cat /proc/mdstat 
+   Personalities : [raid1] [linear] [multipath] [raid0] [raid6] [raid5] [raid4] [raid10] 
+   md1 : active raid1 loop0p3[3] loop2p3[2](F) loop1p3[1]
+         458688 blocks super 1.2 [2/1] [_U]
+         [==>..................]  recovery = 12.5% (57344/458688) finish=0.1min speed=57344K/sec
+
+Y esperamos a que acabe la sincronización.
+
+Modificación
+------------
+Un |RAID| ya definido podemos modificarlo de diferentes formas:
+
+- Añadiendo un disco de reserva.
+- Añadiendo un disco.
+- Eliminando un disco.
+- Aumentando la capacidad del |RAID|.
+- Modificando el nivel del |RAID|.
+
+.. rubric:: Adición de un disco de reserva
+
+Es necesario preparar las particiones del disco copiando en él la tabla de
+particiones de otro disco que ya pertenezca al |RAID| y después, simplemente,
+añadirlo::
+
+   # sgdisk -R /dev/loop2 /dev/loop0
+   # sgdisk -G /dev/loop2
+   # mdadm --add-spare /dev/md0 /dev/loop2p3
+
+.. rubric:: Adición de un disco
+
+En este caso, no basta con añadir el disco, sino que hay que aumentar el número
+de disco. Por tanto, a lo anterior, debemos añadir::
+
+   # mdadm --grow /dev/md0 --raid-devices=3
+
+.. note:: Existe también la opción :kbd:`--add`, pero esta sólo añade el disco
+   al |RAID| si al |RAID| le hemos aumentado previamente el número de
+   dispositivos. En caso contrario, añade el disco como disco de reserva. Por
+   otro lado, si al |RAID| se le aumenta el número de dispositivos, intentará
+   añadir discos de reserva al |RAID|.
+
+.. rubric:: Eliminación de disco
+
+Ya se visto el procedimiento: el disco debe marcarse como defectuoso antes de
+ser eliminado::
+
+   # mdadm --fail /dev/md0 /dev/loop2p3
+   # mdadm --remove /dev/md0 /dev/loop2p3
+
+Ahora bien, si el proceso se deja aquí el |RAID|, aunque tenga discos para
+asegurar la redundancia, quedará cojo y así lo mostrará :file:`/proc/mdstat`::
+
+   # cat /proc/mdastat
+   [... TODO: Pegar la salida ...::
+   
+Es necesario, además, redefinir el número de dispositivos::
+
+   # mdadm --grow /dev/md0 --raid-devices=2
+
+|RAID| en discos arrancables
+----------------------------
+
+.. rubric:: Notas al pie
+
+.. [#] Supuesto libre, en caso contrario se usará :file:`/dev/md126` y así
+   sucesivamente hasta encontrar el primero libre.
+
+
+.. |RAID| replace:: :abbr:`RAID (Redundant Array of Independent Disks)`
