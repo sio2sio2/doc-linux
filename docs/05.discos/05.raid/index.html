@@ -301,6 +301,30 @@ el resto del epígrafe.</li>
 constitución de dispositivos <abbr title="Redundant Array of Independent Disks">RAID</abbr> como <abbr title="Zettavyte File System">ZFS</abbr> o <abbr title="B-TRee File System">BtrFS</abbr>.</p>
 </dd>
 </dl>
+<p>Es importante tener presente que la constitución de un <abbr title="Redundant Array of Independent Disks">RAID</abbr> exige el
+almacenamiento de los metadatos que lo definen. En los tres casos, esos
+metadatos se almacenan en los propios dispositivos de almacenamiento<a class="footnote-reference" href="#id3" id="id1">[1]</a>. Es
+conveniente, tener presente esto, sobre todo cuando sustuimos el <em>hardware</em> en
+los dos primeros casos:</p>
+<ul>
+<li><p class="first">Si nuestra intención es ser capaz de leer datos, entonces necesitaremos
+que el sistema sea capaz de entender tales metadatos:</p>
+<ul class="simple">
+<li>En el caso de los <abbr title="Redundant Array of Independent Disks">RAID</abbr> por <em>hardware</em>, el núcleo de linux dispone de
+algunos <em>drivers</em> (véase <a class="reference external" href="https://wiki.debian.org/LinuxRaidForAdmins">esta página de la wiki de debian al respecto</a>).</li>
+<li>En el caso de los fake<abbr title="Redundant Array of Independent Disks">RAID</abbr>, puede sacarnos del apuro <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/dmraid(8)">dmraid(8)</a></em>.</li>
+</ul>
+</li>
+<li><p class="first">Si nuestra intención es reaprovechar los discos sin preocuparnos por la
+información, entonces deberemos asegurarnos de eliminar los metadatos. Para
+ello, suele ser suficiente con sobrescrbir con ceros los primeros y los
+últimos 512KiB:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> dd &lt; /dev/zero &gt; /dev/sdX <span class="nv">bs</span><span class="o">=</span><span class="m">512</span> <span class="nv">count</span><span class="o">=</span><span class="m">1024</span>
+<span class="gp">#</span> dd &lt; /dev/zero &gt; /dev/sdX <span class="nv">bs</span><span class="o">=</span><span class="m">512</span> <span class="nv">seek</span><span class="o">=</span><span class="k">$((</span><span class="sb">`</span>blockdev --getsz /dev/sdX<span class="sb">`</span> <span class="o">-</span> <span class="m">1024</span><span class="k">))</span> <span class="nv">count</span><span class="o">=</span><span class="m">1024</span>
+</pre></div>
+</div>
+</li>
+</ul>
 </div>
 <div class="section" id="raids-en-linux">
 <span id="raid-linux"></span><h2>5.4.2. <abbr title="Redundant Array of Independent Disks">RAID</abbr>s en <em>Linux</em><a class="headerlink" href="#raids-en-linux" title="Enlazar permanentemente con este título">¶</a></h2>
@@ -330,7 +354,7 @@ dispositivos físicos, sino particiones, así que necesitamos particionar los
 discos. Si pretendemos que nuestro disco contenga el sistema operativo y sea
 arrancable, entonces tendremos que dejar el arranque fuera del <abbr title="Redundant Array of Independent Disks">RAID</abbr>.
 Suponiendo que utilicemos particionado <abbr title="GUID Partition Table">GPT</abbr> y el disco sea compatible con
-arranques <abbr title="Basic I/O System">BIOS</abbr> y <abbr title="Unified Extensible Firmware Interface">UEFI</abbr><a class="footnote-reference" href="#id2" id="id1">[1]</a>:</p>
+arranques <abbr title="Basic I/O System">BIOS</abbr> y <abbr title="Unified Extensible Firmware Interface">UEFI</abbr><a class="footnote-reference" href="#id4" id="id2">[2]</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> sgdisk -a <span class="m">8</span> -n <span class="s2">&quot;0:40:2047&quot;</span> -t <span class="s2">&quot;0:0xef02&quot;</span> -c <span class="s2">&quot;0:BOOTBIOS&quot;</span> <span class="se">\</span>
          -a <span class="m">2048</span> -n <span class="s2">&quot;0:2048:+50M&quot;</span> -t <span class="s2">&quot;0:0xef00&quot;</span> -c <span class="s2">&quot;0:EFI&quot;</span> <span class="se">\</span>
                  -N <span class="m">0</span> -c <span class="s2">&quot;3:RAID&quot;</span> -t <span class="s2">&quot;3:0xfd00&quot;</span> /dev/loop0
@@ -388,10 +412,18 @@ obviamente.</li>
 </ul>
 </div>
 <p class="rubric">Notas al pie</p>
-<table class="docutils footnote" frame="void" id="id2" rules="none">
+<table class="docutils footnote" frame="void" id="id3" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td>Véase la discusión sobre <a class="reference internal" href="../01.division/02.part.html#part-gpt-uefi"><span class="std std-ref">particionado GPT para UEFI</span></a>.</td></tr>
+<tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td>Incluso en los <abbr title="Redundant Array of Independent Disks">RAID</abbr> por <em>hardware</em> y los fake<abbr title="Redundant Array of Independent Disks">RAID</abbr> en los que habría
+cabido la posibilidad de que esos metadatos se hubieran registrado en memoria
+<em>NVRAM</em> la contraladora controladora o de la placa base.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id4" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id2">[2]</a></td><td>Véase la discusión sobre <a class="reference internal" href="../01.division/02.part.html#part-gpt-uefi"><span class="std std-ref">particionado GPT para UEFI</span></a>.</td></tr>
 </tbody>
 </table>
 </div>

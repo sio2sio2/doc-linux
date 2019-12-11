@@ -234,6 +234,28 @@ Mediante **software**
    Por su parte, algunos sistemas de ficheros soportan directamente la
    constitución de dispositivos |RAID| como |ZFS| o |BtrFS|.
 
+Es importante tener presente que la constitución de un |RAID| exige el
+almacenamiento de los metadatos que lo definen. En los tres casos, esos
+metadatos se almacenan en los propios dispositivos de almacenamiento\ [#]_. Es
+conveniente, tener presente esto, sobre todo cuando sustuimos el *hardware* en
+los dos primeros casos:
+
+- Si nuestra intención es ser capaz de leer datos, entonces necesitaremos
+  que el sistema sea capaz de entender tales metadatos:
+  
+  * En el caso de los |RAID| por *hardware*, el núcleo de linux dispone de
+    algunos *drivers* (véase `esta página de la wiki de debian al respecto
+    <https://wiki.debian.org/LinuxRaidForAdmins>`_).
+  * En el caso de los fake\ |RAID|, puede sacarnos del apuro :manpage:`dmraid(8)`.
+
+- Si nuestra intención es reaprovechar los discos sin preocuparnos por la
+  información, entonces deberemos asegurarnos de eliminar los metadatos. Para
+  ello, suele ser suficiente con sobrescrbir con ceros los primeros y los
+  últimos 512KiB::
+
+   # dd < /dev/zero > /dev/sdX bs=512 count=1024
+   # dd < /dev/zero > /dev/sdX bs=512 seek=$((`blockdev --getsz /dev/sdX` - 1024)) count=1024
+
 .. _raid-linux:
 
 |RAID|\ s en *Linux*
@@ -321,6 +343,10 @@ Estudiaremos ambas posibilidades.
    [0-9]*
 
 .. rubric:: Notas al pie
+
+.. [#] Incluso en los |RAID| por *hardware* y los fake\ |RAID| en los que habría
+   cabido la posibilidad de que esos metadatos se hubieran registrado en memoria
+   *NVRAM* la contraladora controladora o de la placa base.
 
 .. [#] Véase la discusión sobre :ref:`particionado GPT para UEFI <part-gpt-uefi>`.
 

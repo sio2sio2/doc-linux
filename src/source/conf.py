@@ -368,6 +368,8 @@ rst_epilog = """
 .. |VPN| replace:: :abbr:`VPN (Virtual Private Network)`
 """
 
+manpages_url = "https://manpages.debian.org/{path}"
+
 # Para que funcione la sintaxis de PHP sin poner <?php ... ?> en el código.
 from sphinx.highlighting import lexers
 from pygments.lexers.web import PhpLexer
