@@ -270,8 +270,16 @@ arranques |BIOS| y |UEFI|\ [#]_::
             -a 2048 -n "0:2048:+50M" -t "0:0xef00" -c "0:EFI" \
                     -N 0 -c "3:RAID" -t "3:0xfd00" /dev/loop0
 
-en que creamos dos particiones para el arranque y una partición que ocupa
-prácticamente todo el disco encargada de formar parte del |RAID|.
+o bien::
+
+   # sgdisk -a 8 -n "0:40:2047" -t "0:0xef02" -c "0:BOOTBIOS" \
+            -a 2048 -n "0:2048:+50M" -t "0:0xef00" -c "0:EFI" \
+                    -N 0 -c "3:LVM" -t "3:0x8e00" /dev/loop0
+
+donde ambas tablas tienes dos particiones de arranque y una última partición
+para sistemas y datos en la que sólo cambia el etiquetado y tipo dependiendo de
+cuál se la implementación de linux (:ref:`mdadm <mdadm>` o :ref:`lvm <lvmraid>`)
+que pretendeamos usar.
 
 .. warning:: Lo conveniente es que los discos sean del mismo tamaño. Es común,
    sin embargo, que si los discos son de diferente fabricante no contengan
@@ -292,15 +300,19 @@ Hecho lo cual, ya podemos exponer las particiones de ambos discos::
 
 Implementaciones
 ----------------
-.. todo:: Tratar por separado :command:`mdadm` y |RAID|\ s directamente
-   con lvm2. Sería mejor separarlo en sendos documentos.
+El núcleo de linux dispone de un driver llamado |MD| para el soporte de
+volúmenes |RAID|. Como herramientas de usuario para la creación y gestión de
+estos dispositivos hay dos posibilidades:
 
-.. https://blog.programster.org/create-raid-with-lvm
-   https://www.systutorials.com/docs/linux/man/7-lvmraid/
-   https://wiki.archlinux.org/index.php/LVM_(Espa%C3%B1ol)#RAID
+* :ref:`mdadm <mdadm>`, que es una herramienta exclusiva para la creación de
+  estos dispositivos y que nos permite un control más preciso sobre lo que
+  nyestra configuración.
+* :ref:`lvm <lvm>` que, desde su versión 2, permite la definición de volúmenes
+  lógicos que sean a su vez dispositivos |RAID|, para lo cual el grupo de
+  volúmenes deberá haberse construido sobre dos o mas volúmenes físicos,
+  obviamente.
 
-*Linux* dispone de la orden :command:`mdadm` que nos permite crear, destruir y
-modificar |RAID|\ s de nivel 0, 1, 5, 6 y 10.
+Estudiaremos ambas posibilidades.
 
 .. toctree::
    :glob:
@@ -318,5 +330,6 @@ modificar |RAID|\ s de nivel 0, 1, 5, 6 y 10.
 .. |GPT| replace:: :abbr:`GPT (GUID Partition Table)`
 .. |ZFS| replace:: :abbr:`ZFS (Zettavyte File System)`
 .. |BtrFS| replace:: :abbr:`BtrFS (B-TRee File System)`
+.. |MD| replace:: :abbr:`MD (Multiple Devices)`
 
 .. |xor| unicode:: U+2295 .. CIRCLED PLUS
