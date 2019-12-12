@@ -11,6 +11,38 @@ que se realizan sobre un disco físico: :ref:`particionado <particionado>` o
 limitaremos exclusivamente a la creación y gestión de este dispositivo virtual:
 cómo se particione después es otro asunto.
 
+Preliminares
+------------
+En el |RAID| no debemos incluir dispositivos físicos, sino particiones, así que
+necesitamos particionar los discos. Si pretendemos que nuestro disco contenga el
+sistema operativo y sea arrancable, entonces tendremos que dejar el arranque
+fuera del |RAID|.  Suponiendo que utilicemos particionado |GPT| y el disco sea
+compatible con arranques |BIOS| y |UEFI|\ [#]_::
+
+   # sgdisk -a 8 -n "0:40:2047" -t "0:0xef02" -c "0:BOOTBIOS" \
+            -a 2048 -n "0:2048:+50M" -t "0:0xef00" -c "0:EFI" \
+                    -N 0 -c "3:RAID" -t "3:0xfd00" /dev/loop0
+
+en donde hay dos particiones de arranque y una última partición que ocupa el
+resto del disco para crear el |RAID|.
+
+.. warning:: Lo conveniente es que los discos sean del mismo tamaño. Es común,
+   sin embargo, que si los discos son de diferente fabricante no contengan
+   exactamente el mismo número de sectores. Asegúrese de hacer esta operación
+   sobre el disco con menos sectores.
+
+Podemos llevar a cabo la misma operación sobre :file:`/dev/loop1`, pero es
+más cómodo y más conveniente, simplemente, copiar la tabla de particiones en el
+otro disco::
+
+   # sgdisk -R /dev/loop1 /dev/loop0
+   # sgdisk -G /dev/loop1
+
+Hecho lo cual, ya podemos exponer las particiones de ambos discos::
+
+   # partx -a /dev/loop0
+   # partx -a /dev/loop1
+
 Creación
 --------
 Crearemos un |RAID| 1, ya que disponemos de dos discos. La creación de otros
@@ -421,6 +453,8 @@ al |RAID|.
 
 .. rubric:: Notas al pie
 
+.. [#] Véase la discusión sobre :ref:`particionado GPT para UEFI <part-gpt-uefi>`.
+
 .. [#] Supuesto libre, en caso contrario se usará :file:`/dev/md126` y así
    sucesivamente hasta encontrar el primero libre.
 
@@ -437,3 +471,5 @@ al |RAID|.
 .. |GUID| replace:: :abbr:`GUID (Globally Unique Identified)`
 .. |ESP| replace:: :abbr:`ESP (EFI System Partition)`
 .. |GRUB| replace:: :abbr:`GRUB (GRand Unified Bootloader)`
+.. |BIOS| replace:: :abbr:`BIOS (Basic I/O System)`
+.. |UEFI| replace:: :abbr:`UEFI (Unified Extensible Firmware Interface)`

@@ -21,13 +21,23 @@ distribuir los datos entre todos ellos con la finalidad de:
 Dependiendo de cuál sea el |RAID| que se implemente se lograran alcanzar uno o
 más de estos propósitos; y el resultado de su implementación será la creación de
 un dispositivo virtual sobre el que el sistema operativo podra crear particiones
-y sistemas de archivos.
+y sistemas de archivos. A estas finalidades, hay que añadir un concepto
+relacionado con el de la redundancia: el de :dfn:`fiabilidad`, esto es, la
+probabilidad de que el sistema no pierda datos. Así, pues, al discutir sobre los
+distintos tipos de |RAID| indicaremos:
+
+- Cuántos discos deben fallar para el sistema pierda datos.
+- Cuál es propabilidad de que el hecho anterior se produzca.
+- Cuál es su capacidad de almacemiento.
+- Cómo afecta al rendimiento de lectura y escritura.
 
 .. rubric:: Tipos de |RAID|\ s
 
 Hay diversos tipos o niveles de |RAID|\ s, para cuyas descripciones llamaremos
-:var:`s` a la capacidad del disco físico más pequeño y :var:`n` al número de
-discos que lo conforman:
+:var:`s` a la capacidad del disco físico más pequeño, :var:`n` al número de
+discos que lo conforman, y :var:`p` a la probabilidad de que se rompa un disco
+en un determinado tiempo (supondremos esta probabilidad la misma para todos los
+discos):
 
 **RAID 0** (o **Volumen dividido**)
    Se forma con dos o más discos entre los cuales se distribuye equitativamente
@@ -43,7 +53,8 @@ discos que lo conforman:
      consecuencia, no puede romperse ningún disco. Y es más, cuanto mayor sea el
      número de discos, menos fiabilidad tendrá el sistema, ya que aumenta la
      probabilidad de que uno de ellos falle y se desbarate toda la información.
-   - La capacidad del conjunto es :math:`c*s`.
+   - La probabilidad de que el sistema falle es de :math:`P_0 = 1-(1-p)^n`.
+   - La capacidad del conjunto es :math:`n*s`.
    - Mejora el rendimiento tanto en la lectura como en la escritura, ya que se
      puede leer y escribir simultáneamente en los discos.
 
@@ -58,30 +69,32 @@ discos que lo conforman:
 
    - El sistema es capaz de soportar la ruptura de :math:`n-1` discos sin que se
      produzca pérdida de información.
+   - La probabilidad de que el sistema falle es de :math:`P_1 = p^n`.
    - No aumenta la capacidad del conjunto que seguirá siendo la capacidad
      individual de uno de los discos, :math:`s`.
    - Aumenta el rendimiento de las lecturas, ya que pueden realizarse lecturas
      simultáneas, pero no el de escritura.
 
-**RAID 0+1** (o **Espejo de divisiones**):
-   Es un sistema híbrido formado con un mínimo de cuatro discos, de manera que
-   primero se crean dos dispositivos |RAID| 0 que a su vez se toman para
-   constituir un |RAID| 1.
+**RAID 0+1** (o **Espejo de divisiones** o **RAID 01**):
+   Es un sistema híbrido formado con un mínimo de cuatro discos, en los que los
+   :var:`n` discos se agrupan en grupos de :var:`m`. Cada grupo de :var:`m`
+   discos constituye un |RAID| 0 y con todos los grupos se forma un |RAID| 1.
+   Si tenemos cuatro discos y los agrupamos de 2 en 2, este será el resultado:
 
    .. image:: files/RAID0+1.png
 
    Con esta disposición:
 
-   - Hay tolerancia a fallos, aunque sólo pueden fallar discos de un mismo
-     |RAID| 0. Si fallan discos de distinto |RAID| 0, el sistema colapsa.
-   - Aumenta la capacidad hasta :math:`\frac{n}{2} * s`.
-   - Hay mejora en el redimiento de lecturas y escrituras.
+   - Hay tolerancia a fallos, aunque sólo pueden fallar o los discos de un mismo
+     grupo o discos diferentes de distintos grupos.
+   - ¿Alguien me calcula la probabilidad de que este sistema falle?
+   - Aumenta la capacidad hasta :math:`m * s`.
+   - Hay mejora en el rendimiento de lecturas y escrituras.
 
 **RAID 1+0** (o **Divisiones en espejo** o **RAID 10**):
-   El sistema es parecido al anterior, pero se invierten los niveles: primero se
-   hacen dos divisiones cada una de las cuales la constituyen discos en
-   |RAID| 1 y con estas dos divisiones se forma un |RAID| 0. Como en el caso
-   anterior requieren al menos cuatro discos:
+   El sistema es parecido al anterior, pero se invierten los niveles: cada grupo
+   de :var:`m` discos forma un |RAID| 1 y con todos los grupos se forma un
+   |RAID| 0. Como en el caso anterior se requieren al menos cuatro discos:
 
    .. image:: files/RAID1+0.png
 
@@ -89,7 +102,8 @@ discos que lo conforman:
 
    - Gran toleracia a fallos, ya que el sistema falla solamente cuando fallan
      todos los discos de una misma división.
-   - Se duplica la capacidad individual: :math:`2*s`.
+   - La probabilidad de que el sistema falle es de :math:`P_{10} = 1-(1-p^m)^\frac{m}{n}`.
+   - Aumenta la capacidad hasta :math:`\frac{n}{m}*s`.
    - Hay mejora en el rendimiento de las lecturas y las escrituras,
 
 **RAID 5**
@@ -129,11 +143,16 @@ discos que lo conforman:
 
    - Es tolerante a fallos en la medida, en que la paridad permite que se pueda
      estropear un único disco.
+   - La probabilidad de que el sistema falle es la probabilidad de que falle
+     un |RAID| 0 menos la probabilidad de que sólo se rompa un disco, ya que en
+     este caso el |RAID| 0 sí falla, pero el |RAID| 5, no. Por tanto:
+     :math:`P_5 = P_0 - n*p*(1-p)^{n-1}`.
    - Aumenta la capacidad, ya que la paridad sólo ocupa el equivalente a un
      disco físico. Por tanto, obtendremos una capacidad de :math:`(n-1)*s`.
-   - No hay mejora en el rendimiento de las escrituras, y hay una penalización
+   - Hay mejora en el rendimiento de las lecturas, pero hay una penalización
      en las escrituras, ya que una escritura implica leer datos del resto de
-     discos para generar la paridad y escribir ésta.
+     discos para generar la paridad y escribir ésta. Esta bajada en el
+     rendimiento en la escrituras es su principal defecto.
 
    Variantes de este nivel son:
 
@@ -152,6 +171,10 @@ discos que lo conforman:
    hasta dos discos:
 
    - Tolera que fallen hasta dos discos.
+   - La probabilidad de que el sistema falle es la probabilidad de que falle un
+     |RAID| 5 menos la probabilidad de que fallen dos discos, ya que en este
+     caso un |RAID| 5 falla, pero un |RAID| 6, no. Por tanto: :math:`P_6 = P_5 -
+     n*(n-1)*p^2*(1-p)^{n-2}`.
    - Aumenta la capacidad, hasta :math:`(n-2)*s`.
    - Presenta los mismos incovenientes de rendimiento que su primo hermano el
      |RAID|\ 5: no mejora las operaciones de lectura y penaliza las de
@@ -260,10 +283,9 @@ los dos primeros casos:
 
 |RAID|\ s en *Linux*
 ====================
-
-Preliminares
-------------
-Es obvio que para nuestras pruebas necesitaremos los discos físicos que
+Ilustraremos la creación y manipulación de |RAID| implementando un |RAID| 1,
+porque no entraña excesiva dificultad crear |RAID|\ s de otros niveles. Es obvio
+que para ello necesitaremos los discos físicos que
 constituyen el |RAID|. Para evitarlos usaremos ficheros que emulen estos discos
 físicos::
 
@@ -280,45 +302,6 @@ De modo que nuestros dispositivos físicos serán :file:`/dev/loop0` y
    disco que contiene su sistema operativo, lo perderá todo. La guía utiliza
    :file:`/dev/loop0` y :file:`/dev/loop1` entre otras cosas para evitar que un
    *corta y pega* irreflexivo, provoque una catástrofe en su sistema.
-
-No obstante, los preparativos no acaban aquí. En el |RAID| no debemos incluir
-dispositivos físicos, sino particiones, así que necesitamos particionar los
-discos. Si pretendemos que nuestro disco contenga el sistema operativo y sea
-arrancable, entonces tendremos que dejar el arranque fuera del |RAID|.
-Suponiendo que utilicemos particionado |GPT| y el disco sea compatible con
-arranques |BIOS| y |UEFI|\ [#]_::
-
-   # sgdisk -a 8 -n "0:40:2047" -t "0:0xef02" -c "0:BOOTBIOS" \
-            -a 2048 -n "0:2048:+50M" -t "0:0xef00" -c "0:EFI" \
-                    -N 0 -c "3:RAID" -t "3:0xfd00" /dev/loop0
-
-o bien::
-
-   # sgdisk -a 8 -n "0:40:2047" -t "0:0xef02" -c "0:BOOTBIOS" \
-            -a 2048 -n "0:2048:+50M" -t "0:0xef00" -c "0:EFI" \
-                    -N 0 -c "3:LVM" -t "3:0x8e00" /dev/loop0
-
-donde ambas tablas tienes dos particiones de arranque y una última partición
-para sistemas y datos en la que sólo cambia el etiquetado y tipo dependiendo de
-cuál se la implementación de linux (:ref:`mdadm <mdadm>` o :ref:`lvm <lvmraid>`)
-que pretendeamos usar.
-
-.. warning:: Lo conveniente es que los discos sean del mismo tamaño. Es común,
-   sin embargo, que si los discos son de diferente fabricante no contengan
-   exactamente el mismo número de sectores. Asegúrese de hacer esta operación
-   sobre el disco con menos sectores.
-
-Podemos llevar a cabo la misma operación sobre :file:`/dev/loop1`, pero es
-más cómodo y más conveniente, simplemente, copiar la tabla de particiones en el
-otro disco::
-
-   # sgdisk -R /dev/loop1 /dev/loop0
-   # sgdisk -G /dev/loop1
-
-Hecho lo cual, ya podemos exponer las particiones de ambos discos::
-
-   # partx -a /dev/loop0
-   # partx -a /dev/loop1
 
 Implementaciones
 ----------------
@@ -350,11 +333,7 @@ Estudiaremos ambas posibilidades.
    cabido la posibilidad de que esos metadatos se hubieran registrado en memoria
    *NVRAM* la contraladora controladora o de la placa base.
 
-.. [#] Véase la discusión sobre :ref:`particionado GPT para UEFI <part-gpt-uefi>`.
-
 .. |RAID| replace:: :abbr:`RAID (Redundant Array of Independent Disks)`
-.. |BIOS| replace:: :abbr:`BIOS (Basic I/O System)`
-.. |UEFI| replace:: :abbr:`UEFI (Unified Extensible Firmware Interface)`
 .. |GPT| replace:: :abbr:`GPT (GUID Partition Table)`
 .. |ZFS| replace:: :abbr:`ZFS (Zettavyte File System)`
 .. |BtrFS| replace:: :abbr:`BtrFS (B-TRee File System)`
