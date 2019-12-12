@@ -323,12 +323,14 @@ Hecho lo cual, ya podemos exponer las particiones de ambos discos::
 Implementaciones
 ----------------
 El núcleo de linux dispone de un driver llamado |MD| para el soporte de
-volúmenes |RAID|. Como herramientas de usuario para la creación y gestión de
-estos dispositivos hay dos posibilidades:
+volúmenes |RAID|. Y, de hecho, como herramienta de bajo nivel existe
+:manpage:`dmsetup(8)`.  Sin embargo, es mejor usar herramientas de usuario
+más sencillas para la creación y gestión de estos dispositivos, para lo cual
+tenemos fundamentalmente dos posibilidades:
 
-* :ref:`mdadm <mdadm>`, que es una herramienta exclusiva para la creación de
-  estos dispositivos y que nos permite un control más preciso sobre lo que
-  nyestra configuración.
+* :ref:`mdadm <mdadm>`, que es una herramienta exclusiva para la gestión de
+  estos dispositivos y que nos permite un control más preciso sobre nuestra
+  configuración.
 * :ref:`lvm <lvm>` que, desde su versión 2, permite la definición de volúmenes
   lógicos que sean a su vez dispositivos |RAID|, para lo cual el grupo de
   volúmenes deberá haberse construido sobre dos o mas volúmenes físicos,
