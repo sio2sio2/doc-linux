@@ -53,7 +53,7 @@ discos):
      consecuencia, no puede romperse ningún disco. Y es más, cuanto mayor sea el
      número de discos, menos fiabilidad tendrá el sistema, ya que aumenta la
      probabilidad de que uno de ellos falle y se desbarate toda la información.
-   - La probabilidad de que el sistema falle es de :math:`P_0 = 1-(1-p)^n`.
+   - La probabilidad de que el sistema falle es de :math:`P^n_{R0} = 1-(1-p)^n`.
    - La capacidad del conjunto es :math:`n*s`.
    - Mejora el rendimiento tanto en la lectura como en la escritura, ya que se
      puede leer y escribir simultáneamente en los discos.
@@ -69,7 +69,7 @@ discos):
 
    - El sistema es capaz de soportar la ruptura de :math:`n-1` discos sin que se
      produzca pérdida de información.
-   - La probabilidad de que el sistema falle es de :math:`P_1 = p^n`.
+   - La probabilidad de que el sistema falle es de :math:`P^n_{R1} = p^n`.
    - No aumenta la capacidad del conjunto que seguirá siendo la capacidad
      individual de uno de los discos, :math:`s`.
    - Aumenta el rendimiento de las lecturas, ya que pueden realizarse lecturas
@@ -88,6 +88,13 @@ discos):
    - Hay tolerancia a fallos, aunque sólo pueden fallar o los discos de un mismo
      grupo o discos diferentes de distintos grupos.
    - ¿Alguien me calcula la probabilidad de que este sistema falle?
+
+   .. La probabilidad de que casque al menos uno de los discos de todos los
+      grupos, si :math:`x = P^m_{R0}` (pirobabilidad de que falle uno de los RAID0),
+      es :math:`x^\frac{n}{m}`. Pero habría que restar la posibilidad de que los
+      discos cascados fueran el mismo disco en todos los RAID0.
+
+
    - Aumenta la capacidad hasta :math:`m * s`.
    - Hay mejora en el rendimiento de lecturas y escrituras.
 
@@ -102,7 +109,7 @@ discos):
 
    - Gran toleracia a fallos, ya que el sistema falla solamente cuando fallan
      todos los discos de una misma división.
-   - La probabilidad de que el sistema falle es de :math:`P_{10} = 1-(1-p^m)^\frac{m}{n}`.
+   - La probabilidad de que el sistema falle es de :math:`P^{n,m}_{R10} = 1-(1-p^m)^\frac{m}{n}`.
    - Aumenta la capacidad hasta :math:`\frac{n}{m}*s`.
    - Hay mejora en el rendimiento de las lecturas y las escrituras,
 
@@ -146,7 +153,7 @@ discos):
    - La probabilidad de que el sistema falle es la probabilidad de que falle
      un |RAID| 0 menos la probabilidad de que sólo se rompa un disco, ya que en
      este caso el |RAID| 0 sí falla, pero el |RAID| 5, no. Por tanto:
-     :math:`P_5 = P_0 - n*p*(1-p)^{n-1}`.
+     :math:`P^n_{R5} = P^n_{R0} - n*p*(1-p)^{n-1}`.
    - Aumenta la capacidad, ya que la paridad sólo ocupa el equivalente a un
      disco físico. Por tanto, obtendremos una capacidad de :math:`(n-1)*s`.
    - Hay mejora en el rendimiento de las lecturas, pero hay una penalización
@@ -173,8 +180,8 @@ discos):
    - Tolera que fallen hasta dos discos.
    - La probabilidad de que el sistema falle es la probabilidad de que falle un
      |RAID| 5 menos la probabilidad de que fallen dos discos, ya que en este
-     caso un |RAID| 5 falla, pero un |RAID| 6, no. Por tanto: :math:`P_6 = P_5 -
-     n*(n-1)*p^2*(1-p)^{n-2}`.
+     caso un |RAID| 5 falla, pero un |RAID| 6, no. Por tanto: :math:`P^n_{R6} =
+     P^n_{R5} - n*(n-1)*p^2*(1-p)^{n-2}`.
    - Aumenta la capacidad, hasta :math:`(n-2)*s`.
    - Presenta los mismos incovenientes de rendimiento que su primo hermano el
      |RAID|\ 5: no mejora las operaciones de lectura y penaliza las de
