@@ -85,18 +85,18 @@ discos):
 
    Con esta disposición:
 
-   - Hay tolerancia a fallos, aunque sólo pueden fallar o los discos de un mismo
-     grupo o discos diferentes de distintos grupos.
+   - Hay tolerancia a fallos, ya qye el sistema falla sólo cuando falla al menos
+     un mismo disco de todos los grupos en |RAID| 0.
    - ¿Alguien me calcula la probabilidad de que este sistema falle?
+   - Aumenta la capacidad hasta :math:`m * s`.
+   - Hay mejora en el rendimiento de lecturas y escrituras.
 
    .. La probabilidad de que casque al menos uno de los discos de todos los
       grupos, si :math:`x = P^m_{R0}` (pirobabilidad de que falle uno de los RAID0),
       es :math:`x^\frac{n}{m}`. Pero habría que restar la posibilidad de que los
       discos cascados fueran el mismo disco en todos los RAID0.
+      (Pero esto no vale de nada, ¿no?)
 
-
-   - Aumenta la capacidad hasta :math:`m * s`.
-   - Hay mejora en el rendimiento de lecturas y escrituras.
 
 **RAID 1+0** (o **Divisiones en espejo** o **RAID 10**):
    El sistema es parecido al anterior, pero se invierten los niveles: cada grupo
