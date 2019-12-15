@@ -7,37 +7,56 @@ Introducción teórica
 ====================
 Un |RAID| puede definirse como un sistemas de almacenamiento que, mediante
 técnicas *hardware* o *software*, utiliza de manera conjunta varios discos para
-distribuir los datos entre todos ellos con la finalidad de:
+distribuir los datos entre todos ellos con la finalidad, respecto al uso de un
+único disco. de:
 
-- Introducir **redundancia** para hacer el sistema tolerante a fallos, de manera
-  que aunque falle algún disco, el sistema pueda seguir accediendo a los datos
-  sin interrupciones
+- Introducir **redundancia** para hacer el sistema más tolerante a fallos, de
+  manera que, aunque falle algún disco, el sistema pueda seguir accediendo a los
+  datos sin interrupciones. El grado de tolerancia a los fallos puede medirse
+  calculando la **probabilidad de fallo irrecuperable**.
+
+  Tengase en cuenta que cuando hay redundancia más importante que el hecho de
+  que fallen los discos es el hecho de que lo hagan varios casi simultáneamente.
+  Por ese motivo, algunos consideran buena idea mezclar discos de distinto
+  fabricante o discos de un mismo fabricante, pero de distinto lote. Pero, por
+  otro lado, puede no ser una buena idea mezclar discos con distinto
+  rendimiento.
 
 - Aumentar la **capacidad** de almacenamiento, esto es, constituir una unidad de
-  almacenamiento mayor que cada una de los discos físicos por separado.
+  almacenamiento mayor que la de un disco individual. Es conveniente tener en
+  cuenta que en los discos que constituyen un |RAID| es aprovechable la
+  capacidad de cada uno sólo hasta la capacidad del más pequeño, por lo que para
+  no desaprovechar espacio de disco lo óptimo es que todos los discos sean del
+  mismo tamaño.
 
-- Aumentar el **rendimiento** en las lecturas y escrituras.
+- Aumentar el **rendimiento** en las operaciones de lectura y escritura.
 
-Dependiendo de cuál sea el |RAID| que se implemente se lograran alcanzar uno o
-más de estos propósitos; y el resultado de su implementación será la creación de
-un dispositivo virtual sobre el que el sistema operativo podra crear particiones
-y sistemas de archivos. A estas finalidades, hay que añadir un concepto
-relacionado con el de la redundancia: el de :dfn:`fiabilidad`, esto es, la
-probabilidad de que el sistema no pierda datos. Así, pues, al discutir sobre los
-distintos tipos de |RAID| indicaremos:
-
-- Cuántos discos deben fallar para el sistema pierda datos.
-- Cuál es propabilidad de que el hecho anterior se produzca.
-- Cuál es su capacidad de almacemiento.
-- Cómo afecta al rendimiento de lectura y escritura.
+El grado de consecuención de estos propósitos depende de cuál sea el tipo de
+|RAID| que se implemente; y el resultado aparente de la implementación será la
+creación de un dispositivo virtual sobre el que el sistema operativo podra crear
+particiones y sistemas de archivos.
 
 .. rubric:: Tipos de |RAID|\ s
 
-Hay diversos tipos o niveles de |RAID|\ s, para cuyas descripciones llamaremos
-:var:`s` a la capacidad del disco físico más pequeño, :var:`n` al número de
-discos que lo conforman, y :var:`p` a la probabilidad de que se rompa un disco
-en un determinado tiempo (supondremos esta probabilidad la misma para todos los
-discos):
+Antes de pasar a describir los más comunes, es preciso fijar la siguiente
+**nomenclatura**:
+
+* :var:`s` es la capacidad del disco físico más pequeño.
+* :var:`n` es el número de discos físicos que constituye el |RAID|.
+* :var:`m` es, en los |RAID|\ s anidados, el número de discos del grupo anidado.
+* :var:`g` es, en los |RAID|\ s anidados, el número de grupos de discos. Por tanto,
+  :math:`n = g*s`.
+* :var:`p` es la probabilidad de que se rompa un disco en un periodo de tiempo
+  determinado. Se supondrá la misma para todos los discos. Para estimarla
+  podemos guiarnos por las estadísticas que publica la compañía Backblaze_
+  basada en los fallos de sus propios discos duros. Para 2018, `estos fueron los
+  datos <https://www.backblaze.com/blog/hard-drive-stats-for-2018/>`_.
+* :math:`P^n_{rX}(p)` es la probabilidad de fallo irrecuperable de un |RAID| **X**
+  constituido por :var:`n` discos cuya probabilidad individual de fallo es :var:`p`.
+  Cuando el |RAID| es anidado, el número de discos se notará :math:`n,m`. Por
+  ejemplo, :math:`P^{6,2}_{r10}(1\%)` es la probabilidad de fallo irrecuperable de
+  un |RAID| 10 de seis discos con tres divisiones de dos discos y una
+  probabilidad de fallo del 1%.
 
 **RAID 0** (o **Volumen dividido**)
    Se forma con dos o más discos entre los cuales se distribuye equitativamente
@@ -45,15 +64,13 @@ discos):
 
    .. image:: files/RAID0.png
 
-   Es conveniente, como en el resto de tipos, que los discos sean de la misma
-   capacidad, ya que sólo es aprovechable cada disco hasta la capacidad del más
-   pequeño. En lo referente a los propósitos de |RAID|:
+   En lo referente a los propósitos de |RAID|:
 
    - El sistema no es tolerante a fallos, puesto que no existe redundancia. En
      consecuencia, no puede romperse ningún disco. Y es más, cuanto mayor sea el
      número de discos, menos fiabilidad tendrá el sistema, ya que aumenta la
      probabilidad de que uno de ellos falle y se desbarate toda la información.
-   - La probabilidad de que el sistema falle es de :math:`P^n_{R0} = 1-(1-p)^n`.
+   - La probabilidad de que el sistema falle es de :math:`P^n_{r0}(p) = 1-(1-p)^n`.
    - La capacidad del conjunto es :math:`n*s`.
    - Mejora el rendimiento tanto en la lectura como en la escritura, ya que se
      puede leer y escribir simultáneamente en los discos.
@@ -69,49 +86,11 @@ discos):
 
    - El sistema es capaz de soportar la ruptura de :math:`n-1` discos sin que se
      produzca pérdida de información.
-   - La probabilidad de que el sistema falle es de :math:`P^n_{R1} = p^n`.
+   - La probabilidad de que el sistema falle es de :math:`P^n_{r1}(p) = p^n`.
    - No aumenta la capacidad del conjunto que seguirá siendo la capacidad
      individual de uno de los discos, :math:`s`.
    - Aumenta el rendimiento de las lecturas, ya que pueden realizarse lecturas
      simultáneas, pero no el de escritura.
-
-**RAID 0+1** (o **Espejo de divisiones** o **RAID 01**):
-   Es un sistema híbrido formado con un mínimo de cuatro discos, en los que los
-   :var:`n` discos se agrupan en grupos de :var:`m`. Cada grupo de :var:`m`
-   discos constituye un |RAID| 0 y con todos los grupos se forma un |RAID| 1.
-   Si tenemos cuatro discos y los agrupamos de 2 en 2, este será el resultado:
-
-   .. image:: files/RAID0+1.png
-
-   Con esta disposición:
-
-   - Hay tolerancia a fallos, ya qye el sistema falla sólo cuando falla al menos
-     un mismo disco de todos los grupos en |RAID| 0.
-   - ¿Alguien me calcula la probabilidad de que este sistema falle?
-   - Aumenta la capacidad hasta :math:`m * s`.
-   - Hay mejora en el rendimiento de lecturas y escrituras.
-
-   .. La probabilidad de que casque al menos uno de los discos de todos los
-      grupos, si :math:`x = P^m_{R0}` (pirobabilidad de que falle uno de los RAID0),
-      es :math:`x^\frac{n}{m}`. Pero habría que restar la posibilidad de que los
-      discos cascados fueran el mismo disco en todos los RAID0.
-      (Pero esto no vale de nada, ¿no?)
-
-
-**RAID 1+0** (o **Divisiones en espejo** o **RAID 10**):
-   El sistema es parecido al anterior, pero se invierten los niveles: cada grupo
-   de :var:`m` discos forma un |RAID| 1 y con todos los grupos se forma un
-   |RAID| 0. Como en el caso anterior se requieren al menos cuatro discos:
-
-   .. image:: files/RAID1+0.png
-
-   Esta disposición sopone:
-
-   - Gran toleracia a fallos, ya que el sistema falla solamente cuando fallan
-     todos los discos de una misma división.
-   - La probabilidad de que el sistema falle es de :math:`P^{n,m}_{R10} = 1-(1-p^m)^\frac{m}{n}`.
-   - Aumenta la capacidad hasta :math:`\frac{n}{m}*s`.
-   - Hay mejora en el rendimiento de las lecturas y las escrituras,
 
 **RAID 5**
    Es un sistema de al menos tres discos fisicos, de manera que la información
@@ -153,7 +132,7 @@ discos):
    - La probabilidad de que el sistema falle es la probabilidad de que falle
      un |RAID| 0 menos la probabilidad de que sólo se rompa un disco, ya que en
      este caso el |RAID| 0 sí falla, pero el |RAID| 5, no. Por tanto:
-     :math:`P^n_{R5} = P^n_{R0} - n*p*(1-p)^{n-1}`.
+     :math:`P^n_{r5}(p) = P^n_{r0} - n*p*(1-p)^{n-1}`.
    - Aumenta la capacidad, ya que la paridad sólo ocupa el equivalente a un
      disco físico. Por tanto, obtendremos una capacidad de :math:`(n-1)*s`.
    - Hay mejora en el rendimiento de las lecturas, pero hay una penalización
@@ -180,14 +159,66 @@ discos):
    - Tolera que fallen hasta dos discos.
    - La probabilidad de que el sistema falle es la probabilidad de que falle un
      |RAID| 5 menos la probabilidad de que fallen dos discos, ya que en este
-     caso un |RAID| 5 falla, pero un |RAID| 6, no. Por tanto: :math:`P^n_{R6} =
-     P^n_{R5} - n*(n-1)*p^2*(1-p)^{n-2}`.
+     caso un |RAID| 5 falla, pero un |RAID| 6, no. Por tanto:
+     :math:`P^n_{r6}(p) = P^n_{r5}(p) - n*(n-1)*p^2*(1-p)^{n-2}`.
    - Aumenta la capacidad, hasta :math:`(n-2)*s`.
    - Presenta los mismos incovenientes de rendimiento que su primo hermano el
      |RAID|\ 5: no mejora las operaciones de lectura y penaliza las de
      escritura.
 
    .. image:: files/RAID6.png
+
+Hay, además, sistemas |RAID|\ s que se constituyen **anidando** dos o más
+niveles de |RAID|. Los más utilizados son:
+
+**RAID 0+1** (o **Espejo de divisiones** o **RAID 01**):
+   Es un sistema híbrido formado con un mínimo de cuatro discos, en los que los
+   :var:`n` discos se agrupan en grupos de :var:`m`. Cada grupo de :var:`m`
+   discos constituye un |RAID| 0 y con todos los grupos se forma un |RAID| 1.
+   Si tenemos cuatro discos y los agrupamos de 2 en 2, este será el resultado:
+
+   .. image:: files/RAID0+1.png
+
+   Con esta disposición:
+
+   - Hay tolerancia a fallos, ya que el sistema falla sólo cuando falla al menos
+     un mismo disco de todos los grupos en |RAID| 0.
+   - ¿Alguien me calcula la probabilidad de que este sistema falle?
+   - Aumenta la capacidad hasta :math:`m * s`.
+   - Hay mejora en el rendimiento de lecturas y escrituras.
+
+   .. La probabilidad de que casque al menos uno de los discos de todos los
+      grupos, si :math:`x = P^m_{r0}` (probabilidad de que falle uno de los RAID0),
+      es :math:`x^\frac{n}{m}`. Pero habría que restar la posibilidad de que los
+      discos cascados fueran el mismo disco en todos los RAID0.
+      (Pero esto no vale de nada, ¿no?)
+
+
+**RAID 1+0** (o **Divisiones en espejo** o **RAID 10**):
+   El sistema es parecido al anterior, pero se invierten los niveles: cada grupo
+   de :var:`m` discos forma un |RAID| 1 y con todos los grupos se forma un
+   |RAID| 0. Como en el caso anterior se requieren al menos cuatro discos:
+
+   .. image:: files/RAID1+0.png
+
+   Esta disposición sopone:
+
+   - Hay toleracia a fallos, ya que el sistema falla cuando fallan
+     todos los discos de una misma división.
+   - La probabilidad de que el sistema falle es de :math:`P^{n,m}_{r10}(p) = P^{n/m}_{0}(P^m_{r1}(p)) = 1-(1-p^m)^\frac{n}{m}`.
+   - Aumenta la capacidad hasta :math:`\frac{n}{m}*s`.
+   - Hay mejora en el rendimiento de las lecturas y las escrituras,
+
+**RAID 5+0** (o **RAID 50**)
+   Como el anterior, pero el nivel del |RAID| anidado es un |RAID|\ 5, por lo
+   que el mínimo de discos para constituirlo es **6**:
+
+   - Hay tolerancia a fallos, ya que el sistema falla cuando falla uno
+     de los |RAID|\ s 5 que constituye cualquiera de las divisiones, esto es
+     que fallen dos discos de una misma división.
+   - La probabilidad de que el sistema falle es de :math:`P{n.m}_{r50}(p) = P^{n/m}_{0}(P^m_{r5}(p))`.
+   - Aumenta la capacidad hasta :math:`(n - \frac{n}{m})*s`.
+   - Mejora el rendimiento en lectura y escritura respecto al |RAID| 5.
 
 .. rubric:: Particularidades
 
@@ -197,8 +228,8 @@ particularidades que comparten todos los sistemas |RAID|:
 #. Al constituirlos es necesario que se creen una serie de **estructuras de
    metadatos** a semejanza de lo que ocurre con los sistemas de ficheros.
 
-#. Habilitan algún mecanismo para advertir al administrador de la **rotura de
-   disco**, a fin de que este sea diligente en su sustitución. Estos mecanismos
+#. Debe Habilitarse algún mecanismo para advertir al administrador del **fallo
+   de disco**, a fin de que sea diligente en su sustitución. Estos mecanismos
    pueden ser muy variados (pitidos, leds), pero suelen incluir el envío de un
    correo electrónico de aviso.
 
@@ -214,6 +245,19 @@ particularidades que comparten todos los sistemas |RAID|:
    incorpora al |RAID| y comienza inmediatamente el *proceso de recuperación*.
    La labor del administrador consistirá en añadir al sistema un nuevo disco de
    reserva.
+
+#. Tenga presente que, si el sistema sólo tenía un grado de redundancia (p.e. un
+   |RAID| 5 o un |RAID| 1 de dos discos), durante el proceso de reconstrucción
+   el sistema es vulnerable  por lo que cualquier nuevo fallo provoca la pérdida
+   irrecuperable de los datos. Además, el proceso de reconstrucción es una tarea
+   penosa que implica muchas lecturas sobre los discos supervivientes y,
+   consecuentemente, la sobrecarga de trabajo justamente durante este periodo de
+   vulnerabilidad, hace al sistema especialmente propenso a un nuevo fallo en
+   alguno de los supervivientes. Por eso, algunos administradores consideran que
+   tras un fallo lo mejor es proceder a un *backup* de los datos antes de la
+   resconstrucción; y rechazan como buena la idea de habilitar discos de reserva
+   (véase, por ejemplo, `este artículo
+   <https://blog.open-e.com/why-a-hot-spare-hard-disk-is-a-bad-idea/>`_).
 
 .. rubric:: Técnicas de implementación
 
@@ -347,3 +391,5 @@ Estudiaremos ambas posibilidades.
 .. |MD| replace:: :abbr:`MD (Multiple Devices)`
 
 .. |xor| unicode:: U+2295 .. CIRCLED PLUS
+
+.. _Backblaze: https://www.backblaze.com

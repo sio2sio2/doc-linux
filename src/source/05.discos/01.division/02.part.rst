@@ -388,7 +388,7 @@ que, como la anterior, permite definir la salida. Por ejemplo::
    120034123776
 
 devuelve el tamaño del disco en *bytes*. También es útil para forzar al kernel
-a releer la tabla de particiones del dispositivo::
+a releer la tabla de particiones del dispositivo\ [#]_::
 
    # blockdev --rereadpt /dev/sda
 
@@ -506,7 +506,7 @@ Lo que hemos hecho es:
       $ /sbin/sfdisk -TXdos
 
 * Una partición de 1GB para swap.
-* Una partición que *Linux* que ocupa el resto de la extendida (o sea, el resto
+* Una partición de *Linux* que ocupa el resto de la extendida (o sea, el resto
   del disco).
 
 La salida de la orden nos debería mostrar las particiones resultantes.
@@ -535,6 +535,11 @@ existan.
    Ciertamente los códigos en particiones |GPT| son bastante complicados. No
    daremos más explicaciones porque aún no hemos discutido cómo son estas
    particiones.
+
+.. note:: En las operaciones anteriores de modificación de la tabla de particiones,
+   podemos incluir la opción ``-b`` para hacer una copia de los sectores
+   afectados por nuestras modificaciones. Si algo saliera mal, podríamos volver
+   al estado anterior con :ref:`dd <dd>`\ [#]_.
 
 .. _part-gpt:
 
@@ -840,10 +845,14 @@ a. |GPT| exclusivamente compatible con |BIOS|, que podemos definir así::
    * Las definiciones no sobreescriben una tabla anterior, de modo que si
      hiciéramos::
 
-      $ /sbin/sgdisk -N 0 -c "O:RESTO"
+      $ /sbin/sgdisk -N 0 -c "5:RESTO"
 
      añadiríamos a continuación una quinta partición que ocuparía lo que quede de
-     disco, ya que :kbd:`-N` tiene ese efecto.
+     disco, ya que :kbd:`-N` tiene el efecto de ocupar el espacio restante. Ahora
+     bien, si utilizamos el número de una partición existente, entonces
+     redefiniremos esa partición::
+
+      $ /sbin/sgdisk -c "3:TERCERA" -t "3:0x0700" /tmp/disco.raw
 
    .. warning:: Sopese utilizar el esquema propuesto para que sea compatible
       también con |UEFI|, por si se produce un cambio en el *hardware*.
@@ -876,6 +885,17 @@ a. |GPT| exclusivamente compatible con |BIOS|, que podemos definir así::
 
 Otras acciones recurrentes con :command:`sgdisk` son:
 
+#. Borrar una partición::
+   
+      $ /sbin/sgdisk -d 5 /tmp/disco.raw
+
+#. Intercambiar la entrada de una partición por la de otra::
+
+      $ /sbin/sgdisk -r 1:3 /tmp/disco.raw
+
+   En este caso la partición primera partición pasa a estar definida en la
+   tercera entrada de la |GPT|, y la tercera, en la primera.
+
 #. Copiar la |GPT| al final del disco, que puede sernos útil cuando hacemos una
    copia cruda de un disco más pequeño en uno mayor::
 
@@ -897,6 +917,29 @@ Otras acciones recurrentes con :command:`sgdisk` son:
    Y si se quiere restaurar en disco::
 
       $ /sbin/sgdisk -l GPT /tmp/disco.raw
+
+#. Borrar la tabla de particiones y la cabecera |GPT|, pero
+   respetando el |MBR|::
+
+      $ /sbin/sgdisk -z /tmp/disco.raw
+
+   o sin siquiera respetarlo::
+
+      $ /sbin/sgdisk -Z /tmp/disco.raw
+
+   .. note:: En caso de que quisiéramos redefinir una tabla de particiones de cero,
+      sobre un disco que ya tuviera definidas particiones, :kbd:`-z` podría ser
+      la primera opción antes de las demás que definan la nueva tabla.
+
+#. Convertir de |DOS| a |GPT|::
+
+      $ /sbin/sgdisk -g /tmp/disco_dos.raw
+
+#. Convertir de |GPT| a |DOS|::
+
+      $ /sbin/sgdisk -m 3:4:5 /tmp/disco.raw
+
+   En este caso, sólo se pasan la definición de las particiones 3, 4 y 5.
 
 .. _bios-uefi:
 
@@ -1009,6 +1052,14 @@ en modo |EFI| es el siguiente:
    **63** (se empieza a numerar en **0**). Échele un ojo si tiene curiosidad
    a `este artículo de la Wikipedia
    <https://es.wikipedia.org/wiki/Unidad_de_disco_duro#Estructura_f%C3%ADsica>`_.
+.. [#] Es posible que después de alterar la tabla de particiones con :ref:`fdisk
+   <fdisk>` o :ref:`gdisk <gdisk.i>` el *kernel* no actualice la tabla de
+   particiones porque haya algún proceso que lo impida, por ejemplo, porque hay
+   un sistema de ficheros montado o un |RAID| ensamblado. En esos caso, es
+   preciso primero, parar tal proceso y a continuación intentar releer la tabla
+   de particiones.
+.. [#] Hasta la versión *2.25*, el propio :command:`sfdisk` suministraba una
+   opción :kbd:`-I` para deshacer los cambios.
 .. [#] Los códigos de 4 dígitos hexadecimales son códigos internos de la
    de la suite de particionado :ref:`gdisk <gdisk.i>`. Los identificadores, en
    realidad, son mucho más largos.

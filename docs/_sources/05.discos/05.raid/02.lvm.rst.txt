@@ -15,8 +15,8 @@ La gestión de volúmenes lógicos redundantes tiene su propia página de manual
 .. image:: files/RAID+LVM.png
 
 En este caso, la tercera partición del disco, contiene un dispositivo |RAID|\
-[#]_ construido con :ref:`mdadm` que constituye todo él un grupo de volúmenes
-sobre el cual se definen los volúmenes lógicos. En cambio, si creamos
+[#]_ construido con :ref:`mdadm <mdadm>` que constituye todo él un grupo de
+volúmenes sobre el cual se definen los volúmenes lógicos. En cambio, si creamos
 dispositivos lógicos con |RAID| usando |LVM|:
 
 .. image:: files/LVMRAID.png
@@ -41,7 +41,7 @@ exactamente equivalentes:
     volúmenes no redundantes, los volúmenes físicos que lo constituyan no tienen
     que tener igual tamaño. Por ejemplo:
 
-    .. todo:: Hacer un esquema.
+    .. image:: files/LVMRAID2.png
 
     Por tanto, podemos no replicar las tablas de particiones en los restantes
     discos físicos o incluso no hacer tablas de particiones en ellos. Esto hará
@@ -50,7 +50,7 @@ exactamente equivalentes:
     o mejorar el rendimiento en el acceso y no tanto en asegurar la
     disponibilidad del sistema.
   + Alternativamente, podríamos hacer que todos los volúmenes lógicos fueran
-    redundantes. En es caso, los volúmenes físicos que constituyen el |RAID| sí
+    redundantes. En este caso, los volúmenes físicos que constituyen el |RAID| sí
     sería acoonsejable que fueran iguales y, por tanto, tendríamos un caso
     equivalente a la primera solución. Consecuentemente, podríamos particionar
     de igual manera los discos y hacerlos todos arrancables.
@@ -93,10 +93,10 @@ del primer disco.
 Creación
 --------
 Para crear volúmenes lógicos redundantes, basta con usar :ref:`lvcreate
-<lvcreate>`, aunque con las opciones adecuadas. Por ejemplo, empecemos procrear
+<lvcreate>`, aunque con las opciones adecuadas. Por ejemplo, empecemos por crear
 un volumen no redundante::
 
-   # lvcreate -L 100M -n uno VGdebian
+   # lvcreate -L 100M -n uno VGraid
    # vgs VGraid
      VG     #PV #LV #SN Attr   VSize   VFree  
      VGraid   2   1   0 wz--n- 940,00m 840,00m
@@ -104,11 +104,256 @@ un volumen no redundante::
      LV   VG     Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
      uno  VGraid -wi-a----- 100,00m
 
-Como es natural, ahora hay 100MiB libres menos.
+Como es natural, ahora hay 100MiB libres menos. Creemos otro volumen lógico que
+sea un |RAID| 1 de 200MiB::
 
-.. https://blog.programster.org/create-raid-with-lvm
-   https://www.systutorials.com/docs/linux/man/7-lvmraid/
-   https://wiki.archlinux.org/index.php/LVM_(Espa%C3%B1ol)#RAID
+   # lvcreate --type raid1 -L 200M --mirrors 1 --nosync -n 1 VGraid
+
+Para crearlo hemos incluido :kbd:`--type` que nos permite indicar el tipo de
+|RAID| (que no puede ser más que un |RAID| 1 porque sólo hay dos volúmenes
+físicos); :kbd:`--mirrors` con el que indicamos el número de espejos (excluido
+el original); y :kbd:`--nosync` que evita que se intente sincronizar los
+volúmenes físicos. Si consultamos el resultado::
+
+   # vgs
+     VG       #PV #LV #SN Attr   VSize    VFree  
+     VGraid     2   2   0 wz--n-  940,00m 432,00m
+   # lvs VGraid
+     LV    VG     Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+     1     VGraid Rwi-a-r--- 200,00m                                    100,00          
+     uno   VGraid -wi-a----- 100,00m
+
+.. note:: Adicionalmente, se pueden añadir en la creación los volúmenes físicos
+   sobre los que queremos que se construya el |RAID|\ 1\ [#]_: basta con
+   haberlos añadido al final::
+
+      # lvcreate --type raid1 -L 200M --mirrors 1 --nosync -n 1 VGraid /dev/loop0p3 /dev/loop1
+
+veremos que no se han ocupado 200MiB, sino, obviamente, el doble. Además, para
+:file:`/dev/VGraid/1` observamos en los atributos una "R", que indica que el
+volumen es redundante. 
+
+.. note:: En la definición de los |RAID| i0, 4, 5 y 6, no debe usarse
+   :kbd:`--mirrors` sino :kbd:`--stripes`, que define los volúmenes que no son se
+   usan para paridad. En un |RAID| 10, se usa tanto :kbd:`--mirrors` como
+   :kbd:`--stripes`.
+
+Consulta
+--------
+Las salidas "normales", no obstante, dan muy poca información, así que para los
+|RAID| es mejor recurir a otras::
+
+   # lvs -a -o name,copy_percent,seg_type,devices VGraid
+   LV           Cpy%Sync Type   Devices                    
+   1            100,00   raid1  1_rimage_0(0),1_rimage_1(0)
+   [1_rimage_0]          linear /dev/loop0p3(26)           
+   [1_rimage_1]          linear /dev/loop1(1)
+   [1_rmeta_0]           linear /dev/loop0p3(25)           
+   [1_rmeta_1]           linear /dev/loop1(0)
+   uno                   linear /dev/loop0p3(0)
+
+Ahora sí podemos ver:
+
+* Que el volumen redundante es un |RAID| 1.
+* Que sus volúmenes físicos están completamente sincronizados.
+* Que está consituido por dos dipositivos.
+* Que esos dispositivos están uno en el volumen físico :file:`/dev/loop0p3` y
+  otro en :file:`/dev/loop1`. La inclusión de esos dispositivos (subvolúmenes en
+  la terminología de |LVM|) se debe a la inclusión de la opción :kbd:`-a`.
+
+Modificación
+------------
+Veremos cómo:
+
+* Aumentar la capacidad
+* Agregar un volumen físico.
+* Eliminar un volumen físico.
+* Sustituir un disco.
+* Tranformar un volumen en un |RAID|.
+* Añadir un disco de reserva.
+
+.. rubric:: Aumentar la capacidad del |RAID|
+
+Basta con aumentar el volumen lógico del modo ya visto para volúmenes no
+redundantes. Sin embargo, antes de hacerlo, creemos un volumen no redundante en
+:file:`/dev/loop1` para confirmar que en las ampliaciones no hace falta que los
+espacios de disco sean contiguos::
+
+   # lvcreate -n dos -L 50M VGraid /dev/loop1
+
+Y ahora sí ampliamos en 50MiB el |RAID| existente::
+
+   # lvextend -L +50M /dev/VGraid/1
+   # lvs -a -o name,size,seg_type,devices VGraid
+     LV           LSize   Type   Devices                    
+     1            300,00m raid1  1_rimage_0(0),1_rimage_1(0)
+     [1_rimage_0] 300,00m linear /dev/loop0p3(26)           
+     [1_rimage_1] 300,00m linear /dev/loop1(1)              
+     [1_rimage_1] 300,00m linear /dev/loop1(76)             
+     [1_rmeta_0]    4,00m linear /dev/loop0p3(25)           
+     [1_rmeta_1]    4,00m linear /dev/loop1(0)              
+     dos          100,00m linear /dev/loop1(51)             
+     uno          100,00m linear /dev/loop0p3(0)
+
+.. rubric:: Agregar un volumen físico
+
+Primero es necesario que el volumen físico pertenezca al grupo de volúmenes::
+
+   # truncate -s 500M disco2.raw
+   # losetup /dev/loop2 disco2.raw
+   # pvcreate /dev/loop2
+   # vgextend VGraid /dev/loop2
+   # pvs
+   PV           VG       Fmt  Attr PSize   PFree  
+   /dev/loop0p3 VGraid   lvm2 a--  444,00m  88,00m
+   /dev/loop1   VGraid   lvm2 a--  496,00m 188,00m
+   /dev/loop2   VGraid   lvm2 a--  496,00m 496,00m
+
+.. index:: lvconvert
+
+Hecho lo cual, basta con usar :command:`lvconvert`::
+
+   # lvconvert --mirrors +1 /dev/VGraid/1 /dev/loop2
+
+Tras la orden se añadirá el tercer dispositivo al |RAID| 1 y comenzará la
+syncronización.
+
+.. rubric:: Eliminar un volumen físico
+
+La operación inversa, mientras exista redundancia de más, es idéntica::
+
+   # lvconvert --mirrors -1 /dev/VGraid/1 /dev/loop2
+
+.. rubric:: Sustituir un disco.
+
+Partamos de que nuestro |RAID| 1 tiene dos discos y se rompe uno, lo cual
+podemos emularlo, desactivando el |RAID| y haciendo deshaciendo la relación
+entre :file:`disco1.raw` y :file:`disco2.raw`::
+
+   # vgchange -an VGraid
+   # losetup -d /dev/loop1
+   # vgchange -ay VGraid
+     Couldn't find device with uuid M3JEem-FlP3-Um35-LUZS-cwni-5ml1-pDqCJh.
+     Refusing activation of partial LV VGraid/dos.  Use '--activationmode partial' to override.
+     2 logical volume(s) in volume group "VGraid" now active
+   # lvs -a -o name,attr /dev/VGraid/1
+   LV   Attr      
+     1    rwi-a-r-p-
+
+La "p" que se encuentra en los atributos denota que se ha producdo un problema.
+Como ya tenemos :file:`/dev/loop2` añadido al grupo de volúmenes, podemos
+indicarle al *software* que repare el |RAID| lo que se traduce en que este
+utilice el volúmen físico disponible como espejo::
+
+   # lvconvert --repair /dev/VGraid/1
+   # lvs -a -o name,attr,devices VGraid
+     LV           Attr       Devices
+     1            rwi-a-r--- 1_rimage_0(0),1_rimage_1(0)
+     [1_rimage_0] iwi-aor--- /dev/loop0p3(26)           
+     [1_rimage_1] iwi-aor--- /dev/loop2(1)              
+     [1_rmeta_0]  ewi-aor--- /dev/loop0p3(25)           
+     [1_rmeta_1]  ewi-aor--- /dev/loop2(0)              
+     dos          -wi-----p- [unknown](51)              
+     uno          -wi-a----- /dev/loop0p3(0)
+
+Ahora el |RAID| está formado con espacio de :file:`disco0.raw` y
+:file:`disco2.raw`. EL volumen lógico no redundante :file:`/dev/VGraid/dos`, que
+se encontraba todo él sobre :file:`/dev/loop1` está perdido y lo mejor sería
+eliminarlo::
+
+   # lvremove /dev/VGraid/dos
+
+Tras lo cual podríamos eliminar :file:`/dev/loop1` del grupo de volúmenes::
+
+   # vgreduce --removemissing VGraid
+   # pvremove /dev/loop1
+
+.. rubric:: Añadir un disco de reserva
+
+.. warning:: La versión de :program:`lvm2` que trae buster `tiene un bug
+   <https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=928278>`_
+   que impide que el disco de reserva se incluya automáticamente en el |RAID|.
+   Sin ese *bug*, lo expuesto aquí debería funcionar.
+
+En los |RAID|\ s hechos con |LVM|, cualquier volumen físico adicional con
+sufiente espacio se considera un disco de reserva si en el fichero
+:file:`/etc/lvm/lvm.conf` la variable *raid_fault_policy* tiene el valor
+*allocate*. Su valor predeterminado es::
+
+   # lvm dumpconfig activation/raid_fault_policy
+   raid_fault_policy="warn"
+
+que, simplemente, informa en el registro del error, pero sin llevar a cabo
+ninguna acción (tampoco enviar un correo electrónico al administrador). Si
+editamos el fichero convenientemente, podremos poner el valor adecuado::
+
+   # lvm dumpconfig activation/raid_fault_policy
+   raid_fault_policy="allocate"
+
+Si partimos del estado anterior, tenemos un grupo de volúmenes constituido por
+:file:`/dev/loop0p3` y :file:`/dev/loop2`, pero no por :file:`/dev/loop1` al que
+desvinculamos por completo del |RAID| y del grupo de volúmenes. Volvamos a
+introducirlo para que nos sirva como dispositivo de reserva::
+
+   # pvcreate /dev/loop1
+   # vgextend VGtest /dev/loop1
+
+AHora debemos provocar un fallo en, por ejemplo, :file:`/dev/loop2` para que el
+|RAID| se reconstruya tomando automáticamente :file:`/dev/loop1`.
+Desgraciadamente, |LVM| no proporciona ninguna herramienta para simular fallos,
+así que debemos buscarnos la vida. Si el dispositivo fuera la partición de un
+disco físico real (pongamos que :file:`/dev/sdz`), entonces bastaría con
+cambiarle su estado::
+
+   # echo "offline" > /sys/class/block/sdz/device/state
+
+pero, como hacemos pruebas sobre un dispositivo virtual la cosa es más
+complicada. Una estrategia es averiguar cómo se llama su subvolumen
+correspondiente del |RAID|. En la salida de :command:`lvs` de más arriba
+:file:`/dev/loop2` está asociado a *1_rimage_1*, por lo que el dispositivo
+asoaciado es :file:`/dev/mapper/VGraid-1_rimage_1`. Podemos comprobarlo así::
+
+   # dmsetup table VGraid-1_rimage_1
+   0 204800 linear 7:2 10240
+
+Para provocar un error, debe hacerse::
+
+   # echo "0 204800 error" | dmsetup reload VGraid-1_rimage_1
+   # dmsetup resume VGraid-1_rimage_1
+
+Si a la vez estuviéramos consultándo el registro con::
+
+   # journalctl -fn0
+
+habríamos visto una línea similar a esta::
+
+   dic 14 23:43:25 debian kernel: Buffer I/O error on dev dm-9, logical block 25584, async page read
+
+y al intentar hacer cualquier operación sobre el |RAID| (por ejemplo, darle
+formato a :file:`/dev/VGraid-1`), saltará la liebre::
+
+   dic 14 23:46:16 debian lvm[561]: WARNING: Device #1 of raid1 array, VGtest-raid1, has failed.
+
+En este momento debería ocupar el disco de reserva el puesto del fallado y
+comenzar la sincronización\ [#]_. Ya sólo queda quitar el disco defectuoso del
+grupo de volúmenes::
+
+   # vgreduce VGraid /dev/loop2
+
+.. rubric:: Transformar un volumen lógico en un |RAID|
+
+Una posibilidad muy interesante es convertir un volumén lógico que no se definió
+como |RAID| en un volumen |RAID|, lo cual sería el equivalente a haber creado
+con :ref:`mdadm <mdadm>` un |RAID| 1 degradado con un sólo disco. Para ello
+basta con tener espacio suficiente en otro volumen físico y usar
+:command:`lvconvert` para transformar el volumen en un |RAID|::
+
+   # lvconvert -y --type raid1 --mirrors 1 /dev/VGraid/uno
+
+.. Ver qué se extrae de estos links:
+
+   http://blog.koehntopp.info/2019/12/02/cloning-and-splitting-logical-volumes.html
+   http://blog.koehntopp.info/2019/12/03/trying-lvmraid-for-real.html
 
 .. rubric:: Notas al pie
 
@@ -116,6 +361,13 @@ Como es natural, ahora hay 100MiB libres menos.
    cualquier tipo de |RAID|.
 .. [#] Entiéndase por :dfn:`volumen lógico redundante` un volumen lógico que
    contituye un |RAID|, incluo aunque sea de nivel 0, el cual no es redundante.
+.. [#] En realidad, definir sobre qué volumen físico se quiere definir el
+   volumen lógicos se puede hacer sobre cualquier tipo de volumen lógico,
+   incluso en aquellos que no son redundantes.
+.. [#] Pero por culpa del *bug* de la versión de |LVM| tendremos que lanzar a
+   mano la reparación para que se utilice el disco de reserva::
+
+      # lvconvert --repair /dev/VGraid/1
 
 .. |LVM| replace:: :abbr:`LVM (Logical Volume Management)`
 .. |RAID| replace:: :abbr:`RAID (Redundant Array of Independent Dists)`
