@@ -213,25 +213,27 @@ niveles de |RAID|. Los más utilizados son:
    Como el anterior, pero el nivel del |RAID| anidado es un |RAID|\ 5, por lo
    que el mínimo de discos para constituirlo es **6**:
 
+   .. image:: files/RAID5+0.png
+
    - Hay tolerancia a fallos, ya que el sistema falla cuando falla uno
      de los |RAID|\ s 5 que constituye cualquiera de las divisiones, esto es
      que fallen dos discos de una misma división.
-   - La probabilidad de que el sistema falle es de :math:`P{n.m}_{r50}(p) = P^{n/m}_{0}(P^m_{r5}(p))`.
+   - La probabilidad de que el sistema falle es de :math:`P^{n.m}_{r50}(p) = P^{n/m}_{0}(P^m_{r5}(p))`.
    - Aumenta la capacidad hasta :math:`(n - \frac{n}{m})*s`.
    - Mejora el rendimiento en lectura y escritura respecto al |RAID| 5.
 
-.. rubric:: Particularidades
+.. rubric:: Consideraciones
 
 Sea cuál sea la implementación y el nivel del |RAID|, hay una serie de
-particularidades que comparten todos los sistemas |RAID|:
+consideraciones a tener en cuenta:
 
 #. Al constituirlos es necesario que se creen una serie de **estructuras de
    metadatos** a semejanza de lo que ocurre con los sistemas de ficheros.
 
-#. Debe Habilitarse algún mecanismo para advertir al administrador del **fallo
+#. Debe habilitarse algún mecanismo para advertir al administrador del **fallo
    de disco**, a fin de que sea diligente en su sustitución. Estos mecanismos
-   pueden ser muy variados (pitidos, leds), pero suelen incluir el envío de un
-   correo electrónico de aviso.
+   pueden ser muy variados (pitidos, leds, apunte en el registro), pero suelen
+   incluir el envío de un correo electrónico de aviso.
 
 #. Al reemplazarse un dispositivo defectuoso por uno nuevo, se desencadena un
    **proceso de recuperación** para volver a la situación previa a la rotura.
@@ -241,22 +243,21 @@ particularidades que comparten todos los sistemas |RAID|:
 #. Para minimizar el tiempo de sustitución de un disco defectuoso, algunos
    sistemas incorporan un **dispositivo de reserva** (*hot spare*) que se
    encuentra conectado pero inactivo, por lo que no forma parte efectiva del
-   |RAID|. En el momento en que se detecta una avería, el disco de reserva se
-   incorpora al |RAID| y comienza inmediatamente el *proceso de recuperación*.
-   La labor del administrador consistirá en añadir al sistema un nuevo disco de
-   reserva.
+   |RAID|. Al surgir un fallo en algún disco, se inhabilita y automáticamente el
+   disco de reserva ocupa su lugar en el |RAID|, por lo que comienza inmediatamente
+   el *proceso de recuperación*. La labor del administrador consistirá en
+   añadir al sistema un nuevo disco de reserva para la próxima vez que se
+   produzca una rotura.
 
 #. Tenga presente que, si el sistema sólo tenía un grado de redundancia (p.e. un
    |RAID| 5 o un |RAID| 1 de dos discos), durante el proceso de reconstrucción
    el sistema es vulnerable  por lo que cualquier nuevo fallo provoca la pérdida
-   irrecuperable de los datos. Además, el proceso de reconstrucción es una tarea
-   penosa que implica muchas lecturas sobre los discos supervivientes y,
-   consecuentemente, la sobrecarga de trabajo justamente durante este periodo de
-   vulnerabilidad, hace al sistema especialmente propenso a un nuevo fallo en
-   alguno de los supervivientes. Por eso, algunos administradores consideran que
-   tras un fallo lo mejor es proceder a un *backup* de los datos antes de la
-   resconstrucción; y rechazan como buena la idea de habilitar discos de reserva
-   (véase, por ejemplo, `este artículo
+   irrecuperable de los datos. Además, este proceso requiere muchas lecturas
+   sobre los discos supervivientes, lo que los sobrecarga de trabajo y hace al
+   sistema especialmente propenso a un nuevo fallo, esta vez fatal. Por eso,
+   algunos administradores consideran que tras un fallo lo mejor es proceder a
+   un *backup* de los datos antes de la resconstrucción; y rechazan como buena
+   la idea de habilitar discos de reserva (véase, por ejemplo, `este artículo
    <https://blog.open-e.com/why-a-hot-spare-hard-disk-is-a-bad-idea/>`_).
 
 .. rubric:: Técnicas de implementación
@@ -280,11 +281,14 @@ Mediante **firmware**
    constitución del |RAID|, sino que el chip de la controladora de disco
    incluye *firmware* específico para la definición del |RAID|. Como en el caso
    anterior, la configuración del |RAID| se hace con anterioridad a la carga del
-   sistema operativo, por la que éste sólo detecta el dispositivo virtual.
+   sistema operativo, por la que éste sólo muestra el dispositivo virtual, pero
+   será el procesdador el encargado de procesar todo lo necesario, como en el
+   caso posterior.
 
    Aunque aparentemente es una solución similiar, al no existir *hardware*
-   expecífico dedicado, su rendimiento es peor y, por lo general, es conveniente
-   una solución *software* pura.
+   expecífico dedicado y delegar todos los cálculo en el procesador, su
+   rendimiento es peor y, por lo general, es conveniente una solución *software*
+   pura.
 
 
 Mediante **software**
@@ -300,9 +304,9 @@ Mediante **software**
      herramientas.
    - *Windows* gracias a `Logical Disk Manager
      <https://en.wikipedia.org/wiki/Logical_Disk_Manager>`_ y en las versiones modernas
-     de servidor a `Sorage Spaces
+     de servidor a `Storage Spaces
      <https://en.wikipedia.org/wiki/Features_new_to_Windows_8#Storage>`_.
-   - *Linux* mediante su herramienta :command:`md`, que será a la que dediquemos
+   - *Linux* mediante su módulo :command:`md`, que será al que dediquemos
      el resto del epígrafe.
 
    Por su parte, algunos sistemas de ficheros soportan directamente la
@@ -325,7 +329,7 @@ los dos primeros casos:
 - Si nuestra intención es reaprovechar los discos sin preocuparnos por la
   información, entonces deberemos asegurarnos de eliminar los metadatos. Para
   ello, suele ser suficiente con sobrescrbir con ceros los primeros y los
-  últimos 512KiB::
+  últimos 512KiB de cada dispositivo::
 
    # dd < /dev/zero > /dev/sdX bs=512 count=1024
    # dd < /dev/zero > /dev/sdX bs=512 seek=$((`blockdev --getsz /dev/sdX` - 1024)) count=1024
