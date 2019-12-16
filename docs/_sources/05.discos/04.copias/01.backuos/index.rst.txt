@@ -2,3 +2,18 @@
 
 *Backups*
 =========
+
+.. Hablar de:
+
+   Soluciones de usuario:
+
+   + tar.
+   + dar.
+   + rsync.
+
+   Soluciones para redes profesionales:
+
+   + Un sistema más automatizado de copias como backuppc o bacula.
+
+.. https://pablo.sarubbi.com.ar/sysadmin/sistemas-de-backup-con-backuppc
+.. https://victorroblesweb.es/2013/11/04/backups-red-bacula-funcionamiento/

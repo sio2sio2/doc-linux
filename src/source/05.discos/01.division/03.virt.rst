@@ -132,7 +132,7 @@ particiones, para ello es necesario usar :command:`partx`
    /dev/loop0
 
 Hecho el particionado y expuestas las particiones, lo primero es declarar que la
-tercera partición es un volumen físico::
+tercera partición es un volumen físico\ [#]_::
 
    # pvcreate /dev/loop0p3
 
@@ -355,17 +355,16 @@ Instántaneas
 Una :dfn:`instantánea` consiste en el almacenamiento del estado del sistema de
 archivos en el momento de llevarla a cabo. Para ello, no se hace una copia del
 sistema (lo cual es costoso en tiempo y equivaldría a una copia de seguridad),
-sino que se marca ese instante como propio de instantánea y, cuando se modifica
-el contenido del fichero, se guarda una copia de la versión previa a la
-modificación que era la versión del fichero en el momento de la instatánea. De
-esta forma, el estado de la instatánea es la suma de los archivos que no han
-llegado a ser modificados más la copia de los archivos sí modificados previa a
-su primera modificación.
+sino que al modificarse por primera vez tras la instantánea el contenido de un
+fichero, se guarda una copia de éste sin la modificación. De esta forma, el
+estado de la instantánea es la suma de los archivos que no han llegado a ser
+modificados más la copia de los archivos sí modificados.
 
 Las instantáneas reparan las pérdidas por modificación o borrado no deseados,
 papel que también puede cumplir una copia de seguridad, pero a diferencia de
 éstas, no sirven como medida contra los fallos de disco o la corrupción de
-datos, ya que se almacenan en el mismo dispositivo. 
+datos, ya que requieren el sistema original y pueden estar almacenadas sobre el
+mismo dispositivo físico.
 
 Hay dos mecanismos para la creación de instantáneas:
 
@@ -375,11 +374,56 @@ Hay dos mecanismos para la creación de instantáneas:
   el *software* que nos ocupa en *Linux* o la restauración del sistema en los
   sitemas *Windows*.
 
-.. https://www.instructables.com/id/Snapshots-con-LVM-Usalos-como-backup-para-revertir/
+Práctica
+--------
+Para llevar a cabo instantáneas con |LVM| el procedimiento es simple: basta con
+crear un volúmen lógico que se declare que sirve para almacenar la instantánea
+de otro volumen lógico. Por ejemplo, vamos a dar a uno de los volúmenes lógicos
+y a escribir dentro de él::
 
-.. todo:: Por escribir
+   # mkfs.ext4 -L PRIMERA /dev/Vtest/primera
+   # mount /dev/VGtest/primera /mnt
+   # echo "Hola" > /mnt/saluto.txt
+
+Hecho lo cual, podemos crear una instatánea del estado actual de "primera"::
+
+   # lvcreate -s -n primera_snapshot -L 50M /dev/VGtest/primera
+
+donde es importante tener presente que el tamaño como máximo puede ser el tamaño
+del volumen original. También se puede añadir un parámetro adicional para
+indicar sobre qué volumen físico de los que integran el grupo de volúmenes se quiere
+definir la instantánea.
+
+A partir de ahora puede alterarse el contenido de :file:`/dev/VGtest/primera`::
+
+   # echo "Adios" >> /mnt/saludo.txt
+
+Podemos controlar cuál el tamaño ocupado por las copias en la instatánea con
+:ref:`lvs <lvs>`::
+
+   # lvs /dev/VGtest/primera_snapshot
+
+porque hay que tener presente que la instatánea deja de tener utilidad si se
+queda sin espacio. Para aumentarlo, puede usarse :ref:`lvextend <lvextend>` como
+se hace con los volúmenes lógicos normales. Si en algún momento se dean revertir
+todos los cambios y volver al estado de la instantánea::
+
+   # lvconvert --merge /dev/VGtest/primera_snapshot
+
+volveremos a él en cuanto volvamos a montar el volumen lógico::
+
+   # mount -o remount /mnt
+
+Si decidimos que no tiene sentido mantener la instánea, simplemente, borramos el
+volumen::
+
+   # lvremote /dev/VGtest/primera_snapshot
 
 .. rubric:: Notas al pie
+
+.. [#] En las versiones más recientes, esto no es ya necesario y al incluir un
+   disco  o partición en un grupo de volúmenes, se define ya como volumen físico
+   automáticamente.
 
 .. [#] Los porcentajes puede referise al espacio libre (:kbd:`FREE`) en el grupo
    de volúmenes, al espacio del volúmen lógico (:kbd:`LV`), al espacio del grupo

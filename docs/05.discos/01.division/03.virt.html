@@ -161,7 +161,7 @@ particiones, para ello es necesario usar <strong class="command">partx</strong><
 </pre></div>
 </div>
 <p>Hecho el particionado y expuestas las particiones, lo primero es declarar que la
-tercera partición es un volumen físico:</p>
+tercera partición es un volumen físico<a class="footnote-reference" href="#id3" id="id1">[1]</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> pvcreate /dev/loop0p3
 </pre></div>
 </div>
@@ -333,7 +333,7 @@ las dos órdenes anteriores son equivalente a:</p>
 </div>
 <p>aumenta hasta los 6GiB el volumen lógico cuyo anterior tamaño era 5GiB. Es
 posible también usar porcentajes en vez de tamaños o incrementos absolutos a
-través de la opción <kbd class="kbd docutils literal notranslate">-l</kbd><a class="footnote-reference" href="#id2" id="id1">[1]</a>:</p>
+través de la opción <kbd class="kbd docutils literal notranslate">-l</kbd><a class="footnote-reference" href="#id4" id="id2">[2]</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvcreate -l <span class="m">100</span>%FREE VGtest -n tercera
 </pre></div>
 </div>
@@ -373,16 +373,15 @@ semejante:</p>
 <p>Una <em class="dfn">instantánea</em> consiste en el almacenamiento del estado del sistema de
 archivos en el momento de llevarla a cabo. Para ello, no se hace una copia del
 sistema (lo cual es costoso en tiempo y equivaldría a una copia de seguridad),
-sino que se marca ese instante como propio de instantánea y, cuando se modifica
-el contenido del fichero, se guarda una copia de la versión previa a la
-modificación que era la versión del fichero en el momento de la instatánea. De
-esta forma, el estado de la instatánea es la suma de los archivos que no han
-llegado a ser modificados más la copia de los archivos sí modificados previa a
-su primera modificación.</p>
+sino que al modificarse por primera vez tras la instantánea el contenido de un
+fichero, se guarda una copia de éste sin la modificación. De esta forma, el
+estado de la instantánea es la suma de los archivos que no han llegado a ser
+modificados más la copia de los archivos sí modificados.</p>
 <p>Las instantáneas reparan las pérdidas por modificación o borrado no deseados,
 papel que también puede cumplir una copia de seguridad, pero a diferencia de
 éstas, no sirven como medida contra los fallos de disco o la corrupción de
-datos, ya que se almacenan en el mismo dispositivo.</p>
+datos, ya que requieren el sistema original y pueden estar almacenadas sobre el
+mismo dispositivo físico.</p>
 <p>Hay dos mecanismos para la creación de instantáneas:</p>
 <ul class="simple">
 <li>Mediante el uso de sistemas de ficheros que las soporten nativamente como
@@ -391,19 +390,68 @@ datos, ya que se almacenan en el mismo dispositivo.</p>
 el <em>software</em> que nos ocupa en <em>Linux</em> o la restauración del sistema en los
 sitemas <em>Windows</em>.</li>
 </ul>
-<div class="admonition-todo admonition" id="index-5">
-<p class="first admonition-title">Por hacer</p>
-<p class="last">Por escribir</p>
+<div class="section" id="practica">
+<h3>5.1.3.5.1. Práctica<a class="headerlink" href="#practica" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Para llevar a cabo instantáneas con <abbr title="Logical Volume Management">LVM</abbr> el procedimiento es simple: basta con
+crear un volúmen lógico que se declare que sirve para almacenar la instantánea
+de otro volumen lógico. Por ejemplo, vamos a dar a uno de los volúmenes lógicos
+y a escribir dentro de él:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkfs.ext4 -L PRIMERA /dev/Vtest/primera
+<span class="gp">#</span> mount /dev/VGtest/primera /mnt
+<span class="gp">#</span> <span class="nb">echo</span> <span class="s2">&quot;Hola&quot;</span> &gt; /mnt/saluto.txt
+</pre></div>
+</div>
+<p>Hecho lo cual, podemos crear una instatánea del estado actual de «primera»:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvcreate -s -n primera_snapshot -L 50M /dev/VGtest/primera
+</pre></div>
+</div>
+<p>donde es importante tener presente que el tamaño como máximo puede ser el tamaño
+del volumen original. También se puede añadir un parámetro adicional para
+indicar sobre qué volumen físico de los que integran el grupo de volúmenes se quiere
+definir la instantánea.</p>
+<p>A partir de ahora puede alterarse el contenido de <code class="file docutils literal notranslate"><span class="pre">/dev/VGtest/primera</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="nb">echo</span> <span class="s2">&quot;Adios&quot;</span> &gt;&gt; /mnt/saludo.txt
+</pre></div>
+</div>
+<p>Podemos controlar cuál el tamaño ocupado por las copias en la instatánea con
+<a class="reference internal" href="#lvs"><span class="std std-ref">lvs</span></a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvs /dev/VGtest/primera_snapshot
+</pre></div>
+</div>
+<p>porque hay que tener presente que la instatánea deja de tener utilidad si se
+queda sin espacio. Para aumentarlo, puede usarse <a class="reference internal" href="#lvextend"><span class="std std-ref">lvextend</span></a> como
+se hace con los volúmenes lógicos normales. Si en algún momento se dean revertir
+todos los cambios y volver al estado de la instantánea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvconvert --merge /dev/VGtest/primera_snapshot
+</pre></div>
+</div>
+<p>volveremos a él en cuanto volvamos a montar el volumen lógico:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mount -o remount /mnt
+</pre></div>
+</div>
+<p>Si decidimos que no tiene sentido mantener la instánea, simplemente, borramos el
+volumen:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvremote /dev/VGtest/primera_snapshot
+</pre></div>
 </div>
 <p class="rubric">Notas al pie</p>
-<table class="docutils footnote" frame="void" id="id2" rules="none">
+<table class="docutils footnote" frame="void" id="id3" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td>Los porcentajes puede referise al espacio libre (<kbd class="kbd docutils literal notranslate">FREE</kbd>) en el grupo
+<tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td>En las versiones más recientes, esto no es ya necesario y al incluir un
+disco  o partición en un grupo de volúmenes, se define ya como volumen físico
+automáticamente.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id4" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id2">[2]</a></td><td>Los porcentajes puede referise al espacio libre (<kbd class="kbd docutils literal notranslate">FREE</kbd>) en el grupo
 de volúmenes, al espacio del volúmen lógico (<kbd class="kbd docutils literal notranslate">LV</kbd>), al espacio del grupo
 de volúmenes (<kbd class="kbd docutils literal notranslate">VG</kbd>) y algún otro.</td></tr>
 </tbody>
 </table>
+</div>
 </div>
 </div>
 
@@ -420,7 +468,10 @@ de volúmenes (<kbd class="kbd docutils literal notranslate">VG</kbd>) y algún 
 <li><a class="reference internal" href="#disponibilidad">5.1.3.2. Disponibilidad</a></li>
 <li><a class="reference internal" href="#consulta">5.1.3.3. Consulta</a></li>
 <li><a class="reference internal" href="#modificacion">5.1.3.4. Modificación</a></li>
-<li><a class="reference internal" href="#instantaneas">5.1.3.5. Instántaneas</a></li>
+<li><a class="reference internal" href="#instantaneas">5.1.3.5. Instántaneas</a><ul>
+<li><a class="reference internal" href="#practica">5.1.3.5.1. Práctica</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
