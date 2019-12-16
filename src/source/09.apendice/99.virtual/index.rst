@@ -27,7 +27,7 @@ entre:
    la |CLR| de la plataforma *.net*.
    
    Para llevarse a cabo esta virtualización las aplicaciones deben estar
-   codificadas en un código intermedio llamado *bytecode* y un *sofware*
+   codificadas en un código intermedio llamado *bytecode* y un *software*
    denominado :dfn:`máquina virtual` se encarga de traducir este código al
    código máquina de la plataforma sobre la cual se ejecuta esta máquina
    virtual.
@@ -35,7 +35,7 @@ entre:
 **Virtualización de recursos**
    Consiste en la creación de un recurso virtual *hardware* (memoria,
    almacenamiento, etc.). Por ejemplo, la memoria virtual es un ejemplo de
-   virtualización de memoria principal. En el caso de de memoria de
+   virtualización de memoria principal. En el caso de memoria de
    almacenamiento los sistemas |RAID| también encierran una virtualización de
    recursos, ya que el conjunto de discos físicos que lo constituye se
    virtualiza en un recurso virtual que se comporta como si escribiéramos y
@@ -61,7 +61,7 @@ Antes de empezar, no obstante, hay que introducir cuatro conceptos:
 **Virtualización completa**
    Es aquella en que el *huésped* corre dentro de un sistema totalmente
    virtualizado de manera que no es consciente de que en realidad se ejecuta
-   dentro de una virtualización. En consecuencia la virtualización debe ofrecer
+   dentro de una virtualización. En consecuencia, la virtualización debe ofrecer
    a este sistema una plataforma *hardware* virtual completamente funcional.
 
    Dentro de la virtualización completa, podemos hacer dos distinciones. La
@@ -116,7 +116,7 @@ Antes de empezar, no obstante, hay que introducir cuatro conceptos:
 **Contenedores**
    La virtualización por sistema operativo la llevan a cabo aquellos sistemas
    operativos capaces de crear varios espacios de usuario completamente aislados
-   unos de otros. Cada una de estos espacios de usuario constituye un
+   unos de otros. Cada uno de estos espacios de usuario constituye un
    contenedor y es capaz de ver y manejar aquellos recursos hardware que se le
    han asignado.
 

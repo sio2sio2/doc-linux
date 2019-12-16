@@ -14,7 +14,7 @@ indispensable tener presentes algunos conceptos:
    unidad de disco. Cada una de estas divisiones lógicas se registra en la zona
    específica del propio disco dedicada a ese efecto, es independiente de cuál
    sea el sistema operativo o los sistemas operativos instalados, y está
-   constituida por sectores contiguos. A esta listado almacenado en el disco, se
+   constituida por sectores contiguos. A este listado almacenado en el disco, se
    le denomina :dfn:`tabla de particiones`. Por lo general, los sistemas
    operativos entienden las divisiones y las tratan como si trataran discos
    independientes.
@@ -31,7 +31,7 @@ indispensable tener presentes algunos conceptos:
 
 **Partición virtual** (terminología propia)
    Una :dfn:`partición virtual` es cada una de las divisiones en que se parte un
-   disco virtual. En *Windows* se denominan :dfn:`volúmenes` y en linux
+   disco virtual. En *Windows* se denominan :dfn:`volúmenes` y en *Linux*
    :dfn:`volúmenes lógicos`.
 
 Hay pues una analogía entre disco físico/partición y disco virtual/partición
@@ -54,7 +54,7 @@ Bajo el presente artículo estudiaremos:
 
 - Cómo es el proceso de arranque de un ordenador.
 - Cómo llevar a cabo la creación de particiones sobre un disco físico.
-- En linux, cómo definir grupos de volúmenes y cómo dividirlos en volúmenes
+- En *Linux*, cómo definir grupos de volúmenes y cómo dividirlos en volúmenes
   lógicos.
 
 .. toctree::
