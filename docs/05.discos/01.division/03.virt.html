@@ -390,49 +390,151 @@ mismo dispositivo físico.</p>
 el <em>software</em> que nos ocupa en <em>Linux</em> o la restauración del sistema en los
 sitemas <em>Windows</em>.</li>
 </ul>
-<div class="section" id="practica">
-<h3>5.1.3.5.1. Práctica<a class="headerlink" href="#practica" title="Enlazar permanentemente con este título">¶</a></h3>
 <p>Para llevar a cabo instantáneas con <abbr title="Logical Volume Management">LVM</abbr> el procedimiento es simple: basta con
 crear un volúmen lógico que se declare que sirve para almacenar la instantánea
-de otro volumen lógico. Por ejemplo, vamos a dar a uno de los volúmenes lógicos
-y a escribir dentro de él:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkfs.ext4 -L PRIMERA /dev/Vtest/primera
-<span class="gp">#</span> mount /dev/VGtest/primera /mnt
-<span class="gp">#</span> <span class="nb">echo</span> <span class="s2">&quot;Hola&quot;</span> &gt; /mnt/saluto.txt
+de otro volumen lógico. Por ejemplo, vamos a dar formato a uno de los volúmenes
+lógicos y a escribir dentro de él:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkfs.ext4 -L PRIMERA /dev/VGtest/primera
+<span class="gp">#</span> mkdir /tmp/<span class="o">{</span>original,snap<span class="o">}</span>
+<span class="gp">#</span> mount /dev/VGtest/primera /tmp/original
+<span class="gp">#</span> <span class="nb">echo</span> <span class="s2">&quot;Hola&quot;</span> &gt; /tmp/original/saluto.txt
 </pre></div>
 </div>
 <p>Hecho lo cual, podemos crear una instatánea del estado actual de «primera»:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvcreate -s -n primera_snapshot -L 50M /dev/VGtest/primera
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvcreate -s -n primera_snap -L 50M /dev/VGtest/primera
 </pre></div>
 </div>
 <p>donde es importante tener presente que el tamaño como máximo puede ser el tamaño
 del volumen original. También se puede añadir un parámetro adicional para
 indicar sobre qué volumen físico de los que integran el grupo de volúmenes se quiere
-definir la instantánea.</p>
-<p>A partir de ahora puede alterarse el contenido de <code class="file docutils literal notranslate"><span class="pre">/dev/VGtest/primera</span></code>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="nb">echo</span> <span class="s2">&quot;Adios&quot;</span> &gt;&gt; /mnt/saludo.txt
+definir la instantánea. Hecho esto, podemos practicar dos estrategias:</p>
+<ol class="loweralpha simple">
+<li>La obvia que es continuar trabajando sobre el volumen original y, si en algún
+momento decidimos revertir los cambios, recuperar la instantánea. Un ejemplo
+en que es una buena opción esta estrategia es ante una actualización. Si
+sospechamos que algo puede ir mal, podemos hacer antes una instantánea y
+dependiendo del resultado, revertir al estado anterior a la instalación o
+desechar la instantánea.</li>
+<li>Trabajar sobre la instantánea sin alterar el volumen original, ya que si
+<em>recuperamos</em> la instantánea lo que haremos será aplicar los cambios de la
+instánea sobre el volumen original. Esta opción es adecuada en los casos en
+que queremos que el sistema siga funcionando en producción del mismo modo,
+mientras nosotros introducimos cambios (p.e. en algunos <em>scripts</em>). De nuevo,
+podrá darse el caso de que decidamos aplicar los cambios (recuperando la
+instantánea) o desecharlos (borrándola).</li>
+</ol>
+<p class="rubric">Trabajando sobre el propio volumen</p>
+<p>Para nuestro ejemplo, podemos hacer algunos cambios simples:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="nb">echo</span> <span class="s2">&quot;Adios&quot;</span> &gt;&gt; /tmp/original/saludo.txt
+<span class="gp">#</span> cp /etc/resolv.conf /tmp/original
 </pre></div>
 </div>
-<p>Podemos controlar cuál el tamaño ocupado por las copias en la instatánea con
-<a class="reference internal" href="#lvs"><span class="std std-ref">lvs</span></a>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvs /dev/VGtest/primera_snapshot
+<p>Con estas acciones la instantánea debería ir paulatimente incrementando su
+ocupación (ya que necesita almacenar las copias de los ficheros) y es
+conveniente vigilar este dato, ya que si malograremos la instantánea si
+superamos la capacidad máxima (lo cual no ocurrirá jamás si hacemos su tamaño
+igual al tamaño del volumen original con <kbd class="kbd docutils literal notranslate">-l 100%ORIGIN</kbd>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvs -o data_percent /dev/VGtest/primera_snap
+<span class="go">Data%</span>
+<span class="go">0.09</span>
 </pre></div>
 </div>
-<p>porque hay que tener presente que la instatánea deja de tener utilidad si se
-queda sin espacio. Para aumentarlo, puede usarse <a class="reference internal" href="#lvextend"><span class="std std-ref">lvextend</span></a> como
-se hace con los volúmenes lógicos normales. Si en algún momento se dean revertir
-todos los cambios y volver al estado de la instantánea:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvconvert --merge /dev/VGtest/primera_snapshot
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">Si comprobamos que la ocupación se aproxima al 100%, podemos usar
+<a class="reference internal" href="#lvextend"><span class="std std-ref">lvextend</span></a> como se hace en los volúmenes lógicos normales.</p>
+</div>
+<p>Dependiendo de si los cambios sobre el volumen son aceptables o no, tocará
+desechar la instantánea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvremote /dev/VGtest/primera_snap
 </pre></div>
 </div>
-<p>volveremos a él en cuanto volvamos a montar el volumen lógico:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mount -o remount /mnt
+<p>o revertir los cambios sobre el volumen:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> umount /tmp/original
+<span class="gp">#</span> lvconvert --merge /dev/VGtest/primera_snap
 </pre></div>
 </div>
-<p>Si decidimos que no tiene sentido mantener la instánea, simplemente, borramos el
-volumen:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvremote /dev/VGtest/primera_snapshot
+<p>cuyo efecto será que el volumen vuelta al estado de la instantánea y que el
+volumen con la instantánea desaparezca automáticamente.</p>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p class="last">Es importante que tanto el volumen original como el de la
+instantánea se encuentren desmontados en el momento de hacer la fusión.</p>
+</div>
+<p class="rubric">Trabajando sobre la instantánea</p>
+<p>Alternativamente, podemos trabajar sobre la instantánea y dejar sin alterar el
+volumen original. Para ello, basta con montar la instantánea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mount /dev/VGtest/primera_snap /tmp/snap
 </pre></div>
+</div>
+<p>y realizar los cambios sobre ella:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="nb">echo</span> <span class="s2">&quot;Adios&quot;</span> &gt;&gt; /tmp/snap/saludo.txt
+<span class="gp">#</span> cp /etc/resolv.conf /tmp/snap
+</pre></div>
+</div>
+<p>En este caso, la operaciones para desechar o revertir los cambios son justamente
+las opuestas. Si deseamos aplicar los cambios sobre el volumen, necesitamos
+fusionar con la instantánea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> umount /tmp/<span class="o">{</span>original,snap<span class="o">}</span>
+<span class="gp">#</span> lvconvert --merge /dev/VGtest/primera_snap
+</pre></div>
+</div>
+<p>y, si deseamos desecharlos, eliminar el volumen de la instantánea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> umount /tmp/snap
+<span class="gp">#</span> lvremote /dev/VGtest/primera_snap
+</pre></div>
+</div>
+</div>
+<div class="section" id="aprovisionamiento-fino">
+<span id="lvm-aprovisionamiento"></span><h2>5.1.3.6. Aprovisionamiento fino<a class="headerlink" href="#aprovisionamiento-fino" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>El <em class="dfn">aprovisionamiento fino</em> (<em>thin provisioning</em>, en inglés) consiste en
+reservar para un volumen lógico más espacio de disco del que realmente tiene
+asignado. Es un concepto muy comúnmente usando en virtualización para cuyas
+máquinas virtuales podemos usar discos de un tamaño mucho mayor del que
+realmente ocupa su fichero correspondiente. Algo parecido se logra con la orden
+<a class="reference internal" href="02.part.html#truncate"><span class="std std-ref">truncate</span></a>. Se contrapone al <em class="dfn">aprovisionamiento grueso</em> que
+consiste en justo lo contrario, esto es, en reservar exactamente el tamaño del
+volumen. Hasta ahora, hemos practicado con <abbr title="Logical Volume Management">LVM</abbr>, este último tipo de
+aprovisionamiento.</p>
+<p>Sin embargo, <abbr title="Logical Volume Management">LVM</abbr> soporta <em>aprovisionamiento fino</em> que, en principio, puede
+servir para dos propósitos distintos:</p>
+<ul class="simple">
+<li>Ajustar el tamaño máximo de varios volúmenes lógicos a parte (o todo)
+del tamaño del grupo de volúmenes. Si no tenemos claro, cuáles van a ser las
+necesidades de crecimiento de estos volúmenes, esto puede ahorrarnos la
+necesidad de hacerlos excesivamente pequeños y, según sea la evolución
+posterior, tener después que aumentarles progresivamente el tamaño.</li>
+<li>Si instalamos sobre un disco pequeño con intención de que el sistema acabe
+corriendo sobre un disco mayor, crear los volúmenes lógicos con el tamaño
+que tendrán en el disco final. Usaremos esto al plantear la <a class="reference internal" href="../10.instalacion/index.html#inst-servidor"><span class="std std-ref">instalación
+del servidor</span></a>.</li>
+</ul>
+<p>Lo primero, antes de empezar, es asegurarse de que está instalado el paquete
+<strong>thin-provisioning-tools</strong>, hecho lo cual, podemos hacer pruebas con un nuevo
+disco:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> truncate -s 500M <span class="m">0</span>.disk
+<span class="gp">#</span> losetup /dev/loop0 <span class="m">0</span>.disk
+<span class="gp">#</span> vgcreate VGtest /dev/loop0
+</pre></div>
+</div>
+<p>Para probar el concepto crearemos dos volúmenes lógicos: el primero normal y el
+segundo un «<em>pool</em>», esto es, un volumen en el que encerraremos los volúmenes
+para los que deseamos <em>aprovisionamiento fino</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvcreate -L 100m -n fuera VGtest
+<span class="gp">#</span> lvcreate --thinpool pool -l <span class="m">100</span>%FREE VGtest
+<span class="gp">#</span> lvs VGtest
+<span class="go">  LV    VG     Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert</span>
+<span class="go">  fuera VGtest -wi-a----- 100,00m</span>
+<span class="go">  pool  VGtest twi-a-tz-- 388,00m             0,00   10,84</span>
+</pre></div>
+</div>
+<p>El primero es un volumen de 100MiB y, además, no podrá cambiar su tamaño a menos
+que agrandemos el grupo de volúmenes con, por ejemplo, otro disco. El segundo es
+el <em>pool</em> dentro del que podemos crear volúmenes lógicos con aparentemente
+cualquier tamaño.</p>
+<div class="admonition-todo admonition" id="index-5">
+<p class="first admonition-title">Por hacer</p>
+<p class="last">SEGUIR.</p>
 </div>
 <p class="rubric">Notas al pie</p>
 <table class="docutils footnote" frame="void" id="id3" rules="none">
@@ -448,10 +550,10 @@ automáticamente.</td></tr>
 <tbody valign="top">
 <tr><td class="label"><a class="fn-backref" href="#id2">[2]</a></td><td>Los porcentajes puede referise al espacio libre (<kbd class="kbd docutils literal notranslate">FREE</kbd>) en el grupo
 de volúmenes, al espacio del volúmen lógico (<kbd class="kbd docutils literal notranslate">LV</kbd>), al espacio del grupo
-de volúmenes (<kbd class="kbd docutils literal notranslate">VG</kbd>) y algún otro.</td></tr>
+de volúmenes (<kbd class="kbd docutils literal notranslate">VG</kbd>) y, para instantáneas, ORIGIN que refiere al tamaño
+del volumen original.</td></tr>
 </tbody>
 </table>
-</div>
 </div>
 </div>
 
@@ -468,10 +570,8 @@ de volúmenes (<kbd class="kbd docutils literal notranslate">VG</kbd>) y algún 
 <li><a class="reference internal" href="#disponibilidad">5.1.3.2. Disponibilidad</a></li>
 <li><a class="reference internal" href="#consulta">5.1.3.3. Consulta</a></li>
 <li><a class="reference internal" href="#modificacion">5.1.3.4. Modificación</a></li>
-<li><a class="reference internal" href="#instantaneas">5.1.3.5. Instántaneas</a><ul>
-<li><a class="reference internal" href="#practica">5.1.3.5.1. Práctica</a></li>
-</ul>
-</li>
+<li><a class="reference internal" href="#instantaneas">5.1.3.5. Instántaneas</a></li>
+<li><a class="reference internal" href="#aprovisionamiento-fino">5.1.3.6. Aprovisionamiento fino</a></li>
 </ul>
 </li>
 </ul>

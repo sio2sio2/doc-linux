@@ -374,50 +374,156 @@ Hay dos mecanismos para la creación de instantáneas:
   el *software* que nos ocupa en *Linux* o la restauración del sistema en los
   sitemas *Windows*.
 
-Práctica
---------
 Para llevar a cabo instantáneas con |LVM| el procedimiento es simple: basta con
 crear un volúmen lógico que se declare que sirve para almacenar la instantánea
-de otro volumen lógico. Por ejemplo, vamos a dar a uno de los volúmenes lógicos
-y a escribir dentro de él::
+de otro volumen lógico. Por ejemplo, vamos a dar formato a uno de los volúmenes
+lógicos y a escribir dentro de él::
 
-   # mkfs.ext4 -L PRIMERA /dev/Vtest/primera
-   # mount /dev/VGtest/primera /mnt
-   # echo "Hola" > /mnt/saluto.txt
+   # mkfs.ext4 -L PRIMERA /dev/VGtest/primera
+   # mkdir /tmp/{original,snap}
+   # mount /dev/VGtest/primera /tmp/original
+   # echo "Hola" > /tmp/original/saluto.txt
 
 Hecho lo cual, podemos crear una instatánea del estado actual de "primera"::
 
-   # lvcreate -s -n primera_snapshot -L 50M /dev/VGtest/primera
+   # lvcreate -s -n primera_snap -L 50M /dev/VGtest/primera
 
 donde es importante tener presente que el tamaño como máximo puede ser el tamaño
 del volumen original. También se puede añadir un parámetro adicional para
 indicar sobre qué volumen físico de los que integran el grupo de volúmenes se quiere
-definir la instantánea.
+definir la instantánea. Hecho esto, podemos practicar dos estrategias:
 
-A partir de ahora puede alterarse el contenido de :file:`/dev/VGtest/primera`::
+a. La obvia que es continuar trabajando sobre el volumen original y, si en algún
+   momento decidimos revertir los cambios, recuperar la instantánea. Un ejemplo
+   en que es una buena opción esta estrategia es ante una actualización. Si
+   sospechamos que algo puede ir mal, podemos hacer antes una instantánea y
+   dependiendo del resultado, revertir al estado anterior a la instalación o
+   desechar la instantánea.
 
-   # echo "Adios" >> /mnt/saludo.txt
+b. Trabajar sobre la instantánea sin alterar el volumen original, ya que si
+   *recuperamos* la instantánea lo que haremos será aplicar los cambios de la
+   instánea sobre el volumen original. Esta opción es adecuada en los casos en
+   que queremos que el sistema siga funcionando en producción del mismo modo,
+   mientras nosotros introducimos cambios (p.e. en algunos *scripts*). De nuevo,
+   podrá darse el caso de que decidamos aplicar los cambios (recuperando la
+   instantánea) o desecharlos (borrándola).
 
-Podemos controlar cuál el tamaño ocupado por las copias en la instatánea con
-:ref:`lvs <lvs>`::
+.. rubric:: Trabajando sobre el propio volumen
 
-   # lvs /dev/VGtest/primera_snapshot
+Para nuestro ejemplo, podemos hacer algunos cambios simples::
 
-porque hay que tener presente que la instatánea deja de tener utilidad si se
-queda sin espacio. Para aumentarlo, puede usarse :ref:`lvextend <lvextend>` como
-se hace con los volúmenes lógicos normales. Si en algún momento se dean revertir
-todos los cambios y volver al estado de la instantánea::
+   # echo "Adios" >> /tmp/original/saludo.txt
+   # cp /etc/resolv.conf /tmp/original
 
-   # lvconvert --merge /dev/VGtest/primera_snapshot
+Con estas acciones la instantánea debería ir paulatimente incrementando su
+ocupación (ya que necesita almacenar las copias de los ficheros) y es
+conveniente vigilar este dato, ya que si malograremos la instantánea si
+superamos la capacidad máxima (lo cual no ocurrirá jamás si hacemos su tamaño
+igual al tamaño del volumen original con :kbd:`-l 100%ORIGIN`)::
 
-volveremos a él en cuanto volvamos a montar el volumen lógico::
+   # lvs -o data_percent /dev/VGtest/primera_snap
+   Data%
+   0.09
 
-   # mount -o remount /mnt
+.. note:: Si comprobamos que la ocupación se aproxima al 100%, podemos usar
+   :ref:`lvextend <lvextend>` como se hace en los volúmenes lógicos normales.
 
-Si decidimos que no tiene sentido mantener la instánea, simplemente, borramos el
-volumen::
+Dependiendo de si los cambios sobre el volumen son aceptables o no, tocará
+desechar la instantánea::
 
-   # lvremote /dev/VGtest/primera_snapshot
+   # lvremote /dev/VGtest/primera_snap
+
+o revertir los cambios sobre el volumen::
+
+   # umount /tmp/original
+   # lvconvert --merge /dev/VGtest/primera_snap
+
+cuyo efecto será que el volumen vuelta al estado de la instantánea y que el
+volumen con la instantánea desaparezca automáticamente.
+
+.. warning:: Es importante que tanto el volumen original como el de la
+   instantánea se encuentren desmontados en el momento de hacer la fusión.
+
+.. rubric:: Trabajando sobre la instantánea
+
+Alternativamente, podemos trabajar sobre la instantánea y dejar sin alterar el
+volumen original. Para ello, basta con montar la instantánea::
+
+   # mount /dev/VGtest/primera_snap /tmp/snap
+
+y realizar los cambios sobre ella::
+
+   # echo "Adios" >> /tmp/snap/saludo.txt
+   # cp /etc/resolv.conf /tmp/snap
+
+En este caso, la operaciones para desechar o revertir los cambios son justamente
+las opuestas. Si deseamos aplicar los cambios sobre el volumen, necesitamos
+fusionar con la instantánea::
+
+   # umount /tmp/{original,snap}
+   # lvconvert --merge /dev/VGtest/primera_snap
+
+y, si deseamos desecharlos, eliminar el volumen de la instantánea::
+
+   # umount /tmp/snap
+   # lvremote /dev/VGtest/primera_snap
+
+.. _lvm-aprovisionamiento:
+
+Aprovisionamiento fino
+======================
+El :dfn:`aprovisionamiento fino` (*thin provisioning*, en inglés) consiste en
+reservar para un volumen lógico más espacio de disco del que realmente tiene
+asignado. Es un concepto muy comúnmente usando en virtualización para cuyas
+máquinas virtuales podemos usar discos de un tamaño mucho mayor del que
+realmente ocupa su fichero correspondiente. Algo parecido se logra con la orden
+:ref:`truncate <truncate>`. Se contrapone al :dfn:`aprovisionamiento grueso` que
+consiste en justo lo contrario, esto es, en reservar exactamente el tamaño del
+volumen. Hasta ahora, hemos practicado con |LVM|, este último tipo de
+aprovisionamiento.
+
+Sin embargo, |LVM| soporta *aprovisionamiento fino* que, en principio, puede
+servir para dos propósitos distintos:
+
+- Ajustar el tamaño máximo de varios volúmenes lógicos a parte (o todo)
+  del tamaño del grupo de volúmenes. Si no tenemos claro, cuáles van a ser las
+  necesidades de crecimiento de estos volúmenes, esto puede ahorrarnos la
+  necesidad de hacerlos excesivamente pequeños y, según sea la evolución
+  posterior, tener después que aumentarles progresivamente el tamaño.
+
+- Si instalamos sobre un disco pequeño con intención de que el sistema acabe 
+  corriendo sobre un disco mayor, crear los volúmenes lógicos con el tamaño
+  que tendrán en el disco final. Usaremos esto al plantear la :ref:`instalación
+  del servidor <inst-servidor>`.
+
+Lo primero, antes de empezar, es asegurarse de que está instalado el paquete
+**thin-provisioning-tools**, hecho lo cual, podemos hacer pruebas con un nuevo
+disco::
+
+   # truncate -s 500M 0.disk
+   # losetup /dev/loop0 0.disk
+   # vgcreate VGtest /dev/loop0
+
+Para probar el concepto crearemos dos volúmenes lógicos: el primero normal y el
+segundo un "*pool*", esto es, un volumen en el que encerraremos los volúmenes
+para los que deseamos *aprovisionamiento fino*::
+
+   # lvcreate -L 100m -n fuera VGtest
+   # lvcreate --thinpool pool -l 100%FREE VGtest
+   # lvs VGtest
+     LV    VG     Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+     fuera VGtest -wi-a----- 100,00m                                                    
+     pool  VGtest twi-a-tz-- 388,00m             0,00   10,84
+
+El primero es un volumen de 100MiB y, además, no podrá cambiar su tamaño a menos
+que agrandemos el grupo de volúmenes con, por ejemplo, otro disco. El segundo es
+el *pool* dentro del que podemos crear volúmenes lógicos con aparentemente
+cualquier tamaño.
+
+.. todo:: SEGUIR.
+
+.. https://www.theurbanpenguin.com/maning-lvm-snapshots/
+.. https://www.theurbanpenguin.com/thin-provisioning-lvm2/
 
 .. rubric:: Notas al pie
 
@@ -427,7 +533,8 @@ volumen::
 
 .. [#] Los porcentajes puede referise al espacio libre (:kbd:`FREE`) en el grupo
    de volúmenes, al espacio del volúmen lógico (:kbd:`LV`), al espacio del grupo
-   de volúmenes (:kbd:`VG`) y algún otro.
+   de volúmenes (:kbd:`VG`) y, para instantáneas, ORIGIN que refiere al tamaño
+   del volumen original.
 
 .. |LVM| replace:: :abbr:`LVM (Logical Volume Management)`
 .. |LV| replace:: :abbr:`LV (Logical Volume)`
