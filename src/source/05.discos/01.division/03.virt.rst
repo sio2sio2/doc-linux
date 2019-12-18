@@ -81,7 +81,7 @@ que usando :ref:`sgdisk <sgdisk>` puede realizarse de esta forma::
 
    $ sgdisk -a 8 -n "0:40:2047" -t "0:0xef02" -c "0:BOOTBIOS" \
             -a 2048 -n "0:2048:+50M" -t "0:0xef00" -c "0:EFI" \
-            -N 0 -t "3:0x8e00" -c "3:LVM" /tmp/disco.raw
+            -N 0 -t "3:0x8e00" -c "3:LVM" /tmp/0.disk
 
 de forma que creamos las dos particiones necesarias para el arranque aparte,
 y una tercera partición destinanda a ser el volumen físico que constituya el
@@ -107,10 +107,10 @@ bucle:
 
 ::
 
-   # losetup /dev/loop0 /tmp/disco.raw
+   # losetup /dev/loop0 /tmp/0.disk
    # losetup
    NAME       SIZELIMIT OFFSET AUTOCLEAR RO BACK-FILE      DIO LOG-SEC
-   /dev/loop0         0      0         0  0 /tmp/disco.raw   0     512
+   /dev/loop0         0      0         0  0 /tmp/0.disk   0     512
    # losetup -d /dev/loop0
 
 Con todo, asociar el fichero al dispositivo no provoca que aparezcan las
@@ -322,8 +322,8 @@ grupo de volúmenes. El disco físico se ha acabado, pero si "compráramos" otro
 podríamos añadirlo como volumen lógico a *VGtest* y volveríamos a disponer de
 espacio libre::
 
-   # truncate -s 10G /tmp/otrodisco.raw
-   # losetup /dev/loop1 /tmp/otrodisco.raw
+   # truncate -s 10G /tmp/1.disk
+   # losetup /dev/loop1 /tmp/1.disk
    # pvcreate /dev/loop1
    # vgextend VGtest /dev/loop1
    # vgs VGtest
@@ -474,12 +474,12 @@ Aprovisionamiento fino
 ======================
 El :dfn:`aprovisionamiento fino` (*thin provisioning*, en inglés) consiste en
 reservar para un volumen lógico más espacio de disco del que realmente tiene
-asignado. Es un concepto muy comúnmente usando en virtualización para cuyas
+disponible. Es un concepto muy comúnmente usando en virtualización para cuyas
 máquinas virtuales podemos usar discos de un tamaño mucho mayor del que
 realmente ocupa su fichero correspondiente. Algo parecido se logra con la orden
-:ref:`truncate <truncate>`. Se contrapone al :dfn:`aprovisionamiento grueso` que
+:ref:`truncate <truncate>`. Se contrapone al :dfn:`aprovisionamiento grueso`, que
 consiste en justo lo contrario, esto es, en reservar exactamente el tamaño del
-volumen. Hasta ahora, hemos practicado con |LVM|, este último tipo de
+volumen. Hasta ahora, hemos practicado con |LVM| este último tipo de
 aprovisionamiento.
 
 Sin embargo, |LVM| soporta *aprovisionamiento fino* que, en principio, puede
@@ -518,9 +518,48 @@ para los que deseamos *aprovisionamiento fino*::
 El primero es un volumen de 100MiB y, además, no podrá cambiar su tamaño a menos
 que agrandemos el grupo de volúmenes con, por ejemplo, otro disco. El segundo es
 el *pool* dentro del que podemos crear volúmenes lógicos con aparentemente
-cualquier tamaño.
+cualquier tamaño::
 
-.. todo:: SEGUIR.
+   # lvcreate -T -n tvol1 -V 1G VGtest/pool
+   # lvcreate -T -n tvol2 -V 2G VGtest/pool
+   # lvs VGtest
+     LV    VG     Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+     fuera VGtest -wi-a----- 100,00m                                                    
+     pool  VGtest twi-aotz-- 388,00m             0,00   11,04                           
+     tvol1 VGtest Vwi-a-tz--   1,00g pool        0,00                                   
+     tvol2 VGtest Vwi-a-tz--   2,00g pool        0,00 
+
+Al crear ambos volúmenes, se nos refiere la opción
+:kbd:`activation/thin_pool_autoextend_threshold`, porque su valor es 100::
+
+   # lvm dumpconfig activation/thin_pool_autoextend_threshold
+   thin_pool_autoextend_threshold=100
+
+La variable fija el tanto por cierto de ocupación del *pool* para el que una vez
+alcanzado se incrementa el tamaño en un porcentaje fijado por::
+
+   # lvm dumpconfig activation/thin_pool_autoextend_percent
+   thin_pool_autoextend_percent=20
+
+pero justamente un valor de 100% deshabilita la posibilidad. Si ponemos un valor
+más bajo (p.e el 85%), sí se llevará a cabo la ampliación automática... si se
+puede, que no es nuestro caso, ya que el grupo de volúmenes está completamente
+lleno.
+
+SI probamos a dar formato a uno de los volúmenes del *pool*, comprobaremos el
+sistema de ficheros participa de la ficción del tamaño::
+
+   # mkfs.ext4 -L TVOL2 /dev/VGtest/tvol2
+   # mount /dev/VGtest/tvol2 /mnt/
+   # df -h /mnt/
+   S.ficheros               Tamaño Usados  Disp Uso% Montado en
+   /dev/mapper/VGtest-tvol2   2,0G   6,0M  1,8G   1% /mnt
+
+Sin embargo, el espacio real es el que ocupa el *pool*::
+
+   # lvs VGtest/pool
+     LV   VG     Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+     pool VGtest twi-aotz-- 388,00m             25,14  12,21
 
 .. https://www.theurbanpenguin.com/maning-lvm-snapshots/
 .. https://www.theurbanpenguin.com/thin-provisioning-lvm2/

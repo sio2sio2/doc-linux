@@ -274,7 +274,7 @@ herramientas:
 Es probable que, para hacer pruebas, no deseemos usar un disco real. En ese
 caso, lo más cómo es crear un fichero y trabajar sobre él\ [#]_. Por ejemplo::
 
-   $ truncate -s 20G disco.raw
+   $ truncate -s 20G 0.disk
 
 Esto creará un `fichero disperso
 <https://es.wikipedia.org/wiki/Archivo_disperso>`_ de 20G, que ocupa de forma
@@ -430,8 +430,8 @@ interactiva y exige que el usuario vaya escogiendo qué acción en la que quiere
 hacer. Pese a ello, se puede consultar directamente la tabla de particiones sin
 entrar en su entorno::
 
-   $ /sbin/fdisk -l disco.raw
-   Disco disco.raw: 20 GiB, 21474836480 bytes, 41943040 sectores
+   $ /sbin/fdisk -l 0.disk
+   Disco 0.disk: 20 GiB, 21474836480 bytes, 41943040 sectores
    Unidades: sectores de 1 * 512 = 512 bytes
    Tamaño de sector (lógico/físico): 512 bytes / 512 bytes
    Tamaño de E/S (mínimo/óptimo): 512 bytes / 512 bytes
@@ -442,7 +442,7 @@ no dispone siquiera de una tabla de particiones.
 Para manipular las particiones (crearlas en este caso) basta con indicar el
 disco sobre el que se quiere actuar::
 
-   $ /sbin/fdisk disco.raw
+   $ /sbin/fdisk 0.disk
    [...]
    Orden (m para obtener ayuda):
 
@@ -464,7 +464,7 @@ incorporando argumentos en línea o pasando la tabla de particiones por la
 entrada estándar. Para consultar la tabla de particiones, se utiliza la misma
 sintaxis que :ref:`fdisk <fdisk>`::
 
-   $ /sbin/sfdisk -l disco.raw
+   $ /sbin/sfdisk -l 0.disk
 
 La forma más sencilla de crear una tabla de particiones es copiar una ya
 existente de otro disco::
@@ -485,7 +485,7 @@ disponible; el del tamaño, ocupar el máximo posible; el valor para el tipo, "L
 (un alias para partición tipo linux); y el valor para activa, que no lo sea. Por
 ejemplo::
 
-   $ /sbin/sfdisk disco.raw <<EOF
+   $ /sbin/sfdisk 0.disk <<EOF
    label: dos
    ,$((32*1024**2/512)),L,*
    ,,E
@@ -517,7 +517,7 @@ La salida de la orden nos debería mostrar las particiones resultantes.
 Además, de crear tablas completas, podemos modificar la ya existente gracias a
 la opción :kbd:`-N`. Por ejemplo, la orden::
 
-   $ echo ",,L,-" | /sbin/sfdisk -N1 disco.raw
+   $ echo ",,L,-" | /sbin/sfdisk -N1 0.disk
 
 deja todo como está, pero desactivando la partición. También es posible añadir
 más particiones usando como argumento de :kbd:`-N` índices de particiones que no
@@ -527,7 +527,7 @@ existan.
    particionado |GPT|, :command:`sfdisk` puede usarse también para crear una
    tabla de particiones de este tipo::
 
-      $ /sbin/sfdisk disco.raw <<EOF
+      $ /sbin/sfdisk 0.disk <<EOF
       label: gpt
       ,$((50*1024**2/512)),U,
       ,$((2*1024**3/512)),L,
@@ -774,9 +774,9 @@ con :ref:`sfdisk <sfdisk>`, aunque con algunas variantes:
 
 Empecemos, simplemente, por consultar la tabla de particiones\ [#]_::
 
-   $ /sbin/sgdisk -p /tmp/disco.raw
+   $ /sbin/sgdisk -p /tmp/0.disk
    Creating new GPT entries in memory.
-   Disk /tmp/disco.raw: 41943040 sectors, 20.0 GiB
+   Disk /tmp/0.disk: 41943040 sectors, 20.0 GiB
    Sector size (logical): 512 bytes
    Disk identifier (GUID): 97F6B136-94D6-4393-9348-47F3F5DB70F6
    Partition table holds up to 128 entries
@@ -797,21 +797,21 @@ la información lo siguiente:
   (512 *bytes*), la cabecera |GPT| (otros 512 *bytes*) y la propia |GPT|
   (16KiB)::
 
-   $ /sbin/sgdisk -f /tmp/disco.raw
+   $ /sbin/sgdisk -f /tmp/0.disk
    Creating new GPT entries in memory.
    34
 
 
 - La alineación si no se cambia, será de 1MiB (2048 sectores)::
 
-   $ /sbin/sgdisk -D /tmp/disco.raw
+   $ /sbin/sgdisk -D /tmp/0.disk
    Creating new GPT entries in memory.
    2048
  
   lo que determina que en realidad la primera partición empiece en el sector
   2048::
 
-   $ /sbin/sgdisk -F /tmp/disco.raw
+   $ /sbin/sgdisk -F /tmp/0.disk
    Creating new GPT entries in memory.
    2048
 
@@ -823,7 +823,7 @@ a. |GPT| exclusivamente compatible con |BIOS|, que podemos definir así::
       $ /sbin/sgdisk -a 8 -n "0:40:2047" -t "0:0xef02" -c "0:BOOTBIOS" \
                      -a 2048 -n "0:+0:+32M" -c "0:UNO" \
                              -n "0:+0:+2G" -t "0:0x0700" -c "0:DOS" \
-                             -n "0:+0:+1G" -c "0:TRES" /tmp/disco.raw
+                             -n "0:+0:+1G" -c "0:TRES" /tmp/0.disk
 
    en donde:
 
@@ -855,7 +855,7 @@ a. |GPT| exclusivamente compatible con |BIOS|, que podemos definir así::
      bien, si utilizamos el número de una partición existente, entonces
      redefiniremos esa partición::
 
-      $ /sbin/sgdisk -c "3:TERCERA" -t "3:0x0700" /tmp/disco.raw
+      $ /sbin/sgdisk -c "3:TERCERA" -t "3:0x0700" /tmp/0.disk
 
    .. warning:: Sopese utilizar el esquema propuesto para que sea compatible
       también con |UEFI|, por si se produce un cambio en el *hardware*.
@@ -865,7 +865,7 @@ a. |GPT| exclusivamente compatible con |BIOS|, que podemos definir así::
       $ /sbin/sgdisk -n "0:2048:+50M" -t "0:0xef00" -c "0:EFI" \
                      -n "0:+0:+32M" -c "0:UNO" \
                      -n "0:+0:+2G" -t "0:0x0700" -c "0:DOS" \
-                     -n "0:+0:+1G" -c "0:TRES" /tmp/disco.raw
+                     -n "0:+0:+1G" -c "0:TRES" /tmp/0.disk
 
    En este caso, la partición |EFI| debe ser lo suficientemente grande para
    albergar los arranques de los sistemas operativos que pretendeamos instalar. En
@@ -878,7 +878,7 @@ a. |GPT| exclusivamente compatible con |BIOS|, que podemos definir así::
                      -a 2048 -n "0:2048:+50M" -t "0:0xef00" -c "0:EFI" \
                              -n "0:+0:+32M" -c "0:UNO" \
                              -n "0:+0:+2G" -t "0:0x0700" -c "0:DOS" \
-                             -n "0:+0:+1G" -c "0:TRES" /tmp/disco.raw
+                             -n "0:+0:+1G" -c "0:TRES" /tmp/0.disk
 
    En este caso, la finalidad no es tanto que el sistema sea capaz de arrancar
    con ambos *firmwares* (cosa que también se puede hacer) como que arrancando
@@ -890,11 +890,11 @@ Otras acciones recurrentes con :command:`sgdisk` son:
 
 #. Borrar una partición::
    
-      $ /sbin/sgdisk -d 5 /tmp/disco.raw
+      $ /sbin/sgdisk -d 5 /tmp/0.disk
 
 #. Intercambiar la entrada de una partición por la de otra::
 
-      $ /sbin/sgdisk -r 1:3 /tmp/disco.raw
+      $ /sbin/sgdisk -r 1:3 /tmp/0.disk
 
    En este caso la partición primera partición pasa a estar definida en la
    tercera entrada de la |GPT|, y la tercera, en la primera.
@@ -902,12 +902,12 @@ Otras acciones recurrentes con :command:`sgdisk` son:
 #. Copiar la |GPT| al final del disco, que puede sernos útil cuando hacemos una
    copia cruda de un disco más pequeño en uno mayor::
 
-      $ /sbin/sgdisk -e /tmp/disco.raw
+      $ /sbin/sgdisk -e /tmp/0.disk
 
 #. Copiar la tabla de particiones en un nuevo disco::
 
-      $ /sbin/sgdisk -R /tmp/nuevo.raw /tmp/disco.raw
-      $ /sbin/sgdisk -G /tmp/nuevo.raw
+      $ /sbin/sgdisk -R /tmp/1.disk /tmp/0.disk
+      $ /sbin/sgdisk -G /tmp/1.disk
 
    La segunda instrucción es necesaria para que cambien los UIDs de las
    particiones en el segundo disco, ya que la copia que se hace de la |GPT| es
@@ -915,20 +915,20 @@ Otras acciones recurrentes con :command:`sgdisk` son:
 
 #. Copiar la |GPT| en un fichero llamado :file:`GPT`::
 
-      $ /sbin/sgdisk -b GPT /tmp/disco.raw
+      $ /sbin/sgdisk -b GPT /tmp/0.disk
 
    Y si se quiere restaurar en disco::
 
-      $ /sbin/sgdisk -l GPT /tmp/disco.raw
+      $ /sbin/sgdisk -l GPT /tmp/0.disk
 
 #. Borrar la tabla de particiones y la cabecera |GPT|, pero
    respetando el |MBR|::
 
-      $ /sbin/sgdisk -z /tmp/disco.raw
+      $ /sbin/sgdisk -z /tmp/0.disk
 
    o sin siquiera respetarlo::
 
-      $ /sbin/sgdisk -Z /tmp/disco.raw
+      $ /sbin/sgdisk -Z /tmp/0.disk
 
    .. note:: En caso de que quisiéramos redefinir una tabla de particiones de cero,
       sobre un disco que ya tuviera definidas particiones, :kbd:`-z` podría ser
@@ -936,11 +936,11 @@ Otras acciones recurrentes con :command:`sgdisk` son:
 
 #. Convertir de |DOS| a |GPT|::
 
-      $ /sbin/sgdisk -g /tmp/disco_dos.raw
+      $ /sbin/sgdisk -g /tmp/dos.disk
 
 #. Convertir de |GPT| a |DOS|::
 
-      $ /sbin/sgdisk -m 3:4:5 /tmp/disco.raw
+      $ /sbin/sgdisk -m 3:4:5 /tmp/0.disk
 
    En este caso, sólo se pasan la definición de las particiones 3, 4 y 5.
 

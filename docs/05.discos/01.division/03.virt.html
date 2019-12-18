@@ -118,7 +118,7 @@ el siguiente:</p>
 <p>que usando <a class="reference internal" href="02.part.html#sgdisk"><span class="std std-ref">sgdisk</span></a> puede realizarse de esta forma:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> sgdisk -a <span class="m">8</span> -n <span class="s2">&quot;0:40:2047&quot;</span> -t <span class="s2">&quot;0:0xef02&quot;</span> -c <span class="s2">&quot;0:BOOTBIOS&quot;</span> <span class="se">\</span>
          -a <span class="m">2048</span> -n <span class="s2">&quot;0:2048:+50M&quot;</span> -t <span class="s2">&quot;0:0xef00&quot;</span> -c <span class="s2">&quot;0:EFI&quot;</span> <span class="se">\</span>
-         -N <span class="m">0</span> -t <span class="s2">&quot;3:0x8e00&quot;</span> -c <span class="s2">&quot;3:LVM&quot;</span> /tmp/disco.raw
+         -N <span class="m">0</span> -t <span class="s2">&quot;3:0x8e00&quot;</span> -c <span class="s2">&quot;3:LVM&quot;</span> /tmp/0.disk
 </pre></div>
 </div>
 <p>de forma que creamos las dos particiones necesarias para el arranque aparte,
@@ -140,10 +140,10 @@ módulo <em>loop</em>:</p>
 </div>
 <p>y usar <strong class="command">losetup</strong> para asociar/desasociar el fichero a un dispositivo de
 bucle:</p>
-<span class="target" id="losetup"></span><div class="highlight-console notranslate" id="index-1"><div class="highlight"><pre><span></span><span class="gp">#</span> losetup /dev/loop0 /tmp/disco.raw
+<span class="target" id="losetup"></span><div class="highlight-console notranslate" id="index-1"><div class="highlight"><pre><span></span><span class="gp">#</span> losetup /dev/loop0 /tmp/0.disk
 <span class="gp">#</span> losetup
 <span class="go">NAME       SIZELIMIT OFFSET AUTOCLEAR RO BACK-FILE      DIO LOG-SEC</span>
-<span class="go">/dev/loop0         0      0         0  0 /tmp/disco.raw   0     512</span>
+<span class="go">/dev/loop0         0      0         0  0 /tmp/0.disk   0     512</span>
 <span class="gp">#</span> losetup -d /dev/loop0
 </pre></div>
 </div>
@@ -341,8 +341,8 @@ través de la opción <kbd class="kbd docutils literal notranslate">-l</kbd><a c
 grupo de volúmenes. El disco físico se ha acabado, pero si «compráramos» otro,
 podríamos añadirlo como volumen lógico a <em>VGtest</em> y volveríamos a disponer de
 espacio libre:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> truncate -s 10G /tmp/otrodisco.raw
-<span class="gp">#</span> losetup /dev/loop1 /tmp/otrodisco.raw
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> truncate -s 10G /tmp/1.disk
+<span class="gp">#</span> losetup /dev/loop1 /tmp/1.disk
 <span class="gp">#</span> pvcreate /dev/loop1
 <span class="gp">#</span> vgextend VGtest /dev/loop1
 <span class="gp">#</span> vgs VGtest
@@ -489,12 +489,12 @@ fusionar con la instantánea:</p>
 <span id="lvm-aprovisionamiento"></span><h2>5.1.3.6. Aprovisionamiento fino<a class="headerlink" href="#aprovisionamiento-fino" title="Enlazar permanentemente con este título">¶</a></h2>
 <p>El <em class="dfn">aprovisionamiento fino</em> (<em>thin provisioning</em>, en inglés) consiste en
 reservar para un volumen lógico más espacio de disco del que realmente tiene
-asignado. Es un concepto muy comúnmente usando en virtualización para cuyas
+disponible. Es un concepto muy comúnmente usando en virtualización para cuyas
 máquinas virtuales podemos usar discos de un tamaño mucho mayor del que
 realmente ocupa su fichero correspondiente. Algo parecido se logra con la orden
-<a class="reference internal" href="02.part.html#truncate"><span class="std std-ref">truncate</span></a>. Se contrapone al <em class="dfn">aprovisionamiento grueso</em> que
+<a class="reference internal" href="02.part.html#truncate"><span class="std std-ref">truncate</span></a>. Se contrapone al <em class="dfn">aprovisionamiento grueso</em>, que
 consiste en justo lo contrario, esto es, en reservar exactamente el tamaño del
-volumen. Hasta ahora, hemos practicado con <abbr title="Logical Volume Management">LVM</abbr>, este último tipo de
+volumen. Hasta ahora, hemos practicado con <abbr title="Logical Volume Management">LVM</abbr> este último tipo de
 aprovisionamiento.</p>
 <p>Sin embargo, <abbr title="Logical Volume Management">LVM</abbr> soporta <em>aprovisionamiento fino</em> que, en principio, puede
 servir para dos propósitos distintos:</p>
@@ -531,10 +531,47 @@ para los que deseamos <em>aprovisionamiento fino</em>:</p>
 <p>El primero es un volumen de 100MiB y, además, no podrá cambiar su tamaño a menos
 que agrandemos el grupo de volúmenes con, por ejemplo, otro disco. El segundo es
 el <em>pool</em> dentro del que podemos crear volúmenes lógicos con aparentemente
-cualquier tamaño.</p>
-<div class="admonition-todo admonition" id="index-5">
-<p class="first admonition-title">Por hacer</p>
-<p class="last">SEGUIR.</p>
+cualquier tamaño:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvcreate -T -n tvol1 -V 1G VGtest/pool
+<span class="gp">#</span> lvcreate -T -n tvol2 -V 2G VGtest/pool
+<span class="gp">#</span> lvs VGtest
+<span class="go">  LV    VG     Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert</span>
+<span class="go">  fuera VGtest -wi-a----- 100,00m</span>
+<span class="go">  pool  VGtest twi-aotz-- 388,00m             0,00   11,04</span>
+<span class="go">  tvol1 VGtest Vwi-a-tz--   1,00g pool        0,00</span>
+<span class="go">  tvol2 VGtest Vwi-a-tz--   2,00g pool        0,00</span>
+</pre></div>
+</div>
+<p>Al crear ambos volúmenes, se nos refiere la opción
+<kbd class="kbd docutils literal notranslate">activation/thin_pool_autoextend_threshold</kbd>, porque su valor es 100:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvm dumpconfig activation/thin_pool_autoextend_threshold
+<span class="go">thin_pool_autoextend_threshold=100</span>
+</pre></div>
+</div>
+<p>La variable fija el tanto por cierto de ocupación del <em>pool</em> para el que una vez
+alcanzado se incrementa el tamaño en un porcentaje fijado por:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvm dumpconfig activation/thin_pool_autoextend_percent
+<span class="go">thin_pool_autoextend_percent=20</span>
+</pre></div>
+</div>
+<p>pero justamente un valor de 100% deshabilita la posibilidad. Si ponemos un valor
+más bajo (p.e el 85%), sí se llevará a cabo la ampliación automática… si se
+puede, que no es nuestro caso, ya que el grupo de volúmenes está completamente
+lleno.</p>
+<p>SI probamos a dar formato a uno de los volúmenes del <em>pool</em>, comprobaremos el
+sistema de ficheros participa de la ficción del tamaño:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkfs.ext4 -L TVOL2 /dev/VGtest/tvol2
+<span class="gp">#</span> mount /dev/VGtest/tvol2 /mnt/
+<span class="gp">#</span> df -h /mnt/
+<span class="go">S.ficheros               Tamaño Usados  Disp Uso% Montado en</span>
+<span class="go">/dev/mapper/VGtest-tvol2   2,0G   6,0M  1,8G   1% /mnt</span>
+</pre></div>
+</div>
+<p>Sin embargo, el espacio real es el que ocupa el <em>pool</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvs VGtest/pool
+<span class="go">  LV   VG     Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert</span>
+<span class="go">  pool VGtest twi-aotz-- 388,00m             25,14  12,21</span>
+</pre></div>
 </div>
 <p class="rubric">Notas al pie</p>
 <table class="docutils footnote" frame="void" id="id3" rules="none">

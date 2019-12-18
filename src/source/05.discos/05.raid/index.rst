@@ -344,10 +344,10 @@ que para ello necesitaremos los discos físicos que
 constituyen el |RAID|. Para evitarlos usaremos ficheros que emulen estos discos
 físicos::
 
-   # truncate -s 500M disco1.raw
-   # losetup /dev/loop0 disco1.raw
-   # truncate -s 500M disco2.raw
-   # losetup /dev/loop1 disco1.raw
+   # truncate -s 500M /tmp/0.disk
+   # losetup /dev/loop0 /tmp/0.disk
+   # truncate -s 500M /tmp/1.disk
+   # losetup /dev/loop1 /tmp/1.disk
 
 De modo que nuestros dispositivos físicos serán :file:`/dev/loop0` y
 :file:`/dev/loop1` en vez de :file:`sda`, :file:`sdb`, etc.
