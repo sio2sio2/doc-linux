@@ -244,12 +244,13 @@ Concentremos juntas las limitaciones de este sistema de particionado:
 #. Los escasos 64 *bytes* para codificar toda la tabla de particiones, provocan
    que en principio sólo se puedan definir 4 particiones.
 #. Para burlar la limitación anterior, se idea la argucia de la partición
-   extendida, pero no deja de ser una chapuza que provoca que la definición de la
+   extendida, pero no deja de ser un remiendo que provoca que la definición de la
    tabla de particiones no esté concentrada en un solo punto, sino desperdigada a
    lo largo de todo el disco.
 #. Sólo se usa un *byte* para codificar el tipo de partición, lo que ha
-   propiciado que algunos códigos identifique a sistemas de ficheros distintos.
-   Por ejemplo, *0x07* identifica a |NTFS|, pero también al |HPFS| de OS/2.
+   propiciado que algunos sistemas de ficheros estén identificados por un mismo
+   código. Por ejemplo, *0x07* identifica a |NTFS|, pero también al |HPFS| de
+   OS/2.
 #. Por :ref:`lo ya expuesto <tam-max-part-dos>`, los discos no pueden ser
    mayores a *2TiB*.
 
@@ -662,31 +663,33 @@ directorio con ficheros necesarios para llevar a cabo su propio arranque:
 
    /
    +-- EFI/
-   |    +-- NvVars
-   |    +-- debian/
-   |    +-- Windows/
-   |    +-- etc.
-   |
-   +-- NvVars
+        +-- debian/
+        +-- Windows/
+        +-- etc.
 
 De este modo, los arranques de los distintos sistemas operativos pueden
 coexistir sin problemas. Para que quepan es recomendable que tenga al menos
-100MB. Hay, además, un fichero llamado :file:`NvVars` que incluye el orden en
-que debe intentarse arrancar estos sistemas, con lo que definir cuál es el
-sistema de arranque predeterminado se reduce a definir cuál es el orden de cada
-elemento de la lista. Para ello hay varias posibilidades:
+100MB. En la |NVRAM| del *firmware*\ [#]_ pueden irse añadiendo entradas a la
+secuencia de arranque y definiendo el orden de tales entradas. Si instalamos un
+nuevo sistema operativo es de prever que la propia instalación se encargue de
+ello, pero manualmente puede manipularse esta secuencia:
 
-- Quizás el entorno de configuración de la |UEFI| permita la edición gráfico de
+- Quizás el entorno de configuración de |UEFI| permita la edición gráfica de
   este fichero.
 - La *shell* de |UEFI| lo permite a través del comando :command:`bcfg`.
 - Desde el propio sistema operativo suele haber herramientas para manipular el
-  archivo. En linux, este comando es :command:`efibootmgr`
+  archivo. En linux, este comando es :command:`efibootmgr`\ [#]_.
 
-Además, la |UEFI| también dispondrá de un menú para escoger en cada arranque
-cuál es la entrada a probar primero. A diferencia del menú |BIOS| este arranque
-no se limita a ofrecer dispositivos, sino que ofrecerá directamente los
-arranques encontrados en la |ESP|, que pueden gestores de arranque o
-directamente sistemas operativos.
+|UEFI|, como |BIOS|, suele disponer si se pulsa la tecla adecuada durante el
+arranque de un menú para escoger cuál es la entrada a probar primero. A
+diferencia del menú |BIOS| este arranque no se limita a ofrecer dispositivos,
+sino que puede ofrecer directamente los arranques encontrados en la |ESP|, que
+pueden ser gestores de arranque o directamente sistemas operativos, si estos se
+registraron en la |NVRAM|.
+
+.. note:: Si una entrada indica que se arrancará por el dispositivo de disco
+   (como en los arranques |BIOS|), |UEFI| intentará cargar en la |ESP| el
+   fichero :file:`/EFI/Boot/bootx64.efi`.
 
 Dadas las posibilidades que ofrece |UEFI|, podríamos prescindir del gestor de
 arranque\ [#]_ incluso aun cuando dispusiéramos de varios sistemas operativos en
@@ -1037,10 +1040,13 @@ en modo |EFI| es el siguiente:
 
       # efibootmgr
 
-#. Salir,y reiniciar\ [#]_::
+#. Salir y reiniciar\ [#]_::
 
       # exit
       # reboot
+
+.. https://askbot.fedoraproject.org/en/question/111637/how-can-i-create-a-efi-boot-menu-entry-using-efibootmgr/
+.. https://wiki.mageia.org/en/About_EFI_UEFI
 
 .. rubric:: Notas al pie
 
@@ -1077,6 +1083,17 @@ en modo |EFI| es el siguiente:
 .. [#] Los códigos de 4 dígitos hexadecimales son códigos internos de la
    de la suite de particionado :ref:`gdisk <gdisk.i>`. Los identificadores, en
    realidad, son mucho más largos.
+.. [#] En la implementación |UEFI| que traen algunos *softwares* de
+   virtualización (OVMF_), la |NVRAM| se emula almacenando en el directorio
+   :file:`EFI` un fichero llamado :file:`NvVars`.
+.. [#] Por ejemplo, esta orden añade una nueva entrada::
+
+      # efibootmgr --create --disk /dev/sda --part 2 --loader /EFI/so/bootx64.efi \
+         --label "Mi primer arranque UEFI"
+
+   en la que se intenta cargar el fichero :file:`/EFI/so/bootx64.efi` y la que
+   se supone que la partición |ESP| es la segunda del disco.
+
 .. [#] Para que un kernel de linux pueda arrancarse directamente es necesario
    que se compilase con la opción `EFIstub
    <https://wiki.archlinux.org/index.php/EFISTUB>`_.
@@ -1112,6 +1129,7 @@ en modo |EFI| es el siguiente:
 .. |SSD| replace:: :abbr:`SSD (Solid-State Drive)`
 .. |RAID| replace:: :abbr:`RAID (Redundant Array of Independent Disks)`
 .. |ESP| replace:: :abbr:`ESP (EFI System Partition)`
+.. |NVRAM| replace:: :abbr:`NVRAM (Non-Volatile RAM)`
 
 .. _kvm: https://www.linux-kvm.org/page/Main_Page
 .. _parted: https://www.gnu.org/software/parted/manual/parted.html
