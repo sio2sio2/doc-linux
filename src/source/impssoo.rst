@@ -14,4 +14,3 @@ Sistermas Informáticos en Red*.
    09.apendice/99.virtual/index
    02.conbas/[0-9]*/index 
    05.discos/01.division/index
-   05.discos/06.grub/index
