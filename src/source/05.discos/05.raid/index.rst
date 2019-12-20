@@ -312,6 +312,24 @@ Mediante **software**
    Por su parte, algunos sistemas de ficheros soportan directamente la
    constitución de dispositivos |RAID| como |ZFS| o |BtrFS|.
 
+   .. table:: Equivalencias con |ZFS|
+      :class: raid-zfs
+
+      ========== =================================
+       Nivel      Nombre en |ZFS|
+      ========== =================================
+       0          Striped Vdev
+       1          Mirrored Vdev
+       5          Z
+       6          Z2
+       10         Striped mirrored Vdev
+       50, 60     Striped RaidZ Zpool
+      ========== =================================
+
+   .. seealso:: Puede consultar una breve descripción de cada |RAID|
+      en `este artículo sobre ZFS
+      <http://www.zfsbuild.com/2010/05/26/zfs-raid-levels/>`_.
+
 Es importante tener presente que la constitución de un |RAID| exige el
 almacenamiento de los metadatos que lo definen. En los tres casos, esos
 metadatos se almacenan en los propios dispositivos de almacenamiento\ [#]_. Es
@@ -390,7 +408,7 @@ Estudiaremos ambas posibilidades.
 
 .. |RAID| replace:: :abbr:`RAID (Redundant Array of Independent Disks)`
 .. |GPT| replace:: :abbr:`GPT (GUID Partition Table)`
-.. |ZFS| replace:: :abbr:`ZFS (Zettavyte File System)`
+.. |ZFS| replace:: :abbr:`ZFS (Zettabyte File System)`
 .. |BtrFS| replace:: :abbr:`BtrFS (B-TRee File System)`
 .. |MD| replace:: :abbr:`MD (Multiple Devices)`
 

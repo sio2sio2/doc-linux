@@ -31,8 +31,9 @@ indispensable tener presentes algunos conceptos:
 
 **Partición virtual** (terminología propia)
    Una :dfn:`partición virtual` es cada una de las divisiones en que se parte un
-   disco virtual. En *Windows* se denominan :dfn:`volúmenes` y en *Linux*
-   :dfn:`volúmenes lógicos`.
+   disco virtual. Por tanto, una *partición virtual* es a un *disco virtual* lo
+   que una partición a un *dispotivo físico*. En *Windows* se denominan
+   :dfn:`volúmenes` y en *Linux* :dfn:`volúmenes lógicos`.
 
 Hay pues una analogía entre disco físico/partición y disco virtual/partición
 virtual, aunque dos son sus diferencias fundamentales:
@@ -57,8 +58,19 @@ Bajo el presente artículo estudiaremos:
 - En *Linux*, cómo definir grupos de volúmenes y cómo dividirlos en volúmenes
   lógicos.
 
+.. warning:: Para la creación de particiones y volúmenes el texto se centra
+   en exponer aplicaciones de terminal que permiten su definición de modo no
+   interactivo (:ref:`sgdisk <sgdisk>` y :ref:`sfdisk <sfdisk>`). Dependiendo
+   del perfil del lector, quizás sea más propio utilizar herramientas
+   interacticas de terminal como :ref:`gdisk <gdisk.i>` y :ref:`fdisk
+   <fdisk>`, o gráficas como Gparted_. Por ello, el uso práctico de las
+   herramientas no se mezcla con la exposición de conceptos teóricos.
+
 .. toctree::
    :glob:
    :maxdepth: 2
 
    [0-9]*
+
+
+.. _Gparted: https://gparted.org/

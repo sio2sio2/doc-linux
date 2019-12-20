@@ -721,6 +721,10 @@ incluirla ahí:
 
 Práctica
 ========
+
+Aplicaciones de terminal
+------------------------
+
 .. warning:: Las particiones "*UNO*", "*DOS*", "*TRES*" que aparecen en los
    ejemplos son absolutamente inútiles en un sistema real y sirven tan sólo para
    ilustrar el uso de las herramiestas. Más allá de las particiones de arranque,
@@ -950,7 +954,7 @@ Otras acciones recurrentes con :command:`sgdisk` son:
 .. _bios-uefi:
 
 Migración a |UEFI|
-==================
+------------------
 Remataremos la exposición sobre particionado, describiendo cómo convertir
 nuestro arranque |BIOS| en arranque |UEFI| si tuvimos la previsión desde un
 principio de crear particiones |GUID| e incluimos tanto la partición
@@ -1045,6 +1049,47 @@ en modo |EFI| es el siguiente:
       # exit
       # reboot
 
+.. _efi-arranque-directo:
+
+Arranque directo
+----------------
+El núcleo de debien tiene EFIStub_, esto es, la
+capacidad de ser cargado como un ejecutable directamente por el firmware |UEFI|,
+sin necsidad de usar |GRUB| u otro gestor de arranque. Ello supone copiar el
+núcleo y el sistema de ficheros inicial (*initrd*) en la partición |ESP| y, si
+queremos que tanto lo uno como lo otro se actualicen al actualizar el núcleo, 
+añadir un par de *scripts*.
+
+#. Crear el *script* para automatizar la copia del núcleo en la partición
+   |ESP|::
+
+      # cat > /etc/kernel/postinst.d/zz-update-efistub
+      #!/bin/sh
+
+      cp /vmlinuz /boot/efi/EFI/debian/
+
+#. Crear el *script* para automatizar la copia del *initrd* en la partición
+   |ESP|::
+
+      # mkdir -p /etc/initramfs/post-update.d
+      # cat > /etc/initramfs/post-update.d/zz-update-efistub
+      #!/bin/sh
+
+      cp /initrd.img /boot/efi/EFI/debian/
+
+#. Copiar manualmente el núcleo y la imagen *initrd*::
+
+      # /etc/kernel/postinst.d/zz-update-efistub
+      # /etc/initramfs/post-update.d/zz-update-efistub
+
+#. Añadir una entrada al menú de arranque |UEFI|::
+
+      # efibootmgr -c -g -L "Debian $(/etc/debian_version)" -d /dev/sda -p2 -l /EFI/debian/vmlinuz \
+         -u "root=/dev/VGbuster/raiz ro quiet rootfstype=ext4 add_efi_memmap initrd=/EFI/debian/initrd.img"
+
+   donde se ha supuesto que la partición |ESP| es :file:`/dev/sda2` y la raíz
+   del sistema se encuentra en el volumen :file:`/dev/VGbuster/raiz`.
+
 .. https://askbot.fedoraproject.org/en/question/111637/how-can-i-create-a-efi-boot-menu-entry-using-efibootmgr/
 .. https://wiki.mageia.org/en/About_EFI_UEFI
 
@@ -1095,8 +1140,7 @@ en modo |EFI| es el siguiente:
    se supone que la partición |ESP| es la segunda del disco.
 
 .. [#] Para que un kernel de linux pueda arrancarse directamente es necesario
-   que se compilase con la opción `EFIstub
-   <https://wiki.archlinux.org/index.php/EFISTUB>`_.
+   que se compile con la opción EFIStub_, disponible desde la versión 3.3.0.
 .. [#] Utilizaremos el fichero de 20G que propusimos crear anteriormente para
    estas pruebas.
 .. [#] En realidad, si nuestra intención es arrancar mediante |UEFI| y partimos
@@ -1136,3 +1180,4 @@ en modo |EFI| es el siguiente:
 .. _gparted: https://gparted.org/
 .. _gdisk: http://www.rodsbooks.com/gdisk
 .. _OVMF: https://github.com/tianocore/tianocore.github.io/wiki/OVMF
+.. _EFIStub: https://wiki.archlinux.org/index.php/EFISTUB

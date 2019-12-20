@@ -794,6 +794,8 @@ incluirla ahí:</p>
 </div>
 <div class="section" id="gdisk-i">
 <span id="id12"></span><h3>5.1.2.2.5. Práctica<a class="headerlink" href="#gdisk-i" title="Enlazar permanentemente con este título">¶</a></h3>
+<div class="section" id="aplicaciones-de-terminal">
+<h4>5.1.2.2.5.1. Aplicaciones de terminal<a class="headerlink" href="#aplicaciones-de-terminal" title="Enlazar permanentemente con este título">¶</a></h4>
 <div class="admonition warning">
 <p class="first admonition-title">Advertencia</p>
 <p class="last">Las particiones «<em>UNO</em>», «<em>DOS</em>», «<em>TRES</em>» que aparecen en los
@@ -1042,7 +1044,7 @@ la primera opción antes de las demás que definan la nueva tabla.</p>
 </ol>
 </div>
 <div class="section" id="migracion-a-uefi">
-<span id="bios-uefi"></span><h3>5.1.2.2.6. Migración a <abbr title="Unified Extensible Firmware Interface">UEFI</abbr><a class="headerlink" href="#migracion-a-uefi" title="Enlazar permanentemente con este título">¶</a></h3>
+<span id="bios-uefi"></span><h4>5.1.2.2.5.2. Migración a <abbr title="Unified Extensible Firmware Interface">UEFI</abbr><a class="headerlink" href="#migracion-a-uefi" title="Enlazar permanentemente con este título">¶</a></h4>
 <p>Remataremos la exposición sobre particionado, describiendo cómo convertir
 nuestro arranque <abbr title="Basic I/O System">BIOS</abbr> en arranque <abbr title="Unified Extensible Firmware Interface">UEFI</abbr> si tuvimos la previsión desde un
 principio de crear particiones <abbr title="Globally Unique Identifier">GUID</abbr> e incluimos tanto la partición
@@ -1149,6 +1151,50 @@ arranque:</p>
 </div>
 </li>
 </ol>
+</div>
+<div class="section" id="arranque-directo">
+<span id="efi-arranque-directo"></span><h4>5.1.2.2.5.3. Arranque directo<a class="headerlink" href="#arranque-directo" title="Enlazar permanentemente con este título">¶</a></h4>
+<p>El núcleo de debien tiene <a class="reference external" href="https://wiki.archlinux.org/index.php/EFISTUB">EFIStub</a>, esto es, la
+capacidad de ser cargado como un ejecutable directamente por el firmware <abbr title="Unified Extensible Firmware Interface">UEFI</abbr>,
+sin necsidad de usar <abbr title="GRand Unified Bootloader">GRUB</abbr> u otro gestor de arranque. Ello supone copiar el
+núcleo y el sistema de ficheros inicial (<em>initrd</em>) en la partición <abbr title="EFI System Partition">ESP</abbr> y, si
+queremos que tanto lo uno como lo otro se actualicen al actualizar el núcleo,
+añadir un par de <em>scripts</em>.</p>
+<ol class="arabic">
+<li><p class="first">Crear el <em>script</em> para automatizar la copia del núcleo en la partición
+<abbr title="EFI System Partition">ESP</abbr>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cat &gt; /etc/kernel/postinst.d/zz-update-efistub
+<span class="gp">#</span>!/bin/sh
+
+<span class="go">cp /vmlinuz /boot/efi/EFI/debian/</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">Crear el <em>script</em> para automatizar la copia del <em>initrd</em> en la partición
+<abbr title="EFI System Partition">ESP</abbr>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkdir -p /etc/initramfs/post-update.d
+<span class="gp">#</span> cat &gt; /etc/initramfs/post-update.d/zz-update-efistub
+<span class="gp">#</span>!/bin/sh
+
+<span class="go">cp /initrd.img /boot/efi/EFI/debian/</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">Copiar manualmente el núcleo y la imagen <em>initrd</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> /etc/kernel/postinst.d/zz-update-efistub
+<span class="gp">#</span> /etc/initramfs/post-update.d/zz-update-efistub
+</pre></div>
+</div>
+</li>
+<li><p class="first">Añadir una entrada al menú de arranque <abbr title="Unified Extensible Firmware Interface">UEFI</abbr>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> efibootmgr -c -g -L <span class="s2">&quot;Debian </span><span class="k">$(</span>/etc/debian_version<span class="k">)</span><span class="s2">&quot;</span> -d /dev/sda -p2 -l /EFI/debian/vmlinuz <span class="se">\</span>
+   -u <span class="s2">&quot;root=/dev/VGbuster/raiz ro quiet rootfstype=ext4 add_efi_memmap initrd=/EFI/debian/initrd.img&quot;</span>
+</pre></div>
+</div>
+<p>donde se ha supuesto que la partición <abbr title="EFI System Partition">ESP</abbr> es <code class="file docutils literal notranslate"><span class="pre">/dev/sda2</span></code> y la raíz
+del sistema se encuentra en el volumen <code class="file docutils literal notranslate"><span class="pre">/dev/VGbuster/raiz</span></code>.</p>
+</li>
+</ol>
 <p class="rubric">Notas al pie</p>
 <table class="docutils footnote" frame="void" id="id16" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
@@ -1242,7 +1288,7 @@ se supone que la partición <abbr title="EFI System Partition">ESP</abbr> es la 
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
 <tr><td class="label"><a class="fn-backref" href="#id11">[10]</a></td><td>Para que un kernel de linux pueda arrancarse directamente es necesario
-que se compilase con la opción <a class="reference external" href="https://wiki.archlinux.org/index.php/EFISTUB">EFIstub</a>.</td></tr>
+que se compile con la opción <a class="reference external" href="https://wiki.archlinux.org/index.php/EFISTUB">EFIStub</a>, disponible desde la versión 3.3.0.</td></tr>
 </tbody>
 </table>
 <table class="docutils footnote" frame="void" id="id26" rules="none">
@@ -1268,6 +1314,7 @@ cuyo implementación de <abbr title="Unified Extensible Firmware Interface">UEFI
 (<a class="reference internal" href="../../02.conbas/01.preliminares/index.html#poweroff"><span class="std std-ref">poweroff</span></a>) tras el cambio, no se guarda la nueva entrada.</td></tr>
 </tbody>
 </table>
+</div>
 </div>
 </div>
 </div>
@@ -1299,8 +1346,12 @@ cuyo implementación de <abbr title="Unified Extensible Firmware Interface">UEFI
 <li><a class="reference internal" href="#bios">5.1.2.2.2. <abbr title="Basic I/O System">BIOS</abbr></a></li>
 <li><a class="reference internal" href="#uefi">5.1.2.2.3. <abbr title="Unified Extensible Firmware Interface">UEFI</abbr></a></li>
 <li><a class="reference internal" href="#arranque-hibrido">5.1.2.2.4. Arranque híbrido</a></li>
-<li><a class="reference internal" href="#gdisk-i">5.1.2.2.5. Práctica</a></li>
-<li><a class="reference internal" href="#migracion-a-uefi">5.1.2.2.6. Migración a <abbr title="Unified Extensible Firmware Interface">UEFI</abbr></a></li>
+<li><a class="reference internal" href="#gdisk-i">5.1.2.2.5. Práctica</a><ul>
+<li><a class="reference internal" href="#aplicaciones-de-terminal">5.1.2.2.5.1. Aplicaciones de terminal</a></li>
+<li><a class="reference internal" href="#migracion-a-uefi">5.1.2.2.5.2. Migración a <abbr title="Unified Extensible Firmware Interface">UEFI</abbr></a></li>
+<li><a class="reference internal" href="#arranque-directo">5.1.2.2.5.3. Arranque directo</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>

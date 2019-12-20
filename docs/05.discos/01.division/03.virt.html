@@ -117,7 +117,7 @@ el siguiente:</p>
 <img alt="../../_images/part-lvm.png" src="../../_images/part-lvm.png" />
 <p>que usando <a class="reference internal" href="02.part.html#sgdisk"><span class="std std-ref">sgdisk</span></a> puede realizarse de esta forma:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> sgdisk -a <span class="m">8</span> -n <span class="s2">&quot;0:40:2047&quot;</span> -t <span class="s2">&quot;0:0xef02&quot;</span> -c <span class="s2">&quot;0:BOOTBIOS&quot;</span> <span class="se">\</span>
-         -a <span class="m">2048</span> -n <span class="s2">&quot;0:2048:+50M&quot;</span> -t <span class="s2">&quot;0:0xef00&quot;</span> -c <span class="s2">&quot;0:EFI&quot;</span> <span class="se">\</span>
+         -a <span class="m">2048</span> -n <span class="s2">&quot;0:2048:+100M&quot;</span> -t <span class="s2">&quot;0:0xef00&quot;</span> -c <span class="s2">&quot;0:EFI&quot;</span> <span class="se">\</span>
          -N <span class="m">0</span> -t <span class="s2">&quot;3:0x8e00&quot;</span> -c <span class="s2">&quot;3:LVM&quot;</span> /tmp/0.disk
 </pre></div>
 </div>
@@ -161,7 +161,7 @@ particiones, para ello es necesario usar <strong class="command">partx</strong><
 </pre></div>
 </div>
 <p>Hecho el particionado y expuestas las particiones, lo primero es declarar que la
-tercera partición es un volumen físico<a class="footnote-reference" href="#id3" id="id1">[1]</a>:</p>
+tercera partición es un volumen físico<a class="footnote-reference" href="#id4" id="id1">[1]</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> pvcreate /dev/loop0p3
 </pre></div>
 </div>
@@ -333,7 +333,7 @@ las dos órdenes anteriores son equivalente a:</p>
 </div>
 <p>aumenta hasta los 6GiB el volumen lógico cuyo anterior tamaño era 5GiB. Es
 posible también usar porcentajes en vez de tamaños o incrementos absolutos a
-través de la opción <kbd class="kbd docutils literal notranslate">-l</kbd><a class="footnote-reference" href="#id4" id="id2">[2]</a>:</p>
+través de la opción <kbd class="kbd docutils literal notranslate">-l</kbd><a class="footnote-reference" href="#id5" id="id2">[2]</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvcreate -l <span class="m">100</span>%FREE VGtest -n tercera
 </pre></div>
 </div>
@@ -373,10 +373,11 @@ semejante:</p>
 <p>Una <em class="dfn">instantánea</em> consiste en el almacenamiento del estado del sistema de
 archivos en el momento de llevarla a cabo. Para ello, no se hace una copia del
 sistema (lo cual es costoso en tiempo y equivaldría a una copia de seguridad),
-sino que al modificarse por primera vez tras la instantánea el contenido de un
-fichero, se guarda una copia de éste sin la modificación. De esta forma, el
-estado de la instantánea es la suma de los archivos que no han llegado a ser
-modificados más la copia de los archivos sí modificados.</p>
+sino que al modificarse por primera vez tras la creación de la instantánea el
+contenido de un fichero, se guarda en la instantánea una copia de éste sin la
+modificación. De esta forma, el estado de la instantánea es la suma de los
+archivos que no han llegado a ser modificados, guardados en el volumen original,
+más la copia de los archivos sí modificados, guardados en la instantánea.</p>
 <p>Las instantáneas reparan las pérdidas por modificación o borrado no deseados,
 papel que también puede cumplir una copia de seguridad, pero a diferencia de
 éstas, no sirven como medida contra los fallos de disco o la corrupción de
@@ -388,7 +389,7 @@ mismo dispositivo físico.</p>
 <abbr title="Zettabyte File System">ZFS</abbr> o <abbr title="B-tree File System">BtrFS</abbr>.</li>
 <li>Mediante <em>software</em> adicional que se encargue de hacer las instantáneas como
 el <em>software</em> que nos ocupa en <em>Linux</em> o la restauración del sistema en los
-sitemas <em>Windows</em>.</li>
+sistemas <em>Windows</em>.</li>
 </ul>
 <p>Para llevar a cabo instantáneas con <abbr title="Logical Volume Management">LVM</abbr> el procedimiento es simple: basta con
 crear un volúmen lógico que se declare que sirve para almacenar la instantánea
@@ -405,9 +406,10 @@ lógicos y a escribir dentro de él:</p>
 </pre></div>
 </div>
 <p>donde es importante tener presente que el tamaño como máximo puede ser el tamaño
-del volumen original. También se puede añadir un parámetro adicional para
-indicar sobre qué volumen físico de los que integran el grupo de volúmenes se quiere
-definir la instantánea. Hecho esto, podemos practicar dos estrategias:</p>
+del volumen original<a class="footnote-reference" href="#id6" id="id3">[3]</a> (<kbd class="kbd docutils literal notranslate">-l 100%ORIGIN</kbd>). También se puede añadir un
+parámetro adicional para indicar sobre qué volumen físico de los que integran el
+grupo de volúmenes se quiere definir la instantánea. Hecho esto, podemos
+practicar dos estrategias:</p>
 <ol class="loweralpha simple">
 <li>La obvia que es continuar trabajando sobre el volumen original y, si en algún
 momento decidimos revertir los cambios, recuperar la instantánea. Un ejemplo
@@ -431,9 +433,8 @@ instantánea) o desecharlos (borrándola).</li>
 </div>
 <p>Con estas acciones la instantánea debería ir paulatimente incrementando su
 ocupación (ya que necesita almacenar las copias de los ficheros) y es
-conveniente vigilar este dato, ya que si malograremos la instantánea si
-superamos la capacidad máxima (lo cual no ocurrirá jamás si hacemos su tamaño
-igual al tamaño del volumen original con <kbd class="kbd docutils literal notranslate">-l 100%ORIGIN</kbd>):</p>
+conveniente vigilar este dato, ya que malograremos la instantánea, si
+superamos la capacidad máxima:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvs -o data_percent /dev/VGtest/primera_snap
 <span class="go">Data%</span>
 <span class="go">0.09</span>
@@ -558,7 +559,7 @@ alcanzado se incrementa el tamaño en un porcentaje fijado por:</p>
 más bajo (p.e el 85%), sí se llevará a cabo la ampliación automática… si se
 puede, que no es nuestro caso, ya que el grupo de volúmenes está completamente
 lleno.</p>
-<p>SI probamos a dar formato a uno de los volúmenes del <em>pool</em>, comprobaremos el
+<p>Si probamos a dar formato a uno de los volúmenes del <em>pool</em>, comprobaremos el
 sistema de ficheros participa de la ficción del tamaño:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkfs.ext4 -L TVOL2 /dev/VGtest/tvol2
 <span class="gp">#</span> mount /dev/VGtest/tvol2 /mnt/
@@ -573,8 +574,24 @@ sistema de ficheros participa de la ficción del tamaño:</p>
 <span class="go">  pool VGtest twi-aotz-- 388,00m             25,14  12,21</span>
 </pre></div>
 </div>
+<p>El aprovisionamiento fino es especialmente propicio para <a class="reference internal" href="#lvm-snapshots"><span class="std std-ref">las instantáneas</span></a>, ya que permite que la instantánea comparta el <em>pool</em> del
+volumen original. Además, no es necesario indicar tamaño, ya que por defecto se
+crerará un volumen con el tamaño del volumen original:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvcreate -s -n tvol1_s VGtest/tvol1
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">No soportan aprovisionamiento fino ni el <a class="reference external" href="https://wiki.debian.org/DebianInstaller">instalador de debian</a>, ni <abbr title="GRand Unified Bootloader">GRUB</abbr>, lo cual dificulta
+enormemente meter el sistema de ficheros raíz en un volumen de este tipo.
+Lo primero impide crear o aprovechar volúmenes de aprovisionamiento fino
+durante el proceso de instalación; y
+lo segundo obliga a no incluir dentro de ellos el núcleo y el sistema
+de ficheros inicial (<em>initrd</em>), lo cual se traduce en montar  <code class="file docutils literal notranslate"><span class="pre">/boot</span></code>
+aparte o en copiar <a class="reference internal" href="02.part.html#efi-arranque-directo"><span class="std std-ref">ambos ficheros en la partición ESP</span></a>.</p>
+</div>
 <p class="rubric">Notas al pie</p>
-<table class="docutils footnote" frame="void" id="id3" rules="none">
+<table class="docutils footnote" frame="void" id="id4" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
 <tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td>En las versiones más recientes, esto no es ya necesario y al incluir un
@@ -582,13 +599,21 @@ disco  o partición en un grupo de volúmenes, se define ya como volumen físico
 automáticamente.</td></tr>
 </tbody>
 </table>
-<table class="docutils footnote" frame="void" id="id4" rules="none">
+<table class="docutils footnote" frame="void" id="id5" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
 <tr><td class="label"><a class="fn-backref" href="#id2">[2]</a></td><td>Los porcentajes puede referise al espacio libre (<kbd class="kbd docutils literal notranslate">FREE</kbd>) en el grupo
 de volúmenes, al espacio del volúmen lógico (<kbd class="kbd docutils literal notranslate">LV</kbd>), al espacio del grupo
-de volúmenes (<kbd class="kbd docutils literal notranslate">VG</kbd>) y, para instantáneas, ORIGIN que refiere al tamaño
+de volúmenes (<kbd class="kbd docutils literal notranslate">VG</kbd>) y, para instantáneas, <kbd class="kbd docutils literal notranslate">ORIGIN</kbd> que refiere al tamaño
 del volumen original.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id6" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id3">[3]</a></td><td>De hecho, si se hace la instantánea del tamaño del volumen original jamás
+tendremos el problema de que la instantánea sea incapaz de albergar las
+copias de los ficheros originales y se malogre.</td></tr>
 </tbody>
 </table>
 </div>

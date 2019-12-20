@@ -2,12 +2,12 @@
 
 Arranque
 ========
-Los ordenadores al iniciarse cargan el *firmware* de la placa base, cuyo
-objetivo final es iniciar el proceso de arranque del sistema operativo. Ahora
-bien, existen dos tipos distintos de *firmware*.
+Los ordenadores al iniciarse cargan el *firmware* de la placa base, pero el
+objetivo final es cargar un sistema operativo en memoria y cederle el control.
+Ahora bien, existen dos tipos distintos de *firmware*.
 
 - El antiguo |BIOS| de 16 bits.
-- El moderno |UEFI| o |EFI|\ [#]_ de 32 *bits* (arquitectura *x86*) ó 64 *bits*
+- El moderno |EFI| o |UEFI|\ [#]_ de 32 *bits* (arquitectura *x86*) ó 64 *bits*
   (arquitectura *x86_64*).
 
 Dependiendo de cuál sea el *firmware* se llevará a cabo el arranque de una u
@@ -36,27 +36,28 @@ arranque se delega en el código que se disponga en el |MBR|.
 ------
 Al contrario del sistema anterior, |UEFI| es capaz de entender la tabla de
 particiones y algunos tipos de ficheros (obligatoriamente |FAT| y, para
-dispositivos ópticos, CDFS), y es capaz de arrancar directamente los
-sistemas cuyo arranque encuentre en una partición de disco de tipo *EF00* creada
+dispositivos ópticos, CDFS), y dispone de un :ref:`gestor de arranque
+<boot-manager>` básico capaz de cargar programas y cargadores de arranque
+que se encuentren en una partición de disco de tipo *EF00*\ [#]_ creada
 a ese efecto y formateada típicamente en |FAT|. Se tratará de ello al estudiar
 el particionado.
 
 .. table:: Comparativa |UEFI|/|BIOS|
    :class: uefi-bios
 
-   +-----------------+---------------+-------------------+
-   | Características | |BIOS|        | |UEFI|            |
-   +=================+===============+===================+
-   | Arquitectura    |   16bits      | 32 ó 64 bits      |
-   +-----------------+---------------+-------------------+
-   | Compatibilidad  | No            | A extinguir       |
-   +-----------------+---------------+-------------------+
-   | Arranque        | Dispositivos  | Sistemas en |ESP| |
-   +-----------------+---------------+-------------------+
-   | Seguridad       | Ninguna       | Secure boot       |
-   +-----------------+---------------+-------------------+
-   | Gestor externo  | Necesario     | Opcional          |
-   +-----------------+---------------+-------------------+
+   +-----------------+---------------+--------------------+
+   | Características | |BIOS|        | |UEFI|             |
+   +=================+===============+====================+
+   | Arquitectura    |   16bits      | 32 ó 64 bits       |
+   +-----------------+---------------+--------------------+
+   | Compatibilidad  | No            | A extinguir        |
+   +-----------------+---------------+--------------------+
+   | Arranque        | Dispositivos  | Programas en |ESP| |
+   +-----------------+---------------+--------------------+
+   | Seguridad       | Ninguna       | Secure boot        |
+   +-----------------+---------------+--------------------+
+   | Gestor externo  | Necesario     | Opcional           |
+   +-----------------+---------------+--------------------+
 
    
 
@@ -81,33 +82,66 @@ Proceso de arranque
 Podemos distinguir las siguientes fases:
 
 #. Comprobación del hardware (memoria y discos). Durante esta fase, el *firmware*
-   mediante pulsación de algunas teclas, brinda al usuario la posibilidad de
-   reconfigurar (a lo que vulgarmente se denomina "entrar en la bios") o
-   presentar un menú para seleccionar qué arranque se desea.
+   mediante pulsación de algunas teclas, brinda al usuario la posibilidad de:
 
-#. Si el usuario, escoge reconfigurar (habitualmente pulsando la tecla "Suprimir"),
-   el *firmware* para el arranque y pasa a presentar un entorno donde el usuario
-   puede cambiar los parámetros de arranque que se almacenan en memoria
-   |NVRAM| (p.e. la secuencia de dispositivos de arranque). Al término de la
-   configuración, escoja o no salvar los cambios, vuelve a iniciarse el proceso.
+   + Reconfigurar el *firmware*, a lo que vulgarmente se denomina "entrar en la bios".
+   + Presentar un menú para seleccionar qué se desea arrancar.
+   + No hacer nada y que se cargue el arranque predeterminado (p.e. el primer
+     disco duro).
 
-#. Si el usuario, escoge seleccionar el arranque, se presenta un menú que
+#. Si el usuario escoge **reconfigurar** (habitualmente pulsando la tecla
+   "Suprimir"), el *firmware* para el proceso de arranque y pasa a presentar un entorno
+   donde el usuario puede cambiar parámetros del *firmware* que se almacenan en
+   memoria |NVRAM| (p.e. el orden de arranque). Al término de la configuración,
+   se escoja o no salvar los cambios, vuelve a iniciarse el proceso.
+
+#. Si el usuario, escoge **seleccionar** el arranque, se presenta un menú que
    permite al usuario escoger entre todos los dispositivos de almacenamiento
    detectados en el caso de |BIOS|, o escoger entre todos los sistemas
    operativos de todos los dispositivos detectados en el caso de |UEFI|\ [#]_.
    La entrada seleccionada se añade a la secuencia de arranque como primer ítem
    a comprobar.
 
-#. Se revisa la secuencia de arranque y se procede a arrancar un sistema
-   operativo según el orden en ella establecido.
+#. Se revisa la secuencia de arranque y se procede a arrancar un programa
+   según el orden en ella establecido. El programa habitualmente es un gestor de
+   arranque como |GRUB| o *Windows Boot Manager*, pero puede ser de otra
+   naturaleza como memtest_.
+
+.. _boot-manager:
+
+Gestores y cargadores de arranque
+---------------------------------
+Al tratar sobre el arranque de sistemas operativos hay dos clases de programas
+que a menudo se confunden: el *gestor de arranque* (*boot manager* en inglés) y
+el *cargador de arranque* (*boot loader* en inglés).
+
+Un :dfn:`cargador de arranque` es el programa capaz de cargar en memoria el
+núcleo de un sistema operativo y cederle el control de la máquina. Un ejemplo de
+cargador de arranque puro es EFIStub_, el cargador de arranque para |EFI|
+incluido en el propio núcleo de *Linux*.
+
+Un :dfn:`gestor de arranque` es el programa que permite al usuario elegir qué
+cargador de arranque desea lanzar. La elección no tiene por qué ser
+estrictamente un cargador de arranque: puede ser otro gestor de arranque o un
+programa |EFI| que sirva para alguna otra cosa como memtest_ para comprobar la
+integridad de la memoria o hdt_ para consultar cuál es el *hardware* del equipo.
+Habitualmente, los *gestores de arranque* son también *cargadores de arranque*
+(es el caso de |GRUB|) y, en consecuencia, tiene la capacidad de hacer la labor
+de estos últimos. Un ejemplo de *gestor de arranque* puro es el incluido dentro
+del firmware |EFI|. Otro *gestor de arranque*, que no sea además cargador, es
+`rEFInd <http://www.rodsbooks.com/refind/>`_.
 
 .. rubric:: Notas al pie
 
 .. [#] Intel publicó la especificación con el nombre de |EFI|. Al ser adoptada
-   por la industria en general pasó a llamarse |UEFI|.
+   por la industria en general pasó a llamarse |UEFI|. Así pues, ambos términos
+   son sinónimos.
 .. [#] Intel, por ejemplo, ha anunciado que dejará de dar soporte a |BIOS| a
    partir de 2020 (puede leer `este artículo al respecto
    <https://www.genbeta.com/actualidad/se-acerca-el-fin-de-bios-intel-eliminara-el-soporte-en-2020>`_). 
+.. [#] En realidad, el código identificativo de esta partición es mucho más
+   largo. ``EF00`` es el código simplificado que usa la utilidad :ref:`gdisk
+   <gdisk.i>`.
 .. [#] En |UEFI| es posible porque este firmware sí entiende de particiones y es
    capaz de leer cuáles son los sistemas operativos instalados en cada disco.
 
@@ -119,3 +153,8 @@ Podemos distinguir las siguientes fases:
 .. |FAT| replace:: :abbr:`FAT (File allocation Table)`
 .. |NVRAM| replace:: :abbr:`NVRAM (Non-Volatile RAM)`
 .. |ESP| replace:: :abbr:`ESP (EFI System Partition)`
+.. |GRUB| replace:: :abbr:`GRUB (GRand Unified Bootloader)`
+
+.. _memtest: https://www.memtest.org/
+.. _hdt: https://wiki.syslinux.org/wiki/index.php?title=Hdt_(Hardware_Detection_Tool)
+.. _EFIStub: https://wiki.archlinux.org/index.php/EFISTUB
