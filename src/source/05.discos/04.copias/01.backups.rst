@@ -1,0 +1,303 @@
+.. _backups:
+
+Copias de seguridad
+*******************
+Llevar a cabo copias de seguridad o de respaldo (*backups* en el argot) es el
+único método completamente eficaz para evitar la pérdida de datos (o al menos la
+pérdida significativa de muchos datos). Otros métodos que replican datos como
+los |RAID|, los replican en el mismo sistema, por lo que un accidente que afecte
+al sistema completo (p.e. una inundación, un incendio o un sabotaje) puede
+provocar la pérdida de los datos y todas sus réplicas y, en consecuencia, la
+pérdida completa. Por ello, sólo la copia que **aloje** físicamente los datos
+**en un lugar distinto** es eficaz. En contraposición, la recuperación mediante
+una copia de respaldo requiere de una operación manual que lleva tiempo, tiempo
+durante el cual el sistema no está disponible.
+
+Por lo general, las copias de seguridad son complementarias al :ref:`uso de
+RAID <raid>`: estos permiten mantener la disponibilidad del sistema ante
+fallos de discos individuales y la recuperación sin apenas esfuerzo; mientras
+que las copias de seguridad sirven:
+
+- Como contramedida última ante accidentes más graves que afecten a todo el equipo.
+- Para guardar versiones antiguas de ficheros ante una modificación torpe o un
+  borrado accidental, aunque para esto último también puede hacerse uso de las
+  :ref:`instantáneas <lvm-snapshots>`.
+
+Para la exposición de las copias de seguridad haremos:
+
+* Una introducción teórica sobre ellas.
+* La explicación de algunos mecanismos para copias de máquinas indivuales.
+* La explicación de algunos mecanimos para copias centralizadas de redes de
+  ordenadores.
+
+Introducción teórica
+====================
+La política de copias de seguridad viene determinada fundamentalmente por cuatro
+factores:
+
+#. Qué **contenido** es el que debe copiarse. Dado que cuanto mayor sea el
+   volumen de datos a copiar, mayor debe ser el volumen del receptor de la copia
+   y mayor el tiempo empleado en realizarla, en ocasiones se podrá ser
+   selectivo y copiar sólo archivos de datos con valor para la organización o
+   los usuarios. En otras ocasiones, en cambio, puede interesar copiar también
+   el sistema operativo y las aplicaciones, porque aunque esto no sean datos
+   únicos que no puedan recrearse, una reinstalación puede llevar mucho tiempo y
+   ser muy complicada si se llevaron a cabo configuraciones complejas de las que
+   se hizo una documentación deficiente.
+
+#. Qué **destino** se dará a la copia: cuánto mayor sea la distancia entre
+   origen y destino, menor será el riesgo de que ambos dispositivos se pierdan a
+   la vez; pero a la vez mayor el tiempo de copiado.
+
+#. Con qué **frecuencia** se llevarán a cabo las copias: cuanto más alta sea 
+   la frecuencia, menos serán los datos que puedan perderse por haberse generado
+   después de la última copia; pero mayores serán los recursos empleados. 
+
+#. En un sistema en red con varios dispositivos, la **centralización** del
+   proceso o, por el contrario, el que se lleven a cabo 
+
+.. _backup-req:
+
+Requisitos
+----------
+Se hagan como se hagan, un sistema eficaz de copias debe:
+
+* Ser **programable**, con el fin de que se lleve a cabo de forma automática.
+* Ser **registrable**, esto es, generar registros (*logs*) en el sistema con el
+  fin de que el administrador puede consultar cómo se han realizado o detectar
+  problemas en su ejecución.
+* **Notificar** su resultado (de buen o mal suceso) al administración, por lo
+  general, mediante correo electrónico.
+
+Tipos
+-----
+Los cuatro factores determinan los distintos tipos de copias de seguridad, de
+modo que junto a la expresión del criterio con el que se clasifican se referirá
+el factor asociado a tal criterio.
+
+a) Según la **sincronización** de los datos entre original y copia (**frecuencia**):
+
+   * :dfn:`Copia síncrona` que es aquella que procura que original y copia siempre
+     tengan el mismo contenido. Esto es, en realidad, lo que hace un |RAID| 1,
+     por ejemplo.
+
+   * :dfn:`Copia asíncrona` en la que la sincronización sólo se lleva a cabo en
+     el momento de lanzar una copia. En una planificación correcta, la
+     frecuencia de sincronización (creación de las copias) será regular.
+
+   Las copias de respaldo, por su propósito, no son *síncronas*.
+
+#) Según la **planificación** de las copias (**frecuencia**):
+
+   * :dfn:`Copia irregular` que es aquella que se hace sin automatización ni plan
+     previo. En ámbitos profesionales son inadmisibles a menos que la *copia
+     irregular* sea complementaria a una política planificada de copias y
+     responda a una necesidad puntual.
+
+   * :dfn:`Copia planificada`, que es aquellas que responde a una
+     política predefinida de copias de seguridad.
+
+#) Según el **origen** de los datos y el **destino** de la copia (**destino**):
+
+   + :dfn:`Copia local`, que es aquella en que origen y el destino se encuentran en
+     mismo sistema informática. Por lo general son más rápidas, fiables y están
+     menos expuestas a la intercepción por terceros; pero a costa de ser más
+     vulnerable a las amenazas físicas.
+
+   + :dfn:`Copia remota`, que es aquella en que origen y destino no se encuentran
+     en el mismo sistema, incluso ni siquiera en la misma red.
+
+   No obstante la clasificación anterior, el grado de cercanía es muy graduable,
+   ya que la copia respecto al original puede llevarse a cabo:
+
+   + En el **mismo sistema de archivos**, en cuyo caso la copia de seguridad sólo
+     salvaguarda de modificaciones indeseadas o borrados accidentales. Cualquier
+     otro problema (corrupción del sistema de archivos, fallo de disco),
+     afectará tanto al original como a la copia. Las copias manuales por parte
+     de un usuario antes de proceder a la modificación del contenido de un
+     fichero o :ref:`instantáneas <lvm-snapshots>` son copias de este tipo.
+
+   + En **distinto sistema de ficheros del mismo disco**, en cuyo caso sólo
+     añadiremos protección frente a la corrupción del sistema de archivos.
+
+   + En un **disco diferente** del mismo equipo, que añade protección frente al
+     fallo del disco original, pero no ante un accidente que afecte a todo el
+     equipo.
+
+   + **Dispositivo extraíble**, incluido ópticos, lo cual permite alejar la
+     copia del original. Sin embargo, requiere la conexión manual y, en
+     consecuencia, dificulta la automatización de las copias.
+
+   + En un **servidor de almacenamiento local**, en cuyo puede establecerse un
+     sistema de servicio de copias centralizado y automatizado.
+
+   + En `cintas magnéticas
+     <https://es.wikipedia.org/wiki/Cinta_magn%C3%A9tica_de_almacenamiento_de_datos>`_
+     dispositivo de almacenamiento tradicional para copias de seguridad que
+     modernamente han derivado en el estándar `LTO
+     <https://es.wikipedia.org/wiki/Linear_Tape-Ope>`_. Son de acceso secuencial
+     y lentas pero, en contraposición, muy baratas por lo que se siguen usando en
+     los ambientes empresariales cuando el volumen de datos es alto. De hecho,
+     el nombre de la herramienta (y formato de *backup*) :ref:`tar <tar>` es un
+     acrónimo de *Tar ARchive*. Las cintas suelen cargarse en dispositivos
+     independientes del equipo, incluso conectados mediante red y no
+     directamente, e incluso pueden cargarse y reutilizarse automáticamente, por
+     lo que pueden cumplir los requisitos exigidos a cualquier sistema
+     profesional de copias.
+
+   + En un **servidor de almacenamiento remoto** (copias en la nube) que obligan
+     necesariamente a cifrar las comunicaciones y, si no controlamos nosotros
+     tal servidor remoto (lo habitual), a cifrar también el almacenamiento.
+
+#) Según la **naturaleza de los datos** (**contenido**):
+
+   + :dfn:`Copia de archivos de datos`, que son aquellas copias que se hacen
+     para respaldar los datos generados por los usuarios. No incluyen, pues, ni
+     aplicaciones ni configuraciones de éstas ni el propio sistema operativo.
+
+   + :dfn:`Copia de bases de datos`, que son aquellas copias que respaldan datos
+     almacenados en bases de datos. En principio, estos son tambian datos
+     generados, pero al estar estructurados en bases de datos suelen usarsa
+     herramientas específicas, a menudo proporcionadas por el propio sistema
+     gestor de bases de datos.
+
+   + :dfn:`Copia del sistema y las aplicaciones`, que son aquellas que respaldan
+     el sistema completo, de modo que una restauración completa genera
+     enteramente el sistema. No son, por lo general, *copias de archivos* sino
+     *copias imagen* para las que se ha usado un software específico de clonado.
+     En el mundo del ŝoftware libre* son muy habituales Clonezilla_ y Fog_.
+     Trataremos con detenimiento este tipo particular de copia :ref:`en epígrafe
+     aparte <clonacion>`. También entran dentro de esta categoría las
+     :ref:`instantáneas <lvm-snapshots>` que se llevan a cabo justamente antes
+     de una actualización o modificación de las configuración del sistema.
+
+#) Según los datos a copiar **desde la última copia** (**contenido**):
+
+   + :dfn:`Copia completa`, que es aquella en la que se incluyen todos los datos
+     que se desean repaldar, con independencia de las copias que se hayan podido
+     hacer anteriormente. En este caso, para restaurar los datos basta con
+     restaurar la copia.
+
+   * :dfn:`Copia diferencial`, que es aquella en la que se incluyen todos los
+     datos que se desean respaldar, modificados desde la última copia completa.
+     En este caso, para restaurar los datos basta con restaurar la copia
+     diferencial y la copia completa respecta a la que se hizo. Tiene la ventaja
+     respecto a la anterior de que tarda menos tiempo en llevarse cabo yh ocupa
+     menos espacio, pero el inconveniente de que no basta con guardar la última
+     copia, sino que, además, requiere guardar la copia completa respecto a la
+     que se hizo. Si desean guardarse varias copias diferenciales para tener la
+     posibilidad de recuperar los datos en cualquiera de los instantes de
+     tiempos entonces las copias diferenciales incluirá idénticos archivos. Por
+     ejemplo, un archivo modificado antes de la primera copia diferencial, se
+     encontrará en todas las copias diferenciales exactamente con el mismo
+     contenido.
+
+   * :dfn:`Copia incremental`, que es aquella en la que se incluyen todos los
+     datos que se desean respaldar, modificados desde la última copia completa o
+     incremental. En consecuencia, para restaurar el estado de una determinada
+     copia incremental, se necesita restaurar la copia completa y,
+     sucesivamente, todas las copias incrementales hasta aquella que conserva el
+     estado que deseamos restaurar.
+
+   Lo habitual es que la politica de copias implemente un sistema mixto en que
+   se haga una *copia completa* cada cierto tiempo y, entre ellas, copias
+   incrementales o diferenciales.
+
+#) Según al **nivel** al que se copian los datos (**contenido**):
+
+   + :dfn:`Copia de archivos`, que es aquella en que se copian archivos y
+     directorios y los metadatos asociados a éstos (fechas, propietarios,
+     permisos), pero no datos relativos a información de más bajo nivel como el
+     propio sistema de archivos.
+
+   + :dfn:`Copia imagen`, que son copias completas bloque a bloque de
+     particiones o discos completos. Este tipo de copias entra dentro del
+     concepto de :ref:`clonación <clonacion>`.
+
+#) Según la **centralización** del proceso:
+
+   + **Copia aislada**
+   + **Copia centralizada**
+
+   Dado que divideremos las herramientas de copia según este criterio,
+   explicaremos más adelante estos dos tipos de copias.
+
+Política de copias
+------------------
+La *política de copias de seguridad* debe plasmarse en un documento que describa
+concienzudamente cómo, cuándo, de qué y en qué se llevarán a cabo las copias; y
+suele formar parte del *plan de seguridad*. En concreto, debe definirse:
+
+- Quiénes son los **responsables** (al menos dos) de la supervisión y qué avisos
+  deben redibir.
+
+- Qué **datos** y qué **equipos** deben ser respaldados.
+
+- Cuál es la **programación temporal de las copias** completas, diferenciales e
+  incrementales.
+
+- **Dónde** se llevan a cabo las copias (posiblemente un servidor).
+
+- Qué **soporte** para las copias se usará y cómo se manipulan y almacenan los
+  soportes extraíbles, incluyendo su etiquetado.
+
+- La política de **rotación** de las copias, esto es, a partir de qué copia
+  antigua copia se borran las copias anteriores.
+
+- Si se llevan a cabo copias de aplicaciones y sistemas.
+
+Copia aislada
+=============
+Trataremos bajo este epígrafe las herramientas pensadas para hacer :dfn:`copias
+aisladas`, esto es, copias de datos de máquinas individuales. Estas herramientas
+suelen centrarse en llevar a cabo este cometido, por lo que no funcionan como un
+servicio, sino que tienen que ser lanzadas a mano en el momento que queremos
+llevar a cabo la copia. Si nuestro propósito es crear con ellas cierta política de
+copias, entonces requeriremos algunos extras:
+
+- Una herramienta como :ref:`cron <cron>` para establecer las periodicidad con
+  que deben llevarse a cabo las copias y que estas se lleven a cabo
+  automáticamente.
+
+- Muy propablemente, :ref:`un script <scripts>` que lance la herramienta
+  personalizándola para el caso que queremos resolver y que se encargue de hacer
+  las notificaciones al administrador.
+
+.. note:: Existen programas que utilizan estas herramientas y nos ahorran la
+   tarea de programar el *script*, utilizar *cron* o ambas.
+
+El uso de estas herramientas sólo es apropiado cuando es una la máquina de la
+que se quieren hacer copias (típicamente en ordenadores domésticos). En el
+ámbito empresarial, la necesidad de copias se amp0lia a múltiples equipos de la
+red y es conveniente el uso de herramientas para la *copia centralizada*.
+
+.. rubric:: Herramientas
+
+.. toctree::
+   :glob:
+   :maxdepth: 1
+
+   01.backups/0*
+
+Copia centralizada
+==================
+Los sistema de :dfn:`copia centralizada` permiten definir en un servidor una
+política completa de copias para todos los equipos de una red. Son, pues,
+herramientas más complejas y completas que las anteriores que incluyen todas las
+operaciones necesarias (copias en sí, definición de la periodicidad, lanzamiento
+automático, registro, avisos, etc.). En los sistemas *Linux*, tres de las
+aplicaciones más utilizadas son Amanda_, Bacula_ y BackupPC_ 
+
+.. toctree::
+   :glob:
+   :maxdepth: 1
+
+   01.backups/1*
+
+.. |RAID| replace:: :abbr:`RAID (Redundant Array Of Independent Disks)`
+
+.. _clonezilla: https://clonezilla.org/
+.. _fog: https://fogproject.org/
+.. _amanda: http://www.amanda.org/
+.. _bacula: https://www.bacula.org/
+.. _backuppc: https://backuppc.github.io/backuppc/

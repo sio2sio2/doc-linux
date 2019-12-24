@@ -1,5 +1,7 @@
-Gestión de discos
-=================
+.. _disks:
+
+Dispositivos de almacenamiento
+==============================
 
 La información del servidor que es al fin lo más valioso, se almacena en
 los discos, de modo que es fundamental planificar convenientemente cómo se

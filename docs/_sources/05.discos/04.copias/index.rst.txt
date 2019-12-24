@@ -1,14 +1,18 @@
 Copias
 ======
+Bajo el epígrafe trataremos tres enfoques distintos sobre las copias de disco:
 
-Bajo el epígrafe trataremos dos enfoques distintos sobre las copias de disco:
-las copias de seguridad y las clonaciones: las primeras permiten salvaguardar
-los datos de fallos de disco; las segundas permiten copiar sistemas enteros con
-el propósito, normalmente, de reproducir una misma instalación en muchas
-máquinas.
+* las **copias de seguridad**, que permiten salvaguardar los datos ante fallos o
+  accidentes en el almacenamiento.
+  
+* Las **clonaciones** con las que se copian sistemas enteros con el propósito,
+  normalmente, de reproducir una misma instalación en muchas máquinas.
+
+* Las **instalaciones desatendidas** que no son copias en sí, pero permiten la
+  instalación automatizada de un mismo sistema en múltiples ordenadores.
 
 .. toctree::
    :glob:
-   :maxdepth: 2
+   :maxdepth: 1
 
-   [0-9]*/index
+   [0-9]*
