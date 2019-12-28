@@ -652,7 +652,7 @@ siguiendo el criterio predeterminado de la herramienta (1MiB).
 Esta *firmware* no utiliza el |MBR|, sino que, como es capaz de entender el
 particionado y algunos sistemas de ficheros, busca los arranques en una
 partición de tipo |EFI| (código *0xEF00*) que ha debido de ser creada para ese
-fin y formateada como |FAT|. Para referirse a esta partición |EFI| suele
+fin y formateada como |FAT|\ [#]_. Para referirse a esta partición |EFI| suele
 utilizarse el acrónimo inglés |ESP|.
 
 La especificación establece que en dicha partición debe existir un directorio
@@ -869,7 +869,7 @@ a. |GPT| exclusivamente compatible con |BIOS|, que podemos definir así::
 
 #. Tabla de particiones |GPT| exclusivamente compatible con |UEFI|::
 
-      $ /sbin/sgdisk -n "0:2048:+50M" -t "0:0xef00" -c "0:EFI" \
+      $ /sbin/sgdisk -n "0:2048:+100M" -t "0:0xef00" -c "0:EFI" \
                      -n "0:+0:+32M" -c "0:UNO" \
                      -n "0:+0:+2G" -t "0:0x0700" -c "0:DOS" \
                      -n "0:+0:+1G" -c "0:TRES" /tmp/0.disk
@@ -882,7 +882,7 @@ a. |GPT| exclusivamente compatible con |BIOS|, que podemos definir así::
 #. Tabla de particiones |GPT| compatible tanto con |BIOS| como con |UEFI|::
 
       $ /sbin/sgdisk -a 8 -n "0:40:2047" -t "0:0xef02" -c "0:BOOTBIOS" \
-                     -a 2048 -n "0:2048:+50M" -t "0:0xef00" -c "0:EFI" \
+                     -a 2048 -n "0:2048:+100M" -t "0:0xef00" -c "0:EFI" \
                              -n "0:+0:+32M" -c "0:UNO" \
                              -n "0:+0:+2G" -t "0:0x0700" -c "0:DOS" \
                              -n "0:+0:+1G" -c "0:TRES" /tmp/0.disk
@@ -1023,10 +1023,10 @@ en modo |EFI| es el siguiente:
 
    #. Montar los sistemas especiales sobre el sistema de disco::
 
-         # mount -t devtmpfs none /mnt/dev
-         # mount -t devpts none /mnt/dev/pts
-         # mount -t proc none /mnt/procs
-         # mount -t sysfs none /mnt/sys
+         # mount -t devtmpfs udev /mnt/dev
+         # mount -t devpts devpts /mnt/dev/pts
+         # mount -t proc proc /mnt/procs
+         # mount -t sysfs sysfs /mnt/sys
 
    #. Entrar en la jaula::
 
@@ -1049,11 +1049,34 @@ en modo |EFI| es el siguiente:
       # exit
       # reboot
 
+.. _efi-entradas-grub:
+
+Entradas
+--------
+Una instalación estándar de *debian* instala, simplemente, su |GRUB| dentro de
+:file:`/EFI/debian` y añade una entrada a la secuencia de arranque del
+*firmware* con el identificado "*debian*". Podemos alterar la leyenda de la
+secuencia de arranque, borrando la actual entrada "*debian*" y creando otra
+distinta::
+
+   # efibootmgr        # Y miramos cuál es índice de la entrada (p.e. 7)
+   # efibootmgr -Bb7
+   # efibootmgr -cgL "Grub menu" -d /dev/sda -p 2 -l "/EFI/debian/shimx64.efi"
+
+Otra posibilidad, es hacer que la entrada en la secuencia para el
+dispositivo de disco arranque nuestro |GRUB|. Eso pasa porque se cree
+:file:`/EFI/Boot/bootx64.efi` para lo cual podemos hacer::
+
+   # grub-install --no-nvram --force-extra-removable
+
+Otra posibilidad es crear una entrada que arranque directamente el sistema, lo
+cual dejaremos para epígrafe aparte.
+
 .. _efi-arranque-directo:
 
 Arranque directo
 ----------------
-El núcleo de debien tiene EFIStub_, esto es, la
+El núcleo de *debian* tiene EFIStub_, esto es, la
 capacidad de ser cargado como un ejecutable directamente por el firmware |UEFI|,
 sin necsidad de usar |GRUB| u otro gestor de arranque. Ello supone copiar el
 núcleo y el sistema de ficheros inicial (*initrd*) en la partición |ESP| y, si
@@ -1093,6 +1116,7 @@ añadir un par de *scripts*.
 .. https://askbot.fedoraproject.org/en/question/111637/how-can-i-create-a-efi-boot-menu-entry-using-efibootmgr/
 .. https://wiki.mageia.org/en/About_EFI_UEFI
 
+
 .. rubric:: Notas al pie
 
 .. [#] Bien es cierto que, esto último, sólo en |BIOS| más modernas. En
@@ -1128,6 +1152,10 @@ añadir un par de *scripts*.
 .. [#] Los códigos de 4 dígitos hexadecimales son códigos internos de la
    de la suite de particionado :ref:`gdisk <gdisk.i>`. Los identificadores, en
    realidad, son mucho más largos.
+.. [#] En realidad, la especificación |UEFI| ni siquiera exige que la partición
+   sea de tipo |ESP| y se limita a buscar una partición que entienda (|FAT|).
+   Además, las entradas que se almacenan en la |NVRAM| indican cuál es la
+   partición de disco donde se encuentra el fichero a leer.
 .. [#] En la implementación |UEFI| que traen algunos *softwares* de
    virtualización (OVMF_), la |NVRAM| se emula almacenando en el directorio
    :file:`EFI` un fichero llamado :file:`NvVars`.
