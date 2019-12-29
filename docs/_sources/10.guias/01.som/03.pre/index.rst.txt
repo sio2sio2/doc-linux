@@ -15,8 +15,7 @@ Virtualización
 ==============
 Texto
 -----
-El contenido de esta parte está disponible :ref:`en este enlace
-<virtual>`.
+Consulte el :ref:`epígrafe sobre virtualización <virtual>`.
 
 .. include:: /10.guias/01.som/99.ejercicios/030.virt.rst
 
@@ -24,6 +23,8 @@ Particionado
 ============
 Texto
 -----
-El contenido está disponle a través de :ref:`este otro enlace <disk-div>`.
+Consulte el :ref:`epígrafe sobre división del disco <disk-div>`, sin atender a
+la práctica desarrollada con órdenes de terminal. A este nivel, como herramienta
+alternativa se usará `Gparted <https://gparted.org/>`_.
 
 .. include:: /10.guias/01.som/99.ejercicios/031.part.rst

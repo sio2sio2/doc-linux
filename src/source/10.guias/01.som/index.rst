@@ -1,8 +1,7 @@
 Sistemas Operativos Monopuesto
 ==============================
 
-Contenidos
-----------
+.. rubric:: Contenidos
 
 .. toctree::
    :maxdepth: 2
@@ -10,8 +9,7 @@ Contenidos
 
    [0-9]*/index
 
-Relación de ejercicios
------------------------
+.. rubric:: Relación de ejercicios
 
 .. toctree::
    :maxdepth: 1
