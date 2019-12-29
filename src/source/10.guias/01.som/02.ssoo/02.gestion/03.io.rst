@@ -1,0 +1,154 @@
+Gestión de Entrada/Salida
+*************************
+Una tarea fundamental de los |SSOO| es el control de los periféricos de E/S del
+ordenador.
+
+Tipos de periféricos
+====================
+Ya establecimos una primera clasificación de los dispositivos dependiendo de
+cuál sea el **sentido de flujo** de la información:
+
+* *De entrada*, que introducen en el sistema información externa, como un
+  teclado o un ratón.
+* *De salida*, que reciben información interna del sistema con el propósito de
+  proporcionársela al usuario, como es el caso de un monitor o una impresora.
+* *De entrada/salida*, en que el flujo de información es bidireccional, por lo
+  que tanto introducen como reciben información. Es el caso de un módem o una
+  tarjeta de red.
+
+Hay otra clasificación que depende del **modo de envío** de los datos\ [#]_:
+
+.. _disp-block:
+
+* *Dispositivo de bloques*, que es aquel que envía o recibe la información en
+  bloques de tamaño fijo. Por ejemplo, los dispositivos de almacenamiento en que
+  se envía y recibe la información contenida en cada sector (que típicamente es
+  de 512 *bytes*).
+
+.. _disp-char:
+
+* *Dispositivo de caracteres*, que es aquel que envía o recibe la información en
+  *bytes* (caracteres) individuales. Por ejemplo, el teclado.
+
+Software relacionado
+====================
+El sistema operativo tiene dedicada una parte a la gestión de los dispositivos
+de E/S, para lo cual es necesario que:
+
+- El dispositivo *hardware* incluya un componente lógico llamado el
+  :dfn:`firmware`.
+- El propio sistema operativo disponga de otro componente lógico que se
+  comunique con él denominado :dfn:`driver` o :dfn:`controlador`, que logra
+  abstraer al resto del sistema operativo y a las aplicaciones de usuarios
+  de los detalles particulares del *hardware*.
+
+De este modo, al necesitar un proceso la comunicación con un dispositivo
+lo hace a través de órdenes comunes a todos los dispositivos de su tipo y es
+el *driver* el encargado de traducir estas órdenes genéricas a las particulares
+que necesite ese *hardware* específico.
+
+En consecuencia, los controladores son específicos para un sistema operativo y
+hardware específico, de modo que dos impresoras de distinto modelo requerirán
+sendos *drivers* para su funcionamiento\ [#]_.
+
+Tradicionalmente, los *controladores* se ejecutan en modo *kernel*, lo cual
+provoca problemas cuando fallan ya que pueden dar al traste con todo el sistema
+operativo. Cada vez es más común, sin embargo, que se ejecuten en modo usuario.
+
+Respecto al autor del controlador, podemos encontrar distintos tipos:
+
+* *Genérico*, que son los que vienen incorporados en el propio sistema operativo
+  y cubren un amplio abanico de modelos y marcas, aunque pueden no explotar
+  todas las posibilidades de un dispositivo concreto o mermar el rendimiento.
+
+* *Oficiales*, que son los desarrollados y distribuidos por el propio fabricante
+  del *software* y requieren su instalación explícita. Por lo general, son los
+  que proporcionan un mejor rendimiento.
+  
+* *Libres*, que son los desarrollados por la comunidad con la colaboración o sin
+  ayuda del propio fabricante. Su calidad depende en gran medida de la
+  información que proporcione el fabricante sobre el diseño del dispositivo. 
+
+Interrupciones
+==============
+La gestión de E/S se basa en el tratamiento de peticiones de :dfn:`interrupción`
+(|IRQ| por sus siglas en inglés), que son señales que un dispositivo envía al
+procesador por una línea especial del bus de control para pedirle que interrumpa
+el proceso en ejecución y pase a ejecutar una rutina de tratamiento de la
+interrupción. Al recibir una interrupción, el sistema operativo actúa del
+siguiente modo:
+
+#. El proceso **En ejecución** se para y pasa al estado **Listo**.
+#. Se trata la interrupción que supondrá la actualización de los datos de algún
+   proceso con los datos procedentes del periférico. Como consecuencia de ello,
+   es posible que un proceso **Bloqueado** pase a estar **Listo**.
+#. Una vez tratada la interrupción, el proceso que decida el planificador, según
+   el algoritmo que use, ocupará el procesador pasando de **Listo** a **En
+   ejecución**.
+
+El bus de control de la placa base dispone de líneas específicas para las
+peticiones de interrupción. Estas líneas están numeradas y cada una de ellas
+está dedicada a un tipo de interrupción diferente. Por ejemplo, antiguamente la
+|IRQ|\ 2, estaba dedicada al teclado; o las |IRQ|\ 3 y 4 a los puertos serie. En
+las placas |XT| sólo había 8 líneas. En las placas |AT| se aumentaron las líneas
+a 16. En los sistemas modernos que usan el controlador |APIC| diseñado por
+Intel, hay 24 líneas para interrupciones más ocho líneas extra dedicadas al
+encaminamiento de interrupciones, y las interrupciones son asignadas
+dinámicamente por el propio sistema operativo.
+
+Transferencia
+=============
+Dada que la cantidad de información que se mueve entre la memoria y los
+dispositivos es ingente, muchos dispositivos como tarjetas gráficas, tarjetas de
+sonido o dispositivos de almacenamiento, disponen de acceso directo a la
+memoria (|DMA| por sus siglas en inglés), de manera que la transferencia puede
+llevarse a cabo directamente desde el dispositivo a la memoria sin pasar
+previamente por el procesador. Gracias a ello, la transferencia puede realizarse
+sin sobrecargar el procesador con muchísimas interrupciones.
+
+Además, para paliar la diferencia de velocidad entre el procesador y los
+dispositivos de E/S, se usan diversas técnicas:
+
+**Caching**
+   Se almacenan datos en una memoria temporal de pequeño tamaño y acceso muy rápido
+   de manera que 
+
+   - Cuando se necesita un dato, se comprueba antes de acudir al dispositivo si
+     se encuentra en la memoria caché, de la cuál es más rápido obtenerlo.
+
+   - Mientras haya espacio en la memoria caché, se almacena el dato enviado o
+     recibido del dispositivo de E/S, por si puede ser útil en una operación
+     posterior, y no se borrará de tal memoria hasta que no sea estrictamente
+     necesario, porque falte memoria para almacenar otro dato.
+
+**Buffering**
+   Esta técnica consiste en disponer áreas de almacenamiento temporal de lectura
+   y escritura rápidas llamadas :dfn:`buffer` (de entrada o de salida), que
+   funcionan del siguiente modo:
+
+   - Cuando un proceso debe enviar datos al dispositivo de salida, envía los
+     datos a un *buffer* de salida, no al dispositivo, y continúa su ejecución,
+     mientras el dispositivo puede ir obteniendo la información del *buffer* a
+     su ritmo.
+
+   - Cuando un dispositivo de entrada envía datos, los envía a un *buffer* de
+     entrada, incluso adelantándose a la petición del sistema operativo. Esto
+     propicia que, si el sistema pide esos datos, los pueda leer del *buffer*
+     que es mucho más rápido.
+
+.. rubric:: Notas al pie
+
+.. [#] En los sistemas operativos también existen dispositivos *virtuales* que
+   pueden ser de bloques o de caracteres. En este caso, nos referimos
+   exclusivamente a dispositivos físicos, esto es, periféricos.
+
+.. [#] Sin perjuicio de que dos modelos muy, muy parecidos puedan compartir un
+   driver común, porque comparten el mismo `chipset
+   <https://es.wikipedia.org/wiki/Chipset#El_t.C3.A9rmino_chip-set_en_la_electr.C3.B3nica>`_.
+
+.. |SSOO| replace:: :abbr:`SSOO (Sistemas Operativos)`
+.. |DMA| replace:: :abbr:`DMA (Direct Memory Access)`
+.. |IRQ| replace:: :abbr:`IRQ (Interruption ReQuest)`
+.. |XT| replace:: :abbr:`XT (eXtended Technology)`
+.. |AT| replace:: :abbr:`AT (Advanced Technology)`
+.. |APIC| replace:: :abbr:`APIC (Advanced Programmable Interrupt Controller)`
