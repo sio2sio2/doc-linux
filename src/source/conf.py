@@ -366,6 +366,8 @@ rst_epilog = """
 .. |IMAP| replace:: :abbr:`IMAP (Internet Message Access Protocol)`
 .. |IP| replace:: :abbr:`IP (Internet Protocol)`
 .. |VPN| replace:: :abbr:`VPN (Virtual Private Network)`
+.. |RAID| replace:: :abbr:`RAID (Redundant Array of Inexpensive Disks)`
+.. |SAI| replace:: :abbr:`SAI (Sistema de alimentación ininterrumpida)`
 """
 
 manpages_url = "https://manpages.debian.org/{path}"

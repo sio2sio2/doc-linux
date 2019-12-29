@@ -105,5 +105,4 @@ sobrescrituras para asegurarse de que el dato original haya desaparecido...
 
 
 .. |SSD| replace:: :abbr:`SSD (Solid-State Drive)`
-.. |RAID| replace:: :abbr:`RAID (Redundant Array od Independent Disks)`
 .. |RAM| replace:: :abbr:`RAM (Random Access Memory)`

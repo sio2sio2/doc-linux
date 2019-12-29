@@ -406,7 +406,6 @@ Estudiaremos ambas posibilidades.
    cabido la posibilidad de que esos metadatos se hubieran registrado en memoria
    *NVRAM* la contraladora controladora o de la placa base.
 
-.. |RAID| replace:: :abbr:`RAID (Redundant Array of Independent Disks)`
 .. |GPT| replace:: :abbr:`GPT (GUID Partition Table)`
 .. |ZFS| replace:: :abbr:`ZFS (Zettabyte File System)`
 .. |BtrFS| replace:: :abbr:`BtrFS (B-TRee File System)`

@@ -259,4 +259,3 @@ el transporte indicado en la configuración, que es *smtp*.
 .. |MUA| replace:: :abbr:`MUA (Mail User Agent)`
 .. |MDA| replace:: :abbr:`MDA (Mail Delivery Agent)`
 .. |MSA| replace:: :abbr:`MSA (Mail Submission Agent)`
-.. |RAID| replace:: :abbr:`RAID (Redundant Array of Independent Disks)`

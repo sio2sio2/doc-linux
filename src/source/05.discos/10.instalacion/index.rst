@@ -525,7 +525,6 @@ problema.
    esta forma los errores se expresarán en inglés y será más fácil encontrar una
    solución en internet. Cambiaremos más delante su lengua a él sólo.
 
-.. |RAID| replace:: :abbr:`RAID (Redundant Array of Independent Disks)`
 .. |GPT| replace:: :abbr:`GPT (GUID Partition Table)`
 .. |BIOS| replace:: :abbr:`BIOS (Basic I/O System)`
 .. |UEFI| replace:: :abbr:`UEFI (Unified Extensible Firmware Interface)`

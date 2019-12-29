@@ -576,7 +576,6 @@ Enlaces de interés
 .. [#] Suponiendo, claro está, que se tenga instalado un servidor de correo en
    la máquina.
 
-.. |SAI| replace:: :abbr:`SAI (Sistema de Alimentación Ininterrumpida)`
 .. |UPS| replace:: :abbr:`UPS (Uninterruptible Power Supply)`
 .. |USB| replace:: :abbr:`USB (Universal Serial Bus)`
 .. |VA| replace:: :abbr:`VA (Voltiamperio)`

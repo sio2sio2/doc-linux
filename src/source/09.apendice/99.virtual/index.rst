@@ -215,7 +215,6 @@ De los referidos estudiaremos:
 
 .. |JVM| replace:: :abbr:`JVM (Java Virtual Machine)`
 .. |CLR| replace:: :abbr:`JVM (Common Language Runtime)`
-.. |RAID| replace:: :abbr:`RAID (Redundant Array of Independent Disks)`
 .. |KVM| replace:: :abbr:`KVM (Kernel-baed Virtual Machine)`
 .. |CPU| replace:: :abbr:`CPU (Central Processing Unit)`
 .. |SO| replace:: :abbr:`SO (Sistema operativo)`
