@@ -33,5 +33,27 @@ Uso habitual
      los distintos componentes e iconos que hay en ella y que información
      proporcionan.
 
+#. Interfaz:
+
+   * **Teoría**: No hay.
+   * :ref:`Práctica 3 <p4.3>`: destinada a revisar algunos aspectos
+     importantes de la interfaz:
+
+     - Cerrar sesión.
+     - Apagar o reiniciar.
+     - Cortana.
+     - Escritorio.
+
+#. Exploración de ficheros:
+
+   * **Teoría**: No hay.
+   * :ref:`Práctica 4 <p4.4>`: destinana a explicar cómo es la estructura de
+     ficheros en *Windows* y a cómo usar el explorador.
+
+#. Configuraciones:
+
+   * **Teoría**: No hay.
+   * :ref:`Práctica 5 <p4.5>`...
+
 .. |BIOS| replace:: :abbr:`BIOS (Basic I/O System)`
 .. |UEFI| replace:: :abbr:`UEFI (Unified Extensible Firmware Interface)`
