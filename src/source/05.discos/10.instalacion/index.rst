@@ -40,22 +40,32 @@ particionado |GPT| el arranque tanto con |BIOS| como con |UEFI|\ [#]_:
     Punto de montaje     Nombre     Tamaño      Tamaño previo
    ==================== ========== =========== ===============
     /                    RAIZ       5 GiB       1792 MiB
-    /home                HOME       20 GiB      64 MiB
-    /srv                 SRV        10 GiB      512 MiB
     /var/log             LOG        1 GiB       64 MiB
-    /var/lib/mysql       MYSQL      1 GiB       164 MiB
+    /home                HOME       Variable    512 MiB
+    /srv                 SRV        Variable    512 MiB
+    /var/lib/mysql       MYSQL      Variable    512 MiB
     swap                 SWAP       2 GiB       32 MiB
     /boot/efi            EFI        100 MiB     100 MIB
     \-                   BIOSBOOT   1 MiB       1 MiB
    ==================== ========== =========== ===============
     
 La columna de *tamaño previo* indica el tamaño que le daremos a la partición en
-la máquina virtual y la de *tamaño* el que tendrá en el disco real, aunque los
-referidos a :file:`/home`, :file:`/srv` o :file:`/var/lib/mysql` podemos
-modificarlos al gusto. El tamaño de :file:`/` debería ser más que suficiente
-para un sistema servidor sin entorno gráfico. Por otro lado, salvo las dos
-últimas particiones, el resto son en realidad volúmenes lógicos cuyo grupo de
-volúmenes se define sobre un el |RAID| 1.
+la máquina virtual y la de *tamaño* el que tendrá en el disco real. En este
+particionado podemos establecer lo siguiente:
+
+- Las dos últimas particiones son particiones de disco y quedan fuera de
+  cualquier |RAID| o grupo de volúmenes.
+- El resto de sistemas de archivos se encuentran son volúmenes físicos de un
+  grupo de volúmenes construido sobre un |RAID| 1.
+- :kbd:`/`, :kbd:`/var/log` y :kbd:`swap` son sistemas de archivos cuyo tamaño
+  final está bien definido y si excede los límites que hemos establecido muy
+  probablemente se deba a algún desajuste y no a problemas reales de espacio.
+- Los tres restastes sistemas, sin embargo, tendrán un tamaño variable según los
+  datos que se almacenen en ellos. Podríamos crear tres volúmenes lógicos
+  independendientes, pero podemos aprovechar el concepto de
+  :ref:`aprovisionamiento fino <lvm-aprovisionamiento>` para que ocupen el
+  mismo espacio y compitan por él. Como, sin embargo, el instalador de *Buster*
+  no lo soporta, completaremos su creación durante la postinstalación.
 
 Para guardar el esquema de particiones sugerido basta un disco virtual de 3GiB.
 
@@ -91,23 +101,21 @@ y sobre él crear un grupo de volúmenes y definir los volúmenes lógicos::
 
    # vgcreate VGraid /dev/md0
    # lvcreate -n raiz -L 1792M VGraid
-   # lvcreate -n home -L 64M VGraid
    # lvcreate -n log -L 64M VGraid
-   # lvcreate -n srv -L 512M VGraid
-   # lvcreate -n mysql -L 164M VGraid
+   # lvcreate -n pool -L 512M VGraid
    # lvcreate -n swap -C y -L 64M VGraid
 
-El último volumen definido es el dedicado a *swap* cuyo espacio se fuerza
-contiguo por razones de rendimiento. Esto obliga a que al pasar el servidor al
-disco real y ampliar los tamaños, este volumen deba ser el primero en ampliarse.
+De estos volúmenes, el nombrado *pool* será el volumen que posteriormente
+convirtamos en el *pool* de aprovisionamiento, y lo colocamos antes del
+dedicado a *swap* para poder forzar a que el espacio de *swap*
+sea contiguo por razones de rendimiento. De esta forma, al ampliar tamaños,
+si operamos primero sobre el de *swap*, podremos ampliarlo hasta los 2GiB, sin
+que deje de ser contiguo.
 
 Además formateamos para asegurarnos que el tamaño de bloque es de 4KiB::
 
    #  mkfs.ext4 -L RAIZ -b4k /dev/VGraid/raiz
-   #  mkfs.ext4 -L HOME -b4k /dev/VGraid/home
    #  mkfs.ext4 -L LOG -b4k /dev/VGraid/log
-   #  mkfs.ext4 -L SRV -b4k /dev/VGraid/srv
-   #  mkfs.ext4 -L MYSQL -b4k /dev/VGraid/mysql
 
 Una vez hecho esto, ya podemos comenzar la instalación en una máquina virtual,
 así que desconectamos::
@@ -183,7 +191,7 @@ sencilla:
       :alt: Vista general de las particiones y volúmenes definidos
 
    así que nuestra labor se limita a asociar cada volumen con el punto de
-   montaje apropiado. Por ejemplo, para el volumen dedicado a :file:`/home`:
+   montaje apropiado. Por ejemplo, para el volumen dedicado a :file:`/`:
 
    .. image:: files/14-particiones.png
       :alt: Vista de las opciones de una partición
@@ -191,7 +199,9 @@ sencilla:
    Obsérvese que no se reformatea la partición, ya que lo hicimos antes de
    comenzar la instalación. Es importante no hacerlo, ya que de lo contrario en
    las particiones muy pequeñas, la herramienta escogerá como tamaño de bloque
-   1KiB, cuando nuestra intención es que sea de 4KiB.
+   1KiB, cuando nuestra intención es que sea de 4KiB. Además, como no hemos
+   podido crear aún los volúmenes de aprovisionamiento fino, dejamos *pool* sin
+   asignar.
 
    Recuerde que hemos creado una partición |ESP| y que esta suele montarse sobre
    :file:`/boot/efi`, así que no olvide definirlo también:
@@ -200,7 +210,7 @@ sencilla:
       :alt: Definición de la partición ESP
 
    .. note:: Esta prevención es necesaria porque estamos llevando a cabo la
-      instalación en un sistema |BIOS|. Si fuera |UEFI|, debian habría tomado
+      instalación en un sistema |BIOS|. Si fuera |UEFI|, *Debian* habría tomado
       directamente la partición como la apropiada para este fin.
 
 #. Después de aceptar el particionado, pasara un tiempo mientras se instalán en
@@ -253,7 +263,7 @@ servidor.
 
 Postinstalación
 ===============
-Tras la instalación hay dos tareas que pueden interesarnos:
+Tras la instalación hay tres tareas que podemos acometer:
 
 Personalización
 ---------------
@@ -267,6 +277,49 @@ Las operaciones de personalización son muy particulares y pueden incluir:
    virtual y cuando estén a punto, trasladar el resultado a la máquina real.
    Esto nos la da la ventaja de disponer en el futuro de un servidor virtual
    sobre el que hacer pruebas antes de llevarlas a cabo sobre el servidor real.
+
+Aprovisionamiento fino
+----------------------
+Como el instalador no soporta *aprovisionamiento fino* es ahora cuando debemos
+llevarlo a cabo. Para ello hemos de arrancar el sistema,  instalar la
+herramienta propiada y convertir el volumen lógico que reservamos para esta
+función en un *pool*::
+
+   # apt install thin-provisioning-tools
+   # lvconvert --thinpool /dev/VGraid/pool
+
+Hecho lo cual podemos crear los tres volúmenes faltantes::
+
+   # lvcreate -T -n home -V 512M VGraid/pool
+   # lvcreate -T -n srv -V 512M VGraid/pool
+   # lvcreate -T -n mysql -V 512M VGraid/pool
+   # mkfs.ext4 -L SRV -b4k /dev/VGraid/srv
+   # mkfs.ext4 -L HOME -b4k /dev/VGraid/home
+   # mkfs.ext4 -L MYSQL -b4k /dev/VGraid/mysql
+
+Por último, podemos copiar los ficheros personal sobre el nuevo volumen::
+
+   # mount /dev/VGraid/home /mnt
+   # tar -C /home/ -cf - . | tar -C /mnt/ -xvpf -
+   # umount /mnt
+   # rm /home/usuario -rf
+
+crear el punto de montaje :file:`/var/log/mysql`::
+
+   # mkdir /var/lib/mysql
+
+Añadir los tres puntos de montaje a :file:`/etc/fstab`::
+
+   # cat > /etc/fstab
+   /dev/mapper/VGraid-mysql /var/lib/mysql ext4 defaults   0       2
+   /dev/mapper/VGraid-home /home   ext4    defaults        0       2
+   /dev/mapper/VGraid-srv  /srv    ext4    defaults        0       2
+
+Y montarlo, por esta vez, a mano::
+
+   # mount /home
+   # mount /var/lib/mysql
+   # mount /srv
 
 Generación de la imagen final
 -----------------------------
@@ -370,10 +423,21 @@ dedicado a *swap* cuyo espacio debe ser contiguo::
    # lvextend -L 2G /dev/VGraid/swap
    # mkswap -L SWAP -U $(blkid -t LABEL=SWAP -o value -s UUID) /dev/VGraid/swap
    # lvextend -rL 5G /dev/VGraid/raiz
-   # lvextend -rL 20G /dev/VGraid/home
-   # lvextend -rL 10G /dev/VGraid/srv
-   # lvextend -rL 1G /dev/VGraid/mysql
    # lvextend -rL 1G /dev/VGraid/log
+
+Opcionalmente podemos reservar 5GiB para futuras instantáneas del sistema raíz\ [#]_::
+
+   # lvcreate -s -n raiz_snap -L 5G /dev/VGraid/raiz
+
+y reservar para el *pool* el espacio restante. Los volúmnes que cohabitan en él,
+podemos extenderlos hasta el tamaño que estimemos oportuno, sabiendo que
+posteriomente podremos ampliarlos::
+
+   # lvextend -l +100%FREE /dev/VGraid/pool
+   # lvextend -rL 50G /dev/VGraid/home
+   # lvextend -rL 100G /dev/VGraid/srv
+   # lvextend -rL 2G /dev/VGraid/mysql
+   # lvremove /dev/VGraid/raiz_snap
 
 Sincronización del arranque
 ---------------------------
@@ -413,9 +477,9 @@ Tenemos dos opciones:
 - Hacer un |RAID| 1 constituido por ambas particiones |ESP|, que será por su
   dificultad lo que expongamos.
 
-Partamos de que mantenemos las dos particiones por separado durante el tiempo
-en que el sistema arranca con |BIOS| y que, cuando migramos a |UEFI|, usamos
-la |ESP| de :file:`/dev/sda` para almacenar el arranque.
+Partamos de que mantenemos las dos particiones por separado durante el tiempo en
+que el sistema arranca con |BIOS| y que, cuando :ref:`migramos a UEFI
+<bios-uefi>`, usamos la |ESP| de :file:`/dev/sda` para almacenar el arranque.
 
 En esta situación vamos a copiar temporalmente el contenido de la partición::
 
@@ -524,6 +588,12 @@ problema.
 .. [#] El administrador, sin embargo, es mejor que *hable inglés*, ya que de
    esta forma los errores se expresarán en inglés y será más fácil encontrar una
    solución en internet. Cambiaremos más delante su lengua a él sólo.
+
+.. [#] Desgraciadamente la instantánea no se puede hacer sobre un volumen del
+   *pool* de aprovisionamiento, porque ello exige que el volumen original se
+   fije de sólo lectuta, operación que exigiría, dado que se trata del sistema
+   raíz, de parar el servidor y llevar a cabo la instantánea con ayuda de un
+   sistema operativo externo.
 
 .. |GPT| replace:: :abbr:`GPT (GUID Partition Table)`
 .. |BIOS| replace:: :abbr:`BIOS (Basic I/O System)`
