@@ -477,8 +477,9 @@ rspamd
    y no es la solución más rápida del mundo. Como alternativas pueden tentarse:
 
    * `bogofilter <http://bogofilter.sourceforge.net/>`_ según lo explicado `aquí
-     <https://www.tinslave.co.uk/blog/index.php?pos>`_. Tiene el inconveniente
-     de que usa exclusivamente filtros bayesiano y no reglas de puntuación.
+     <https://www.tinslave.co.uk/blog/index.php?post/50/Lightweight-anti-spam-alternative-for-small-servers>`_.
+     Tiene el inconveniente de que usa exclusivamente filtros bayesiano y no
+     reglas de puntuación.
 
    * `Rrspamd <https://rspamd.com/>`_. que sí se basa en reglas Hay `una guía
      completa de cómo integrarlo con postfix

@@ -54,7 +54,7 @@ máquina que se encarga del servicio de correo.
 .. todo:: Es necesario investigar sobre:
 
    * :ref:`Filtros de buzón en el servidor <dovecot-sieve>`.
-   * :program:`rspamd`: puede integrarse como *milter* y suporta, además,
+   * :ref:`rspamd <rspamd>`: puede integrarse como *milter* y suporta, además,
      :ref:`SPF <spf>`, :ref:`DKIM <dkim>` y :ref:`DMARC` con lo que quizás
      pueda sustitutir a todo el *software* descrito en esos apartados. Tiene,
      por lo que parece un módulo para `ARC

@@ -12,6 +12,8 @@ archivos, introduciremos algunos conceptos relativos a ella.
 Hay tres filosofías distintas para implementar el mecanismo de control de
 accesos:
 
+.. _control-dac:
+
 #. Control de accesos discrecional (|DAC|)
 
    Es el mecanismo más habitual en que la seguridad se basa en la identidad de

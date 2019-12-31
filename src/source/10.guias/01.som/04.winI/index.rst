@@ -1,5 +1,8 @@
-Uso de *Windows* 10
-*******************
+Fundamentos de *Windows* 10
+***************************
+Para realizar las pruebas pueden utilizarse una `versión de evaluación
+<https://www.microsoft.com/es-es/evalcenter/evaluate-windows-10-enterprise>`_
+para 90 días que proporciona la propia Microsoft.
 
 .. warning:: El documento es sólo un índice de los temas a tratar
 
