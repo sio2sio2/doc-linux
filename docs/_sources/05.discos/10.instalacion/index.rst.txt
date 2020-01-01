@@ -55,11 +55,12 @@ particionado podemos establecer lo siguiente:
 
 - Las dos últimas particiones son particiones de disco y quedan fuera de
   cualquier |RAID| o grupo de volúmenes.
-- El resto de sistemas de archivos se encuentran son volúmenes físicos de un
-  grupo de volúmenes construido sobre un |RAID| 1.
-- :kbd:`/`, :kbd:`/var/log` y :kbd:`swap` son sistemas de archivos cuyo tamaño
-  final está bien definido y si excede los límites que hemos establecido muy
-  probablemente se deba a algún desajuste y no a problemas reales de espacio.
+- El resto de sistemas de archivos son volúmenes lógicos de un grupo de
+  volúmenes construido sobre un |RAID| 1.
+- :kbd:`/`, :kbd:`/var/log` y :kbd:`swap` son volúmenes cuyo tamaño final
+  podemos establecer a priori a partir de cuál sea el uso que le demos al
+  servidor. Por ejemplo, un servidor sin entorno gráfico difícilmente necesitará
+  más de 5 GiB de espacio de almacenamiento.
 - Los tres restastes sistemas, sin embargo, tendrán un tamaño variable según los
   datos que se almacenen en ellos. Podríamos crear tres volúmenes lógicos
   independendientes, pero podemos aprovechar el concepto de
@@ -107,12 +108,11 @@ y sobre él crear un grupo de volúmenes y definir los volúmenes lógicos::
 
 De estos volúmenes, el nombrado *pool* será el volumen que posteriormente
 convirtamos en el *pool* de aprovisionamiento, y lo colocamos antes del
-dedicado a *swap* para poder forzar a que el espacio de *swap*
-sea contiguo por razones de rendimiento. De esta forma, al ampliar tamaños,
-si operamos primero sobre el de *swap*, podremos ampliarlo hasta los 2GiB, sin
-que deje de ser contiguo.
+dedicado a *swap* para que al situarse éste último al final pueda ampliarse
+luego su tamaño hasta los 2 GiB manteniendo la contiguidad del espacio. De
+hecho, forzamos la contiguidad a través de la opción :kbd:`-C`.
 
-Además formateamos para asegurarnos que el tamaño de bloque es de 4KiB::
+Además formateamos para asegurarnos de que el tamaño de bloque es de 4KiB::
 
    #  mkfs.ext4 -L RAIZ -b4k /dev/VGraid/raiz
    #  mkfs.ext4 -L LOG -b4k /dev/VGraid/log
@@ -130,9 +130,8 @@ así que desconectamos::
 Instalación
 ===========
 Debemos hacernos con el disco de instalación de la última estable de debian\
-[#]_ y arrancar la máquina virtual desde este disco y colocando el disco duro
-que hemos preparado bajo el epígrafe anterior. La instalación es bastante
-sencilla:
+[#]_, colocar el disco duro que hemos preparado bajo el epígrafe anterior, y
+arrancar la máquina virtual. La instalación es bastante sencilla:
 
 #. Elegimos la instalación con *ncurses* (¿para qué queremos la gráfica?):
 
@@ -213,7 +212,7 @@ sencilla:
       instalación en un sistema |BIOS|. Si fuera |UEFI|, *Debian* habría tomado
       directamente la partición como la apropiada para este fin.
 
-#. Después de aceptar el particionado, pasara un tiempo mientras se instalán en
+#. Después de aceptar el particionado, pasara un tiempo mientras se instalan en
    disco los paquetes básicos, después de lo cual se pedirá si deseamos añadir
    más discos como fuente de paquetes. Nuestra intención es instalar paquetes de
    internet, así que contestaremos que no:
@@ -249,7 +248,7 @@ sencilla:
    .. image:: files/21-paquetes.png
       :alt: Qué paquetes se instalarán automáticamente
 
-#, Y para finalizar el último pasa nos pide indicar dónde se instalará |GRUB|.
+#. Y para finalizar el último paso nos pide indicar dónde se instalará |GRUB|.
    Como sólo tenemos un disco (:file:`sda`), es en él donde debemos instalarlo:
 
    .. image:: files/22-grub.png
@@ -272,11 +271,6 @@ Las operaciones de personalización son muy particulares y pueden incluir:
 - Sustituir :program:`vim-tiny` por :program:`vim`.
 - Realizar :ref:`ajustes <ajustes>` (instalar y configurar :ref:`tmux <tmux>`,
   etc.)
-
-.. note:: Otra opción es que configuremos todos los servicios sobre la máquina
-   virtual y cuando estén a punto, trasladar el resultado a la máquina real.
-   Esto nos la da la ventaja de disponer en el futuro de un servidor virtual
-   sobre el que hacer pruebas antes de llevarlas a cabo sobre el servidor real.
 
 Aprovisionamiento fino
 ----------------------
@@ -341,6 +335,19 @@ la ocasión, puede ahorrarnos el trabajo::
 
 El script generará en el mismo directorio un nuevo disco :file:`disco-light.qcw`
 con el mínimo tamaño posible.
+
+Configurar el servidor
+----------------------
+Con todo lo anterior ya tenemos un sistema base para trabajar. A partir de aquí
+tenemos dos posibilidades:
+
+- Trasladarlo al servidor.
+- Llevar a cabo las instalaciones y configuraciones de servicios sobre la imagen
+  y, cuando esté a punto, trasladar el resultado a la máquina real. Obrar de
+  este segundo modo, nos da la ventaja de disponer en el futuro de una plantilla
+  que la configuración exacta de nuestro servidor y, en consecuencia, apta para
+  hacer pruebas antes de pasar los cambios al servidor real. En caso, de optar
+  por esto segundo, no está de manos pasarle :command:`mrproper` al acabar.
 
 Traslado a servidor real
 ========================
