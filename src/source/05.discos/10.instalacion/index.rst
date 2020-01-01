@@ -41,9 +41,9 @@ particionado |GPT| el arranque tanto con |BIOS| como con |UEFI|\ [#]_:
    ==================== ========== =========== ===============
     /                    RAIZ       5 GiB       1792 MiB
     /var/log             LOG        1 GiB       64 MiB
-    /home                HOME       Variable    512 MiB
-    /srv                 SRV        Variable    512 MiB
-    /var/lib/mysql       MYSQL      Variable    512 MiB
+    /home                HOME       Variable    768 MiB
+    /srv                 SRV        Variable    768 MiB
+    /var/lib/mysql       MYSQL      Variable    768 MiB
     swap                 SWAP       2 GiB       32 MiB
     /boot/efi            EFI        100 MiB     100 MIB
     \-                   BIOSBOOT   1 MiB       1 MiB
@@ -103,7 +103,7 @@ y sobre él crear un grupo de volúmenes y definir los volúmenes lógicos::
    # vgcreate VGraid /dev/md0
    # lvcreate -n raiz -L 1792M VGraid
    # lvcreate -n log -L 64M VGraid
-   # lvcreate -n pool -L 512M VGraid
+   # lvcreate -n pool -L 768M VGraid
    # lvcreate -n swap -C y -L 64M VGraid
 
 De estos volúmenes, el nombrado *pool* será el volumen que posteriormente
@@ -284,9 +284,9 @@ función en un *pool*::
 
 Hecho lo cual podemos crear los tres volúmenes faltantes::
 
-   # lvcreate -T -n home -V 512M VGraid/pool
-   # lvcreate -T -n srv -V 512M VGraid/pool
-   # lvcreate -T -n mysql -V 512M VGraid/pool
+   # lvcreate -T -n home -V 768M VGraid/pool
+   # lvcreate -T -n srv -V 768M VGraid/pool
+   # lvcreate -T -n mysql -V 768M VGraid/pool
    # mkfs.ext4 -L SRV -b4k /dev/VGraid/srv
    # mkfs.ext4 -L HOME -b4k /dev/VGraid/home
    # mkfs.ext4 -L MYSQL -b4k /dev/VGraid/mysql
@@ -486,7 +486,7 @@ Tenemos dos opciones:
 
 Partamos de que mantenemos las dos particiones por separado durante el tiempo en
 que el sistema arranca con |BIOS| y que, cuando :ref:`migramos a UEFI
-<bios-uefi>`, usamos la |ESP| de :file:`/dev/sda` para almacenar el arranque.
+<bios-uefi>`\ [#]_, usamos la |ESP| de :file:`/dev/sda` para almacenar el arranque.
 
 En esta situación vamos a copiar temporalmente el contenido de la partición::
 
@@ -602,9 +602,16 @@ problema.
    raíz, de parar el servidor y llevar a cabo la instantánea con ayuda de un
    sistema operativo externo.
 
+.. [#] Durante el proceso de migración, si seguimos los pasos referidos, seremos
+   incapaces de acceder a los volúmenes lógicos que usan aprovisionamiento fino,
+   ya que el instalador carece de soporte. Este error, sin embargo, es
+   irrelevante, ya que no necesitamos esos sistema de archivos para instalar
+   la versión |EFI| de |GRUB|
+
 .. |GPT| replace:: :abbr:`GPT (GUID Partition Table)`
 .. |BIOS| replace:: :abbr:`BIOS (Basic I/O System)`
 .. |UEFI| replace:: :abbr:`UEFI (Unified Extensible Firmware Interface)`
+.. |EFI| replace:: :abbr:`EFI (Extensible Firmware Interface)`
 .. |ESP| replace:: :abbr:`ESP (EFI System Partition)`
 .. |GRUB| replace:: :abbr:`GRUB (GRand Unified Bootloader)`
 .. |USB| replace:: :abbr:`USB (Universal Serial Bus)`
