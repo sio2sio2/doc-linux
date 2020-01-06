@@ -9,6 +9,7 @@ sus respectivos módulos, éstas contendrán:
 - Contenidos de caracter teórico.
 - Índices para desarrollar las partes prácticas sin aplicación en *Linux* (las
   referentes a *Windows*, p.e.)
+- Enlaces a las partes pertinentes del manual.
 - Ejercicios complementarios.
 
 .. note:: Las guías son todas las que están, pero no están todas las que son;
