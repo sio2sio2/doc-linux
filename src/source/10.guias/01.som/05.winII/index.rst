@@ -25,8 +25,8 @@ Usuarios y grupos
 .. note:: Nos centramos en usuarios y grupos locales.
 
 * Hay varios modos de gestionarlos, pero el modo más compacto y completo de
-  hacerlo es a través de la sección correspondiente del "Administrador de
-  equpipos".
+  hacerlo es a través de la sección correspondiente del :program:`Administrador de
+  equipos`.
 
 * A grandes rasgos hay tres **usuarios** locales definidos:
 
@@ -55,6 +55,23 @@ Usuarios y grupos
      se explican todos los usuarios predefinidos.
 
 * A diferencia de *Linux*, pueden añadirse un grupo como miembro de otro.
+
+* Los usuarios tienen su perfil personal en la ruta
+  :file:`C:\Users\nombre_usuario`, de manera que:
+
+  - Cada vez que se crea ese directorio personal se copia el contenido de
+    :file:`C:\Users\Default` (oculto), exactamente del mismo modo que en +Linux*
+    se hace con :file:`/etc/skel`.
+
+  - Se hace accesible todo el contenido que se encuentra dentro de
+    :file:`C:\Users\Public`. Por ejemplo, si en :file:`C:\Users\Public\Desktop`
+    se añade un fichero, ese fichero lo verán todos los usuarios en su
+    escritorio.
+
+  - :file:`C:\Users\nombre_usuario\NTUSER.DAT` almacena la configuración
+    personal del usuario, de suerte que cada vez que éste inicia sesión, se
+    carga el contenido de este fichero en el registro y se aplica la
+    configuración (p.e. cuál es la imagen de fondo de escritorio).
 
 Permisos
 --------
@@ -207,12 +224,62 @@ Se accede a ellas mediante el programa :command:`secpol.msc` o a través de las
 
 Gestión de procesos
 ===================
+Para la *gestión de procesos*, *Windows 10* proporciona el
+:program:`Administrador de tareas`, accesible a través del menú que se presenta
+al pulsar :kbd:`Ctrl+Alt+Supr`, o directamente pulsado
+:kbd:`Ctrl+Shift+Esc`, o ejecutando :command:`TaskManager.exe`. La aplicación
+dispone de distintas pestañas cada una de las cuales sirve para un
+propósitos:
+
+.. image:: files/taskmanager.png
+
+* *Procesos* permite consultar los procesos en ejecución y cuáles son recursos
+  que consumen. Además, permite matarlos.
+* *Detalles* enumera los procesos indicando cuál es el ejecutable.
+* *Servicios* permite arrancar y parar servicios. Si el proceso que deseamos
+  parar es un servicio, es preferible hacerlo usando esta pestaña.
+* *Rendimiento* nos ofrece información sobre el consumo de |CPU|, memoria, etc.
+* *Inicio* lista una serie de aplicaciones que se ejecután automáticamente
+  durante el arranque del sistema. Se permite deshabilitarlas.
 
 Gestión de servicios
 ====================
+Además de poder arrancar o parar servicios a través del :program:`Administrador
+de tareas` es posible llevar a cabo una gestión más exhaustiva decidiendo qué
+servicios se habilitan o deshabilitan, de manera que se levanten o no de manera
+automáticamente al iniciar *Windows*. Esto es posible a través del gestor de
+servicios al cual puede llegarse a través del :program:`Administrador de Equipos`
+o directamente ejecutando :program:`services.msc`.
 
 Programación de tareas
 ======================
+Para programar tareas futuras, periódicas o que deben ejecutarse al producirse
+alguna circunstancia (p.e. al iniciar sesión), debe utilizarse el
+:program:`Programador de tareas` accesible a través de las "Herramientas
+administrativas".
+
+.. image:: files/programador.png
+
+Crear una *tarea básica* es relativamente sencillo (puede consultar `este enlace
+de genbeta sobre cómo programar tareas en Windows 10
+<https://www.genbeta.com/paso-a-paso/como-programar-tareas-en-windows-10>`_).
+Las lista de tareas definidas por el usuario pueden consultarse en la
+sección "Biblioteca del Programador de tareas", aunque, si no aparece, habrá que
+actualizar la vista con el menú contextual.
+
+Restauración del sistema
+========================
+*Windows* 10 permite crear puntos de restauración de sistema operativo (no del
+sistema de archivos, para lo cual tendríamos que crear copias de seguridad) a
+través del programa :program:`SystemPropertiesProtection.exe`, accesible desde
+las "Propiedades" de "Este Equipo" o la sección "Sistema" del "Panel de
+Control". La creación de estos puntos exige primero habilitar la posibilidad reservando
+una cantidad de espacio en disco para ello.
+
+.. seealso:: Puede consultar `este artículo de genbeta.com sobre restauración
+   <https://www.genbeta.com/paso-a-paso/como-crear-punto-restauracion-windows-10>`_.
+
+.. include:: /10.guias/01.som/99.ejercicios/05.winII.rst
 
 .. rubric:: Notas al pie
 
@@ -220,3 +287,4 @@ Programación de tareas
    simples.
 
 .. |NTFS| replace:: :abbr:`NTFS (NT File System)`
+.. |CPU| replace:: :abbr:`CPU (Central Processing Unit)`

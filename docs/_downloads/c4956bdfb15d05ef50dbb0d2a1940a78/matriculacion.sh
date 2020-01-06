@@ -163,14 +163,14 @@ trata_usuario() {
 # $@: Los nicks de todos los alumnos que sí están matriculados.
 # 
 borrar_antiguos() {
-   local IFS="|" user grupo
+   local usu grupo matriculados="$1"
 
    [ $# -gt 0 ] || return 0
 
-   getent passwd | awk -F: '$1 !~ /('"$*"')/ {print $1}' | while read -r user; do
-      case "$(id -gn "$user")" in
-         $GRUPO1|$GRUPO2) 
-            del_user "$user"
+   getent passwd | while read -r usu; do
+      case "$(id -gn "$usu")" in
+         $GRUPO1|$GRUPO2)
+            echo "$matriculados" | grep -Eq "^$usu$" || del_user "$usu"
             ;;
       esac
    done
@@ -210,7 +210,8 @@ while IFS=: read -r nombre nif curso; do
       continue
    fi
 
-   matriculados="$matriculados $nick"
+   matriculados="$matriculados
+$nick"
 done < "$1"
 
-borrar_antiguos $matriculados
+borrar_antiguos "$matriculados"

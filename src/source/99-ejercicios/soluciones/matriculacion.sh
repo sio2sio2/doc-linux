@@ -56,7 +56,7 @@ crea_nick() {
       shift
    done
 
-   digitos=$(echo "$nif" | sed -r 's:.*([0-9]{3})[A-Z]?$:\1:')
+   digitos=$(echo "$nif" | sed -r 's:.*([0-9]{3})[a-zA-Z]?$:\1:')
 
    echo "$inicial$(printf "%.3s" "$@")$digitos" | tr '[:upper:]' '[:lower:]'
 }
@@ -74,7 +74,7 @@ comprobar_linea() {
    [ -n "${1%%#*}" ] || return 1
 
    # NIF incorrecto (podría mejorarse y comprobrar la letra).
-   echo "$2" | grep -qE '^[0-9]{7,8}[A-Z]$' || return 2
+   echo "$2" | grep -qE '^[0-9]{7,8}[a-zA-Z]$' || return 2
 
    case $3 in
       1|2|1+) ;;
@@ -138,6 +138,8 @@ trata_usuario() {
 
 
    pone_grupo_principal() {
+      # Si el grupo ya es suplementario, tiene que dejar de serlo
+      id -Gn "$1" | grep -Eq " $2\b" && deluser "$1" "$2"
       usermod -g "$2" "$1"
    }
 
@@ -158,19 +160,19 @@ trata_usuario() {
 }
 
 #
-# Borrar los antiguos alumnos que
+# Lista los antiguos alumnos que
 # han dejado el instituto en el nuevo curso
 # $@: Los nicks de todos los alumnos que sí están matriculados.
 # 
-borrar_antiguos() {
-   local IFS="|" user grupo
+listar_exalumnos() {
+   local usu grupo gid1 gid2 matriculados="$1"
+   gid1=$(getent group "$GRUPO1" | cut -d: -f3)
+   gid2=$(getent group "$GRUPO2" | cut -d: -f3)
 
-   [ $# -gt 0 ] || return 0
-
-   getent passwd | awk -F: '$1 !~ /('"$*"')/ {print $1}' | while read -r user; do
-      case "$(id -gn "$user")" in
-         $GRUPO1|$GRUPO2) 
-            del_user "$user"
+   getent passwd | while read -r usu _ _ gid _; do
+      case "$gid" in
+         $gid1|$gid2)
+            echo "$matriculados" | grep -Eq "^$usu$" || echo "$usu"
             ;;
       esac
    done
@@ -188,6 +190,7 @@ for grupo in "$GRUPO1" "$GRUPO2"; do
 done
 
 
+# Actualiza los alumnos matriculados
 num=0
 matriculados=
 while IFS=: read -r nombre nif curso; do
@@ -210,7 +213,12 @@ while IFS=: read -r nombre nif curso; do
       continue
    fi
 
-   matriculados="$matriculados $nick"
+   matriculados="$matriculados
+$nick"
 done < "$1"
 
-borrar_antiguos $matriculados
+
+# Borrar antiguos alumnos
+listar_exalumnos "$matriculados" | while read -r exalumno; do
+   del_user "$exalumno"
+done

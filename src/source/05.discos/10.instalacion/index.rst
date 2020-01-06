@@ -2,12 +2,23 @@
 
 Instalación del servidor
 ************************
-El propósito desarrollado bajo este epígrafe es el siguiente:
+Bajo este epígrage veremos cómo:
 
 - Protoinstalar el servidor sobre el disco de una máquina virtual.
-- Discutir cuál es el particionado adecuado para el servidor y llevarlo
-  a cabo haciendo uso de un :ref:`RAID 1 <mdadm>` y :ref:`volúmenes lógicos <lvm>`.
+- Hacer un particionado adecuado.
 - Exponer cómo transladar la protoinstalación a la máquina real.
+
+fruto de lo cual conseguiremos un sistema:
+
+- Preparado para arrancar con |BIOS| o |UEFI|.
+- Instalado sobre un |RAID|\ 1 para mejorar la seguridad y disponibilidad de la
+  información.
+- Que usa :ref:`aprovisionamiento fino <lvm-aprovisionamiento>` para los
+  sistemas de archivos dedicados a los datos.
+- Con posibilidad de crear instantáneas del sistema de archivos raíz para poder
+  revertir cambios inconvenientes.
+- Con una imagen virtual para poder llevar a cabo pruebas con ella, antes de
+  transladarlas al servidor en producción.
 
 Preinstalación
 ==============
@@ -304,10 +315,10 @@ crear el punto de montaje :file:`/var/log/mysql`::
 
 Añadir los tres puntos de montaje a :file:`/etc/fstab`::
 
-   # cat > /etc/fstab
-   /dev/mapper/VGraid-mysql /var/lib/mysql ext4 defaults   0       2
+   # cat >> /etc/fstab
    /dev/mapper/VGraid-home /home   ext4    defaults        0       2
    /dev/mapper/VGraid-srv  /srv    ext4    defaults        0       2
+   /dev/mapper/VGraid-mysql /var/lib/mysql ext4 defaults   0       2
 
 Y montarlo, por esta vez, a mano::
 
@@ -598,8 +609,8 @@ problema.
 
 .. [#] Desgraciadamente la instantánea no se puede hacer sobre un volumen del
    *pool* de aprovisionamiento, porque ello exige que el volumen original se
-   fije de sólo lectuta, operación que exigiría, dado que se trata del sistema
-   raíz, de parar el servidor y llevar a cabo la instantánea con ayuda de un
+   fije de sólo lectuta, operación que, dado que se trata del sistema raíz,
+   exigiría parar el servidor y llevar a cabo la instantánea con ayuda de un
    sistema operativo externo.
 
 .. [#] Durante el proceso de migración, si seguimos los pasos referidos, seremos
