@@ -293,7 +293,7 @@ función en un *pool*::
    # apt install thin-provisioning-tools
    # lvconvert --thinpool /dev/VGraid/pool
 
-Hecho lo cual podemos crear los tres volúmenes faltantes::
+Hecho lo cual debemos crear los tres volúmenes faltantes::
 
    # lvcreate -T -n home -V 768M VGraid/pool
    # lvcreate -T -n srv -V 768M VGraid/pool
@@ -302,7 +302,7 @@ Hecho lo cual podemos crear los tres volúmenes faltantes::
    # mkfs.ext4 -L HOME -b4k /dev/VGraid/home
    # mkfs.ext4 -L MYSQL -b4k /dev/VGraid/mysql
 
-Por último, podemos copiar los ficheros personal sobre el nuevo volumen::
+copiar los ficheros personal sobre el nuevo volumen::
 
    # mount /dev/VGraid/home /mnt
    # tar -C /home/ -cf - . | tar -C /mnt/ -xvpf -
@@ -313,14 +313,14 @@ crear el punto de montaje :file:`/var/log/mysql`::
 
    # mkdir /var/lib/mysql
 
-Añadir los tres puntos de montaje a :file:`/etc/fstab`::
+añadir los tres puntos de montaje a :file:`/etc/fstab`::
 
    # cat >> /etc/fstab
    /dev/mapper/VGraid-home /home   ext4    defaults        0       2
    /dev/mapper/VGraid-srv  /srv    ext4    defaults        0       2
    /dev/mapper/VGraid-mysql /var/lib/mysql ext4 defaults   0       2
 
-Y montarlo, por esta vez, a mano::
+y, por esta vez, montarlo a mano::
 
    # mount /home
    # mount /var/lib/mysql
