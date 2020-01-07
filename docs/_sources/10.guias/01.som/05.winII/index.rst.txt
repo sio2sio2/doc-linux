@@ -54,7 +54,7 @@ Usuarios y grupos
      <https://forsenergy.com/es-es/lug/html/8b53e8eb-37e8-4728-9e24-768348b8b32f.htm>`_
      se explican todos los usuarios predefinidos.
 
-* A diferencia de *Linux*, pueden añadirse un grupo como miembro de otro.
+* A diferencia de *Linux*, puede añadirse un grupo como miembro de otro.
 
 * Los usuarios tienen su perfil personal en la ruta
   :file:`C:\Users\nombre_usuario`, de manera que:
@@ -211,16 +211,30 @@ por quien tenga permisos para ello:
    <https://web.archive.org/web/20100105052819/http://www.cmschill.net/stringtheory/2009/05/02/bitwise-operators/>`_.
 
 
-Directivas de seguridad local
------------------------------
-Se accede a ellas mediante el programa :command:`secpol.msc` o a través de las
-"Herramientas administrativas". Son interesantes:
+Directivas de seguridad
+=======================
+Las :dfn:`directivas de seguridad` permiten configurar aspectos relacionados con
+la seguridad del sistema. Se accede a ellas mediante el programa
+:program:`secpol.msc` o a través de las "Herramientas administrativas". Son
+interesantes:
 
 - *Directivas de cuenta*, dentro de las cuales puede establecerse la política
   centraseñas (longitud, caducidad, etc.)
 
 - *Directivas locales*, dentro de las cuales se les puede asignar a usuarios y
   grupos, permiso para llevar a cabo ciertas tareas.
+
+Directivas de grupo
+===================
+Las :dfn:`directivas de grupo` permiten habilitar o deshabilitar ciertos
+elementos de *Windows*. Las que afectan a todos los usuarios pueden configurarse
+a través de su editor :program:`gpedit.msc`. También se pueden aplicar las
+directivas a usuarios concretos o conjuntos de usuarios (administradores/no
+administradores) mediante el uso del programa :program:`mmc.exe` y eligiendo
+como componente el "Editor de directivas de grupo".
+
+.. seealso:: Puede ver cómo llevar a cabo esto último en `este tutorial
+   <https://www.miprimoinformatico.es/configurar-directivas-locales-no-afecten-al-administrador-windows-10/>`_.
 
 Gestión de procesos
 ===================
@@ -278,6 +292,11 @@ una cantidad de espacio en disco para ello.
 
 .. seealso:: Puede consultar `este artículo de genbeta.com sobre restauración
    <https://www.genbeta.com/paso-a-paso/como-crear-punto-restauracion-windows-10>`_.
+
+Administración de discos
+========================
+Puede llevarse a cabo a través de la "Administración de equipos" o directamente
+a través de :command:`diskmgmt.msc`.
 
 .. include:: /10.guias/01.som/99.ejercicios/05.winII.rst
 
