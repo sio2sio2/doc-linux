@@ -58,6 +58,33 @@ Antes de pasar a describir los más comunes, es preciso fijar la siguiente
   un |RAID| 10 de seis discos con tres divisiones de dos discos y una
   probabilidad de fallo del 1%.
 
+**RAID JBOD**
+   |JBOD| es el acrónimo en inglés de *un mero puñado de discos* y simplemente
+   define un disco virtual que es la concatenación de todos los discos que lo
+   constituyen. El *software*, simplemente, se limita a crear el dispositivo
+   virtual e ir rellenado con datos sucesivamente los discos, de modo que cuadno
+   acaba de llenar uno, sigue con el siguiente.
+
+   .. image:: files/JBOD.png
+
+   Así pues:
+
+   - El sistema no es tolerante a fallos, puesto que no existe redundancia.
+     Ahora bien, la rotura de un disco implica únicamente la pérdida de los
+     archivos almacenados en él.
+   - La probabilidad de que el sistema falle parcialmente es de
+     :math:`P^n_{r0}(p) = 1-(1-p)^n`.
+   - La capacidad del conjunto es la suma de todas las capacidades, esto es,
+     :math:`n*s`, aunque en este caso no es necesario siquiera que los discos
+     tengan la misma capacidad.
+   - No hay mejora alguna en el rendimiento.
+
+   .. note:: Se incluye este "tipo" de |RAID| aquí, porque es muy común verlo
+      incluido como tipo en las soluciones |NAS|. En realidad, esto es,
+      simplemente, un *grupo de volúmenes* de :ref:`LVM <lvm>` o, lo que hemos
+      denominado, *disco virtual* en nuestra :ref:`introducción teórica
+      <disk-div>`.
+
 **RAID 0** (o **Volumen dividido**)
    Se forma con dos o más discos entre los cuales se distribuye equitativamente
    la información sin incluir información redudante.
@@ -410,6 +437,8 @@ Estudiaremos ambas posibilidades.
 .. |ZFS| replace:: :abbr:`ZFS (Zettabyte File System)`
 .. |BtrFS| replace:: :abbr:`BtrFS (B-TRee File System)`
 .. |MD| replace:: :abbr:`MD (Multiple Devices)`
+.. |JBOD| replace:: :abbr:`JBOD (Just a Bunch Of Drives)`
+.. |NAS| replace:: :abbr:`NAS (Network Attached Storage)`
 
 .. |xor| unicode:: U+2295 .. CIRCLED PLUS
 
