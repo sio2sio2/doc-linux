@@ -13,7 +13,7 @@ sus respectivos módulos, éstas contendrán:
 - Ejercicios complementarios.
 
 .. note:: Las guías son todas las que están, pero no están todas las que son;
-   esto es, pueden faltar las guías de módulos que sean apropiados sean el
+   esto es, pueden faltar las guías de módulos que sean apropiados según el
    criterio enunciado bajo el epígrafe.
 
 .. toctree::
