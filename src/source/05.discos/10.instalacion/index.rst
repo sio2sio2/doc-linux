@@ -95,7 +95,7 @@ disco desde el sistema anfitrión para lo cual debemos crear el disco::
 y hacerlo disponible en :file:`/dev/nbd0`::
 
    # modprobe nbd max_part=7
-   # qemu-nbd -c /dev/nd0 servidor.qcw
+   # qemu-nbd -c /dev/nbd0 servidor.qcw
 
 Hecho lo cual, ya podemos particionar::
 

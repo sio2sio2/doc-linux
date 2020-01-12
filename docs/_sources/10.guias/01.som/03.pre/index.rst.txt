@@ -8,8 +8,10 @@ instalación de un sistema operativo:
   del *hardware* real, debemos remitirnos al módulo de *Montaje y mantenimiento
   de equipos*.
 
-- La preparación del disco duro, esto es, los sistemas existentes de
-  **particionado** del disco duro.
+- La preparación del disco duro, esto es, la elección del
+  **particionado** de disco duro adecuado, porque aunque esta tarea es habitual que
+  la realicen los propios instaladores, es conveniente conocer de antemano qué
+  harán estos o, incluso, llevarla a cabo con anterioridad.
 
 Virtualización
 ==============
