@@ -40,11 +40,6 @@ más que superficialmente el sistema.
    [#]_. Estos apuntes supondrán que se tienen al menos unos conocimientos
    modestos de programación estructurada.
 
-.. note:: Si ya se tienen algunos conocimientos de programación en la *shell*,
-   es una lectura recomendable `esta colección de errores habituales en bash
-   <http://mywiki.wooledge.org/BashPitfalls>`_, la mayor parte de los cuales son
-   extensibles a la programación en el estándar *POSIX*.
-
 Descompondremos el breve curso en:
 
 .. toctree::
@@ -63,7 +58,11 @@ Descompondremos el breve curso en:
 #. `The Bash Hacker Wiki <http://wiki.bash-hackers.org/start>`_
 #. `Guía de programación avanzada con bash
    <http://www.tldp.org/LDP/abs/html/index.html>`_
-#. `Greg's wiki <http://mywiki.wooledge.org/>`_
+#. `Greg's wiki <http://mywiki.wooledge.org/>`_, que, además de mucha otra
+   información, incluye `una colección de errores habituales
+   <http://mywiki.wooledge.org/BashPitfalls>`_ al programar en :program:`bash` la
+   mayor parte de los cuales son extensibles a la programación en el estándar
+   *POSIX*.
 
 .. rubric:: Notas al pie
 

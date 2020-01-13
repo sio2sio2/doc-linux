@@ -13,17 +13,17 @@ Cortafuegos
 * :program:`iptables`, desde la versión 2.4.
 * :program:`nftables`, desde la versión 3.13.
 
-Los dos primeros eran cortafuegos sin contexto de conexión (*firewall
-stateless*), mientras que los dos segundos sí son capaces de atender al contexto
-de conexión (*firewall stateful*). Al ser los cortafuegos piezas críticas para
-la seguridad del sistema operativo es común que su sustitución por otro sea
-paulatina y que durante un tiempo convivan el *firewall* antiguo y el nuevo,
-mientras se afinan, los administradores se acostumbran y las aplicaciones que
-dependen de ellos se actualizan. Desde hace unos cuantos años\ [#]_, conviven en
-el núcleo de *Linux* :program:`iptables` y :program:`nftables`, aunque la
-mayoría de las versiones modernas (*Debian* desde *Buster*) incluyen ya
-:program:`nftables` como el cortafuegos predeterminado. Trataremos en esta guía
-ambos.
+Los dos primeros eran cortafuegos sin inspección de estado (:ref:`firewall
+stateless <fw-stateless>`), mientras que los dos segundos sí son capaces de
+atender al contexto de la conexión (:ref:`firewall stateful <fw-stateful>`). Al ser
+los cortafuegos piezas críticas para la seguridad del sistema operativo es común
+que su sustitución por otro sea paulatina y que durante un tiempo convivan el
+*firewall* antiguo y el nuevo, mientras se afinan, los administradores se
+acostumbran y las aplicaciones que dependen de ellos se actualizan. Desde hace
+unos cuantos años\ [#]_, conviven en el núcleo de *Linux* :program:`iptables` y
+:program:`nftables`, aunque la mayoría de las versiones modernas (*Debian* desde
+*Buster*) incluyen ya :program:`nftables` como el cortafuegos predeterminado.
+Trataremos en esta guía ambos.
 
 .. rubric:: Contenidos
 
