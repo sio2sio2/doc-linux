@@ -65,8 +65,8 @@ datos de origen o destino, ya sean direcciones (<abbr title="Internet Protocol">
 <h2>8.7.1.1.1. Funcionamiento<a class="headerlink" href="#funcionamiento" title="Enlazar permanentemente con este título">¶</a></h2>
 <p>Antes de analizar su sintaxis y casos de usos es fundamental entender cómo
 funciona. <strong class="program">iptables</strong> dispone de cinco tablas (<em>nat</em>, <em>filter</em>,
-<em>mangle</em>, <em>raw</em> y <em>security</em>, aunque las dos últimas no las trataremos) y una
-serie de cadenas a las que se añaden las reglas del cortafuegos.</p>
+<em>mangle</em>, <em>raw</em> y <em>security</em>) y una serie de cadenas a las que se añaden las
+reglas del cortafuegos.</p>
 <p>Hablamos alegremente de <em>cadenas</em>, pero ¿qué significa esta palabra en este
 contexto? Básicamente una <em class="dfn">cadena</em> expresa una lista de reglas, cada una de
 las cuales contiene una condición y una acción, de manera que se realizará esa
@@ -143,7 +143,12 @@ organizar las reglas según el tipo de decisión que supongan, de modo que:</p>
 permite o deniegan el paso de los paquetes.</dd>
 <dt><strong>nat</strong></dt>
 <dd>Es la tabla en la que se apuntan reglas de <abbr title="Network Address Translation">NAT</abbr>, esto es, reglas que
-medifican el origen o el destino de los paquetes.</dd>
+medifican el origen o el destino de los paquetes. Es conveniente señalar
+que las reglas de esta tabla sólo se aplican al primer paquete de una
+conexión, de manera que cualquier decisión que se toma para este primer
+paquete se aplica al resto. Adenás, si se aplica una modificación en un
+sentido, sobre el tráfico de vuelta se deshace automáticamente tal
+modificación.</dd>
 <dt><strong>mangle</strong></dt>
 <dd>Es la tabla que permite alternar algunas de los campos de cabecera <abbr title="Internet Protocol">IP</abbr> (p.e.
 el <abbr title="Time To Live">TTL</abbr> o el <abbr title="Type Of Service">TOS</abbr>). También permite alterar la <em>marca</em> del paquete que no
@@ -151,7 +156,9 @@ se encuentra en el propio paquete, sino en la representación que el kernel
 hace del paquete, lo cual a efectos prácticos importa poco.</dd>
 <dt><strong>raw</strong></dt>
 <dd>Es la tabla utilizada básicamente para marcar paquetes a fin de evitar el
-seguimiento de la conexión.</dd>
+seguimiento de la conexión. Para el tráfico con que hagamos esto,
+<strong class="program">iptables</strong> se comportará como un <a class="reference internal" href="../../../10.guias/02.seg/06.cortafuegos.html#fw-stateless"><span class="std std-ref">cortafuegos sin inspección
+de estado</span></a>.</dd>
 <dt><strong>security</strong></dt>
 <dd>Es la tabla para crear reglas de seguridad <abbr title="Media Access Control">MAC</abbr>. Véase para más información
 <a class="reference external" href="https://www.linux.com/tutorials/using-selinux-and-iptables-together/">este artículo</a>.</dd>
@@ -509,9 +516,134 @@ que se especifique qué`extensión es la que se usa a través de la opción
 </li>
 </ul>
 <p class="rubric">Condiciones simples</p>
+<table border="1" class="iptables-simpl-cond docutils">
+<colgroup>
+<col width="21%" />
+<col width="28%" />
+<col width="51%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Opción</th>
+<th class="head" colspan="2">Descripción</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td rowspan="10">-p, –protocol</td>
+<td colspan="2">Protocolo de capa de transporte del paquete. Los valores posibles son
+<kbd class="kbd docutils literal notranslate">udp</kbd>, <kbd class="kbd docutils literal notranslate">tcp</kbd>, <kbd class="kbd docutils literal notranslate">icmp</kbd> o <kbd class="kbd docutils literal notranslate">all</kbd> (o sea, todos).</td>
+</tr>
+<tr class="row-odd"><td colspan="2">iptables -A FORWARD -p icmp -j REJECT</td>
+</tr>
+<tr class="row-even"><td rowspan="2">–sport, –source-port</td>
+<td>Para <abbr title="Transmission Control Protocol">TCP</abbr> o <abbr title="User Datagram Protocol">UDP</abbr>, indicar puerto de origen.
+Para indicar im rango, úsense dos puntos:
+<kbd class="kbd docutils literal notranslate">80:100</kbd>.</td>
+</tr>
+<tr class="row-odd"><td>iptables -A FORWARD -p tcp –sport 80 -j ACCEPT</td>
+</tr>
+<tr class="row-even"><td rowspan="2">–dport, –destination-port</td>
+<td>Para <abbr title="Transmission Control Protocol">TCP</abbr> o <abbr title="User Datagram Protocol">UDP</abbr>, indica puerto de destino.</td>
+</tr>
+<tr class="row-odd"><td>iptables -A FORWARD ! -p tcp –dport 80 -j ACCEPT</td>
+</tr>
+<tr class="row-even"><td rowspan="2">–tcp-flags</td>
+<td>Para <abbr title="Transmission Control Protocol">TCP</abbr>,  permite seleccionar paquetes según
+sus <em>flags</em>: <em>SYN</em>, <em>ACK</em>, <em>FIN</em>, <em>RST</em>, <em>ALL</em>
+(todas) o <em>NONE</em> (ninguna). Si quieren expresarse
+varias pueden separarse por comas. Admite dos
+parámetros el primero cuáles se buscan y el
+segundo cuáles se esperan encontrar. <kbd class="kbd docutils literal notranslate">--syn</kbd>
+equivale a <kbd class="kbd docutils literal notranslate">--tcp-flags SYN,RST,ACK,FIN SYN</kbd>.</td>
+</tr>
+<tr class="row-odd"><td>iptables -A INPUT -p tcp –tcp-flags ALL SYN -j DROP</td>
+</tr>
+<tr class="row-even"><td rowspan="2">–icmp-type</td>
+<td>Para <abbr title="Unternet Control Message Protocol">ICMP</abbr>, especifica el tipo de paquete <abbr title="Unternet Control Message Protocol">ICMP</abbr>
+<span class="target" id="index-0"></span><a class="rfc reference external" href="https://tools.ietf.org/html/rfc792.html"><strong>RFC 792</strong></a>.</td>
+</tr>
+<tr class="row-odd"><td>iptables -A FORWARD -p icmp ! –icmp-type 8 -j DROP</td>
+</tr>
+<tr class="row-even"><td rowspan="2">-s, –source</td>
+<td colspan="2"><abbr title="Internet Protocol">IP</abbr> de origen que puede ser una dirección simple o una red en notación <abbr title="Classless Inter-Domain Routing">CIDR</abbr>
+(p.e. <code class="docutils literal notranslate"><span class="pre">192.168.0.0/24</span></code>) o expresando la máscara <code class="docutils literal notranslate"><span class="pre">192.168.0.0/255.255.255.0</span></code>.</td>
+</tr>
+<tr class="row-odd"><td colspan="2">iptables -A INPUT -s 192.168.0.0/24 -j DROP</td>
+</tr>
+<tr class="row-even"><td rowspan="2">-d, –destination</td>
+<td colspan="2"><abbr title="Internet Protocol">IP</abbr> de destino.</td>
+</tr>
+<tr class="row-odd"><td colspan="2">iptables -A FORWARD -d 192.168.0.0/24 -j DROP</td>
+</tr>
+<tr class="row-even"><td rowspan="2">-i, –in-interface</td>
+<td colspan="2">Interfaz de entrada del paquete. Válida sólo en <em>PREROUTING</em>, <em>INPUT</em> y <em>FORWARD</em>.</td>
+</tr>
+<tr class="row-odd"><td colspan="2">iptables -A FORWARD -i eth0 -p tcp –tcp-flags SYN -j DROP</td>
+</tr>
+<tr class="row-even"><td rowspan="2">-o, –out-interface</td>
+<td colspan="2">Interfaz de salida del paquete. Válida sólo en <em>POSTROUTING</em>, <em>OUTPUT</em> y <em>FORWARD</em>.</td>
+</tr>
+<tr class="row-odd"><td colspan="2">iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE</td>
+</tr>
+</tbody>
+</table>
 <p class="rubric">Extensiones</p>
-<span class="target" id="iptables-log"><span id="ipt-ipset"></span></span></div>
+<div class="admonition-todo admonition" id="index-1">
+<p class="first admonition-title">Por hacer</p>
+<p class="last">Hacer la tabla</p>
 </div>
+</div>
+</div>
+<div class="section" id="conexiones">
+<h2>8.7.1.1.3. Conexiones<a class="headerlink" href="#conexiones" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Al ser <strong class="program">iptables</strong> un cortafuegos de filtrado dinámico, es capaz al analizar un paquete
+de tener en cuenta su contexto, esto es, tener el cuenta que el paquete forma parte de una conexión.
+En realidad, de los tres protocolos de capa de transporte (<abbr title="Transmission Control Protocol">TCP</abbr>, <abbr title="User Datagram Protocol">UDP</abbr> e <abbr title="Unternet Control Message Protocol">ICMP</abbr>) sólo <abbr title="Transmission Control Protocol">TCP</abbr> es un
+protocolo orientado a conexión. <strong class="program">iptables</strong>, no obstante, implementa un seguimiento de
+conexión común a los tres. En relación a la conexión, se consideran cuatro estados distintos para los paquetes:</p>
+<dl class="docutils">
+<dt><strong>NEW</strong></dt>
+<dd>Que es el estado del paquete que origina la conexión.</dd>
+<dt><strong>ESTABLISHED</strong></dt>
+<dd>Que es el estado del paquete que pertenece a una conexión establecida.</dd>
+<dt><strong>RELATED</strong></dt>
+<dd>Que es el estado del paquete que origina una conexión que se puede relacionar
+con otra que ya ha sido establecida. Por ejemplo, imaginemos que intentamos establecer
+una conexión <abbr title="Transmission Control Protocol">TCP</abbr> con un servidor remoto y este nos responde con un paquete <abbr title="Unternet Control Message Protocol">ICMP</abbr> de rechazo.
+El estado de este segundo paquete sería <strong>RELATED</strong>, ya que no forma parte de la conexión
+anterior, pero está relacionado con ella. También en el <a class="reference internal" href="#iptables-ftp"><span class="std std-ref">tráfico FTP</span></a> el paquete
+que abre la conexión de datos es es <strong>RELATED</strong> puesto que tal conexión está relacionada con la
+conexión de control.</dd>
+<dt><strong>INVALID</strong></dt>
+<dd>Que es el estado de los paquetes que no se pueden relacionar con ninguna conexión establecida.</dd>
+<dt><strong>UNTRACKED</strong></dt>
+<dd>Que es el estado de los paquetes de los que se decidió no hacer seguimiento
+de la conexión (con <em>NOTRACK</em>).</dd>
+<dt><strong>SNAT</strong></dt>
+<dd>Que es el estado de los paquetes sobre los que se llevó a cabo un cambio
+en la <abbr title="Internet Protocol">IP</abbr> de origen.</dd>
+<dt><strong>DNAT</strong></dt>
+<dd>Que es el estado de los paquetes sobre los que se llevó a cabo un cambio
+en la <abbr title="Internet Protocol">IP</abbr> de destinoo.</dd>
+</dl>
+<p class="rubric">¿Cómo se establecen conexiones?</p>
+<p>A ojos de <strong class="program">iptables</strong>, al conectarse un cliente con un servidor ocurre lo siguiente:</p>
+<ol class="arabic simple">
+<li>El <em>cliente</em>, usando un puerto aleatorio por encima del 1024 inicia una
+petición a un puerto prefijado del servidor (el paquete inicial tendrá estado <em>NEW</em>).</li>
+<li>El <em>servidor</em>, responde a esa petición usando el mismo canal de comunicación,
+con un paquete de estado <em>ESTABLISHED</em>.</li>
+<li>El resto de paquetes son <em>ESTABLISHED</em>.</li>
+</ol>
+<p>Esquemáticamente, este podría ser un ejemplo:</p>
+<img alt="../../../_images/conexion.png" src="../../../_images/conexion.png" />
+<p>En la figura se ha representado el establecimiento de una conexión <abbr title="Transmission Control Protocol">TCP</abbr>.
+Obsérvese que, aunque desde el punto de vista del protocolo, el establecimiento
+se logra después de las tres comunicaciones representadas, desde el punto de
+vista de iptables solamente la primera comunicación es <em>NEW</em>, todas las demás se
+consideran establecidas. Para el tráfico <abbr title="User Datagram Protocol">UDP</abbr> e <abbr title="Unternet Control Message Protocol">ICMP</abbr>, el esquema es
+exactamente el mismo en lo referente a iptables: la primera comunicación entre
+cliente y servidor es <em>NEW</em> y el resto <em>ESTABLISHED</em>.</p>
+<span class="target" id="iptables-ftp"><span id="iptables-log"></span><span id="ipt-ipset"></span></span></div>
 </div>
 
 
@@ -531,6 +663,7 @@ que se especifique qué`extensión es la que se usa a través de la opción
 <li><a class="reference internal" href="#condicion">8.7.1.1.2.4. Condición</a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#conexiones">8.7.1.1.3. Conexiones</a></li>
 </ul>
 </li>
 </ul>

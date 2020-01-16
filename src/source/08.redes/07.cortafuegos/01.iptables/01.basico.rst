@@ -12,8 +12,8 @@ Funcionamiento
 ==============
 Antes de analizar su sintaxis y casos de usos es fundamental entender cómo
 funciona. :program:`iptables` dispone de cinco tablas (*nat*, *filter*,
-*mangle*, *raw* y *security*, aunque las dos últimas no las trataremos) y una
-serie de cadenas a las que se añaden las reglas del cortafuegos.
+*mangle*, *raw* y *security*) y una serie de cadenas a las que se añaden las
+reglas del cortafuegos.
 
 Hablamos alegremente de *cadenas*, pero ¿qué significa esta palabra en este
 contexto? Básicamente una :dfn:`cadena` expresa una lista de reglas, cada una de
@@ -98,7 +98,12 @@ organizar las reglas según el tipo de decisión que supongan, de modo que:
 
 **nat**
    Es la tabla en la que se apuntan reglas de |NAT|, esto es, reglas que
-   medifican el origen o el destino de los paquetes.
+   medifican el origen o el destino de los paquetes. Es conveniente señalar
+   que las reglas de esta tabla sólo se aplican al primer paquete de una
+   conexión, de manera que cualquier decisión que se toma para este primer
+   paquete se aplica al resto. Adenás, si se aplica una modificación en un
+   sentido, sobre el tráfico de vuelta se deshace automáticamente tal
+   modificación.
 
 **mangle**
    Es la tabla que permite alternar algunas de los campos de cabecera |IP| (p.e.
@@ -108,7 +113,9 @@ organizar las reglas según el tipo de decisión que supongan, de modo que:
 
 **raw**
    Es la tabla utilizada básicamente para marcar paquetes a fin de evitar el
-   seguimiento de la conexión.
+   seguimiento de la conexión. Para el tráfico con que hagamos esto,
+   :program:`iptables` se comportará como un :ref:`cortafuegos sin inspección
+   de estado <fw-stateless>`.
 
 **security**
    Es la tabla para crear reglas de seguridad |MAC|. Véase para más información
@@ -370,7 +377,123 @@ condiciones es conveniente saber que:
 
 .. rubric:: Condiciones simples
 
+.. table::
+   :class: iptables-simpl-cond
+
+   +-----------------------+--------------------------------------------------------------------------------------+
+   | Opción                | Descripción                                                                          |
+   +=======================+======================================================================================+
+   | -p, --protocol        | Protocolo de capa de transporte del paquete. Los valores posibles son                |
+   |                       | :kbd:`udp`, :kbd:`tcp`, :kbd:`icmp` o :kbd:`all` (o sea, todos).                     |
+   |                       +--------------------------------------------------------------------------------------+
+   |                       | iptables -A FORWARD -p icmp -j REJECT                                                |
+   |                       +------------------------------+-------------------------------------------------------+
+   |                       | --sport, --source-port       | Para |TCP| o |UDP|, indicar puerto de origen.         |
+   |                       |                              | Para indicar im rango, úsense dos puntos:             |
+   |                       |                              | :kbd:`80:100`.                                        |
+   |                       |                              +-------------------------------------------------------+
+   |                       |                              | iptables -A FORWARD -p tcp --sport 80 -j ACCEPT       |
+   |                       +------------------------------+-------------------------------------------------------+
+   |                       | --dport, --destination-port  | Para |TCP| o |UDP|, indica puerto de destino.         | 
+   |                       |                              +-------------------------------------------------------+
+   |                       |                              | iptables -A FORWARD ! -p tcp --dport 80 -j ACCEPT     |
+   |                       +------------------------------+-------------------------------------------------------+
+   |                       | --tcp-flags                  | Para |TCP|,  permite seleccionar paquetes según       |
+   |                       |                              | sus *flags*: *SYN*, *ACK*, *FIN*, *RST*, *ALL*        |
+   |                       |                              | (todas) o *NONE* (ninguna). Si quieren expresarse     |
+   |                       |                              | varias pueden separarse por comas. Admite dos         |
+   |                       |                              | parámetros el primero cuáles se buscan y el           |
+   |                       |                              | segundo cuáles se esperan encontrar. :kbd:`--syn`     |
+   |                       |                              | equivale a :kbd:`--tcp-flags SYN,RST,ACK,FIN SYN`.    |
+   |                       |                              +-------------------------------------------------------+
+   |                       |                              | iptables -A INPUT -p tcp --tcp-flags ALL SYN -j DROP  |
+   |                       +------------------------------+-------------------------------------------------------+
+   |                       | --icmp-type                  | Para |ICMP|, especifica el tipo de paquete |ICMP|     |
+   |                       |                              | :rfc:`792`.                                           |
+   |                       |                              +-------------------------------------------------------+
+   |                       |                              | iptables -A FORWARD -p icmp ! --icmp-type 8 -j DROP   |
+   +-----------------------+------------------------------+-------------------------------------------------------+
+   | -s, --source          | |IP| de origen que puede ser una dirección simple o una red en notación |CIDR|       |
+   |                       | (p.e. ``192.168.0.0/24``) o expresando la máscara ``192.168.0.0/255.255.255.0``.     |
+   |                       +--------------------------------------------------------------------------------------+
+   |                       | iptables -A INPUT -s 192.168.0.0/24 -j DROP                                          |
+   +-----------------------+--------------------------------------------------------------------------------------+
+   | -d, --destination     | |IP| de destino.                                                                     |
+   |                       +--------------------------------------------------------------------------------------+
+   |                       | iptables -A FORWARD -d 192.168.0.0/24 -j DROP                                        |
+   +-----------------------+--------------------------------------------------------------------------------------+
+   | -i, --in-interface    | Interfaz de entrada del paquete. Válida sólo en *PREROUTING*, *INPUT* y *FORWARD*.   |
+   |                       +--------------------------------------------------------------------------------------+
+   |                       | iptables -A FORWARD -i eth0 -p tcp --tcp-flags SYN -j DROP                           |
+   +-----------------------+--------------------------------------------------------------------------------------+
+   | -o, --out-interface   | Interfaz de salida del paquete. Válida sólo en *POSTROUTING*, *OUTPUT* y *FORWARD*.  |
+   |                       +--------------------------------------------------------------------------------------+
+   |                       | iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE                                 |
+   +-----------------------+--------------------------------------------------------------------------------------+
+
 .. rubric:: Extensiones
+
+.. todo:: Hacer la tabla
+
+Conexiones
+==========
+Al ser :program:`iptables` un cortafuegos de filtrado dinámico, es capaz al analizar un paquete
+de tener en cuenta su contexto, esto es, tener el cuenta que el paquete forma parte de una conexión.
+En realidad, de los tres protocolos de capa de transporte (|TCP|, |UDP| e |ICMP|) sólo |TCP| es un
+protocolo orientado a conexión. :program:`iptables`, no obstante, implementa un seguimiento de
+conexión común a los tres. En relación a la conexión, se consideran cuatro estados distintos para los paquetes:
+
+**NEW**
+   Que es el estado del paquete que origina la conexión.
+
+**ESTABLISHED**
+   Que es el estado del paquete que pertenece a una conexión establecida.
+
+**RELATED**
+   Que es el estado del paquete que origina una conexión que se puede relacionar
+   con otra que ya ha sido establecida. Por ejemplo, imaginemos que intentamos establecer
+   una conexión |TCP| con un servidor remoto y este nos responde con un paquete |ICMP| de rechazo.
+   El estado de este segundo paquete sería **RELATED**, ya que no forma parte de la conexión
+   anterior, pero está relacionado con ella. También en el :ref:`tráfico FTP <iptables-ftp>` el paquete
+   que abre la conexión de datos es es **RELATED** puesto que tal conexión está relacionada con la
+   conexión de control.
+
+**INVALID**
+   Que es el estado de los paquetes que no se pueden relacionar con ninguna conexión establecida.
+
+**UNTRACKED**
+   Que es el estado de los paquetes de los que se decidió no hacer seguimiento
+   de la conexión (con *NOTRACK*).
+
+**SNAT**
+   Que es el estado de los paquetes sobre los que se llevó a cabo un cambio
+   en la |IP| de origen.
+
+**DNAT**
+   Que es el estado de los paquetes sobre los que se llevó a cabo un cambio
+   en la |IP| de destinoo.
+
+.. rubric:: ¿Cómo se establecen conexiones?
+
+A ojos de :program:`iptables`, al conectarse un cliente con un servidor ocurre lo siguiente:
+
+#. El *cliente*, usando un puerto aleatorio por encima del 1024 inicia una
+   petición a un puerto prefijado del servidor (el paquete inicial tendrá estado *NEW*).
+#. El *servidor*, responde a esa petición usando el mismo canal de comunicación,
+   con un paquete de estado *ESTABLISHED*.
+#. El resto de paquetes son *ESTABLISHED*.
+
+Esquemáticamente, este podría ser un ejemplo:
+
+.. image:: files/conexion.png
+
+En la figura se ha representado el establecimiento de una conexión |TCP|.
+Obsérvese que, aunque desde el punto de vista del protocolo, el establecimiento
+se logra después de las tres comunicaciones representadas, desde el punto de
+vista de iptables solamente la primera comunicación es *NEW*, todas las demás se
+consideran establecidas. Para el tráfico |UDP| e |ICMP|, el esquema es
+exactamente el mismo en lo referente a iptables: la primera comunicación entre
+cliente y servidor es *NEW* y el resto *ESTABLISHED*.
 
 .. https://www.digitalocean.com/community/tutorials/a-deep-dive-into-iptables-and-netfilter-architecture
 
@@ -382,6 +505,7 @@ condiciones es conveniente saber que:
 .. |NAT| replace:: :abbr:`NAT (Network Address Translation)`
 .. |TTL| replace:: :abbr:`TTL (Time To Live)`
 .. |TOS| replace:: :abbr:`TOS (Type Of Service)`
+.. |CIDR| replace:: :abbr:`CIDR (Classless Inter-Domain Routing)`
 
 .. Logs alternativos:
    https://unix.stackexchange.com/questions/342855/how-to-customize-the-format-of-iptable-log-info
@@ -390,5 +514,6 @@ condiciones es conveniente saber que:
 
 .. _ipt-ipset:
 .. _iptables-log:
+.. _iptables-ftp:
 
 
