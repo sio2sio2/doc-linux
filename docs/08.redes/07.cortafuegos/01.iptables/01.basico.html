@@ -66,17 +66,35 @@ datos de origen o destino, ya sean direcciones (<abbr title="Internet Protocol">
 <p>Antes de analizar su sintaxis y casos de usos es fundamental entender cómo
 funciona. <strong class="program">iptables</strong> dispone de cinco tablas (<em>nat</em>, <em>filter</em>,
 <em>mangle</em>, <em>raw</em> y <em>security</em>, aunque las dos últimas no las trataremos) y una
-serie de cadenas a las que se añaden las reglas del cortafuegos. Según entra,
-sale o atraviesan los paquetes el equipo, se consultan para ellos estas cadenas,
-por lo que es necesario conocer cuál es la ruta que siguen a fin de aplicar la
-regla en la cadena correcta. Obsérvese la siguiente figura de izquierda a derecha.</p>
+serie de cadenas a las que se añaden las reglas del cortafuegos.</p>
+<p>Hablamos alegremente de <em>cadenas</em>, pero ¿qué significa esta palabra en este
+contexto? Básicamente una <em class="dfn">cadena</em> expresa una lista de reglas, cada una de
+las cuales contiene una condición y una acción, de manera que se realizará esa
+acción con un determinado paquete, si éste cumple con la condición. Por ejemplo,
+una sentencia válida de <strong class="program">iptables</strong> es la siguiente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> iptables -A FORWARD -p tcp --dport <span class="m">25</span> -j DROP
+</pre></div>
+</div>
+<p>El primer <kbd class="kbd docutils literal notranslate">-A FORWARD</kbd>, indica que vamos a añadir esta regla al final de la
+lista que ya haya en la cadena <em>FORWARD</em>. La acción es <em>DROP</em>, o sea, desechar;
+y la condición es <kbd class="kbd docutils literal notranslate">-p tcp --dport 25</kbd>, o sea, protocolo <abbr title="Transmission Control Protocol">TCP</abbr> con puerto de
+destino el 25. Esto quiere decir que cualquier paquete que cumpla con esto
+(posiblemente sea tráfico <abbr title="Simple Mail Transfer Protocol">SMTP</abbr> de salida), está vetado y no atravesará nuestro
+cortafuegos. ¿Qué pasa con el tráfico web? Como el tráfico web es bastante
+improbable que tenga como destino el puerto 25 (no creo que haya nadie en su
+juicio que ponga a escuchar un servidor web en este puerto), no cumplirá la
+condición, y no será desechado; al menos por esta regla.</p>
+<p id="iptables-flowchart">Según entra, salen o atraviesan los paquetes el equipo, se consultan para ellos
+estas cadenas, por lo que es necesario conocer cuál es la ruta que siguen a fin
+de aplicar la regla en la cadena correcta. Obsérvese la siguiente figura de
+izquierda a derecha.</p>
 <img alt="../../../_images/iptables.png" src="../../../_images/iptables.png" />
 <p>Entiéndase que el «<em>proceso interno</em>», es cualquier proceso cliente o servidor
 susceptible de enviar y recibir paquetes. Un servidor web o un navegador pueden
-ser ejemplo de ello. Otro hito importante representando en la figura es el de «<em>decisión de encaminamiento</em>»,
-que define hacia dónde se dirige el paquete: si a un proceso de la propia
-máquina o a una máquina externa. Obviamente, esta decisión viene determinada por
-la dirección <abbr title="Internet Protocol">IP</abbr> de destino.</p>
+ser ejemplo de ello. Otro hito importante representando en la figura es el de
+«<em>decisión de encaminamiento</em>», que define hacia dónde se dirige el paquete: si
+a un proceso de la propia máquina o a una máquina externa. Obviamente, esta
+decisión viene determinada por la dirección <abbr title="Internet Protocol">IP</abbr> de destino.</p>
 <p>Hay tres tipos de paquetes:</p>
 <dl class="docutils">
 <dt><strong>Paquetes destinados al cortafuegos</strong></dt>
@@ -88,19 +106,412 @@ proceso interno, lo que implica comprobar las reglas de la cadena <em>INPUT</em>
 el paquete no es filtrado por alguna de estas últimas reglas, el paquete
 alcanzará el proceso al que iba destinado y ahí acabará su vida.</dd>
 <dt><strong>Paquetes en tránsito</strong></dt>
-<dd>Representados por la línea verde son los paquetes que alcanzan el
+<dd>Representados por la línea verde, son los paquetes que alcanzan el
 cortafuegos, pero cuyo destino es otra máquina, por lo que utilizarán otra
 interfaz de red (excepcionalmente puede que sea la misma) para salir hacia su
 destino. En su caso la <em>decisión de encaminamiento</em> hace que sigan su curso
 atravesando la cadena <em>FORWARD</em>. Si logra atravesar esta cadena, comprobará
 a continuación <em>POSTROUTING</em>, pasada la cual se escoge según la dirección de
 destino la interfaz de salida y en paquete abandona la máquina.</dd>
+<dt><strong>Paquetes generados por el cortafuegos</strong></dt>
+<dd>Representados por la línea azul, son los paquetes originados por un proceso
+interno del cortafuegos. En este caso se comprueban primero las reglas de la
+cadena <em>OUTPUT</em>. Si el paquete no es filtrado por alguna de sus reglas,
+alcanzará la cadena <em>POSTROUTING</em>, a partir de la cual se obrará de la misma
+forma que con el tipo anterior de paquetes.</dd>
 </dl>
-<p><strong>Paquetes generados por el cortafuegps</strong></p>
+<p>Es muy importante, además, tener presente que dentro de una cadena las reglas se
+comprueban siguiendo un orden, y que la acción que se lleva a cabo sobre el
+paquete:</p>
+<ul>
+<li><p class="first">Habitual,emte supone que se dejen de comprar el resto de reglas de la cadena.</p>
+</li>
+<li><p class="first">Puede suponer que se sigan comprobando reglas como es el caso de la acción
+<strong>LOG</strong>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> iptables -A FORWARD -p tcp --dport <span class="m">25</span> -j LOG --log-prefix <span class="s2">&quot;Cliente hace petición SMTP&quot;</span>
+<span class="gp">#</span> iptables -A FORWARD -p tcp --dport <span class="m">25</span> -j DROP
+</pre></div>
+</div>
+</li>
+</ul>
+<p>En este punto está claro qué es una cadena, pero no hemos aclarado qué son o
+para qué sirven las tablas. Las <em class="dfn">tablas</em> sirven, simplemente para
+organizar las reglas según el tipo de decisión que supongan, de modo que:</p>
+<dl class="docutils">
+<dt><strong>filter</strong></dt>
+<dd>Es la tabla en la que se apuntan reglas de filtrado, esto es, reglas que
+permite o deniegan el paso de los paquetes.</dd>
+<dt><strong>nat</strong></dt>
+<dd>Es la tabla en la que se apuntan reglas de <abbr title="Network Address Translation">NAT</abbr>, esto es, reglas que
+medifican el origen o el destino de los paquetes.</dd>
+<dt><strong>mangle</strong></dt>
+<dd>Es la tabla que permite alternar algunas de los campos de cabecera <abbr title="Internet Protocol">IP</abbr> (p.e.
+el <abbr title="Time To Live">TTL</abbr> o el <abbr title="Type Of Service">TOS</abbr>). También permite alterar la <em>marca</em> del paquete que no
+se encuentra en el propio paquete, sino en la representación que el kernel
+hace del paquete, lo cual a efectos prácticos importa poco.</dd>
+<dt><strong>raw</strong></dt>
+<dd>Es la tabla utilizada básicamente para marcar paquetes a fin de evitar el
+seguimiento de la conexión.</dd>
+<dt><strong>security</strong></dt>
+<dd>Es la tabla para crear reglas de seguridad <abbr title="Media Access Control">MAC</abbr>. Véase para más información
+<a class="reference external" href="https://www.linux.com/tutorials/using-selinux-and-iptables-together/">este artículo</a>.</dd>
+</dl>
+<p>No todas las cadenas se implementan en todas las tablas:</p>
+<table border="1" class="chains-tables docutils">
+<colgroup>
+<col width="17%" />
+<col width="20%" />
+<col width="12%" />
+<col width="15%" />
+<col width="14%" />
+<col width="22%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head"></th>
+<th class="head">PREROUTING</th>
+<th class="head">INPUT</th>
+<th class="head">FORWARD</th>
+<th class="head">OUTPUT</th>
+<th class="head">POSTROUTING</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>raw</td>
+<td>Sí</td>
+<td>&#160;</td>
+<td>&#160;</td>
+<td>Sí</td>
+<td>&#160;</td>
+</tr>
+<tr class="row-odd"><td>mangle</td>
+<td>Sí</td>
+<td>Sí</td>
+<td>Sí</td>
+<td>Sí</td>
+<td>Sí</td>
+</tr>
+<tr class="row-even"><td>nat</td>
+<td>Sí</td>
+<td>&#160;</td>
+<td>&#160;</td>
+<td>Sí</td>
+<td>Sí</td>
+</tr>
+<tr class="row-odd"><td>filter</td>
+<td>&#160;</td>
+<td>Sí</td>
+<td>Sí</td>
+<td>Sí</td>
+<td>&#160;</td>
+</tr>
+<tr class="row-even"><td>security</td>
+<td>&#160;</td>
+<td>Sí</td>
+<td>Sí</td>
+<td>Sí</td>
+<td>&#160;</td>
+</tr>
+</tbody>
+</table>
 </div>
 <div class="section" id="sintaxis">
 <h2>8.7.1.1.2. Sintaxis<a class="headerlink" href="#sintaxis" title="Enlazar permanentemente con este título">¶</a></h2>
-<span class="target" id="ipt-ipset"></span></div>
+<p>Toda sentencia de <strong class="program">iptables</strong> tiene este aspecto:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> iptables <span class="o">[</span>-t TABLA<span class="o">]</span> <span class="o">[</span>opciones<span class="o">]</span> -ACCIÓN CADENA <span class="o">[</span>condiciones<span class="o">]</span> <span class="o">[</span>-j OBJETIVO <span class="o">[</span>opciones_del_objetivo<span class="o">]]</span>
+</pre></div>
+</div>
+<p>en donde se observa que hay cuatro partes fundamentales:</p>
+<ul class="simple">
+<li>la elección de la tabla,</li>
+<li>Cuál es la acción que se quiere llevar a cabo y sobre qué cadena.</li>
+<li>La condición o condiciones que debe cumplir un paquete para que se le apliqye la regla;</li>
+<li>El objetivo.</li>
+</ul>
+<div class="section" id="tabla">
+<h3>8.7.1.1.2.1. Tabla<a class="headerlink" href="#tabla" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Ya se estableció que la tabla identificaba la naturaleza de la regla y para qué
+servía cada una en particular. La expresión de la tabla es opcional y, si no se
+incluya, se sobreentiende que es <em>filter</em>.</p>
+</div>
+<div class="section" id="accion">
+<h3>8.7.1.1.2.2. Acción<a class="headerlink" href="#accion" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Básicamente indican qué se quiere hacer con la regla: si añadirla, borrarla o
+alternarla y sobre qué cadena se lleva a cabo tal acción:</p>
+<table border="1" class="iptables-action docutils">
+<colgroup>
+<col width="28%" />
+<col width="72%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Acción</th>
+<th class="head">Descripción</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td rowspan="2">-A &lt;cadena&gt;</td>
+<td>Añade la nueva regla al final de la cadena</td>
+</tr>
+<tr class="row-odd"><td>iptables -A INPUT -p tcp –dport 80 -j DROP</td>
+</tr>
+<tr class="row-even"><td rowspan="2">-I &lt;cadena&gt; [N]</td>
+<td>Añade la nueva regla a la cadena en la posición que se especifique. Si no se
+expresa ninguna, se sobreentiente que en la primera.</td>
+</tr>
+<tr class="row-odd"><td>iptables -I INPUT -p tcp –dport 80 -j DROP</td>
+</tr>
+<tr class="row-even"><td rowspan="2">-D &lt;cadena&gt; [N]</td>
+<td><p class="first">Borrar una regla de la cadena indicada. Hay dos formas de indicar cuál:</p>
+<ul class="last simple">
+<li>Volverla a escribir tal y como se definió.</li>
+<li>Indicar su número de posición dentro de la cadena.</li>
+</ul>
+</td>
+</tr>
+<tr class="row-odd"><td>iptables -D INPUT -p tcp –dport 80 -j DROP
+iptables -D INPUT 1</td>
+</tr>
+<tr class="row-even"><td rowspan="2">-R &lt;cadena&gt; [N]</td>
+<td>Reemplaza una regla por otra. Se indica la posición de la regla a reemplazar y
+a continuación la regla sustituta.</td>
+</tr>
+<tr class="row-odd"><td>iptables -R INPUT 1 -p tcp –dport 8080 -j DROP</td>
+</tr>
+<tr class="row-even"><td rowspan="2">-F [&lt;cadena&gt;]</td>
+<td>Borrar todas las reglas referentes a una tabla de la cadena. Si no se indica la
+cadena, borra todas las reglas de todas las cadenas de una tabla.</td>
+</tr>
+<tr class="row-odd"><td>iptables -t nat -F PREROUTING</td>
+</tr>
+<tr class="row-even"><td rowspan="2">-Z [&lt;cadena&gt;]</td>
+<td>Pone a cero los contadores de paquetes de la cadena especificada. Si no se
+indica cadena, se aplica a todas las de la tabla. Los contadores muestran el
+número de paquetes que han cumplido las condiciones de la regla.</td>
+</tr>
+<tr class="row-odd"><td>iptables -Z</td>
+</tr>
+<tr class="row-even"><td rowspan="2">-N &lt;nueva_cadena&gt;</td>
+<td>Crea una nueva cadena. Para que los paquetes comprueben sus reglas, será
+necesario saltar a ella desde una de las cadenas predefinidas. Hay un objetivo
+para ello.</td>
+</tr>
+<tr class="row-odd"><td>iptables -N proxy</td>
+</tr>
+<tr class="row-even"><td rowspan="2">-X &lt;cadena&gt;</td>
+<td>Borra una cadena creada anteriormente.</td>
+</tr>
+<tr class="row-odd"><td>iptables -X proxy</td>
+</tr>
+<tr class="row-even"><td rowspan="2">-P [&lt;cadena&gt;] [ACCEPT|DROP]</td>
+<td><p class="first">Establece la política predeterminada de filtrado:</p>
+<ul class="last simple">
+<li>Lista blanca: <em>DROP</em>.</li>
+<li>Lista negra: <em>ACCEPT</em>.</li>
+</ul>
+</td>
+</tr>
+<tr class="row-odd"><td>iptables -P INPUT ACCEPT</td>
+</tr>
+<tr class="row-even"><td rowspan="2">-L [&lt;cadena&gt;]</td>
+<td>Muestra las reglas añadidas a una cadena. Si no se especifica ninguna, muestra
+todas las cadenas de la tabla. Son útiles para esta acción, <kbd class="kbd docutils literal notranslate">-v</kbd>, que
+muestra los contadores de paquetes, <kbd class="kbd docutils literal notranslate">-n</kbd> que muestra direcciones <abbr title="Internet Protocol">IP</abbr> y no
+nombres de máquinas y <kbd class="kbd docutils literal notranslate">--line-numbers</kbd> que muestra la posición de la regla
+y puede ser usada en las acciones de borrado, inserción y remplazo.</td>
+</tr>
+<tr class="row-odd"><td>iptables -t nat –line-numbers -nvL PREROUTING</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="objetivo">
+<h3>8.7.1.1.2.3. Objetivo<a class="headerlink" href="#objetivo" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>El <em class="dfn">objetivo</em> es la operación que se lleva a cabo sobre el paquete en caso
+de que le sea aplicable la regla.</p>
+<table border="1" class="iptables-objetivo docutils">
+<colgroup>
+<col width="7%" />
+<col width="13%" />
+<col width="17%" />
+<col width="63%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Tabla</th>
+<th class="head">Objetivo</th>
+<th class="head" colspan="2">Descripción</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td rowspan="8">filter</td>
+<td rowspan="2">ACCEPT</td>
+<td colspan="2">Se acepta el paquete y no se analizan más reglas de las cadenas de la tabla.</td>
+</tr>
+<tr class="row-odd"><td colspan="2">iptables -A INPUT -p icmp -j ACCEPT</td>
+</tr>
+<tr class="row-even"><td rowspan="2">DROP</td>
+<td colspan="2">Desecha el paquete sin informar al emisor. Por ello, sólo considerará fallida la
+conexión tras un tiempo de espera. Obviamente, no es revisada ninguna regla posterior.</td>
+</tr>
+<tr class="row-odd"><td colspan="2">iptables -A INPUT -p icmp -j DROP</td>
+</tr>
+<tr class="row-even"><td rowspan="2">REJECT</td>
+<td colspan="2">Rechaza un paquete enviando al emisor el aviso del rechazo mediante un paquete <abbr title="Unternet Control Message Protocol">ICMP</abbr>.
+Se puede especificar el tipo de <abbr title="Unternet Control Message Protocol">ICMP</abbr> mediante <kbd class="kbd docutils literal notranslate">--reject-with</kbd> y, en el caso,
+de conexiones <abbr title="Transmission Control Protocol">TCP</abbr> se puedfe usar <em>tcp-reset</em> para enviar un paquete <em>RST</em> que cierre
+elegantemente la conexión. Si no se incluye la opción se envía <kbd class="kbd docutils literal notranslate">port-unreachable</kbd>.</td>
+</tr>
+<tr class="row-odd"><td colspan="2">iptables -A FORWARD -p tcp –dport 25 -j REJECT –reject-with tcp-reset</td>
+</tr>
+<tr class="row-even"><td rowspan="2">LOG</td>
+<td colspan="2">Registra en un archivo el paquete que cumple las condiciones de la regla. De las
+opciones posibles la más útil es <kbd class="kbd docutils literal notranslate">--log-prefix</kbd> que permite añadir un prefijo a
+las anotaciones, lo cual puede ser útil para filtrar esas anotaciones. Vea más
+adelante <a class="reference internal" href="#iptables-log"><span class="std std-ref">como realizar anotaciones en el registro</span></a>. El objetivo
+no altera la comprobación de las reglas posteriores.</td>
+</tr>
+<tr class="row-odd"><td colspan="2"><div class="first last line-block">
+<div class="line">iptables -A FORWARD -p tcp –dport 25 -j LOG –log-prefix=»[netfilter]</div>
+<div class="line">iptables -A FORWARD -p tcp –dport 25 -j REJECT –reject-with tcp-reset</div>
+</div>
+</td>
+</tr>
+<tr class="row-even"><td rowspan="8">nat</td>
+<td rowspan="2">SNAT</td>
+<td colspan="2">Cambia la <abbr title="Internet Protocol">IP</abbr> de origen del paquete. Sólo está disponible en las cadenas
+<em>POSTROUTING</em> e <em>INPUT</em> de la tabla <em>nat</em>. Necesita la opción <kbd class="kbd docutils literal notranslate">--to-source</kbd> para
+indicar cuál es la <abbr title="Internet Protocol">IP</abbr> sustituta.</td>
+</tr>
+<tr class="row-odd"><td colspan="2">iptables -t nat -A POSTROUTING -o eth0 -j SNAT –to-source 172.22.0.2</td>
+</tr>
+<tr class="row-even"><td rowspan="2">MASQUERADE</td>
+<td colspan="2">Cambia la <abbr title="Internet Protocol">IP</abbr> de origen del paquete por la <abbr title="Internet Protocol">IP</abbr> de salida del cortafuegos. Útil
+cuando la <abbr title="Internet Protocol">IP</abbr> es dinámica.</td>
+</tr>
+<tr class="row-odd"><td colspan="2">iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE</td>
+</tr>
+<tr class="row-even"><td rowspan="2">DNAT</td>
+<td colspan="2">Cambia la <abbr title="Internet Protocol">IP</abbr> de destino del paquete. Debe hacerse en la cadena <em>PREROUTING</em> o en
+<em>OUTPUT</em> de la tabla <em>nat</em>. Necesita la opción <kbd class="kbd docutils literal notranslate">--to-destination</kbd> para indicar la
+<abbr title="Internet Protocol">IP</abbr> sustituta. Puede además modificarse el puerto de destino separándolo con dos
+puntos («<kbd class="kbd docutils literal notranslate">:</kbd>»).</td>
+</tr>
+<tr class="row-odd"><td colspan="2">iptables -t nat -A PREROUTING -p udp –dport 53 -j DNAT –to-destination 172.22.0.1</td>
+</tr>
+<tr class="row-even"><td rowspan="2">REDIRECT</td>
+<td colspan="2">Cambia la <abbr title="Internet Protocol">IP</abbr> de destino a <code class="docutils literal notranslate"><span class="pre">127.0.0.1</span></code>. Puede añadirse la opción <kbd class="kbd docutils literal notranslate">--to-port</kbd>
+para modificar el puerto de destino. Puede usarse en <em>PREROUTING</em> o en <em>OUTPUT</em>.</td>
+</tr>
+<tr class="row-odd"><td colspan="2">iptables -t nat -A PREROUTING -p tcp –dport 80 -j REDIRECT –to-port 3128</td>
+</tr>
+<tr class="row-even"><td rowspan="6">mangle</td>
+<td rowspan="2">MARK</td>
+<td colspan="2">Sirve para marcar la representanción del paquete en el núcleo de <em>Linux</em>, con el fin
+de que más adelante el propio <strong class="program">iptables</strong> u otro proceso reconozca la marca.
+Debe usarse con la opción <kbd class="kbd docutils literal notranslate">--set-mark</kbd> para fijar la marca (un byte).</td>
+</tr>
+<tr class="row-odd"><td colspan="2">iptables -t nat -A PREROUTING -p tcp –dport 22 -j MARK –set-mark 0x2</td>
+</tr>
+<tr class="row-even"><td rowspan="2">TOS</td>
+<td colspan="2">Cambia el <abbr title="Type Of Service">TOS</abbr> del paquete.</td>
+</tr>
+<tr class="row-odd"><td colspan="2">iptables -t nat -A PREROUTING -p tcp –dport 22 -j TOS –set-tos 0x10</td>
+</tr>
+<tr class="row-even"><td rowspan="2">TTL</td>
+<td colspan="2">Cambia el <abbr title="Time To Live">TTL</abbr> del paquete.</td>
+</tr>
+<tr class="row-odd"><td colspan="2">iptables -t nat -A PREROUTING -p tcp –dport 22 -j TTL –set-ttl 64</td>
+</tr>
+<tr class="row-even"><td rowspan="2">raw</td>
+<td rowspan="2">NOTRACK</td>
+<td colspan="2">Evitar hacer el seguimiento de la conexión. Puede usarse en las cadenas <em>PREROUTING</em> y
+<em>OUTPUT</em>.</td>
+</tr>
+<tr class="row-odd"><td colspan="2">iptables -t raw -A PREROUTING -p udp –dport 53 -j NOTRACK</td>
+</tr>
+<tr class="row-even"><td rowspan="11">Todas</td>
+<td rowspan="2">nueva_cadena</td>
+<td colspan="2">Hace que la comprobación de reglas salte a la nueva cadena, que previamente tuvo que
+ser definida. Si esto ocurre, se comprobarán las reglas incluidas en esta cadena y, si
+se agotan, se volverá a la cadena en la que se incluyó el salto justamente tras la
+regla que provocó el salto.</td>
+</tr>
+<tr class="row-odd"><td colspan="2">iptables -A INPUT -j indeseables</td>
+</tr>
+<tr class="row-even"><td rowspan="2">RETURN</td>
+<td colspan="2">Hace que el paquete cese la comprobación de las reglas de la cadena y vuelva a la
+cadena de orden superior (p.e. un <em>RETURN</em> en indeseables, provoca el regreso a INPUT).
+Si no hay cadena de orden superior, se aplica la política predefinida de la cadena.</td>
+</tr>
+<tr class="row-odd"><td colspan="2">iptables -t nat -A PREROUTING -i eth1 -s 192.168.9.208/28 -p tcp –dport 80 -j RETURN</td>
+</tr>
+<tr class="row-even"><td rowspan="7">CONNMARK</td>
+<td colspan="2">Define marcas para una conexión. La diferencia entre <em>MARK</em> y <em>CONNMARK</em> es que la
+primera marca paquetes individuales, mientras que la segunda, una vez usada, marcará
+todos los paquetes que pertenezcan a la misma conexión. Las marcas de paquete y de
+conexión son dos campos independientes. Tiene dos grandes utilidades: por un lado,
+posibilita tener marcados los paquetes de vuelta o incluso paquetes de una conexión
+relacionada; por otro. Se usa fundamentalmente en la tabla <em>nat</em>, ya que de esta forma
+se lleva a cabo la definición sólo en el primer paquete.</td>
+</tr>
+<tr class="row-odd"><td rowspan="2">–set-mark</td>
+<td>Fija la marca de conexión.</td>
+</tr>
+<tr class="row-even"><td>iptables -t nat -A PREROUTING -i eth1 -j CONNMARK –set-mark 1</td>
+</tr>
+<tr class="row-odd"><td rowspan="2">–restore-mark</td>
+<td>Copia el valor de la marca de conexión en la marca de paquete.</td>
+</tr>
+<tr class="row-even"><td>iptables -t mangle -A FORWARD -j CONNMARK –restore-mark-mark 1</td>
+</tr>
+<tr class="row-odd"><td rowspan="2">–save-mark</td>
+<td>Guarda la marca de paquete en la marca de conexión</td>
+</tr>
+<tr class="row-even"><td>iptables -t nat -A POSTROUTING -j CONNMARK –save-mark</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="condicion">
+<h3>8.7.1.1.2.4. Condición<a class="headerlink" href="#condicion" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Hace aplicable la regla sobre el paquete, de suerte que todos aquellos paquetes
+que la cumplan realizarán el objetivo expresado en la regla. A cuenta de las
+condiciones es conveniente saber que:</p>
+<ul>
+<li><p class="first">Pueden expresarse varias condiciones lo que implica que deban cumplirse
+todas. Por ejemplo, en:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> iptables -t nat -A PREROUTING -i eth1 -s <span class="m">192</span>.168.9.208/28 -p tcp --dport <span class="m">80</span> -j RETURN
+</pre></div>
+</div>
+<p>hay tres condiciones independientes: <kbd class="kbd docutils literal notranslate">-i eth1</kbd> que expresa cuál es la
+interfaz de entrada, <kbd class="kbd docutils literal notranslate">-s 192.168.9.208/28</kbd>, que expresa cuál es la red
+de origen, y <kbd class="kbd docutils literal notranslate">-p tcp --dport 80</kbd>, que fuerza a que el puerto de destino
+sea el 80/<abbr title="Transmission Control Protocol">TCP</abbr>. Si no se cumplen las condiciones, el paquete no llevará a
+cabo el objetivo (<strong>RETURN</strong>).</p>
+</li>
+<li><p class="first">Las condiciones pueden admitir el uso de opciones. En el ejemplo, la
+condición es <kbd class="kbd docutils literal notranslate">-p tcp</kbd> (protocolo <abbr title="Transmission Control Protocol">TCP</abbr>), pero esta condición admite como
+opción que se especifique un puerto, de ahí que hayamos podido añadir
+<kbd class="kbd docutils literal notranslate">--dport 80</kbd>.</p>
+</li>
+<li><p class="first">Las condiciones pueden negarse anteponiendo el carácter <kbd class="kbd docutils literal notranslate">!</kbd>. Por
+ejemplo, <kbd class="kbd docutils literal notranslate">! -i eth1</kbd> significa cualquier interfaz de entrada, excepto la <em>eth1</em>;
+o <kbd class="kbd docutils literal notranslate">-p tcp ! --dport 80</kbd> cualquier puerto <abbr title="Transmission Control Protocol">TCP</abbr> excepto el 80.</p>
+</li>
+<li><p class="first">Podemos distinguir dos tipos de condiciones:</p>
+<ul class="simple">
+<li>Las condiciones <em>simples</em> que son aquellas que se refieren al origen o
+destino del paquete (ya sea referido a la interfaz o a su dirección <abbr title="Internet Protocol">IP</abbr>) o a su
+protocolo de capa de red (<abbr title="Internet Protocol">IP</abbr>, <abbr title="Unternet Control Message Protocol">ICMP</abbr>) o de transporte (<abbr title="Transmission Control Protocol">TCP</abbr>, <abbr title="User Datagram Protocol">UDP</abbr>). En este
+último caso, podremos inquirir sobre sus puertos de origen o destino.</li>
+<li>Las condiciones que requieren un módulo o extensión, las cuales requieren
+que se especifique qué`extensión es la que se usa a través de la opción
+<kbd class="kbd docutils literal notranslate">-m</kbd> o <kbd class="kbd docutils literal notranslate">--match</kbd>.</li>
+</ul>
+</li>
+</ul>
+<p class="rubric">Condiciones simples</p>
+<p class="rubric">Extensiones</p>
+<span class="target" id="iptables-log"><span id="ipt-ipset"></span></span></div>
+</div>
 </div>
 
 
@@ -113,7 +524,13 @@ destino la interfaz de salida y en paquete abandona la máquina.</dd>
   <ul>
 <li><a class="reference internal" href="#">8.7.1.1. Conceptos básicos</a><ul>
 <li><a class="reference internal" href="#funcionamiento">8.7.1.1.1. Funcionamiento</a></li>
-<li><a class="reference internal" href="#sintaxis">8.7.1.1.2. Sintaxis</a></li>
+<li><a class="reference internal" href="#sintaxis">8.7.1.1.2. Sintaxis</a><ul>
+<li><a class="reference internal" href="#tabla">8.7.1.1.2.1. Tabla</a></li>
+<li><a class="reference internal" href="#accion">8.7.1.1.2.2. Acción</a></li>
+<li><a class="reference internal" href="#objetivo">8.7.1.1.2.3. Objetivo</a></li>
+<li><a class="reference internal" href="#condicion">8.7.1.1.2.4. Condición</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>

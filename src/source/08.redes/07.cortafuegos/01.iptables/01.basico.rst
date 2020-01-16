@@ -13,19 +13,41 @@ Funcionamiento
 Antes de analizar su sintaxis y casos de usos es fundamental entender cómo
 funciona. :program:`iptables` dispone de cinco tablas (*nat*, *filter*,
 *mangle*, *raw* y *security*, aunque las dos últimas no las trataremos) y una
-serie de cadenas a las que se añaden las reglas del cortafuegos. Según entra,
-sale o atraviesan los paquetes el equipo, se consultan para ellos estas cadenas,
-por lo que es necesario conocer cuál es la ruta que siguen a fin de aplicar la
-regla en la cadena correcta. Obsérvese la siguiente figura de izquierda a derecha.
+serie de cadenas a las que se añaden las reglas del cortafuegos.
+
+Hablamos alegremente de *cadenas*, pero ¿qué significa esta palabra en este
+contexto? Básicamente una :dfn:`cadena` expresa una lista de reglas, cada una de
+las cuales contiene una condición y una acción, de manera que se realizará esa
+acción con un determinado paquete, si éste cumple con la condición. Por ejemplo,
+una sentencia válida de :program:`iptables` es la siguiente::
+
+   # iptables -A FORWARD -p tcp --dport 25 -j DROP
+
+El primer :kbd:`-A FORWARD`, indica que vamos a añadir esta regla al final de la
+lista que ya haya en la cadena *FORWARD*. La acción es *DROP*, o sea, desechar;
+y la condición es :kbd:`-p tcp --dport 25`, o sea, protocolo |TCP| con puerto de
+destino el 25. Esto quiere decir que cualquier paquete que cumpla con esto
+(posiblemente sea tráfico |SMTP| de salida), está vetado y no atravesará nuestro
+cortafuegos. ¿Qué pasa con el tráfico web? Como el tráfico web es bastante
+improbable que tenga como destino el puerto 25 (no creo que haya nadie en su
+juicio que ponga a escuchar un servidor web en este puerto), no cumplirá la
+condición, y no será desechado; al menos por esta regla.
+
+.. _iptables-flowchart:
+
+Según entra, salen o atraviesan los paquetes el equipo, se consultan para ellos
+estas cadenas, por lo que es necesario conocer cuál es la ruta que siguen a fin
+de aplicar la regla en la cadena correcta. Obsérvese la siguiente figura de
+izquierda a derecha.
 
 .. image:: files/iptables.png
 
 Entiéndase que el "*proceso interno*", es cualquier proceso cliente o servidor
 susceptible de enviar y recibir paquetes. Un servidor web o un navegador pueden
-ser ejemplo de ello. Otro hito importante representando en la figura es el de "*decisión de encaminamiento*",
-que define hacia dónde se dirige el paquete: si a un proceso de la propia
-máquina o a una máquina externa. Obviamente, esta decisión viene determinada por
-la dirección |IP| de destino. 
+ser ejemplo de ello. Otro hito importante representando en la figura es el de
+"*decisión de encaminamiento*", que define hacia dónde se dirige el paquete: si
+a un proceso de la propia máquina o a una máquina externa. Obviamente, esta
+decisión viene determinada por la dirección |IP| de destino. 
 
 Hay tres tipos de paquetes:
 
@@ -39,7 +61,7 @@ Hay tres tipos de paquetes:
    alcanzará el proceso al que iba destinado y ahí acabará su vida.
 
 **Paquetes en tránsito**
-   Representados por la línea verde son los paquetes que alcanzan el
+   Representados por la línea verde, son los paquetes que alcanzan el
    cortafuegos, pero cuyo destino es otra máquina, por lo que utilizarán otra
    interfaz de red (excepcionalmente puede que sea la misma) para salir hacia su
    destino. En su caso la *decisión de encaminamiento* hace que sigan su curso
@@ -47,16 +69,319 @@ Hay tres tipos de paquetes:
    a continuación *POSTROUTING*, pasada la cual se escoge según la dirección de
    destino la interfaz de salida y en paquete abandona la máquina.
 
-**Paquetes generados por el cortafuegps**
+**Paquetes generados por el cortafuegos**
+   Representados por la línea azul, son los paquetes originados por un proceso
+   interno del cortafuegos. En este caso se comprueban primero las reglas de la
+   cadena *OUTPUT*. Si el paquete no es filtrado por alguna de sus reglas,
+   alcanzará la cadena *POSTROUTING*, a partir de la cual se obrará de la misma
+   forma que con el tipo anterior de paquetes.
+
+Es muy importante, además, tener presente que dentro de una cadena las reglas se
+comprueban siguiendo un orden, y que la acción que se lleva a cabo sobre el
+paquete:
+
+* Habitual,emte supone que se dejen de comprar el resto de reglas de la cadena.
+
+* Puede suponer que se sigan comprobando reglas como es el caso de la acción
+  **LOG**::
+
+   # iptables -A FORWARD -p tcp --dport 25 -j LOG --log-prefix "Cliente hace petición SMTP"
+   # iptables -A FORWARD -p tcp --dport 25 -j DROP
+
+En este punto está claro qué es una cadena, pero no hemos aclarado qué son o
+para qué sirven las tablas. Las :dfn:`tablas` sirven, simplemente para 
+organizar las reglas según el tipo de decisión que supongan, de modo que:
+
+**filter**
+   Es la tabla en la que se apuntan reglas de filtrado, esto es, reglas que
+   permite o deniegan el paso de los paquetes.
+
+**nat**
+   Es la tabla en la que se apuntan reglas de |NAT|, esto es, reglas que
+   medifican el origen o el destino de los paquetes.
+
+**mangle**
+   Es la tabla que permite alternar algunas de los campos de cabecera |IP| (p.e.
+   el |TTL| o el |TOS|). También permite alterar la *marca* del paquete que no
+   se encuentra en el propio paquete, sino en la representación que el kernel
+   hace del paquete, lo cual a efectos prácticos importa poco.
+
+**raw**
+   Es la tabla utilizada básicamente para marcar paquetes a fin de evitar el
+   seguimiento de la conexión.
+
+**security**
+   Es la tabla para crear reglas de seguridad |MAC|. Véase para más información
+   `este artículo
+   <https://www.linux.com/tutorials/using-selinux-and-iptables-together/>`_.
+
+No todas las cadenas se implementan en todas las tablas:
+
+.. table::
+   :class: chains-tables
+
+   ========== ============ ======= ========= ======== =============
+   \           PREROUTING   INPUT   FORWARD   OUTPUT   POSTROUTING
+   ========== ============ ======= ========= ======== =============
+   raw             Sí                           Sí
+   mangle          Sí         Sí       Sí       Sí          Sí
+   nat             Sí                           Sí          Sí
+   filter                     Sí       Sí       Sí
+   security                   Sí       Sí       Sí
+   ========== ============ ======= ========= ======== =============
 
 Sintaxis
 ========
+Toda sentencia de :program:`iptables` tiene este aspecto::
 
+   # iptables [-t TABLA] [opciones] -ACCIÓN CADENA [condiciones] [-j OBJETIVO [opciones_del_objetivo]]
+
+en donde se observa que hay cuatro partes fundamentales: 
+
+* la elección de la tabla, 
+* Cuál es la acción que se quiere llevar a cabo y sobre qué cadena.
+* La condición o condiciones que debe cumplir un paquete para que se le apliqye la regla;
+* El objetivo.
+
+Tabla
+------
+Ya se estableció que la tabla identificaba la naturaleza de la regla y para qué
+servía cada una en particular. La expresión de la tabla es opcional y, si no se
+incluya, se sobreentiende que es *filter*.
+
+Acción
+------
+Básicamente indican qué se quiere hacer con la regla: si añadirla, borrarla o
+alternarla y sobre qué cadena se lleva a cabo tal acción:
+
+.. table::
+   :class: iptables-action
+
+   +--------------------------------+---------------------------------------------------------------------------------+
+   | Acción                         | Descripción                                                                     |
+   +================================+=================================================================================+
+   | -A <cadena>                    | Añade la nueva regla al final de la cadena                                      |
+   |                                +---------------------------------------------------------------------------------+
+   |                                | iptables -A INPUT -p tcp --dport 80 -j DROP                                     |
+   +--------------------------------+---------------------------------------------------------------------------------+
+   | -I <cadena> [N]                | Añade la nueva regla a la cadena en la posición que se especifique. Si no se    |
+   |                                | expresa ninguna, se sobreentiente que en la primera.                            |
+   |                                +---------------------------------------------------------------------------------+
+   |                                | iptables -I INPUT -p tcp --dport 80 -j DROP                                     |
+   +--------------------------------+---------------------------------------------------------------------------------+
+   | -D <cadena> [N]                | Borrar una regla de la cadena indicada. Hay dos formas de indicar cuál:         |
+   |                                |                                                                                 |
+   |                                | * Volverla a escribir tal y como se definió.                                    |
+   |                                | * Indicar su número de posición dentro de la cadena.                            |
+   |                                +---------------------------------------------------------------------------------+
+   |                                | iptables -D INPUT -p tcp --dport 80 -j DROP                                     |
+   |                                | iptables -D INPUT 1                                                             |
+   +--------------------------------+---------------------------------------------------------------------------------+
+   | -R <cadena> [N]                | Reemplaza una regla por otra. Se indica la posición de la regla a reemplazar y  |
+   |                                | a continuación la regla sustituta.                                              |
+   |                                +---------------------------------------------------------------------------------+
+   |                                | iptables -R INPUT 1 -p tcp --dport 8080 -j DROP                                 |
+   +--------------------------------+---------------------------------------------------------------------------------+
+   | -F [<cadena>]                  | Borrar todas las reglas referentes a una tabla de la cadena. Si no se indica la |
+   |                                | cadena, borra todas las reglas de todas las cadenas de una tabla.               |
+   |                                +---------------------------------------------------------------------------------+
+   |                                | iptables -t nat -F PREROUTING                                                   |
+   +--------------------------------+---------------------------------------------------------------------------------+
+   | -Z [<cadena>]                  | Pone a cero los contadores de paquetes de la cadena especificada. Si no se      |
+   |                                | indica cadena, se aplica a todas las de la tabla. Los contadores muestran el    |
+   |                                | número de paquetes que han cumplido las condiciones de la regla.                |
+   |                                +---------------------------------------------------------------------------------+
+   |                                | iptables -Z                                                                     |
+   +--------------------------------+---------------------------------------------------------------------------------+
+   | -N <nueva_cadena>              | Crea una nueva cadena. Para que los paquetes comprueben sus reglas, será        |
+   |                                | necesario saltar a ella desde una de las cadenas predefinidas. Hay un objetivo  |
+   |                                | para ello.                                                                      |
+   |                                +---------------------------------------------------------------------------------+
+   |                                | iptables -N proxy                                                               |
+   +--------------------------------+---------------------------------------------------------------------------------+
+   | -X <cadena>                    | Borra una cadena creada anteriormente.                                          |
+   |                                +---------------------------------------------------------------------------------+
+   |                                | iptables -X proxy                                                               |
+   +--------------------------------+---------------------------------------------------------------------------------+
+   | -P [<cadena>] [ACCEPT|DROP]    | Establece la política predeterminada de filtrado:                               |
+   |                                |                                                                                 |
+   |                                | * Lista blanca: *DROP*.                                                         |
+   |                                | * Lista negra: *ACCEPT*.                                                        |
+   |                                +---------------------------------------------------------------------------------+
+   |                                | iptables -P INPUT ACCEPT                                                        |
+   +--------------------------------+---------------------------------------------------------------------------------+
+   | -L [<cadena>]                  | Muestra las reglas añadidas a una cadena. Si no se especifica ninguna, muestra  |
+   |                                | todas las cadenas de la tabla. Son útiles para esta acción, :kbd:`-v`, que      |
+   |                                | muestra los contadores de paquetes, :kbd:`-n` que muestra direcciones |IP| y no |
+   |                                | nombres de máquinas y :kbd:`--line-numbers` que muestra la posición de la regla |
+   |                                | y puede ser usada en las acciones de borrado, inserción y remplazo.             |
+   |                                +---------------------------------------------------------------------------------+
+   |                                | iptables -t nat --line-numbers -nvL PREROUTING                                  |
+   +--------------------------------+---------------------------------------------------------------------------------+
+
+Objetivo
+--------
+El :dfn:`objetivo` es la operación que se lleva a cabo sobre el paquete en caso
+de que le sea aplicable la regla.
+
+.. table::
+   :class: iptables-objetivo
+
+   +--------+--------------+----------------------------------------------------------------------------------------+
+   | Tabla  | Objetivo     | Descripción                                                                            |
+   +========+==============+========================================================================================+
+   | filter | ACCEPT       | Se acepta el paquete y no se analizan más reglas de las cadenas de la tabla.           |
+   |        |              +----------------------------------------------------------------------------------------+
+   |        |              | iptables -A INPUT -p icmp -j ACCEPT                                                    |
+   |        +--------------+----------------------------------------------------------------------------------------+
+   |        | DROP         | Desecha el paquete sin informar al emisor. Por ello, sólo considerará fallida la       |
+   |        |              | conexión tras un tiempo de espera. Obviamente, no es revisada ninguna regla posterior. |
+   |        |              +----------------------------------------------------------------------------------------+
+   |        |              | iptables -A INPUT -p icmp -j DROP                                                      |
+   |        +--------------+----------------------------------------------------------------------------------------+
+   |        | REJECT       | Rechaza un paquete enviando al emisor el aviso del rechazo mediante un paquete |ICMP|. |
+   |        |              | Se puede especificar el tipo de |ICMP| mediante :kbd:`--reject-with` y, en el caso,    |
+   |        |              | de conexiones |TCP| se puedfe usar *tcp-reset* para enviar un paquete *RST* que cierre |
+   |        |              | elegantemente la conexión. Si no se incluye la opción se envía :kbd:`port-unreachable`.|
+   |        |              +----------------------------------------------------------------------------------------+
+   |        |              | iptables -A FORWARD -p tcp --dport 25 -j REJECT --reject-with tcp-reset                |
+   |        +--------------+----------------------------------------------------------------------------------------+
+   |        | LOG          | Registra en un archivo el paquete que cumple las condiciones de la regla. De las       |
+   |        |              | opciones posibles la más útil es :kbd:`--log-prefix` que permite añadir un prefijo a   |
+   |        |              | las anotaciones, lo cual puede ser útil para filtrar esas anotaciones. Vea más         |
+   |        |              | adelante :ref:`como realizar anotaciones en el registro <iptables-log>`. El objetivo   |
+   |        |              | no altera la comprobación de las reglas posteriores.                                   |
+   |        |              +----------------------------------------------------------------------------------------+
+   |        |              | | iptables -A FORWARD -p tcp --dport 25 -j LOG --log-prefix="[netfilter]               |
+   |        |              | | iptables -A FORWARD -p tcp --dport 25 -j REJECT --reject-with tcp-reset              |
+   +--------+--------------+----------------------------------------------------------------------------------------+
+   | nat    | SNAT         | Cambia la |IP| de origen del paquete. Sólo está disponible en las cadenas              |
+   |        |              | *POSTROUTING* e *INPUT* de la tabla *nat*. Necesita la opción :kbd:`--to-source` para  |
+   |        |              | indicar cuál es la |IP| sustituta.                                                     |
+   |        |              +----------------------------------------------------------------------------------------+
+   |        |              | iptables -t nat -A POSTROUTING -o eth0 -j SNAT --to-source 172.22.0.2                  |
+   |        +--------------+----------------------------------------------------------------------------------------+
+   |        | MASQUERADE   | Cambia la |IP| de origen del paquete por la |IP| de salida del cortafuegos. Útil       |
+   |        |              | cuando la |IP| es dinámica.                                                            |
+   |        |              +----------------------------------------------------------------------------------------+
+   |        |              | iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE                                   |
+   |        +--------------+----------------------------------------------------------------------------------------+
+   |        | DNAT         | Cambia la |IP| de destino del paquete. Debe hacerse en la cadena *PREROUTING* o en     |
+   |        |              | *OUTPUT* de la tabla *nat*. Necesita la opción :kbd:`--to-destination` para indicar la |
+   |        |              | |IP| sustituta. Puede además modificarse el puerto de destino separándolo con dos      |
+   |        |              | puntos (":kbd:`:`").                                                                   |
+   |        |              +----------------------------------------------------------------------------------------+
+   |        |              | iptables -t nat -A PREROUTING -p udp --dport 53 -j DNAT --to-destination 172.22.0.1    |
+   |        +--------------+----------------------------------------------------------------------------------------+
+   |        | REDIRECT     | Cambia la |IP| de destino a ``127.0.0.1``. Puede añadirse la opción :kbd:`--to-port`   |
+   |        |              | para modificar el puerto de destino. Puede usarse en *PREROUTING* o en *OUTPUT*.       |
+   |        |              +----------------------------------------------------------------------------------------+
+   |        |              | iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 3128             |
+   +--------+--------------+----------------------------------------------------------------------------------------+
+   | mangle | MARK         | Sirve para marcar la representanción del paquete en el núcleo de *Linux*, con el fin   |
+   |        |              | de que más adelante el propio :program:`iptables` u otro proceso reconozca la marca.   |
+   |        |              | Debe usarse con la opción :kbd:`--set-mark` para fijar la marca (un byte).             |
+   |        |              +----------------------------------------------------------------------------------------+
+   |        |              | iptables -t nat -A PREROUTING -p tcp --dport 22 -j MARK --set-mark 0x2                 |
+   |        +--------------+----------------------------------------------------------------------------------------+
+   |        | TOS          | Cambia el |TOS| del paquete.                                                           |
+   |        |              +----------------------------------------------------------------------------------------+
+   |        |              | iptables -t nat -A PREROUTING -p tcp --dport 22 -j TOS --set-tos 0x10                  |
+   |        +--------------+----------------------------------------------------------------------------------------+
+   |        | TTL          | Cambia el |TTL| del paquete.                                                           |
+   |        |              +----------------------------------------------------------------------------------------+
+   |        |              | iptables -t nat -A PREROUTING -p tcp --dport 22 -j TTL --set-ttl 64                    |
+   +--------+--------------+----------------------------------------------------------------------------------------+
+   | raw    | NOTRACK      | Evitar hacer el seguimiento de la conexión. Puede usarse en las cadenas *PREROUTING* y |
+   |        |              | *OUTPUT*.                                                                              |
+   |        |              +----------------------------------------------------------------------------------------+
+   |        |              | iptables -t raw -A PREROUTING -p udp --dport 53 -j NOTRACK                             |
+   +--------+--------------+----------------------------------------------------------------------------------------+
+   | Todas  | nueva_cadena | Hace que la comprobación de reglas salte a la nueva cadena, que previamente tuvo que   |
+   |        |              | ser definida. Si esto ocurre, se comprobarán las reglas incluidas en esta cadena y, si |
+   |        |              | se agotan, se volverá a la cadena en la que se incluyó el salto justamente tras la     |
+   |        |              | regla que provocó el salto.                                                            |
+   |        |              +----------------------------------------------------------------------------------------+
+   |        |              | iptables -A INPUT -j indeseables                                                       |
+   |        +--------------+----------------------------------------------------------------------------------------+
+   |        | RETURN       | Hace que el paquete cese la comprobación de las reglas de la cadena y vuelva a la      |
+   |        |              | cadena de orden superior (p.e. un *RETURN* en indeseables, provoca el regreso a INPUT).|
+   |        |              | Si no hay cadena de orden superior, se aplica la política predefinida de la cadena.    |
+   |        |              +----------------------------------------------------------------------------------------+
+   |        |              | iptables -t nat -A PREROUTING -i eth1 -s 192.168.9.208/28 -p tcp --dport 80 -j RETURN  |
+   |        +--------------+----------------------------------------------------------------------------------------+
+   |        | CONNMARK     | Define marcas para una conexión. La diferencia entre *MARK* y *CONNMARK* es que la     |
+   |        |              | primera marca paquetes individuales, mientras que la segunda, una vez usada, marcará   |
+   |        |              | todos los paquetes que pertenezcan a la misma conexión. Las marcas de paquete y de     |
+   |        |              | conexión son dos campos independientes. Tiene dos grandes utilidades: por un lado,     |
+   |        |              | posibilita tener marcados los paquetes de vuelta o incluso paquetes de una conexión    |
+   |        |              | relacionada; por otro. Se usa fundamentalmente en la tabla *nat*, ya que de esta forma |
+   |        |              | se lleva a cabo la definición sólo en el primer paquete.                               |
+   |        |              +------------------+---------------------------------------------------------------------+
+   |        |              | --set-mark       | Fija la marca de conexión.                                          |
+   |        |              |                  +---------------------------------------------------------------------+
+   |        |              |                  | iptables -t nat -A PREROUTING -i eth1 -j CONNMARK --set-mark 1      |
+   |        |              +------------------+---------------------------------------------------------------------+
+   |        |              | --restore-mark   | Copia el valor de la marca de conexión en la marca de paquete.      |
+   |        |              |                  +---------------------------------------------------------------------+
+   |        |              |                  | iptables -t mangle -A FORWARD -j CONNMARK --restore-mark-mark 1     |
+   |        |              +------------------+---------------------------------------------------------------------+
+   |        |              | --save-mark      | Guarda la marca de paquete en la marca de conexión                  |
+   |        |              |                  +---------------------------------------------------------------------+
+   |        |              |                  | iptables -t nat -A POSTROUTING -j CONNMARK --save-mark              |
+   +--------+--------------+------------------+---------------------------------------------------------------------+
+
+Condición
+---------
+Hace aplicable la regla sobre el paquete, de suerte que todos aquellos paquetes
+que la cumplan realizarán el objetivo expresado en la regla. A cuenta de las
+condiciones es conveniente saber que:
+
+* Pueden expresarse varias condiciones lo que implica que deban cumplirse
+  todas. Por ejemplo, en::
+
+   # iptables -t nat -A PREROUTING -i eth1 -s 192.168.9.208/28 -p tcp --dport 80 -j RETURN
+
+  hay tres condiciones independientes: :kbd:`-i eth1` que expresa cuál es la
+  interfaz de entrada, :kbd:`-s 192.168.9.208/28`, que expresa cuál es la red
+  de origen, y :kbd:`-p tcp --dport 80`, que fuerza a que el puerto de destino
+  sea el 80/|TCP|. Si no se cumplen las condiciones, el paquete no llevará a
+  cabo el objetivo (**RETURN**).
+
+* Las condiciones pueden admitir el uso de opciones. En el ejemplo, la
+  condición es :kbd:`-p tcp` (protocolo |TCP|), pero esta condición admite como
+  opción que se especifique un puerto, de ahí que hayamos podido añadir
+  :kbd:`--dport 80`.
+
+* Las condiciones pueden negarse anteponiendo el carácter :kbd:`!`. Por
+  ejemplo, :kbd:`! -i eth1` significa cualquier interfaz de entrada, excepto la *eth1*;
+  o :kbd:`-p tcp ! --dport 80` cualquier puerto |TCP| excepto el 80.
+
+* Podemos distinguir dos tipos de condiciones:
+
+  + Las condiciones *simples* que son aquellas que se refieren al origen o
+    destino del paquete (ya sea referido a la interfaz o a su dirección |IP|) o a su
+    protocolo de capa de red (|IP|, |ICMP|) o de transporte (|TCP|, |UDP|). En este
+    último caso, podremos inquirir sobre sus puertos de origen o destino.
+
+  + Las condiciones que requieren un módulo o extensión, las cuales requieren
+    que se especifique qué`extensión es la que se usa a través de la opción
+    :kbd:`-m` o :kbd:`--match`.
+
+.. rubric:: Condiciones simples
+
+.. rubric:: Extensiones
 
 .. https://www.digitalocean.com/community/tutorials/a-deep-dive-into-iptables-and-netfilter-architecture
 
 
 .. |MAC| replace:: :abbr:`MAC (Media Access Control)`
+.. |TCP| replace:: :abbr:`TCP (Transmission Control Protocol)`
+.. |UDP| replace:: :abbr:`UDP (User Datagram Protocol)`
+.. |ICMP| replace:: :abbr:`ICMP (Unternet Control Message Protocol)`
+.. |NAT| replace:: :abbr:`NAT (Network Address Translation)`
+.. |TTL| replace:: :abbr:`TTL (Time To Live)`
+.. |TOS| replace:: :abbr:`TOS (Type Of Service)`
 
 .. Logs alternativos:
    https://unix.stackexchange.com/questions/342855/how-to-customize-the-format-of-iptable-log-info
@@ -64,5 +389,6 @@ Sintaxis
    http://www.luispa.com/archivos/704
 
 .. _ipt-ipset:
+.. _iptables-log:
 
 
