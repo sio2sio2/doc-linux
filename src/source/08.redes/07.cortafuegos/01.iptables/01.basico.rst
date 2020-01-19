@@ -433,7 +433,68 @@ condiciones es conveniente saber que:
 
 .. rubric:: Extensiones
 
-.. todo:: Hacer la tabla
+Cualquier otra condición no incluida en las simplas que refiere la tabla
+anterior, son condiciones que requieren de un módulo invocado a través de las
+opciones :kbd:`-m` o :kbd:`--match`. No trataremos todas y algunas muy
+específicas las referiremos en epígrafe aparte.
+
+.. table::
+   :class: iptables-ext
+
+   +-----------+---------------------+--------------------------------------------------------------------------------+
+   | Extension | Opción              | Descripción                                                                    |
+   +===========+=====================+================================================================================+
+   | multiport | --sports            | Lista de puertos de origen. Admite comas y dos puntos para rangos.             |
+   |           |                     +--------------------------------------------------------------------------------+
+   |           |                     | iptables -A FORWARD --p tcp -m multiport --source-port 22,23,80:100 -j DROP    |
+   |           +---------------------+--------------------------------------------------------------------------------+
+   |           | --dports            | Lista de puertos de destino. Admite comas y dos puntos para rangos.            |
+   |           |                     +--------------------------------------------------------------------------------+
+   |           |                     | iptables -A FORWARD --p tcp -m multiport --source-port 22,23,80:100 -j DROP    |
+   +-----------+---------------------+--------------------------------------------------------------------------------+
+   | mark      | --mark              | Marca del paquete.                                                             |
+   |           |                     +--------------------------------------------------------------------------------+
+   |           |                     | iptables -A INPUT -m mark --mark 1 -j DROP                                     |
+   +-----------+---------------------+--------------------------------------------------------------------------------+
+   | connmark  | --connmark          | Marca de la conexión.                                                          |
+   |           |                     +--------------------------------------------------------------------------------+
+   |           |                     | iptables -t nat -A POSTROUTING -o eth0 -m connmark --mark 0x2 -j MASQUERADE    |
+   +-----------+---------------------+--------------------------------------------------------------------------------+
+   | mac       | --mac-source        | Mac de origen.                                                                 |
+   |           |                     +--------------------------------------------------------------------------------+
+   |           |                     | iptables -A INPUT -m mac --mac-source 00:11:22:33:44:55 -j DROP                |
+   +-----------+---------------------+--------------------------------------------------------------------------------+
+   | physdev   | Sirve para manipular de modo muy limitado **tráfico conmutado**, no encaminado.                      |
+   |           +---------------------+--------------------------------------------------------------------------------+
+   |           | -physdev-in         | Interfaz de entrada.                                                           |
+   |           |                     +--------------------------------------------------------------------------------+
+   |           |                     | iptables -A INPUT -p tcp --dport 25 -m physdev --physdev-in eth1 -j DROP       |
+   |           +---------------------+--------------------------------------------------------------------------------+
+   |           | -physdev-out        | Interfaz de salida.                                                            |
+   |           |                     +--------------------------------------------------------------------------------+
+   |           |                     | iptables -A OUTPUT -p tcp --dport 25 -m physdev --physdev-out eth0 -j DROP     |
+   |           +---------------------+--------------------------------------------------------------------------------+
+   |           | -physdev-is-bridged | Comprueba si el tráfico es conmutado  Solo en *FORWARD* y *POSTROUTING*.       |
+   |           |                     +--------------------------------------------------------------------------------+
+   |           |                     | iptables -A FORWARD -m physdev --physdev-is-bridged -o br0 -j ACCEPT           |
+   +-----------+---------------------+--------------------------------------------------------------------------------+
+   | string    | Su contenido incluye una cadena.                                                                     |
+   |           +---------------------+--------------------------------------------------------------------------------+
+   |           | --algo bm|kmp       | Algoritmo de búsqueda. *bm* es más rápido pero menos exhaustivo                |
+   |           +---------------------+--------------------------------------------------------------------------------+
+   |           | --string            | Cadena a comprobar.                                                            |
+   |           |                     +--------------------------------------------------------------------------------+
+   |           |                     | iptables -A FORWARD -m string --string "facebook" --algo bm -j DROP            |
+   +-----------+---------------------+--------------------------------------------------------------------------------+
+
+Además, trataremos más adelante:
+
+- :ref:`state y conntrack <iptables-conn>`.
+- :ref:`limit <iptables-limit>`.
+- :ref:`recent <iptables-recent>`.
+- :ref:`set <ipt-ipset>`.
+
+.. _iptables-packet-type:
 
 Conexiones
 ==========
@@ -441,7 +502,7 @@ Al ser :program:`iptables` un cortafuegos de filtrado dinámico, es capaz al ana
 de tener en cuenta su contexto, esto es, tener el cuenta que el paquete forma parte de una conexión.
 En realidad, de los tres protocolos de capa de transporte (|TCP|, |UDP| e |ICMP|) sólo |TCP| es un
 protocolo orientado a conexión. :program:`iptables`, no obstante, implementa un seguimiento de
-conexión común a los tres. En relación a la conexión, se consideran cuatro estados distintos para los paquetes:
+conexión común a los tres. En relación a la conexión, se consideran siete estados distintos para los paquetes:
 
 **NEW**
    Que es el estado del paquete que origina la conexión.
@@ -467,11 +528,11 @@ conexión común a los tres. En relación a la conexión, se consideran cuatro e
 
 **SNAT**
    Que es el estado de los paquetes sobre los que se llevó a cabo un cambio
-   en la |IP| de origen.
+   en la |IP| de origen. También tiene este estado los paquetes de respuesta.
 
 **DNAT**
    Que es el estado de los paquetes sobre los que se llevó a cabo un cambio
-   en la |IP| de destinoo.
+   en la |IP| de destinoo. También tiene este estado los paquetes de respuesta.
 
 .. rubric:: ¿Cómo se establecen conexiones?
 
@@ -506,14 +567,3 @@ cliente y servidor es *NEW* y el resto *ESTABLISHED*.
 .. |TTL| replace:: :abbr:`TTL (Time To Live)`
 .. |TOS| replace:: :abbr:`TOS (Type Of Service)`
 .. |CIDR| replace:: :abbr:`CIDR (Classless Inter-Domain Routing)`
-
-.. Logs alternativos:
-   https://unix.stackexchange.com/questions/342855/how-to-customize-the-format-of-iptable-log-info
-   https://wiki.wireshark.org/CaptureSetup/NFLOG
-   http://www.luispa.com/archivos/704
-
-.. _ipt-ipset:
-.. _iptables-log:
-.. _iptables-ftp:
-
-

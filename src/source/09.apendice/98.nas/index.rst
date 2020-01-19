@@ -4,23 +4,29 @@
 ****************************
 `Open Media Vault`_ es una distribución basada em *Debian*\ [#]_ orientada a la
 implementación de servidores |NAS|. Es quizás junto a FreeNAS_ y XigmaNAS_ (antes
-NAS4Free) el *software* más usada para la creación de un servidor |NAS|, pero
+*NAS4Free*) el *software* más usada para la creación de un servidor |NAS|, pero
 presenta la ventaja de que sopora, además de *x86-64*, plataformas |ARM|, lo que
-la hace apta para convertir en |NAS| a una `Raspberry Pi`_. Está, además, basada
-en *Debian* frente a las otras, que se basan en *FreeBSD*, lo que para nosotros
-es una ventaja, si necesitamos cacharrear a bajo nivel. Por contra, no trae de
-serie |ZFS| como las otras dos, por lo que si queremos utilizar este sistema de
-ficheros para contruir el |NAS|, necesitaremos instalr algún extra. Es cierto
-también que, si no se usa |ZFS| los requerimientos de memoria son menores, por
-lo que podemos utilizarla sobre *hardware* más modesto.
-
-.. note:: En principio, también puede instalarse el *software* de |OMV| sobre
-   una debian ya instalada. Consulte `este mensaje
-   <https://forum.openmediavault.org/index.php/Thread/21234-Install-OMV4-on-Debian-9-Stretch/>`_
-   para ver el procedimiento.
+la hace apta para convertir en |NAS| a una `Raspberry Pi`_. El hecho, además,
+de ser una *Debian* (las otras se basan en *FreeBSD*) la hace atractiva a
+nuestros ojos, ya que podremos cacharrear a bajo nivel o realizar una
+instalación a media. Por contra, no trae de serie |ZFS| como las otras dos, por
+lo que si queremos utilizar este sistema de ficheros para construir el |NAS|,
+necesitaremos instalar algún extra. Es cierto también que, si no se usa |ZFS|, los
+requerimientos de memoria son menores, por lo que podemos utilizarla sobre
+*hardware* más modesto.
 
 Instalación
 ===========
+Tenemos dos alternativas para instalar el sistema:
+
+* La imagen *ISO* de la distribución como tal, en plataformas *x86-64*.
+* Un *script* que instala el *software* de |OMV| sobre una *Debian* ya en
+  funcionamiento y que permite su uso en otras plataformas como *x86* o |ARM| o
+  en la propia *x86-64*, si nuestra intención es hacer una instalación a nuestro
+  gusto.
+
+Imagen
+------
 La instalación es idéntica a la de *Debian*, salvo por el hecho de que algunas
 partes de la instalación se llevan a cabo automáticamente y no se crea usuario
 sin provilegios por no ser necesario.
@@ -55,16 +61,28 @@ Al término y tras arrancar el sistema, podremos:
 
 .. image:: files/interfaz.png
 
+*Script*
+--------
+El *script* puede obtenerse de Github_ en `este repositiorio oficial
+<https://github.com/OpenMediaVault-Plugin-Developers/installScript>`_, en donde
+además se encuentran las instrucciones::
+
+   # apt install sudo
+   # wget -O - "https://github.com/OpenMediaVault-Plugin-Developers/installScript/raw/master/install" | sudo bash
+
+tras lo cual tendremos |OMV| perfectamente operativa y podremos acceder a ella
+a través de la interfaz web con el usuario web ya referido.
+
 .. _omv-extras:
 
-.. rubric:: Extras
-
+Extras
+------
 Si queremos los extras, debemos entonces hacernos con ellos e instalarlos.
 La instalación está disponible en `este repositorio de Github
 <https://github.com/OpenMediaVault-Plugin-Developers/packages>`_, pero puede
 llevarse a cabo automáticamente desde la consola con el usuario administrador::
 
-   # wget -O - https://github.com/OpenMediaVault-Plugin-Developers/packages/raw/master/install | bash
+   # wget -O - "https://github.com/OpenMediaVault-Plugin-Developers/packages/raw/master/install" | bash
 
 Más adelante, volveremos a los extras para :ref:`habilitar y usar ZFS <ovm-zfs>`.
 
@@ -183,10 +201,30 @@ y podremos acceder a él según nuestro nivel de permisos::
 
                2027408 blocks of size 1024. 2004864 blocks available
    
+Miscelánea
+==========
+
+Primeros auxilios
+-----------------
+|OMV| dispone de un programa para llevar a cabo algunas tareas auxiliares (p.e.
+cambiar la contraseña del administrador web si la hemos olvidado)::
+
+   # ovm-firstaid
+
+Consejos
+--------
+* Cambie la contraseña de acceso a la interfaz web.
+* Suba una clave pública para el acceso |SSH| como *root* y modique la
+  configuración del servidor para que sólo se pueda acceder con ella y
+  no con contraseña.
+* Configure los avisos por correo electrónico (``Sistema>Avisos``) para
+  recibir en una cuenta que revise periódicamente los mensaje del |NAS| (entre
+  ellos la rotura de algún disco).
+
 .. _ovm-zfs:
 
 |ZFS|
-=====
+-----
 |ZFS| tiene la ventaja de incorportar la capacidad de crear |RAID|\ s dentro del
 propio sistema de ficheros, lo que le permite mejorar los rendimientos de
 escrituras en |RAID| 5 y 6. Esto, sin embargo, se hace a costa de usar
@@ -200,8 +238,6 @@ instalador y debe instalarse más tarde por sí está disponible como paquete. E
 cirtcunstancia afecta a |OMV|, que también incorpora el soporte para |ZFS| como
 un extra.
 
-Instalación
------------
 Después de instalar :ref:`los extras <omv-extras>` tenemos disponibles dos de
 los paquetes necesarios:
 
@@ -239,11 +275,12 @@ archivos <omv-compartible>`, :ref:`establecer su política de permisos
 
 .. rubric:: Notas al pie
 
+.. [#] La v3 basada en *Jessie*, la v4 en *Stretch*, y la v5 en *Buster*. En
+   realidad, más que basarse en *Debian*, son *Debian* con el añadido de la
+   interfaz *web* propia para la administración del |NAS|.
+
 .. [#] es decir, que se almacenan en :file:`/etc/passwd` y :file:`/etc/group`,
    respectivamente.
-
-.. [#] La v5 basada en *Debian Buster*. Por lo que se ve las versiones mayores
-   de |OMV| se lanzan con el cambio de estable en *Debian*.
 
 .. |OMV| replace:: :abbr:`OMV (Open Media Vault)`
 .. |NAS| replace:: :abbr:`NAS (Network Attached Storage)`
@@ -259,3 +296,4 @@ archivos <omv-compartible>`, :ref:`establecer su política de permisos
 .. _Raspberry Pi: https://www.raspberrypi.org/
 .. _FreeNAS: https://www.openmediavault.org://www.freenas.org/
 .. _XigmaNAS: https://www.xigmanas.com/
+.. _Github: https://github.com
