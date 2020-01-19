@@ -18,7 +18,7 @@ A partir de *Buster*, se sigue incluyendo el soporte en el núcleo, pero los
 ejecutables :command:`iptables`, :command:`ebtables` y :command:`arptables` son
 en realidad un frontend para :ref:`nftables <nftables>`, conservando la sintaxis
 de los originales. Es importante tenerlo presente, porque hay módulos de
-:program:`iptables` que ya no existen en :program:`iptables`. Para sintaxis
+:program:`iptables` que ya no existen en :program:`nftables`. Para sintaxis
 básica y algunos módulos, sin embargo, son perfectamente funcionales.
 
 Los verdaderos ejecutables de :program:`netfilter` han pasado a renombrarse
@@ -38,4 +38,4 @@ apunta a :program:`iptables-nft`.
 
    [0-9]*
 
-.. |ARP| replace:: :abbr:`APR (Address Resolution Protocol)`
+.. |ARP| replace:: :abbr:`ARP (Address Resolution Protocol)`
