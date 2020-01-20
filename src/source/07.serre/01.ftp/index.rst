@@ -42,8 +42,8 @@ El plan de estudio consistirá en lo siguiente:
    forma actual se perfiló en 1973.
 
 .. [#] Cada vez es más difícil encontrar servidores que sigan ofreciendo sus
-   servicios de |FTP|. Es interesante, al respecto, la noticia de `kernel.org
-   <http://www.kernel.org>` sobre el cese de su servicio de |FTP|, llevado a
-   cabo a lo largo de 2017.
+   servicios de |FTP|. Es interesante, al respecto, `la noticia de kernel.org
+   <https://www.kernel.org/shutting-down-ftp-services.html>`_ sobre el cese de
+   su servicio de |FTP|, llevado a cabo a comienzos de 2017.
 
 .. [#] Algunas de estas razones están tomadas del enlace anterior.
