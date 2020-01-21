@@ -423,121 +423,13 @@ De los métodos de ataque anteriores, debemos de entresacar dos enseñanzas:
         son dinámicas, así que debe habilitarse algún medio para
         gestionarlas.
 
+.. _iptables-bruta:
 
-.. _ipt-recent:
-
-iptables-recent
-===============
-*recent* es un módulo de iptables que permite crear una lista dinámica con las
-direcciones |IP| (en principio, direcciones |IP| de origen) que establecen
-conexión con nuestro servidor y toma decisiones en base a ello. Por ello, es
-útil para poner en práctica tanto el *port-knocking* como la *limitación de
-accesos*. Antes de ello, estudiemos brevemente las posibilidades del módulo:
-
-* El módulo permite realizar cuatro acciones:
-
-  ``--set``
-   que añade la dirección |IP| a la lista dinámica o actualiza la entrada
-   si ya estaba.
-
-  ``--rcheck``
-   que comprueba si la dirección |IP| se encuentra en la lista.
-
-  ``--update``
-   que además de la comprobación, actualiza la lista para añadir el instante de tiempo
-   como la última vez que se ha visto la |IP|.
-
-  ``--remove``
-   que elimina la |IP| de la lista.
-
-* Pueden existir varias listas independientes cada una con su nombre:
-
-  ``--name <NOMBRE>``
-   permite indicar el nombre de la lista. Si no se especifica ninguno, será "DEFAULT".
-
-* Cuando se comprueba si la entrada existe (``--rcheck`` o ``-update``) pueden añadirse
-  las siguientes opciones:
-
-  ``--seconds <SEGUNDOS>``
-   que restringe la búsqueda en la lista sólo a los últimos segundos que se
-   especifiquen.  Por tanto, si se añade :code:`--seconds 60`, la coincidencia
-   sólo se producirá si se añadió la |IP| en el último minuto.
-
-  ``--hitcount <N>``
-   la búsqueda tendrá éxito sólo si la dirección se encuentra en la lista el
-   número de veces indicado. Por supuesto, puede usarse en conjunción con ``--seconds``.
-
-  ``--reap``
-   usado en conjunción con ``--seconds`` provoca que se eliminen de la lista las entradas
-   de la |IP| anteriores al periodo de tiempo indicado.
-
-* Por último, para alterar el significado de la dirección |IP|:
-
-  ``--rdest``
-   apunta o comprueba tomando la |IP| de destino del paquete, en vez de la de
-   origen.
-
-  ``--mask <MASCARA>``
-   máscara que debe aplicarse a la lista de direcciones.
-
-Por otro lado, la listas pueden consultarse dentro del directorio
-:file:`/proc/net/xt_recent/` e incluso aplicar manualmente modificaciones sobre
-ellas según lo que expone la `página de manual
-<http://ipset.netfilter.org/iptables-extensions.man.html#lbBW>`_.
-
-Para ilustrar el uso, antes de pasar a resolver nuestros problemas completos,
-tomemos y comentemos un par de ejemplos inspirados en los de la documentación
-oficial:
-
-.. rubric:: Ejemplo 1
-
-.. code-block:: bash
-
-   iptables -A INPUT -m recent --rcheck --seconds 120 -j DROP
-   iptables -A INPUT -i eth0 -p icmp -m recent --set -j DROP
-
-Con estas reglas, si una máquina cualquiera intentos hacernos :command:`ping`
-por primera vez, la primera regla se evalúa a falso, ya que la |IP| no se
-encuentra aún en la lista *DEFAULT*. En consecuencia, este primer paquete prueba
-la segunda regla y al ser un paquete *ping* provocará la inclusión en la lista
-de la |IP| y, además, se rechazará el paquete, ya que ``--set`` siempre se
-evalúa a verdadero. A partir de la recepción de este paquete |ICMP| y durante 2
-minutos cualquier paquete procedente de esta |IP|, sea de la naturaleza que sea,
-se rechazará al toparse con la primera regla. Pasados los dos minutos, la
-primera regla se evaluará a falso para paquetes procedentes de la esa |IP| y
-sólo si vuelve a mandar un paquete |ICMP|, volveremos a vetar la dirección.
-
-En conclusión: si a una máquina se le ocurre mandarnos un paquete |ICMP| no
-podrá comunicarse con nosotros durante dos minutos.
-
-Para **comprobar** cómo funciona, podemos probar a hacer una conexión |SSH| a
-esta máquina (|IP| *192.168.1.239*) desde otra máquina (de |IP| *192.168.1.240*):
-deberíamos acceder sin problemas, supuesto que haya un servidor |SSH| instalado,
-claro está. Ahora bien, si hacemos desde *192.168.1.240* un :command:`ping`::
-
-   $ ping -c1 -W1 192.168.1.239
-
-No recibiremos respuesta (ya que la segunda regla lo impide) y además habremos
-metido a la dirección de origen en la lista::
-
-   # cat /proc/net/xt_recent/DEFAULT 
-   src=192.168.1.240 ttl: 1 last_seen: 4296132894 oldest_pkt: 1 4296132894
-
-A partir de este momento y durante dos minutos, no podremos conectar desde
-*192.168.1.240*. Si esperamos, volveremos a poder acceder por |SSH| a menos que
-en algún momento se nos ocurra volver a hacer un :command:`ping`.
-
-.. rubric:: Ejemplo 2
-
-.. code-block:: bash
-
-   iptables -A INPUT -m recent --update --seconds 120 -j DROP
-   iptables -A INPUT -i eth0 -p icmp -m recent --set -j DROP
-
-El segundo ejemplo es semejante, pero al sustituir ``--rcheck`` por ``--update``
-cualquier paquete que envíe la dirección |IP| renovará la entrada en la lista y,
-en consecuencia, la |IP| sólo dejará de estar vetada si pasa dos minutos sin
-enviarnos ningún paquete.
+IPtables
+========
+El :ref:`módulo recent de iptables <iptables-recent>` es muy apropiado tanto
+para limitar los atanques de fuerza bruta como para implementar la técnica del
+*port-knocking*.
 
 .. _ipt-limit:
 
@@ -686,6 +578,12 @@ antes hacer :download:`lo siguiente <files/ssh.sh>`:
 
    .. literalinclude:: files/port-knocking-1
       :language: bash
+
+nftables
+========
+
+.. todo:: Por estudiar las soluciones equivalentes con :ref:`nftables
+   <nftables>`.
 
 .. _fail2ban:
 
@@ -1085,5 +983,4 @@ siguiente configuración::
 .. _john the ripper: https://www.openwall.com/john/
 .. _versión Jumbo: https://github.com/magnumripper/JohnTheRipper
 .. _THC-Hydra: https://github.com/vanhauser-thc/thc-hydra
-.. |ICMP| replace:: :abbr:`ICMP (Internet Control Message Protocol)`
 .. _denyhosts: http://denyhosts.sourceforge.net/   

@@ -4,8 +4,16 @@ Diagnóstico
 ***********
 Todos los discos modernos incluyen |SMART|, una tecnología que permite monitorizarlos
 y detectar fallos puntuales de disco antes de que llegue a producirse una falla
-completa que inutilice el disco. Para poder hacer efectiva la monitorización se
+que los inutilice por completo. Para poder hacer efectiva la monitorización se
 requiere que el sistema operativo, como es el caso de *Linux*, la soporte.
+
+Esta tecnología incluye:
+
+- El mantenimiento, por parte del propio disco, de `una serie de atributos
+  <https://en.wikipedia.org/wiki/S.M.A.R.T.#Known_ATA_S.M.A.R.T._attributes>`_
+  que informan de ciertos aspectos relativos a su funcionamiento y fallos. 
+
+- Una serie de exámenes que inspeccionan el disco en busca de errores.
 
 Instalación
 ===========

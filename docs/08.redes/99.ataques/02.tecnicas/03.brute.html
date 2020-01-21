@@ -471,117 +471,11 @@ gestionarlas.</p>
 </ol>
 </li>
 </ul>
-<div class="section" id="iptables-recent">
-<span id="ipt-recent"></span><h3>8.9.2.4.2.1. iptables-recent<a class="headerlink" href="#iptables-recent" title="Enlazar permanentemente con este título">¶</a></h3>
-<p><em>recent</em> es un módulo de iptables que permite crear una lista dinámica con las
-direcciones <abbr title="Internet Protocol">IP</abbr> (en principio, direcciones <abbr title="Internet Protocol">IP</abbr> de origen) que establecen
-conexión con nuestro servidor y toma decisiones en base a ello. Por ello, es
-útil para poner en práctica tanto el <em>port-knocking</em> como la <em>limitación de
-accesos</em>. Antes de ello, estudiemos brevemente las posibilidades del módulo:</p>
-<ul>
-<li><p class="first">El módulo permite realizar cuatro acciones:</p>
-<dl class="docutils">
-<dt><code class="docutils literal notranslate"><span class="pre">--set</span></code></dt>
-<dd><p class="first last">que añade la dirección <abbr title="Internet Protocol">IP</abbr> a la lista dinámica o actualiza la entrada
-si ya estaba.</p>
-</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">--rcheck</span></code></dt>
-<dd><p class="first last">que comprueba si la dirección <abbr title="Internet Protocol">IP</abbr> se encuentra en la lista.</p>
-</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">--update</span></code></dt>
-<dd><p class="first last">que además de la comprobación, actualiza la lista para añadir el instante de tiempo
-como la última vez que se ha visto la <abbr title="Internet Protocol">IP</abbr>.</p>
-</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">--remove</span></code></dt>
-<dd><p class="first last">que elimina la <abbr title="Internet Protocol">IP</abbr> de la lista.</p>
-</dd>
-</dl>
-</li>
-<li><p class="first">Pueden existir varias listas independientes cada una con su nombre:</p>
-<dl class="docutils">
-<dt><code class="docutils literal notranslate"><span class="pre">--name</span> <span class="pre">&lt;NOMBRE&gt;</span></code></dt>
-<dd><p class="first last">permite indicar el nombre de la lista. Si no se especifica ninguno, será «DEFAULT».</p>
-</dd>
-</dl>
-</li>
-<li><p class="first">Cuando se comprueba si la entrada existe (<code class="docutils literal notranslate"><span class="pre">--rcheck</span></code> o <code class="docutils literal notranslate"><span class="pre">-update</span></code>) pueden añadirse
-las siguientes opciones:</p>
-<dl class="docutils">
-<dt><code class="docutils literal notranslate"><span class="pre">--seconds</span> <span class="pre">&lt;SEGUNDOS&gt;</span></code></dt>
-<dd><p class="first last">que restringe la búsqueda en la lista sólo a los últimos segundos que se
-especifiquen.  Por tanto, si se añade <code class="code docutils literal notranslate"><span class="pre">--seconds</span> <span class="pre">60</span></code>, la coincidencia
-sólo se producirá si se añadió la <abbr title="Internet Protocol">IP</abbr> en el último minuto.</p>
-</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">--hitcount</span> <span class="pre">&lt;N&gt;</span></code></dt>
-<dd><p class="first last">la búsqueda tendrá éxito sólo si la dirección se encuentra en la lista el
-número de veces indicado. Por supuesto, puede usarse en conjunción con <code class="docutils literal notranslate"><span class="pre">--seconds</span></code>.</p>
-</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">--reap</span></code></dt>
-<dd><p class="first last">usado en conjunción con <code class="docutils literal notranslate"><span class="pre">--seconds</span></code> provoca que se eliminen de la lista las entradas
-de la <abbr title="Internet Protocol">IP</abbr> anteriores al periodo de tiempo indicado.</p>
-</dd>
-</dl>
-</li>
-<li><p class="first">Por último, para alterar el significado de la dirección <abbr title="Internet Protocol">IP</abbr>:</p>
-<dl class="docutils">
-<dt><code class="docutils literal notranslate"><span class="pre">--rdest</span></code></dt>
-<dd><p class="first last">apunta o comprueba tomando la <abbr title="Internet Protocol">IP</abbr> de destino del paquete, en vez de la de
-origen.</p>
-</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">--mask</span> <span class="pre">&lt;MASCARA&gt;</span></code></dt>
-<dd><p class="first last">máscara que debe aplicarse a la lista de direcciones.</p>
-</dd>
-</dl>
-</li>
-</ul>
-<p>Por otro lado, la listas pueden consultarse dentro del directorio
-<code class="file docutils literal notranslate"><span class="pre">/proc/net/xt_recent/</span></code> e incluso aplicar manualmente modificaciones sobre
-ellas según lo que expone la <a class="reference external" href="http://ipset.netfilter.org/iptables-extensions.man.html#lbBW">página de manual</a>.</p>
-<p>Para ilustrar el uso, antes de pasar a resolver nuestros problemas completos,
-tomemos y comentemos un par de ejemplos inspirados en los de la documentación
-oficial:</p>
-<p class="rubric">Ejemplo 1</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>iptables -A INPUT -m recent --rcheck --seconds <span class="m">120</span> -j DROP
-iptables -A INPUT -i eth0 -p icmp -m recent --set -j DROP
-</pre></div>
-</div>
-<p>Con estas reglas, si una máquina cualquiera intentos hacernos <strong class="command">ping</strong>
-por primera vez, la primera regla se evalúa a falso, ya que la <abbr title="Internet Protocol">IP</abbr> no se
-encuentra aún en la lista <em>DEFAULT</em>. En consecuencia, este primer paquete prueba
-la segunda regla y al ser un paquete <em>ping</em> provocará la inclusión en la lista
-de la <abbr title="Internet Protocol">IP</abbr> y, además, se rechazará el paquete, ya que <code class="docutils literal notranslate"><span class="pre">--set</span></code> siempre se
-evalúa a verdadero. A partir de la recepción de este paquete <abbr title="Internet Control Message Protocol">ICMP</abbr> y durante 2
-minutos cualquier paquete procedente de esta <abbr title="Internet Protocol">IP</abbr>, sea de la naturaleza que sea,
-se rechazará al toparse con la primera regla. Pasados los dos minutos, la
-primera regla se evaluará a falso para paquetes procedentes de la esa <abbr title="Internet Protocol">IP</abbr> y
-sólo si vuelve a mandar un paquete <abbr title="Internet Control Message Protocol">ICMP</abbr>, volveremos a vetar la dirección.</p>
-<p>En conclusión: si a una máquina se le ocurre mandarnos un paquete <abbr title="Internet Control Message Protocol">ICMP</abbr> no
-podrá comunicarse con nosotros durante dos minutos.</p>
-<p>Para <strong>comprobar</strong> cómo funciona, podemos probar a hacer una conexión <abbr title="Security SHell">SSH</abbr> a
-esta máquina (<abbr title="Internet Protocol">IP</abbr> <em>192.168.1.239</em>) desde otra máquina (de <abbr title="Internet Protocol">IP</abbr> <em>192.168.1.240</em>):
-deberíamos acceder sin problemas, supuesto que haya un servidor <abbr title="Security SHell">SSH</abbr> instalado,
-claro está. Ahora bien, si hacemos desde <em>192.168.1.240</em> un <strong class="command">ping</strong>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> ping -c1 -W1 <span class="m">192</span>.168.1.239
-</pre></div>
-</div>
-<p>No recibiremos respuesta (ya que la segunda regla lo impide) y además habremos
-metido a la dirección de origen en la lista:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cat /proc/net/xt_recent/DEFAULT
-<span class="go">src=192.168.1.240 ttl: 1 last_seen: 4296132894 oldest_pkt: 1 4296132894</span>
-</pre></div>
-</div>
-<p>A partir de este momento y durante dos minutos, no podremos conectar desde
-<em>192.168.1.240</em>. Si esperamos, volveremos a poder acceder por <abbr title="Security SHell">SSH</abbr> a menos que
-en algún momento se nos ocurra volver a hacer un <strong class="command">ping</strong>.</p>
-<p class="rubric">Ejemplo 2</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>iptables -A INPUT -m recent --update --seconds <span class="m">120</span> -j DROP
-iptables -A INPUT -i eth0 -p icmp -m recent --set -j DROP
-</pre></div>
-</div>
-<p>El segundo ejemplo es semejante, pero al sustituir <code class="docutils literal notranslate"><span class="pre">--rcheck</span></code> por <code class="docutils literal notranslate"><span class="pre">--update</span></code>
-cualquier paquete que envíe la dirección <abbr title="Internet Protocol">IP</abbr> renovará la entrada en la lista y,
-en consecuencia, la <abbr title="Internet Protocol">IP</abbr> sólo dejará de estar vetada si pasa dos minutos sin
-enviarnos ningún paquete.</p>
+<div class="section" id="iptables">
+<span id="iptables-bruta"></span><h3>8.9.2.4.2.1. IPtables<a class="headerlink" href="#iptables" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>El <a class="reference internal" href="../../07.cortafuegos/01.iptables/03.ext.html#iptables-recent"><span class="std std-ref">módulo recent de iptables</span></a> es muy apropiado tanto
+para limitar los atanques de fuerza bruta como para implementar la técnica del
+<em>port-knocking</em>.</p>
 <div class="section" id="limitacion-de-accesos">
 <span id="ipt-limit"></span><h4>8.9.2.4.2.1.1. Limitación de accesos<a class="headerlink" href="#limitacion-de-accesos" title="Enlazar permanentemente con este título">¶</a></h4>
 <p>Es obvio que en condiciones normales un uso legítimo de algunos de nuestros
@@ -772,8 +666,15 @@ iptables -A INPUT -j toc
 </div>
 </div>
 </div>
+<div class="section" id="nftables">
+<h3>8.9.2.4.2.2. nftables<a class="headerlink" href="#nftables" title="Enlazar permanentemente con este título">¶</a></h3>
+<div class="admonition-todo admonition" id="index-0">
+<p class="first admonition-title">Por hacer</p>
+<p class="last">Por estudiar las soluciones equivalentes con <a class="reference internal" href="../../07.cortafuegos/02.nftables/index.html#nftables"><span class="std std-ref">nftables</span></a>.</p>
+</div>
+</div>
 <div class="section" id="fail2ban">
-<span id="id6"></span><h3>8.9.2.4.2.2. fail2ban<a class="headerlink" href="#fail2ban" title="Enlazar permanentemente con este título">¶</a></h3>
+<span id="id6"></span><h3>8.9.2.4.2.3. fail2ban<a class="headerlink" href="#fail2ban" title="Enlazar permanentemente con este título">¶</a></h3>
 <p><strong class="program">fail2ban</strong> (<a class="reference external" href="https://www.fail2ban.org/wiki/index.php/Main_Page">página web</a>) es una aplicación escrita
 en <em>python</em> que escruta los accesos a distintos servicios, identifica cuáles de
 ellos son fallidos y, aplicando ciertas reglas de tolerancia (p.e. 5 accesos
@@ -816,7 +717,7 @@ posiblemene, en un lugar diferente.</li>
 </pre></div>
 </div>
 <div class="section" id="estructura-de-la-configuracion">
-<h4>8.9.2.4.2.2.1. Estructura de la configuración<a class="headerlink" href="#estructura-de-la-configuracion" title="Enlazar permanentemente con este título">¶</a></h4>
+<h4>8.9.2.4.2.3.1. Estructura de la configuración<a class="headerlink" href="#estructura-de-la-configuracion" title="Enlazar permanentemente con este título">¶</a></h4>
 <p>Toda la configuración se encuentra dentro de <code class="file docutils literal notranslate"><span class="pre">/etc/fail2ban</span></code>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">/etc/fail2ban/</span>
 <span class="go">|-- action.d</span>
@@ -892,7 +793,7 @@ reglas de <strong class="program">iptables</strong> que aprovechan las capacidad
 </ul>
 </div>
 <div class="section" id="configuracion-basica">
-<h4>8.9.2.4.2.2.2. Configuración básica<a class="headerlink" href="#configuracion-basica" title="Enlazar permanentemente con este título">¶</a></h4>
+<h4>8.9.2.4.2.3.2. Configuración básica<a class="headerlink" href="#configuracion-basica" title="Enlazar permanentemente con este título">¶</a></h4>
 <p>El paquete trae un fichero <code class="file docutils literal notranslate"><span class="pre">jail.conf</span></code> que incluye entre otras cosas
 los valores de la configuración por defecto en la sección <code class="docutils literal notranslate"><span class="pre">[DEFAULT]</span></code>. Esto
 es así, porque el fichero es de tipo <em>INI</em> y cada <em>jail</em> se define en una
@@ -950,7 +851,7 @@ como éste:</p>
 </div>
 </div>
 <div class="section" id="funcionamiento">
-<h4>8.9.2.4.2.2.3. Funcionamiento<a class="headerlink" href="#funcionamiento" title="Enlazar permanentemente con este título">¶</a></h4>
+<h4>8.9.2.4.2.3.3. Funcionamiento<a class="headerlink" href="#funcionamiento" title="Enlazar permanentemente con este título">¶</a></h4>
 <p>Es obvio que cada vez que hagamos un cambio como en la configuración anterior,
 podremos reiniciar el servicio con la herramienta habitual de <em>debian</em>:</p>
 <div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="c1"># invoke-rc.d fail2ban restart</span>
@@ -979,7 +880,7 @@ o, más precisamente dicho, los <em>jails</em> activos:</p>
 </div>
 </div>
 <div class="section" id="hurgando-en-la-configuracion">
-<h4>8.9.2.4.2.2.4. Hurgando en la configuración<a class="headerlink" href="#hurgando-en-la-configuracion" title="Enlazar permanentemente con este título">¶</a></h4>
+<h4>8.9.2.4.2.3.4. Hurgando en la configuración<a class="headerlink" href="#hurgando-en-la-configuracion" title="Enlazar permanentemente con este título">¶</a></h4>
 <p>Hasta ahora, nos hemos limitado a modificar a tientas un <em>jail</em> ya creado
 (<code class="docutils literal notranslate"><span class="pre">[sshd]</span></code>). Ahora bien, más allá de que por su nombre parezca que
 efectivamente vigila el servicio <abbr title="Security SHell">SSH</abbr>, ¿por qué realmente vigila tal servicio?
@@ -1218,16 +1119,17 @@ opción <code class="docutils literal notranslate"><span class="pre">port</span>
 </ul>
 </li>
 <li><a class="reference internal" href="#contramedidas">8.9.2.4.2. Contramedidas</a><ul>
-<li><a class="reference internal" href="#iptables-recent">8.9.2.4.2.1. iptables-recent</a><ul>
+<li><a class="reference internal" href="#iptables">8.9.2.4.2.1. IPtables</a><ul>
 <li><a class="reference internal" href="#limitacion-de-accesos">8.9.2.4.2.1.1. Limitación de accesos</a></li>
 <li><a class="reference internal" href="#port-knocking">8.9.2.4.2.1.2. Port-knocking</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#fail2ban">8.9.2.4.2.2. fail2ban</a><ul>
-<li><a class="reference internal" href="#estructura-de-la-configuracion">8.9.2.4.2.2.1. Estructura de la configuración</a></li>
-<li><a class="reference internal" href="#configuracion-basica">8.9.2.4.2.2.2. Configuración básica</a></li>
-<li><a class="reference internal" href="#funcionamiento">8.9.2.4.2.2.3. Funcionamiento</a></li>
-<li><a class="reference internal" href="#hurgando-en-la-configuracion">8.9.2.4.2.2.4. Hurgando en la configuración</a></li>
+<li><a class="reference internal" href="#nftables">8.9.2.4.2.2. nftables</a></li>
+<li><a class="reference internal" href="#fail2ban">8.9.2.4.2.3. fail2ban</a><ul>
+<li><a class="reference internal" href="#estructura-de-la-configuracion">8.9.2.4.2.3.1. Estructura de la configuración</a></li>
+<li><a class="reference internal" href="#configuracion-basica">8.9.2.4.2.3.2. Configuración básica</a></li>
+<li><a class="reference internal" href="#funcionamiento">8.9.2.4.2.3.3. Funcionamiento</a></li>
+<li><a class="reference internal" href="#hurgando-en-la-configuracion">8.9.2.4.2.3.4. Hurgando en la configuración</a></li>
 </ul>
 </li>
 </ul>

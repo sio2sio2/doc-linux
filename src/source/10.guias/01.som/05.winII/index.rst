@@ -57,18 +57,18 @@ Usuarios y grupos
 * A diferencia de *Linux*, puede añadirse un grupo como miembro de otro.
 
 * Los usuarios tienen su perfil personal en la ruta
-  :file:`C:\Users\nombre_usuario`, de manera que:
+  :file:`C:\\Users\\nombre_usuario`, de manera que:
 
   - Cada vez que se crea ese directorio personal se copia el contenido de
-    :file:`C:\Users\Default` (oculto), exactamente del mismo modo que en +Linux*
+    :file:`C:\\Users\\Default` (oculto), exactamente del mismo modo que en +Linux*
     se hace con :file:`/etc/skel`.
 
   - Se hace accesible todo el contenido que se encuentra dentro de
-    :file:`C:\Users\Public`. Por ejemplo, si en :file:`C:\Users\Public\Desktop`
+    :file:`C:\\Users\\Public`. Por ejemplo, si en :file:`C:\\Users\\Public\\Desktop`
     se añade un fichero, ese fichero lo verán todos los usuarios en su
     escritorio.
 
-  - :file:`C:\Users\nombre_usuario\NTUSER.DAT` almacena la configuración
+  - :file:`C:\\Users\\nombre_usuario\\NTUSER.DAT` almacena la configuración
     personal del usuario, de suerte que cada vez que éste inicia sesión, se
     carga el contenido de este fichero en el registro y se aplica la
     configuración (p.e. cuál es la imagen de fondo de escritorio).
