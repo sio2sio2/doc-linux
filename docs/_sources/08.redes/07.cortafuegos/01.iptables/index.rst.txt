@@ -1,27 +1,28 @@
 .. _iptables:
 
-netfilter (IPtables)
-********************
+IPtables
+********
 Desde *Woody* a *Stretch* el cortafuegos predeterminado en *Debian* ha venido
-siendo :program:`netfilter` que es nombre de la *suite* que engloba el conjunto
-de programas de cortafuegos, aunque vulgarmente nos refiramos a todo él como
-:program:`iptables`, que es, en realidad, sólo uno de ellos. La suite incluye:
+siendo :program:`iptables`, aunque en realidad las aplicaciones que nos permiten
+tratar con :program:`netfilter` son una suite que engloba todo un conjunto de
+aplicaciones:
 
-* :program:`iptables` e :program:`ip6tables` para la inspección en capa de red y de
-  transporte.
-* :program:`ebtables` y :program:`eb6tables` para la inspección en tramas de
-  ethernet.
-* :program:`arptables` y :program:`arp6tables` para la inspección del tráfico
-  |ARP|.
+* :program:`iptables` e :program:`ip6tables` para la inspección en capa de red y
+  de transporte.
+* :program:`ebtables` para la inspección de tramas de ethernet del tráfico
+  conmutado (el que atraviesa :ref:`interfaces bridge <bridge>`).
+* :program:`arptables` para la inspección del tráfico |ARP|.
 
-A partir de *Buster*, se sigue incluyendo el soporte en el núcleo, pero los
-ejecutables :command:`iptables`, :command:`ebtables` y :command:`arptables` son
-en realidad un frontend para :ref:`nftables <nftables>`, conservando la sintaxis
-de los originales. Es importante tenerlo presente, porque hay módulos de
-:program:`iptables` que ya no existen en :program:`nftables`. Para sintaxis
-básica y algunos módulos, sin embargo, son perfectamente funcionales.
+A partir de *Buster*, se sigue incluyendo esta suite (a la que referiremos
+simplemente con el nombre de su ejecutable emblema :program:`iptable`), aunque
+en realidad como *frontend* de :ref:`nftables <nftables>` que conserva la
+sintaxis de los originales. Es importante tenerlo presente, porque si
+pretendemos hacer algo un poco complicado (usar extensiones como las referidas
+:ref:`bajo su epígrafe <iptables-ext>`), nos toparemos con la imposibilidad de
+hacerlo, ya que e *frontend* no llega a tanto grado de traducción.
+Para la sintaxis básica, sin embargo, son perfectamente funcionales.
 
-Los verdaderos ejecutables de :program:`netfilter` han pasado a renombrarse
+Los verdaderos ejecutables de :program:`iptables` han pasado a renombrarse
 añadiendo :kbd:`-legacy`. Así, :program:`iptables-legacy` es el
 :program:`iptables` y, por defecto, :program:`iptables` una alternativa que
 apunta a :program:`iptables-nft`.

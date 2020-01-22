@@ -4,7 +4,7 @@ nftables
 ********
 Es el nuevo cortafuegos de *Linux* con una sintaxis totalmente diferente
 inspirada en :ref:`tcpdump <tcpdump>`. Pese a ello, resulta muy útil el
-conocimiento previo de :program:`netfilter` debido a que:
+conocimiento previo de :program:`iptables` debido a que:
 
 - Aunque de antemano no predefine las tablas ni las cadenas, el flujo 
   de paquetes sigue siendo exactamente el mismo, por lo que los puntos
@@ -18,6 +18,24 @@ conocimiento previo de :program:`netfilter` debido a que:
   embargo, se limitan a la sintaxis básica, por lo que no podremos usar
   sentencias de iptables que incluyan :ref:`extensiones <iptables-ext>`.
 
-.. https://wiki.nftables.org/wiki-nftables/index.php/Main_Page
-   https://www.redeszone.net/tutoriales/seguridad/nftables-firewall-linux-configuracion/
-   https://wiki.archlinux.org/index.php/Nftables_(Espa%C3%B1ol)
+Utilizar :program:`nftables` exige un esfuerzo extra en:
+
+- Definir tablas asignando cada una a una familia de tráfico. Con las antiguas
+  herramientas el tráfico que tratáramos venía definido por la herramienta que
+  usáramos. Por ejemplo, para tráfico conmutado usábamos :program:`ebtables`.
+
+- Definir cadenas para asignar cada una a una familia de tráfico, un tipo de
+  cadena y un enganche (esto, en que instante del flujo opera). En las antiguas
+  herramientas existían cadenas predefinidas con todo ya completamente definido.
+  Por ejemplo, la cadena *INPUT* de la tabla *filter* de :program:`iptables` se
+  refiere a la familia *ip*, es de tipo *filter* y su enganche se encuentra tras
+  la decisión de encaminamiento y antas de la llegada al proceso local.
+
+- Asociar las cadenas a tablas, lo cual ya se daba hecho antes. Siguiendo con el
+  ejemplo de la cadena anterior, ésta ya estaba asociada a la tabla *filter*.
+
+.. toctree::
+   :glob:
+   :maxdepth: 2
+
+   [0-9]*

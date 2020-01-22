@@ -22,10 +22,12 @@ Al ser los cortafuegos piezas críticas para la seguridad del sistema operativo
 es común que su sustitución por otro sea paulatina y que durante un tiempo
 convivan el *firewall* antiguo y el nuevo, mientras se afinan, los
 administradores se acostumbran y las aplicaciones que dependen de ellos se
-actualizan. Desde hace unos cuantos años\ [#]_, conviven en el núcleo de *Linux*
-:program:`iptables` y :program:`nftables`, aunque la mayoría de las versiones
-modernas (*Debian* desde *Buster*) incluyen ya :program:`nftables` como el
-cortafuegos predeterminado.  Trataremos en esta guía ambos.
+actualizan. Desde hace unos cuantos años\ [#]_, conviven en las distribuciones
+de *Linux* :program:`iptables` y su sustituto :program:`nftables`, programas
+ambos que manipulan el *framework* de filtrado de paquetes del núcleo
+(:program:`netfilter`), aunque las distribuciones modernas (*Debian* desde
+*Buster*) fijan ya :program:`nftables` como el cortafuegos predeterminado.
+Trataremos en esta guía ambos.
 
 .. rubric:: Contenidos
 
