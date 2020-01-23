@@ -2,3 +2,55 @@
 
 Reglas
 ******
+Si nuestro cortafuegos no lleva a cabo tareas muy complicadas, es posible seguir
+usando la :ref:`sintaxis de iptables <iptables-sintaxis>` a través de la familia
+de órdenes :program:`iptables-nft`, :program:`ip6tables-nft`,
+:program:`ebtables-nft` y :program:`arptables-nft` sin preocuparnos siquiera de crear
+tablas ni cadenas, puesto que estas órdenes, al ser ejecutadas, crean las
+cadenas pertinentes. Así pues\ [#]_::
+
+   # iptables-nft -vnL
+
+creará las cadenas incluidas en las tablas *filter*\ [#]_::
+
+   # nft list table filter
+   table ip filter {
+      chain INPUT {
+         type filter hook input priority filter; policy accept;
+      }
+
+      chain FORWARD {
+         type filter hook forward priority filter; policy accept;
+      }
+
+      chain OUTPUT {
+         type filter hook output priority filter; policy accept;
+      }
+   }
+
+y la expresión de una regla también será interpretada sin problemas::
+
+   # iptables -A INPUT -p tcp --dport 80 -j DROP
+   # nft list chain filter INPUT
+   table ip filter {
+      chain INPUT {
+         type filter hook input priority filter; policy accept;
+         meta l4proto tcp tcp dport 80 counter packets 0 bytes 0 drop
+      }
+   }
+
+Hay, además, un traductor que permite ver cuál es el equivalente sin
+llegar a hacer la orden efectiva::
+
+   # iptables-translate -A INPUT -p tcp --dport 80 -j DROP
+   nft add rule ip filter INPUT tcp dport 80 counter drop
+
+.. rubric:: Notas al pie
+
+.. [#] EN *Buster* basta con utilizar :command:`iptables`, puesto que es la
+   alternativa predeterminada frente al antiguo :command:`iptables` que ha
+   pasado a renombrase como :command:`iptables-legacy`.
+
+.. [#] No debe entenderse de lo dicho que para crear las tablas, hay que usar la
+   orden de listado primero. Insertar una regla, por ejemplo, ya crea la
+   infraestructura necesaria.
