@@ -39,3 +39,15 @@ Utilizar :program:`nftables` exige un esfuerzo extra en:
    :maxdepth: 2
 
    [0-9]*
+
+.. rubric:: Enlaces de interes
+
+* `La wiki de nftables
+  <https://wiki.nftables.org/wiki-nftables/index.php/Configuring_chains>`_.
+* `Tutorial de la wiki de Archilinux
+  <https://wiki.archlinux.org/index.php/Nftables>`_.
+* `Tutorial de la wiki de Gentoo
+  <https://wiki.gentoo.org/wiki/Nftables>`_.
+* `Presentación de desarrolladores de netfilter en la Cybercamp 2018
+  <https://cybercamp.es/sites/default/files/contenidos/videos/adjuntos/cybercamp18_b06_laura_garcia_liebana_0_0.pdf>`_.
+

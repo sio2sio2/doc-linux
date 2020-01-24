@@ -45,6 +45,277 @@ llegar a hacer la orden efectiva::
    # iptables-translate -A INPUT -p tcp --dport 80 -j DROP
    nft add rule ip filter INPUT tcp dport 80 counter drop
 
+Para tareas más complicadas, en cambio, es forzoso conocer la sintaxis modernas
+y a ello nos dedicaremos.
+
+Sintaxis
+========
+Las reglas se añaden a las cadenas y se van comprobando en el orden en el que
+se encuentran en ella. se añaden del siguiente modo::
+
+   # nft add|insert rule [<famiy>] <table> <chain> [handle <value>] [<selectores>] [<acciones>]
+
+esto es:
+
+- Se puede añadir (:kbd:`add`) o insertar (:kbd:`ìnsert`).
+- Se indica la cadena a la que pertenece la regla.
+- Con :kbd:`handle` se indica la posición de adición o inserción. Añadir
+  implica hacerlo tras la posición e insertar antes de ella. Si no se indica
+  :kbd:`handle`, :kbd:`add` añadirá la regla al final de la cadena e
+  :kbd:`insert`, al commienza.
+- Los selectores (uno o varios) permiten especificar cuál es el tráfico al que
+  afecta la regla.
+- Por último, debe especificarse cuál es el efecto o efectos de la regla sobre
+  el tráfico al que afecta.
+
+Por ejemplo::
+
+   # nft add rule filter INPUT ip daddr 10.0.0.0/8 accept
+
+en este caso, hay una condición, que la dirección de destino esté en la red
+*10.0.0.0/8*; y una acción: aceptar el tráfico. Puede no incluirse acción
+alguna, en cuyo caso, la regla comprobará la condición... pero no hará nada
+(aunque puede tener sentido si :ref:`se quieren contar paquetes
+<nftables-counter>`).
+
+Para listar reglas podemos:
+
+* Listar las reglas de una cadena::
+
+   nft list chain [<family>] <table> <nombre>
+
+  como, por ejemplo::
+
+   # nft list chain filter INPUT
+
+* Listas las reglas de todas las cadenas de una tabla::
+
+   nft list table [<family>] <nombre>
+
+  como por ejemplo::
+
+   # nft list table filter
+
+* Listar todas las reglas::
+
+   # nft list ruleset
+
+Es interesante la opción :kbd:`-a` que indica para cada regla el *handle* que le
+corresponde y que podemos usar para borrar reglas::
+
+   # nft delete rule [<family>] <table> <chain> handle <handle>
+
+como por ejemplo::
+
+   # nft delete rule filter INPUT handle 1
+
+Si sustituimos :kbd:`list` por :kbd:`flush` lograremos el efecto de vaciar de
+reglas la cadena, todas las cadenas de la tabla o todas las cadenas de todas las
+tablas::
+
+   # nft flush chain filter INPUT
+   # nft flush table filter
+   # nft flush ruleset
+
+Condiciones
+-----------
+Algunas de las condiciones que podemos indicar son:
+
+.. table::
+   :class: nftables-matches
+
+   +----------+-----------------+-----------------------------------------------------+
+   | Criterio | Argumento       | Descripción                                         |
+   +==========+=================+=====================================================+
+   | ip       | protocol        | Protocolo de la capa superior (incluido |ICMP|)     |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | ip protocol icmp                                    |
+   |          |                 | ip protocol != tcp                                  |
+   |          |                 | ip protocol {tcp, udp}                              |
+   |          +-----------------+-----------------------------------------------------+
+   |          | saddr           | Dirección de origen.                                |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | ip saddr 8.8.8.8                                    |
+   |          |                 | ip saddr 192.168.255.0/24                           |
+   |          +-----------------+-----------------------------------------------------+
+   |          | daddr           | Dirección de destino.                               |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | ip daddr 8.8.8.8                                    |
+   |          |                 | ip daddr != 192.168.255.0/24                        |
+   +----------+-----------------+-----------------------------------------------------+
+   | ip6      | saddr           | Dirección de origen.                                |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | ip saddr ::/64                                      |
+   |          +-----------------+-----------------------------------------------------+
+   |          | daddr           | Dirección de destino.                               |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | ip daddr ::/64                                      |
+   +----------+-----------------+-----------------------------------------------------+
+   | tcp      | sport           | Puerto de origen.                                   |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | tcp sport ssh                                       |
+   |          |                 | tcp sport 22-80                                     |
+   |          +-----------------+-----------------------------------------------------+
+   |          | dport           | Puerto de destino.                                  |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | tcp dport != telnet                                 |
+   |          |                 | tcp dport {22, 23}                                  |
+   |          +-----------------+-----------------------------------------------------+
+   |          | flags           | Indicadores |TCP|                                   |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | tcp dport != telnet                                 |
+   |          |                 | tcp dport {22, 23}                                  |
+   +----------+-----------------+-----------------------------------------------------+
+   | udp      | sport           | Puerto de origen.                                   |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | udp sport 53                                        |
+   |          +-----------------+-----------------------------------------------------+
+   |          | dport           | Puerto de destino.                                  |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | udp dport != 53                                     |
+   +----------+-----------------+-----------------------------------------------------+
+   | ether    | saddr           | |MAC| de origen.                                    |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | ether saddr 00:11:22:33:44:55                       |
+   |          +-----------------+-----------------------------------------------------+
+   |          | daddr           | |MAC| de destino.                                   |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | ether daddr 00:11:22:33:44:55                       |
+   |          +-----------------+-----------------------------------------------------+
+   |          | type            | Tipo de protocolo de capa superior.                 |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | ether type arp                                      |
+   |          |                 | ether type ip                                       |
+   |          |                 | ether type vlan                                     |
+   +----------+-----------------+-----------------------------------------------------+
+   | vlan     | id              | Identificador de la |VLAN|.                         |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | vlan id 10                                          |
+   +----------+-----------------+-----------------------------------------------------+
+   | ct       | state           | Estado de la conexión: *new*, *established*,        |
+   |          |                 | *related*, *untracked*.                             |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | ct state {established, related}                     |
+   |          +-----------------+-----------------------------------------------------+
+   |          | status          | Estado de la conexión (p.e. *snat* o *dnat* para    |
+   |          |                 | tráfico que ha sufrido |SNAT| o |DNAT|.             |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | ct status dnat                                      |
+   |          +-----------------+-----------------------------------------------------+
+   |          | mark [set]      | Comprueba la marca de la conexión o la fija si se   |
+   |          |                 | usa :kbd:`set`.                                     |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | ct mark 1                                           |
+   |          |                 | ct mark set 1                                       |
+   |          +-----------------+-----------------------------------------------------+
+   |          | direction       | Dirección del paquete: *original* o *reply*         |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | ct direction reply                                  |
+   +----------+-----------------+-----------------------------------------------------+
+   | meta     | | iifname       | Nombre de la interfaz de entrada o salida.          | 
+   |          | | oifname       +-----------------------------------------------------+
+   |          |                 | meta iifname "eth0"                                 |
+   |          |                 | meta iifname "eth*"                                 |
+   |          +-----------------+-----------------------------------------------------+
+   |          | | iif           | Índice de la interfaz que se adjudica al crearla    |
+   |          | | oif           | y puede consultarse en                              |
+   |          |                 | :file:`/class/net/eth0/ifindex`. La comparación es  |
+   |          |                 | más eficiente que para :kbd:`iifname`, pero el      |
+   |          |                 | índice no es                                        |
+   |          |                 | reciclable, por lo que sólo es recomendable usarlo  |
+   |          |                 | si la interfaz se crea una vez y no se destruye     |
+   |          |                 | (p.e. una interfaz física). Consulte `este enlace`_.|
+   |          |                 +-----------------------------------------------------+
+   |          |                 | meta iif eth0                                       |
+   |          +-----------------+-----------------------------------------------------+
+   |          | | iifgroup      | Grupo al que pertenece la interfaz de entrada o     |
+   |          | | oifgroup      | salida. Las interfaces pueden asignarse a un grupo  |
+   |          |                 | (ver :manpage:`ip-link(8)`) y definir los nombres   |
+   |          |                 | de los grupos en :file:`/etc/iproute2/groups`.      |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | meta iifgroup 99                                    |
+   |          +-----------------+-----------------------------------------------------+
+   |          | | iiftype       | Tipo de la interfaz (*ether*, *loopback*, etc.)     |
+   |          | | oiftype       |                                                     |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | meta iiftype loopback                               |
+   |          +-----------------+-----------------------------------------------------+
+   |          | mark [set]      | Comprueba o establece la marca del paquete.         |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | meta mark 2                                         |
+   |          |                 | meta mark set 2                                     |
+   +----------+-----------------+-----------------------------------------------------+
+
+.. _este enlace: https://serverfault.com/a/985167
+
+.. note:: Consulte :manpage:`nft(8)` para una lista completa de criterios y
+   argumentos o `este artículo en la wiki de nftables
+   <https://wiki.nftables.org/wiki-nftables/index.php/Quick_reference-nftables_in_10_minutes>`_.
+
+Tenga presenta que:
+
+* Pueden acomularse condiciones en una misma sentencia::
+
+   ip saddr 8.8.8.8 tcp dport telnet
+
+* Cuando los valores son numéricos la igualdad se nota no indicando operador,
+  pero también pueden usarse operadores de comparación (:kbd:`!=`, :kbd:`<`),
+  rangos o valores hexadecimales (usando la notación :kbd:`0x`)::
+
+   tcp dport 80
+   tcp dport != 80
+   tcp dport >= 80
+   tcp dport 0x50
+   tcp dport 80-120
+
+  .. warning:: Si ejecuta órdenes directamente en la *shell* tendrá que escapar
+     algunos de estos caracteres.
+
+* Es posible incluir como valor conjuntos de valores::
+
+   tcp dport {http, https}
+   tcp dport != {http, https}
+   iif {eth0, eth1}
+
+  .. seealso:: Revise el :ref:`epígrafe dedicado a conjuntos <nftables-sets>`.
+
+.. _nftables-counter:
+
+.. rubric:: Contadores
+
+A las condiciones pueden asociarse contadores que cuenten los paquetes que
+las cumplen. Por ejemplo::
+
+   # nft add table filter
+   # nft add chain filter INPUT {type filter hook input priority 0 \;}
+   # nft add rule filter INPUT ip protocol tcp counter
+
+cuenta los paquetes |TCP| de entrada. Esto es debido a que la posición del
+contador es importante y se ha colocado tras la opción y, como la regla se
+evalua de izquierda a derecha, ya se ha evaluado la condición. Sin embargo, si
+hacemos::
+
+   # nft add rule filter INPUT counter ip protocol tcp counter tcp dport ssh counter
+
+Habremos creado tres contadores en la misma regla: el primero cuenta cualquier
+tipo de paquete, el segundo sólo los paquetes |TCP| y el segundo los paquetes
+que son de tráfico |SSH|.
+
+.. _nftables-sets:
+
+.. rubric:: Conjuntos
+
+
+.. _nftables-maps:
+
+.. rubric:: Diccionarios
+
+Objetivos
+---------
+
+Persistencia
+============
+
 .. rubric:: Notas al pie
 
 .. [#] EN *Buster* basta con utilizar :command:`iptables`, puesto que es la
@@ -54,3 +325,10 @@ llegar a hacer la orden efectiva::
 .. [#] No debe entenderse de lo dicho que para crear las tablas, hay que usar la
    orden de listado primero. Insertar una regla, por ejemplo, ya crea la
    infraestructura necesaria.
+
+.. |MAC| replace:: :abbr:`MAC (Media Access Control)`
+.. |VLAN| replace:: :abbr:`VLAN (Virtual LAN)`
+.. |DNAT| replace:: :abbr:`DNAT (Destination NAT)`
+.. |SNAT| replace:: :abbr:`SNAT (Source NAT)`
+.. |TCP| replace:: :abbr:`TCP (Transmission Control Protocol)`
+.. |ICMP| replace:: :abbr:`ICMP (Internet Control Message Protocol)`

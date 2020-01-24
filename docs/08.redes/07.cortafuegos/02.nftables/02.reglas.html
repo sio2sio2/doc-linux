@@ -95,6 +95,328 @@ llegar a hacer la orden efectiva:</p>
 <span class="go">nft add rule ip filter INPUT tcp dport 80 counter drop</span>
 </pre></div>
 </div>
+<p>Para tareas más complicadas, en cambio, es forzoso conocer la sintaxis modernas
+y a ello nos dedicaremos.</p>
+<div class="section" id="sintaxis">
+<h2>8.7.2.3.1. Sintaxis<a class="headerlink" href="#sintaxis" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Las reglas se añaden a las cadenas y se van comprobando en el orden en el que
+se encuentran en ella. se añaden del siguiente modo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add<span class="p">|</span>insert rule <span class="o">[</span>&lt;famiy&gt;<span class="o">]</span> &lt;table&gt; &lt;chain&gt; <span class="o">[</span>handle &lt;value&gt;<span class="o">]</span> <span class="o">[</span>&lt;selectores&gt;<span class="o">]</span> <span class="o">[</span>&lt;acciones&gt;<span class="o">]</span>
+</pre></div>
+</div>
+<p>esto es:</p>
+<ul class="simple">
+<li>Se puede añadir (<kbd class="kbd docutils literal notranslate">add</kbd>) o insertar (<kbd class="kbd docutils literal notranslate">ìnsert</kbd>).</li>
+<li>Se indica la cadena a la que pertenece la regla.</li>
+<li>Con <kbd class="kbd docutils literal notranslate">handle</kbd> se indica la posición de adición o inserción. Añadir
+implica hacerlo tras la posición e insertar antes de ella. Si no se indica
+<kbd class="kbd docutils literal notranslate">handle</kbd>, <kbd class="kbd docutils literal notranslate">add</kbd> añadirá la regla al final de la cadena e
+<kbd class="kbd docutils literal notranslate">insert</kbd>, al commienza.</li>
+<li>Los selectores (uno o varios) permiten especificar cuál es el tráfico al que
+afecta la regla.</li>
+<li>Por último, debe especificarse cuál es el efecto o efectos de la regla sobre
+el tráfico al que afecta.</li>
+</ul>
+<p>Por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add rule filter INPUT ip daddr <span class="m">10</span>.0.0.0/8 accept
+</pre></div>
+</div>
+<p>en este caso, hay una condición, que la dirección de destino esté en la red
+<em>10.0.0.0/8</em>; y una acción: aceptar el tráfico. Puede no incluirse acción
+alguna, en cuyo caso, la regla comprobará la condición… pero no hará nada
+(aunque puede tener sentido si <a class="reference internal" href="#nftables-counter"><span class="std std-ref">se quieren contar paquetes</span></a>).</p>
+<p>Para listar reglas podemos:</p>
+<ul>
+<li><p class="first">Listar las reglas de una cadena:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">nft list chain [&lt;family&gt;] &lt;table&gt; &lt;nombre&gt;</span>
+</pre></div>
+</div>
+<p>como, por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft list chain filter INPUT
+</pre></div>
+</div>
+</li>
+<li><p class="first">Listas las reglas de todas las cadenas de una tabla:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">nft list table [&lt;family&gt;] &lt;nombre&gt;</span>
+</pre></div>
+</div>
+<p>como por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft list table filter
+</pre></div>
+</div>
+</li>
+<li><p class="first">Listar todas las reglas:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft list ruleset
+</pre></div>
+</div>
+</li>
+</ul>
+<p>Es interesante la opción <kbd class="kbd docutils literal notranslate">-a</kbd> que indica para cada regla el <em>handle</em> que le
+corresponde y que podemos usar para borrar reglas:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft delete rule <span class="o">[</span>&lt;family&gt;<span class="o">]</span> &lt;table&gt; &lt;chain&gt; handle &lt;handle&gt;
+</pre></div>
+</div>
+<p>como por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft delete rule filter INPUT handle <span class="m">1</span>
+</pre></div>
+</div>
+<p>Si sustituimos <kbd class="kbd docutils literal notranslate">list</kbd> por <kbd class="kbd docutils literal notranslate">flush</kbd> lograremos el efecto de vaciar de
+reglas la cadena, todas las cadenas de la tabla o todas las cadenas de todas las
+tablas:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft flush chain filter INPUT
+<span class="gp">#</span> nft flush table filter
+<span class="gp">#</span> nft flush ruleset
+</pre></div>
+</div>
+<div class="section" id="condiciones">
+<h3>8.7.2.3.1.1. Condiciones<a class="headerlink" href="#condiciones" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Algunas de las condiciones que podemos indicar son:</p>
+<table border="1" class="nftables-matches docutils">
+<colgroup>
+<col width="13%" />
+<col width="21%" />
+<col width="66%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Criterio</th>
+<th class="head">Argumento</th>
+<th class="head">Descripción</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td rowspan="6">ip</td>
+<td rowspan="2">protocol</td>
+<td>Protocolo de la capa superior (incluido <abbr title="Internet Control Message Protocol">ICMP</abbr>)</td>
+</tr>
+<tr class="row-odd"><td>ip protocol icmp
+ip protocol != tcp
+ip protocol {tcp, udp}</td>
+</tr>
+<tr class="row-even"><td rowspan="2">saddr</td>
+<td>Dirección de origen.</td>
+</tr>
+<tr class="row-odd"><td>ip saddr 8.8.8.8
+ip saddr 192.168.255.0/24</td>
+</tr>
+<tr class="row-even"><td rowspan="2">daddr</td>
+<td>Dirección de destino.</td>
+</tr>
+<tr class="row-odd"><td>ip daddr 8.8.8.8
+ip daddr != 192.168.255.0/24</td>
+</tr>
+<tr class="row-even"><td rowspan="4">ip6</td>
+<td rowspan="2">saddr</td>
+<td>Dirección de origen.</td>
+</tr>
+<tr class="row-odd"><td>ip saddr ::/64</td>
+</tr>
+<tr class="row-even"><td rowspan="2">daddr</td>
+<td>Dirección de destino.</td>
+</tr>
+<tr class="row-odd"><td>ip daddr ::/64</td>
+</tr>
+<tr class="row-even"><td rowspan="6">tcp</td>
+<td rowspan="2">sport</td>
+<td>Puerto de origen.</td>
+</tr>
+<tr class="row-odd"><td>tcp sport ssh
+tcp sport 22-80</td>
+</tr>
+<tr class="row-even"><td rowspan="2">dport</td>
+<td>Puerto de destino.</td>
+</tr>
+<tr class="row-odd"><td>tcp dport != telnet
+tcp dport {22, 23}</td>
+</tr>
+<tr class="row-even"><td rowspan="2">flags</td>
+<td>Indicadores <abbr title="Transmission Control Protocol">TCP</abbr></td>
+</tr>
+<tr class="row-odd"><td>tcp dport != telnet
+tcp dport {22, 23}</td>
+</tr>
+<tr class="row-even"><td rowspan="4">udp</td>
+<td rowspan="2">sport</td>
+<td>Puerto de origen.</td>
+</tr>
+<tr class="row-odd"><td>udp sport 53</td>
+</tr>
+<tr class="row-even"><td rowspan="2">dport</td>
+<td>Puerto de destino.</td>
+</tr>
+<tr class="row-odd"><td>udp dport != 53</td>
+</tr>
+<tr class="row-even"><td rowspan="6">ether</td>
+<td rowspan="2">saddr</td>
+<td><abbr title="Media Access Control">MAC</abbr> de origen.</td>
+</tr>
+<tr class="row-odd"><td>ether saddr 00:11:22:33:44:55</td>
+</tr>
+<tr class="row-even"><td rowspan="2">daddr</td>
+<td><abbr title="Media Access Control">MAC</abbr> de destino.</td>
+</tr>
+<tr class="row-odd"><td>ether daddr 00:11:22:33:44:55</td>
+</tr>
+<tr class="row-even"><td rowspan="2">type</td>
+<td>Tipo de protocolo de capa superior.</td>
+</tr>
+<tr class="row-odd"><td>ether type arp
+ether type ip
+ether type vlan</td>
+</tr>
+<tr class="row-even"><td rowspan="2">vlan</td>
+<td rowspan="2">id</td>
+<td>Identificador de la <abbr title="Virtual LAN">VLAN</abbr>.</td>
+</tr>
+<tr class="row-odd"><td>vlan id 10</td>
+</tr>
+<tr class="row-even"><td rowspan="8">ct</td>
+<td rowspan="2">state</td>
+<td>Estado de la conexión: <em>new</em>, <em>established</em>,
+<em>related</em>, <em>untracked</em>.</td>
+</tr>
+<tr class="row-odd"><td>ct state {established, related}</td>
+</tr>
+<tr class="row-even"><td rowspan="2">status</td>
+<td>Estado de la conexión (p.e. <em>snat</em> o <em>dnat</em> para
+tráfico que ha sufrido <abbr title="Source NAT">SNAT</abbr> o <abbr title="Destination NAT">DNAT</abbr>.</td>
+</tr>
+<tr class="row-odd"><td>ct status dnat</td>
+</tr>
+<tr class="row-even"><td rowspan="2">mark [set]</td>
+<td>Comprueba la marca de la conexión o la fija si se
+usa <kbd class="kbd docutils literal notranslate">set</kbd>.</td>
+</tr>
+<tr class="row-odd"><td>ct mark 1
+ct mark set 1</td>
+</tr>
+<tr class="row-even"><td rowspan="2">direction</td>
+<td>Dirección del paquete: <em>original</em> o <em>reply</em></td>
+</tr>
+<tr class="row-odd"><td>ct direction reply</td>
+</tr>
+<tr class="row-even"><td rowspan="10">meta</td>
+<td rowspan="2"><div class="first last line-block">
+<div class="line">iifname</div>
+<div class="line">oifname</div>
+</div>
+</td>
+<td>Nombre de la interfaz de entrada o salida.</td>
+</tr>
+<tr class="row-odd"><td>meta iifname «eth0»
+meta iifname «eth*»</td>
+</tr>
+<tr class="row-even"><td rowspan="2"><div class="first last line-block">
+<div class="line">iif</div>
+<div class="line">oif</div>
+</div>
+</td>
+<td>Índice de la interfaz que se adjudica al crearla
+y puede consultarse en
+<code class="file docutils literal notranslate"><span class="pre">/class/net/eth0/ifindex</span></code>. La comparación es
+más eficiente que para <kbd class="kbd docutils literal notranslate">iifname</kbd>, pero el
+índice no es
+reciclable, por lo que sólo es recomendable usarlo
+si la interfaz se crea una vez y no se destruye
+(p.e. una interfaz física). Consulte <a class="reference external" href="https://serverfault.com/a/985167">este enlace</a>.</td>
+</tr>
+<tr class="row-odd"><td>meta iif eth0</td>
+</tr>
+<tr class="row-even"><td rowspan="2"><div class="first last line-block">
+<div class="line">iifgroup</div>
+<div class="line">oifgroup</div>
+</div>
+</td>
+<td>Grupo al que pertenece la interfaz de entrada o
+salida. Las interfaces pueden asignarse a un grupo
+(ver <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/ip-link(8)">ip-link(8)</a></em>) y definir los nombres
+de los grupos en <code class="file docutils literal notranslate"><span class="pre">/etc/iproute2/groups</span></code>.</td>
+</tr>
+<tr class="row-odd"><td>meta iifgroup 99</td>
+</tr>
+<tr class="row-even"><td rowspan="2"><div class="first last line-block">
+<div class="line">iiftype</div>
+<div class="line">oiftype</div>
+</div>
+</td>
+<td>Tipo de la interfaz (<em>ether</em>, <em>loopback</em>, etc.)</td>
+</tr>
+<tr class="row-odd"><td>meta iiftype loopback</td>
+</tr>
+<tr class="row-even"><td rowspan="2">mark [set]</td>
+<td>Comprueba o establece la marca del paquete.</td>
+</tr>
+<tr class="row-odd"><td>meta mark 2
+meta mark set 2</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">Consulte <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/nft(8)">nft(8)</a></em> para una lista completa de criterios y
+argumentos o <a class="reference external" href="https://wiki.nftables.org/wiki-nftables/index.php/Quick_reference-nftables_in_10_minutes">este artículo en la wiki de nftables</a>.</p>
+</div>
+<p>Tenga presenta que:</p>
+<ul>
+<li><p class="first">Pueden acomularse condiciones en una misma sentencia:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ip saddr 8.8.8.8 tcp dport telnet</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">Cuando los valores son numéricos la igualdad se nota no indicando operador,
+pero también pueden usarse operadores de comparación (<kbd class="kbd docutils literal notranslate">!=</kbd>, <kbd class="kbd docutils literal notranslate">&lt;</kbd>),
+rangos o valores hexadecimales (usando la notación <kbd class="kbd docutils literal notranslate">0x</kbd>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">tcp dport 80</span>
+<span class="go">tcp dport != 80</span>
+<span class="go">tcp dport &gt;= 80</span>
+<span class="go">tcp dport 0x50</span>
+<span class="go">tcp dport 80-120</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p class="last">Si ejecuta órdenes directamente en la <em>shell</em> tendrá que escapar
+algunos de estos caracteres.</p>
+</div>
+</li>
+<li><p class="first">Es posible incluir como valor conjuntos de valores:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">tcp dport {http, https}</span>
+<span class="go">tcp dport != {http, https}</span>
+<span class="go">iif {eth0, eth1}</span>
+</pre></div>
+</div>
+<div class="admonition seealso">
+<p class="first admonition-title">Ver también</p>
+<p class="last">Revise el <a class="reference internal" href="#nftables-sets"><span class="std std-ref">epígrafe dedicado a conjuntos</span></a>.</p>
+</div>
+</li>
+</ul>
+<p class="rubric" id="nftables-counter">Contadores</p>
+<p>A las condiciones pueden asociarse contadores que cuenten los paquetes que
+las cumplen. Por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add table filter
+<span class="gp">#</span> nft add chain filter INPUT <span class="o">{</span><span class="nb">type</span> filter hook input priority <span class="m">0</span> <span class="se">\;</span><span class="o">}</span>
+<span class="gp">#</span> nft add rule filter INPUT ip protocol tcp counter
+</pre></div>
+</div>
+<p>cuenta los paquetes <abbr title="Transmission Control Protocol">TCP</abbr> de entrada. Esto es debido a que la posición del
+contador es importante y se ha colocado tras la opción y, como la regla se
+evalua de izquierda a derecha, ya se ha evaluado la condición. Sin embargo, si
+hacemos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add rule filter INPUT counter ip protocol tcp counter tcp dport ssh counter
+</pre></div>
+</div>
+<p>Habremos creado tres contadores en la misma regla: el primero cuenta cualquier
+tipo de paquete, el segundo sólo los paquetes <abbr title="Transmission Control Protocol">TCP</abbr> y el segundo los paquetes
+que son de tráfico <abbr title="Security SHell">SSH</abbr>.</p>
+<p class="rubric" id="nftables-sets">Conjuntos</p>
+<p class="rubric" id="nftables-maps">Diccionarios</p>
+</div>
+<div class="section" id="objetivos">
+<h3>8.7.2.3.1.2. Objetivos<a class="headerlink" href="#objetivos" title="Enlazar permanentemente con este título">¶</a></h3>
+</div>
+</div>
+<div class="section" id="persistencia">
+<h2>8.7.2.3.2. Persistencia<a class="headerlink" href="#persistencia" title="Enlazar permanentemente con este título">¶</a></h2>
 <p class="rubric">Notas al pie</p>
 <table class="docutils footnote" frame="void" id="id3" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
@@ -113,6 +435,7 @@ infraestructura necesaria.</td></tr>
 </tbody>
 </table>
 </div>
+</div>
 
 
           </div>
@@ -120,6 +443,19 @@ infraestructura necesaria.</td></tr>
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
+  <h3><a href="../../../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">8.7.2.3. Reglas</a><ul>
+<li><a class="reference internal" href="#sintaxis">8.7.2.3.1. Sintaxis</a><ul>
+<li><a class="reference internal" href="#condiciones">8.7.2.3.1.1. Condiciones</a></li>
+<li><a class="reference internal" href="#objetivos">8.7.2.3.1.2. Objetivos</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#persistencia">8.7.2.3.2. Persistencia</a></li>
+</ul>
+</li>
+</ul>
+
   <h4>Tema anterior</h4>
   <p class="topless"><a href="01.conceptos.html"
                         title="capítulo anterior">8.7.2.1. Conceptos</a></p>
