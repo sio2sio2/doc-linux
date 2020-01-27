@@ -43,7 +43,7 @@ Utilizar :program:`nftables` exige un esfuerzo extra en:
 .. rubric:: Enlaces de interes
 
 * `La wiki de nftables
-  <https://wiki.nftables.org/wiki-nftables/index.php/Configuring_chains>`_.
+  <https://wiki.nftables.org/wiki-nftables/index.php>`_.
 * `Tutorial de la wiki de Archilinux
   <https://wiki.archlinux.org/index.php/Nftables>`_.
 * `Tutorial de la wiki de Gentoo

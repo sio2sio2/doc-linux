@@ -73,10 +73,10 @@ Por ejemplo::
    # nft add rule filter INPUT ip daddr 10.0.0.0/8 accept
 
 en este caso, hay una condición, que la dirección de destino esté en la red
-*10.0.0.0/8*; y una acción: aceptar el tráfico. Puede no incluirse acción
-alguna, en cuyo caso, la regla comprobará la condición... pero no hará nada
-(aunque puede tener sentido si :ref:`se quieren contar paquetes
-<nftables-counter>`).
+*10.0.0.0/8*; y una acción terminal: aceptar el tráfico. Puede no incluirse
+acción alguna, en cuyo caso, la regla comprobará la condición... pero no
+hará nada en particular (aunque puede tener sentido si :ref:`se quieren contar
+paquetes <nftables-counter>`).
 
 Para listar reglas podemos:
 
@@ -281,37 +281,147 @@ Tenga presenta que:
 
 .. _nftables-counter:
 
-.. rubric:: Contadores
-
-A las condiciones pueden asociarse contadores que cuenten los paquetes que
-las cumplen. Por ejemplo::
-
-   # nft add table filter
-   # nft add chain filter INPUT {type filter hook input priority 0 \;}
-   # nft add rule filter INPUT ip protocol tcp counter
-
-cuenta los paquetes |TCP| de entrada. Esto es debido a que la posición del
-contador es importante y se ha colocado tras la opción y, como la regla se
-evalua de izquierda a derecha, ya se ha evaluado la condición. Sin embargo, si
-hacemos::
-
-   # nft add rule filter INPUT counter ip protocol tcp counter tcp dport ssh counter
-
 Habremos creado tres contadores en la misma regla: el primero cuenta cualquier
 tipo de paquete, el segundo sólo los paquetes |TCP| y el segundo los paquetes
 que son de tráfico |SSH|.
 
-.. _nftables-sets:
+Acciones
+--------
+Las acciones pueden ser:
 
-.. rubric:: Conjuntos
+- *Terminales*, que terminan la evaluación de la regla.
+- *No terminales*, que son aquellas que no acaban la evaluación o establecen una condición.
 
 
-.. _nftables-maps:
+En una regla puede encontrarse como mucho una acción terminal, pero pueden añadirse varias no terminales.
+Además las terminales no tienen por qué encontrarse al final de la sentencia,
+sino que pueden intercalarse entre las condiciones. Por ejemplo::
 
-.. rubric:: Diccionarios
+   # nft add table filter
+   # nft add chain filter INPUT "{type filter hook input priority 0;}"
+   # nft add rule filter INPUT ct state new ip protocol TCP log prefix '"TCP: "' \
+                                            tcp dport ssh log prefix '"SSH: "' accept
 
-Objetivos
----------
+generará una línea de registro advirtiendo de que una nueva conexión cuando ésta
+sea |TCP|, y añadirá otra línea adicional advirtiendo de que es |SSH| cuando,
+además, sea tráfico de este tipo.
+
+.. _nftables-acc-term:
+
+.. rubric:: Acciones terminales
+
+.. table::
+   :class: nftables-acc-term
+
+   +--------------+------------------------------------------------------------+
+   | Acción       |   Descripción                                              |
+   +==============+============================================================+
+   | accept       | Permite el paquete y acaba la evaluación de la cadena.     |
+   +--------------+------------------------------------------------------------+
+   | drop         | Desecha el paquete y acaba la evaluación.                  |
+   +--------------+------------------------------------------------------------+
+   | reject       | Rechaza el paquete, pero informando al emisor. Admite      |
+   |              | añadir la causa (el tipo |ICMP| o un |TCP| reset si el     |
+   |              | tráfico de origen es |TCP|). Si se prescinde de la causa,  |
+   |              | se envía un :kbd:`port-unreachable`                        |
+   |              +------------------------------------------------------------+
+   |              | reject with icmp type host-unreachable                     |
+   |              | reject with icmp type port-unreachable                     |
+   |              | reject with tcp reset                                      |
+   +--------------+------------------------------------------------------------+
+   | queue        | Envía el paquete a una cola en el espacio de usuario para  |
+   |              | que lo gestione una aplicación y acaba la evaluación.      |
+   |              | Véase `cómo enviarlos a la cola`_.                         |
+   +--------------+------------------------------------------------------------+
+   | continue     | Prosegue la evaluación con la siguiente regla.             |
+   +--------------+------------------------------------------------------------+
+   | return       | Deja de evaluar las reglas de la cadena actual y regresa   |
+   |              | a la regla posterior a la que invocó el salto. En una      |
+   |              | cadena base, equivale a *accept*.                          |
+   +--------------+------------------------------------------------------------+
+   | jump <chain> | Salta a la cadena de usuario que se especifique y, al      |
+   |              | término de ésta se prosigue por la siguiente regla.        |
+   +--------------+------------------------------------------------------------+
+   | goto <chain> | Salta también a la cadena especificada, pero al término    |
+   |              | prosigue al final de la cadena desde la que se invocó.     |
+   +--------------+------------------------------------------------------------+
+
+.. _cómo enviarlos a la cola: https://wiki.nftables.org/wiki-nftables/index.php/Queueing_to_userspace
+
+.. _nftables-acc-no-term:
+
+.. rubric:: Acciones no terminales
+
+No llevan acabo una acción que interrumpa la evaluación o introducen alguna
+condición adicional
+
+.. table::
+   :class: nftables-acc-no-term
+
+   +------------+-------------+---------------------------------------------------------------------------------------+
+   |  Acción    | Argumento   | Descripción                                                                           |
+   +============+=============+=======================================================================================+
+   | log        | | prefix    | Registra el paso de un paquete. :kbd:`prefix` añade un prefijo a la                   |
+   |            | | level     | cadena de registro y :kbd:`level` indica cuál debe ser la importancia:                |
+   |            |             | *emerg*, *alert*, *crit*, *err*, *warn*, *notice*, *info* o *debug*.                  |
+   |            |             +---------------------------------------------------------------------------------------+
+   |            |             | nft add rule filter INPUT ct state new dport ssh log prefix '"SSH: "' level info      |
+   +------------+-------------+---------------------------------------------------------------------------------------+
+   | counter    | [name]      | Añade un contador a la regla.                                                         |
+   |            |             +---------------------------------------------------------------------------------------+
+   |            |             | | nft add rule filter INPUT ct state new dport ssh counter                            |
+   |            |             | | nft add rule filter INPUT ct state new dport ssh counter name pines                 |
+   +------------+-------------+---------------------------------------------------------------------------------------+
+   | snat       | to          | Realiza un |SNAT|.                                                                    |
+   |            |             +---------------------------------------------------------------------------------------+
+   |            |             | nft add rule nat POSTROUNTING oif eth0 snat to 172.22.0.2                             |
+   +------------+-------------+---------------------------------------------------------------------------------------+
+   | masquerade | [to :port]  | Realiza un |SNAT| copiando la dirección de la interfaz de salida.                     |
+   |            |             +---------------------------------------------------------------------------------------+
+   |            |             | nft add rule nat POSTROUNTING oif eth0 masquerade                                     |
+   +------------+-------------+---------------------------------------------------------------------------------------+
+   | dnat       | to          | Realiza un |DNAT|.                                                                    |
+   |            |             +---------------------------------------------------------------------------------------+
+   |            |             | | nft add rule nat PREROUNTING iif eth0 tcp dport {http,https} dnat to 192.168.255.10 |
+   |            |             | | nft add rule nat PREROUNTING iif eth0 tcp dport 8080 dnat to 192.168.255.10:80      |
+   |            |             | | nft add rule nat PREROUNTING iif eth0 dnat tcp port map {80: 10.0.0.3,443: 10.0.0.4}|
+   +------------+-------------+---------------------------------------------------------------------------------------+
+   | redirect   | [to :port]  | Realiza un |DNAT| hacia la propia máquina.                                            |
+   |            |             +---------------------------------------------------------------------------------------+
+   |            |             | | nft add rule nat PREROUNTING iif eth0 tcp dport 80 redirect                         |
+   |            |             | | nft add rule nat PREROUNTING iif eth0 tcp dport 8080 redirect to :80                |
+   +------------+-------------+---------------------------------------------------------------------------------------+
+   | limit      | rate [over] | Establece una condición que será verdadera cuando se alcance o se supere (con *over*) |
+   |            |             | el ratio espeficiado. El ratio cuenta paquetes, *bytes*, *kbytes*, *mbytes* en        |
+   |            |             | periodos de *second*, *minute*, *hour*, *day* o *week*. Puede además añadir           |
+   |            |             | :kbd:`burst` para la :ref:`definición de la ráfaga <iptables-limit>`.                 |
+   |            |             +---------------------------------------------------------------------------------------+
+   |            |             | | nft add rule filter INPUT ip protocol icmp limit rate 1/second accept               |
+   |            |             | | nft add rule filter INPUT ip protocol icmp limit rate over 1/second drop            |
+   |            |             | | nft add rule filter INPUT iff eth0 limit rate over 10/seconds burst 50 packets drop |
+   +------------+-------------+---------------------------------------------------------------------------------------+
+   | | add      | @setname    | Añade o actualiza elementos de un :ref:`conjunto <nftables-sets>` desde una regla.    |
+   | | update   |             +---------------------------------------------------------------------------------------+
+   |            |             | nft add rule filter INPUT icmp type echo-request add @testers {ip saddr timeout 2m}   |
+   +------------+-------------+---------------------------------------------------------------------------------------+
+
+Algunas consideraciones:
+
+* Pueden crearse **contadores** con nombre asociándolos a una tabla y usándolos en alguna regla de alguna cadena
+  de esa tabla::
+
+   # nft add table filter
+   # nft add chain filter INPUT "{type filter hook input prority 0;}"
+   # nft add counter filter pines
+   # nft add rule filter INPUT ip protocol icmp counter name pines
+   # nft list table filter
+
+  Los contadores con nombre pueden usarse en varias reglas y, además, resetear valor::
+
+   # nft reset counter filter pines
+
+* Las explicaciones sobre la limitación del tráfico (:kbd:`limit`) algo
+  prolijas, así que les dedicaremos :ref:`un epígrafe exclusivo <nftables-limit>`.
 
 Persistencia
 ============

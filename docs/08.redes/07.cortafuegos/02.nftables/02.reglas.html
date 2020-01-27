@@ -23,7 +23,7 @@
     
     <link rel="index" title="Índice" href="../../../genindex.html" />
     <link rel="search" title="Búsqueda" href="../../../search.html" />
-    <link rel="next" title="8.7.2.4. Uso avanzado" href="03.ext.html" />
+    <link rel="next" title="8.7.2.4. Uso práctico" href="03.conn.html" />
     <link rel="prev" title="8.7.2.1. Conceptos" href="01.conceptos.html" /> 
   </head><body>
     <div class="related" role="navigation" aria-label="related navigation">
@@ -33,7 +33,7 @@
           <a href="../../../genindex.html" title="Índice General"
              accesskey="I">índice</a></li>
         <li class="right" >
-          <a href="03.ext.html" title="8.7.2.4. Uso avanzado"
+          <a href="03.conn.html" title="8.7.2.4. Uso práctico"
              accesskey="N">siguiente</a> |</li>
         <li class="right" >
           <a href="01.conceptos.html" title="8.7.2.1. Conceptos"
@@ -122,9 +122,10 @@ el tráfico al que afecta.</li>
 </pre></div>
 </div>
 <p>en este caso, hay una condición, que la dirección de destino esté en la red
-<em>10.0.0.0/8</em>; y una acción: aceptar el tráfico. Puede no incluirse acción
-alguna, en cuyo caso, la regla comprobará la condición… pero no hará nada
-(aunque puede tener sentido si <a class="reference internal" href="#nftables-counter"><span class="std std-ref">se quieren contar paquetes</span></a>).</p>
+<em>10.0.0.0/8</em>; y una acción terminal: aceptar el tráfico. Puede no incluirse
+acción alguna, en cuyo caso, la regla comprobará la condición… pero no
+hará nada en particular (aunque puede tener sentido si <a class="reference internal" href="#nftables-counter"><span class="std std-ref">se quieren contar
+paquetes</span></a>).</p>
 <p>Para listar reglas podemos:</p>
 <ul>
 <li><p class="first">Listar las reglas de una cadena:</p>
@@ -386,33 +387,201 @@ algunos de estos caracteres.</p>
 </div>
 <div class="admonition seealso">
 <p class="first admonition-title">Ver también</p>
-<p class="last">Revise el <a class="reference internal" href="#nftables-sets"><span class="std std-ref">epígrafe dedicado a conjuntos</span></a>.</p>
+<p class="last">Revise el <a class="reference internal" href="04.ext.html#nftables-sets"><span class="std std-ref">epígrafe dedicado a conjuntos</span></a>.</p>
 </div>
 </li>
 </ul>
-<p class="rubric" id="nftables-counter">Contadores</p>
-<p>A las condiciones pueden asociarse contadores que cuenten los paquetes que
-las cumplen. Por ejemplo:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add table filter
-<span class="gp">#</span> nft add chain filter INPUT <span class="o">{</span><span class="nb">type</span> filter hook input priority <span class="m">0</span> <span class="se">\;</span><span class="o">}</span>
-<span class="gp">#</span> nft add rule filter INPUT ip protocol tcp counter
-</pre></div>
-</div>
-<p>cuenta los paquetes <abbr title="Transmission Control Protocol">TCP</abbr> de entrada. Esto es debido a que la posición del
-contador es importante y se ha colocado tras la opción y, como la regla se
-evalua de izquierda a derecha, ya se ha evaluado la condición. Sin embargo, si
-hacemos:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add rule filter INPUT counter ip protocol tcp counter tcp dport ssh counter
-</pre></div>
-</div>
-<p>Habremos creado tres contadores en la misma regla: el primero cuenta cualquier
+<p id="nftables-counter">Habremos creado tres contadores en la misma regla: el primero cuenta cualquier
 tipo de paquete, el segundo sólo los paquetes <abbr title="Transmission Control Protocol">TCP</abbr> y el segundo los paquetes
 que son de tráfico <abbr title="Security SHell">SSH</abbr>.</p>
-<p class="rubric" id="nftables-sets">Conjuntos</p>
-<p class="rubric" id="nftables-maps">Diccionarios</p>
 </div>
-<div class="section" id="objetivos">
-<h3>8.7.2.3.1.2. Objetivos<a class="headerlink" href="#objetivos" title="Enlazar permanentemente con este título">¶</a></h3>
+<div class="section" id="acciones">
+<h3>8.7.2.3.1.2. Acciones<a class="headerlink" href="#acciones" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Las acciones pueden ser:</p>
+<ul class="simple">
+<li><em>Terminales</em>, que terminan la evaluación de la regla.</li>
+<li><em>No terminales</em>, que son aquellas que no acaban la evaluación o establecen una condición.</li>
+</ul>
+<p>En una regla puede encontrarse como mucho una acción terminal, pero pueden añadirse varias no terminales.
+Además las terminales no tienen por qué encontrarse al final de la sentencia,
+sino que pueden intercalarse entre las condiciones. Por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add table filter
+<span class="gp">#</span> nft add chain filter INPUT <span class="s2">&quot;{type filter hook input priority 0;}&quot;</span>
+<span class="gp">#</span> nft add rule filter INPUT ct state new ip protocol TCP log prefix <span class="s1">&#39;&quot;TCP: &quot;&#39;</span> <span class="se">\</span>
+                                         tcp dport ssh log prefix <span class="s1">&#39;&quot;SSH: &quot;&#39;</span> accept
+</pre></div>
+</div>
+<p>generará una línea de registro advirtiendo de que una nueva conexión cuando ésta
+sea <abbr title="Transmission Control Protocol">TCP</abbr>, y añadirá otra línea adicional advirtiendo de que es <abbr title="Security SHell">SSH</abbr> cuando,
+además, sea tráfico de este tipo.</p>
+<p class="rubric" id="nftables-acc-term">Acciones terminales</p>
+<table border="1" class="nftables-acc-term docutils">
+<colgroup>
+<col width="19%" />
+<col width="81%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Acción</th>
+<th class="head">Descripción</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>accept</td>
+<td>Permite el paquete y acaba la evaluación de la cadena.</td>
+</tr>
+<tr class="row-odd"><td>drop</td>
+<td>Desecha el paquete y acaba la evaluación.</td>
+</tr>
+<tr class="row-even"><td rowspan="2">reject</td>
+<td>Rechaza el paquete, pero informando al emisor. Admite
+añadir la causa (el tipo <abbr title="Internet Control Message Protocol">ICMP</abbr> o un <abbr title="Transmission Control Protocol">TCP</abbr> reset si el
+tráfico de origen es <abbr title="Transmission Control Protocol">TCP</abbr>). Si se prescinde de la causa,
+se envía un <kbd class="kbd docutils literal notranslate">port-unreachable</kbd></td>
+</tr>
+<tr class="row-odd"><td>reject with icmp type host-unreachable
+reject with icmp type port-unreachable
+reject with tcp reset</td>
+</tr>
+<tr class="row-even"><td>queue</td>
+<td>Envía el paquete a una cola en el espacio de usuario para
+que lo gestione una aplicación y acaba la evaluación.
+Véase <a class="reference external" href="https://wiki.nftables.org/wiki-nftables/index.php/Queueing_to_userspace">cómo enviarlos a la cola</a>.</td>
+</tr>
+<tr class="row-odd"><td>continue</td>
+<td>Prosegue la evaluación con la siguiente regla.</td>
+</tr>
+<tr class="row-even"><td>return</td>
+<td>Deja de evaluar las reglas de la cadena actual y regresa
+a la regla posterior a la que invocó el salto. En una
+cadena base, equivale a <em>accept</em>.</td>
+</tr>
+<tr class="row-odd"><td>jump &lt;chain&gt;</td>
+<td>Salta a la cadena de usuario que se especifique y, al
+término de ésta se prosigue por la siguiente regla.</td>
+</tr>
+<tr class="row-even"><td>goto &lt;chain&gt;</td>
+<td>Salta también a la cadena especificada, pero al término
+prosigue al final de la cadena desde la que se invocó.</td>
+</tr>
+</tbody>
+</table>
+<p class="rubric" id="nftables-acc-no-term">Acciones no terminales</p>
+<p>No llevan acabo una acción que interrumpa la evaluación o introducen alguna
+condición adicional</p>
+<table border="1" class="nftables-acc-no-term docutils">
+<colgroup>
+<col width="11%" />
+<col width="12%" />
+<col width="78%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Acción</th>
+<th class="head">Argumento</th>
+<th class="head">Descripción</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td rowspan="2">log</td>
+<td rowspan="2"><div class="first last line-block">
+<div class="line">prefix</div>
+<div class="line">level</div>
+</div>
+</td>
+<td>Registra el paso de un paquete. <kbd class="kbd docutils literal notranslate">prefix</kbd> añade un prefijo a la
+cadena de registro y <kbd class="kbd docutils literal notranslate">level</kbd> indica cuál debe ser la importancia:
+<em>emerg</em>, <em>alert</em>, <em>crit</em>, <em>err</em>, <em>warn</em>, <em>notice</em>, <em>info</em> o <em>debug</em>.</td>
+</tr>
+<tr class="row-odd"><td>nft add rule filter INPUT ct state new dport ssh log prefix “«SSH: «” level info</td>
+</tr>
+<tr class="row-even"><td rowspan="2">counter</td>
+<td rowspan="2">[name]</td>
+<td>Añade un contador a la regla.</td>
+</tr>
+<tr class="row-odd"><td><div class="first last line-block">
+<div class="line">nft add rule filter INPUT ct state new dport ssh counter</div>
+<div class="line">nft add rule filter INPUT ct state new dport ssh counter name pines</div>
+</div>
+</td>
+</tr>
+<tr class="row-even"><td rowspan="2">snat</td>
+<td rowspan="2">to</td>
+<td>Realiza un <abbr title="Source NAT">SNAT</abbr>.</td>
+</tr>
+<tr class="row-odd"><td>nft add rule nat POSTROUNTING oif eth0 snat to 172.22.0.2</td>
+</tr>
+<tr class="row-even"><td rowspan="2">masquerade</td>
+<td rowspan="2">[to :port]</td>
+<td>Realiza un <abbr title="Source NAT">SNAT</abbr> copiando la dirección de la interfaz de salida.</td>
+</tr>
+<tr class="row-odd"><td>nft add rule nat POSTROUNTING oif eth0 masquerade</td>
+</tr>
+<tr class="row-even"><td rowspan="2">dnat</td>
+<td rowspan="2">to</td>
+<td>Realiza un <abbr title="Destination NAT">DNAT</abbr>.</td>
+</tr>
+<tr class="row-odd"><td><div class="first last line-block">
+<div class="line">nft add rule nat PREROUNTING iif eth0 tcp dport {http,https} dnat to 192.168.255.10</div>
+<div class="line">nft add rule nat PREROUNTING iif eth0 tcp dport 8080 dnat to 192.168.255.10:80</div>
+<div class="line">nft add rule nat PREROUNTING iif eth0 dnat tcp port map {80: 10.0.0.3,443: 10.0.0.4}</div>
+</div>
+</td>
+</tr>
+<tr class="row-even"><td rowspan="2">redirect</td>
+<td rowspan="2">[to :port]</td>
+<td>Realiza un <abbr title="Destination NAT">DNAT</abbr> hacia la propia máquina.</td>
+</tr>
+<tr class="row-odd"><td><div class="first last line-block">
+<div class="line">nft add rule nat PREROUNTING iif eth0 tcp dport 80 redirect</div>
+<div class="line">nft add rule nat PREROUNTING iif eth0 tcp dport 8080 redirect to :80</div>
+</div>
+</td>
+</tr>
+<tr class="row-even"><td rowspan="2">limit</td>
+<td rowspan="2">rate [over]</td>
+<td>Establece una condición que será verdadera cuando se alcance o se supere (con <em>over</em>)
+el ratio espeficiado. El ratio cuenta paquetes, <em>bytes</em>, <em>kbytes</em>, <em>mbytes</em> en
+periodos de <em>second</em>, <em>minute</em>, <em>hour</em>, <em>day</em> o <em>week</em>. Puede además añadir
+<kbd class="kbd docutils literal notranslate">burst</kbd> para la <a class="reference internal" href="../01.iptables/03.ext.html#iptables-limit"><span class="std std-ref">definición de la ráfaga</span></a>.</td>
+</tr>
+<tr class="row-odd"><td><div class="first last line-block">
+<div class="line">nft add rule filter INPUT ip protocol icmp limit rate 1/second accept</div>
+<div class="line">nft add rule filter INPUT ip protocol icmp limit rate over 1/second drop</div>
+<div class="line">nft add rule filter INPUT iff eth0 limit rate over 10/seconds burst 50 packets drop</div>
+</div>
+</td>
+</tr>
+<tr class="row-even"><td rowspan="2"><div class="first last line-block">
+<div class="line">add</div>
+<div class="line">update</div>
+</div>
+</td>
+<td rowspan="2">&#64;setname</td>
+<td>Añade o actualiza elementos de un <a class="reference internal" href="04.ext.html#nftables-sets"><span class="std std-ref">conjunto</span></a> desde una regla.</td>
+</tr>
+<tr class="row-odd"><td>nft add rule filter INPUT icmp type echo-request add &#64;testers {ip saddr timeout 2m}</td>
+</tr>
+</tbody>
+</table>
+<p>Algunas consideraciones:</p>
+<ul>
+<li><p class="first">Pueden crearse <strong>contadores</strong> con nombre asociándolos a una tabla y usándolos en alguna regla de alguna cadena
+de esa tabla:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add table filter
+<span class="gp">#</span> nft add chain filter INPUT <span class="s2">&quot;{type filter hook input prority 0;}&quot;</span>
+<span class="gp">#</span> nft add counter filter pines
+<span class="gp">#</span> nft add rule filter INPUT ip protocol icmp counter name pines
+<span class="gp">#</span> nft list table filter
+</pre></div>
+</div>
+<p>Los contadores con nombre pueden usarse en varias reglas y, además, resetear valor:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft reset counter filter pines
+</pre></div>
+</div>
+</li>
+<li><p class="first">Las explicaciones sobre la limitación del tráfico (<kbd class="kbd docutils literal notranslate">limit</kbd>) algo
+prolijas, así que les dedicaremos <a class="reference internal" href="04.ext.html#nftables-limit"><span class="std std-ref">un epígrafe exclusivo</span></a>.</p>
+</li>
+</ul>
 </div>
 </div>
 <div class="section" id="persistencia">
@@ -448,7 +617,7 @@ infraestructura necesaria.</td></tr>
 <li><a class="reference internal" href="#">8.7.2.3. Reglas</a><ul>
 <li><a class="reference internal" href="#sintaxis">8.7.2.3.1. Sintaxis</a><ul>
 <li><a class="reference internal" href="#condiciones">8.7.2.3.1.1. Condiciones</a></li>
-<li><a class="reference internal" href="#objetivos">8.7.2.3.1.2. Objetivos</a></li>
+<li><a class="reference internal" href="#acciones">8.7.2.3.1.2. Acciones</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#persistencia">8.7.2.3.2. Persistencia</a></li>
@@ -460,8 +629,8 @@ infraestructura necesaria.</td></tr>
   <p class="topless"><a href="01.conceptos.html"
                         title="capítulo anterior">8.7.2.1. Conceptos</a></p>
   <h4>Próximo tema</h4>
-  <p class="topless"><a href="03.ext.html"
-                        title="próximo capítulo">8.7.2.4. Uso avanzado</a></p>
+  <p class="topless"><a href="03.conn.html"
+                        title="próximo capítulo">8.7.2.4. Uso práctico</a></p>
   <div role="note" aria-label="source link">
     <h3>Esta página</h3>
     <ul class="this-page-menu">
@@ -492,7 +661,7 @@ infraestructura necesaria.</td></tr>
           <a href="../../../genindex.html" title="Índice General"
              >índice</a></li>
         <li class="right" >
-          <a href="03.ext.html" title="8.7.2.4. Uso avanzado"
+          <a href="03.conn.html" title="8.7.2.4. Uso práctico"
              >siguiente</a> |</li>
         <li class="right" >
           <a href="01.conceptos.html" title="8.7.2.1. Conceptos"
