@@ -109,21 +109,39 @@ Los conjuntos con nombre puede eliminarse::
 
 siempre y cuando no estén vinculados a ninguna regla.
    
+.. ¿"add rule ... delete @set" en los normales o en los dinámicos?
+   https://lwn.net/Articles/806177/
+
 
 .. _nftables-maps:
 
 maps
 ====
 Los :dfn:`mapas` son conjuntos de valores a los que se accede a través de una clave.
-Como en el caso de los conjuntos pueden ser **anónimos**::
+Como en el caso de los conjuntos:
 
-   # nft add rule nat PREROUTING dnat tcp dport map {80: 192.168.1.100, 8888: 192.168.1.101}
+- Pueden ser **anónimos** o **nominados**.
+- Pueden utilizarse en las sentencias de las reglas.
+- Puede modificarse su contenido manualmente.
 
-pero también pueden tener nombre::
+Y a diferencia de ellos, no pueden añadirse elementos a través de reglas. Para
+utilizarlos debe hacerse lo siguiente::
 
-   # nft add map nat servidores {type inet_service: ivp4_addr}
-   # nft add element nat servidores {80: 192.168.1.100, 8888: 192.168.1.101}
-   # nft add rule nat PREROUTING dnat tcp dport map @servidores
+   dnat to tcp dport map {80: 192.168.1.100, 8888: 192.168.1.101}
+   counter name tcp dport map @conn
+
+es decir, debe colocarse primero la expresión que define el valor y después la
+expresión que define la clave. El primero es un ejemplo de mapa anónimo y el
+segundo de mapa con nombre don se requiere hacer algunas definiciones previas::
+
+   # nft add counter filter c22
+   # nft add counter filter c28
+   # nft add map filter conn {type inet_service: counter}
+   # nft add element filter conn {ssh: c22, http: c80}
+
+Y ahora sí, podria usarse el mapa::
+
+   # nft add rule filter INPUT ct state new counter name tcp dport map @conn
 
 .. _nftables-vmap:
 
@@ -273,27 +291,59 @@ En conjunción con las concatenaciones los *conjuntos dinámicos* permiten la
 implementación de las funcionalidades que ofrecen los módulos :ref:`hashlimit y
 connlimit <iptables-limit>` de :program:`iptables`.
 
-.. https://wiki.nftables.org/wiki-nftables/index.php/Meters
+.. _nftables-connlimit:
+
+connlimit
+---------
+Dependiendo de cuáles sean las conexiones que queremos limitar, así tendremos
+que obrar. Consideraremos una política de *lista blanca* en nuestro servidor:
+
+**Conexiones totales de un servicio**
+   Para limitar el número máximo de conexiones simultáneas a un servicio (p.e.
+   un máximo de 5 conexiones a |SSH|)::
+
+      # nft add rule filter INPUT ct state new tcp dport ssh \
+         meter sshconn size 65535 {tcp dport ct count 5} accept
+
+**Conexiones totales de un cliente**
+   Para limitar el número máximo de conexiones que un cliente puede hacer
+   a cualquier servicio::
+
+      # nft add rule filter INPUT ct state new tcp dport ssh \
+         meter sshconn size 65535 {ip saddr ct count 5} accept
+
+**Conexiones totales desde un cliente a un servicio**
+   Para limitar el número máximo de conexiones que un mismo cliente puede
+   hacer a un servicio::
+
+      # nft add rule filter INPUT ct state new tcp dport ssh \
+         meter sshconn size 65535 {ip saddr . tcp dport ct count 2} accept
+
+.. note:: Se usa :kbd:`meter` por compacidad. A partir de los ejemplos, la
+   implementación con *dynamic* es trivial.
 
 .. _nftables-hashlimit:
 
 hashlimit
 ---------
+El módulo *hashlimit* de :program:`iptables` permite limitar el flujo de paquete
+según cual sea el origen o destino de las conexión. A diferencia de *limit*, que
+limita el flujo de paquetes global. Para implementar esta funcionalidad en
+:program:`nftables` basta con utilizar *limit* en conjunción con los conjuntos
+dinámicos y la concatenación. Por ejemplo, para limitar la descarga a través de
+|SSH| con cada cliente podemos hacer::
 
-.. _nftables-connlimit:
+   # nft add rule filter OUTPUT tcp sport ssh \
+      meter sshlimit size 65535 {tcp sport . ip daddr timeout 10s limit rate over 100kbytes/second} drop
 
-connlimit
----------
-
-.. _nftables-recent:
-
-recent
-======
+que limitará a 100 KiB/s el tráfico de descarga para cada uno de los clientes.
 
 .. _nftables-flowtables:
 
 flowtables
 ===========
+
+.. https://wiki.nftables.org/wiki-nftables/index.php/Flowtable
 
 .. |ICMP| replace:: :abbr:`ICMP (Internet Control Message Protocol)`
 .. |MAC| replace:: :abbr:`MAC (Media Access Control)`

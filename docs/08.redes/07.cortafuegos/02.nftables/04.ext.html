@@ -201,14 +201,29 @@ fijar un tamaño máximo y un tiempo de vida del elemento en el conjunto.</p>
 <div class="section" id="maps">
 <span id="nftables-maps"></span><h2>8.7.2.5.2. maps<a class="headerlink" href="#maps" title="Enlazar permanentemente con este título">¶</a></h2>
 <p>Los <em class="dfn">mapas</em> son conjuntos de valores a los que se accede a través de una clave.
-Como en el caso de los conjuntos pueden ser <strong>anónimos</strong>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add rule nat PREROUTING dnat tcp dport map <span class="o">{</span><span class="m">80</span>: <span class="m">192</span>.168.1.100, <span class="m">8888</span>: <span class="m">192</span>.168.1.101<span class="o">}</span>
+Como en el caso de los conjuntos:</p>
+<ul class="simple">
+<li>Pueden ser <strong>anónimos</strong> o <strong>nominados</strong>.</li>
+<li>Pueden utilizarse en las sentencias de las reglas.</li>
+<li>Puede modificarse su contenido manualmente.</li>
+</ul>
+<p>Y a diferencia de ellos, no pueden añadirse elementos a través de reglas. Para
+utilizarlos debe hacerse lo siguiente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dnat to tcp dport map {80: 192.168.1.100, 8888: 192.168.1.101}</span>
+<span class="go">counter name tcp dport map @conn</span>
 </pre></div>
 </div>
-<p>pero también pueden tener nombre:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add map nat servidores <span class="o">{</span><span class="nb">type</span> inet_service: ivp4_addr<span class="o">}</span>
-<span class="gp">#</span> nft add element nat servidores <span class="o">{</span><span class="m">80</span>: <span class="m">192</span>.168.1.100, <span class="m">8888</span>: <span class="m">192</span>.168.1.101<span class="o">}</span>
-<span class="gp">#</span> nft add rule nat PREROUTING dnat tcp dport map @servidores
+<p>es decir, debe colocarse primero la expresión que define el valor y después la
+expresión que define la clave. El primero es un ejemplo de mapa anónimo y el
+segundo de mapa con nombre don se requiere hacer algunas definiciones previas:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add counter filter c22
+<span class="gp">#</span> nft add counter filter c28
+<span class="gp">#</span> nft add map filter conn <span class="o">{</span><span class="nb">type</span> inet_service: counter<span class="o">}</span>
+<span class="gp">#</span> nft add element filter conn <span class="o">{</span>ssh: c22, http: c80<span class="o">}</span>
+</pre></div>
+</div>
+<p>Y ahora sí, podria usarse el mapa:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add rule filter INPUT ct state new counter name tcp dport map @conn
 </pre></div>
 </div>
 </div>
@@ -346,18 +361,59 @@ ratio individual.</p>
 <p>En conjunción con las concatenaciones los <em>conjuntos dinámicos</em> permiten la
 implementación de las funcionalidades que ofrecen los módulos <a class="reference internal" href="../01.iptables/03.ext.html#iptables-limit"><span class="std std-ref">hashlimit y
 connlimit</span></a> de <strong class="program">iptables</strong>.</p>
-<div class="section" id="hashlimit">
-<span id="nftables-hashlimit"></span><h3>8.7.2.5.6.1. hashlimit<a class="headerlink" href="#hashlimit" title="Enlazar permanentemente con este título">¶</a></h3>
-</div>
 <div class="section" id="connlimit">
-<span id="nftables-connlimit"></span><h3>8.7.2.5.6.2. connlimit<a class="headerlink" href="#connlimit" title="Enlazar permanentemente con este título">¶</a></h3>
+<span id="nftables-connlimit"></span><h3>8.7.2.5.6.1. connlimit<a class="headerlink" href="#connlimit" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Dependiendo de cuáles sean las conexiones que queremos limitar, así tendremos
+que obrar. Consideraremos una política de <em>lista blanca</em> en nuestro servidor:</p>
+<dl class="docutils">
+<dt><strong>Conexiones totales de un servicio</strong></dt>
+<dd><p class="first">Para limitar el número máximo de conexiones simultáneas a un servicio (p.e.
+un máximo de 5 conexiones a <abbr title="Security SHell">SSH</abbr>):</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add rule filter INPUT ct state new tcp dport ssh <span class="se">\</span>
+   meter sshconn size <span class="m">65535</span> <span class="o">{</span>tcp dport ct count <span class="m">5</span><span class="o">}</span> accept
+</pre></div>
+</div>
+</dd>
+<dt><strong>Conexiones totales de un cliente</strong></dt>
+<dd><p class="first">Para limitar el número máximo de conexiones que un cliente puede hacer
+a cualquier servicio:</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add rule filter INPUT ct state new tcp dport ssh <span class="se">\</span>
+   meter sshconn size <span class="m">65535</span> <span class="o">{</span>ip saddr ct count <span class="m">5</span><span class="o">}</span> accept
+</pre></div>
+</div>
+</dd>
+<dt><strong>Conexiones totales desde un cliente a un servicio</strong></dt>
+<dd><p class="first">Para limitar el número máximo de conexiones que un mismo cliente puede
+hacer a un servicio:</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add rule filter INPUT ct state new tcp dport ssh <span class="se">\</span>
+   meter sshconn size <span class="m">65535</span> <span class="o">{</span>ip saddr . tcp dport ct count <span class="m">2</span><span class="o">}</span> accept
+</pre></div>
+</div>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">Se usa <kbd class="kbd docutils literal notranslate">meter</kbd> por compacidad. A partir de los ejemplos, la
+implementación con <em>dynamic</em> es trivial.</p>
 </div>
 </div>
-<div class="section" id="recent">
-<span id="nftables-recent"></span><h2>8.7.2.5.7. recent<a class="headerlink" href="#recent" title="Enlazar permanentemente con este título">¶</a></h2>
+<div class="section" id="hashlimit">
+<span id="nftables-hashlimit"></span><h3>8.7.2.5.6.2. hashlimit<a class="headerlink" href="#hashlimit" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>El módulo <em>hashlimit</em> de <strong class="program">iptables</strong> permite limitar el flujo de paquete
+según cual sea el origen o destino de las conexión. A diferencia de <em>limit</em>, que
+limita el flujo de paquetes global. Para implementar esta funcionalidad en
+<strong class="program">nftables</strong> basta con utilizar <em>limit</em> en conjunción con los conjuntos
+dinámicos y la concatenación. Por ejemplo, para limitar la descarga a través de
+<abbr title="Security SHell">SSH</abbr> con cada cliente podemos hacer:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add rule filter OUTPUT tcp sport ssh <span class="se">\</span>
+   meter sshlimit size <span class="m">65535</span> <span class="o">{</span>tcp sport . ip daddr timeout 10s limit rate over 100kbytes/second<span class="o">}</span> drop
+</pre></div>
+</div>
+<p>que limitará a 100 KiB/s el tráfico de descarga para cada uno de los clientes.</p>
+</div>
 </div>
 <div class="section" id="flowtables">
-<span id="nftables-flowtables"></span><h2>8.7.2.5.8. flowtables<a class="headerlink" href="#flowtables" title="Enlazar permanentemente con este título">¶</a></h2>
+<span id="nftables-flowtables"></span><h2>8.7.2.5.7. flowtables<a class="headerlink" href="#flowtables" title="Enlazar permanentemente con este título">¶</a></h2>
 </div>
 </div>
 
@@ -376,12 +432,11 @@ connlimit</span></a> de <strong class="program">iptables</strong>.</p>
 <li><a class="reference internal" href="#concatenaciones">8.7.2.5.4. Concatenaciones</a></li>
 <li><a class="reference internal" href="#limit">8.7.2.5.5. limit</a></li>
 <li><a class="reference internal" href="#conjuntos-dinamicos">8.7.2.5.6. Conjuntos dinámicos</a><ul>
-<li><a class="reference internal" href="#hashlimit">8.7.2.5.6.1. hashlimit</a></li>
-<li><a class="reference internal" href="#connlimit">8.7.2.5.6.2. connlimit</a></li>
+<li><a class="reference internal" href="#connlimit">8.7.2.5.6.1. connlimit</a></li>
+<li><a class="reference internal" href="#hashlimit">8.7.2.5.6.2. hashlimit</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#recent">8.7.2.5.7. recent</a></li>
-<li><a class="reference internal" href="#flowtables">8.7.2.5.8. flowtables</a></li>
+<li><a class="reference internal" href="#flowtables">8.7.2.5.7. flowtables</a></li>
 </ul>
 </li>
 </ul>
