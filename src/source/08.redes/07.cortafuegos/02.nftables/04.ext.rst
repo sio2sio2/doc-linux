@@ -1,6 +1,145 @@
 Uso avanzado
 ************
 
+Objetos de conexión
+===================
+Se distinguen tres:
+
+- Los contadores.
+- Los caudales de tráfico (o límites de ratio de tráfico si se prefiere).
+- Las cuotas.
+
+Los tres se caracterizan porque:
+
+- Pueden ser anónimos o definidos con un nombre. En el primer caso se crean
+  sobre la marca al definir una regla, mientras que en el segundo se crean antes
+  y se usan luego en una o más reglas utilizando el nombre creado.
+
+- Son afectados por la regla en la que se encuentran. Por ejemplo, el contador::
+
+   # nft add filter input tcp dport ssh counter
+
+  incrementa en uno su valor al cumplir un paquete las condiciones incluidas en
+  la regla anteriores a su declaración. Por tanto cualquier paquete enrante de
+  trafico |SSH| incrementará el valor del contador. En cambio, en este otro
+  caso de dos contadores::
+
+   # nft add filter input tcp dport ssh counter ct state new counter
+
+  hay dos contadores, el primero de los cuales se actualiza con cualquier
+  paquete entrante |SSH|, pero el segundo sólo cuando uno de estos paquetes
+  inicia una conexión.
+
+- Un contador es una acción (se actualizan), pero no suponen ninguna condición;
+  mientras que el ratio y la cuota son ambas cosas: son acción porque se
+  actualizan y son condición porque establecen unos umbrales.
+
+.. _nftables-counter:
+
+Contadores
+----------
+Partiendo de esto::
+
+   # nft add table filter
+   # nft add chain filter INPUT "{type filter hook input prority 0;}"
+   # nft add rule filter INPUT icmp type echo-request counter
+   # nft list table filter
+
+hemos creado un contador anónimo que contabilizará las peticiones |ICMP| entrantes.
+Podríamos en cambios haber creado un contador con nombre asociado a la tabla y
+usarlo en la regla::
+
+   # nft add counter filter pines
+   # nft add rule filter INPUT ip protocol icmp counter name pines
+
+Los contadores con nombre pueden usarse en varias reglas y, además, resetear valor::
+
+   # nft reset counter filter pines
+
+.. _nftables-limit:
+
+Caudales
+--------
+El objeto *limit* permite contabilizar el tráfico de datos y mantenerlo dentro
+de un umbral máximo.
+
+.. table::
+   :class: nftables-acc-no-term
+
+   +------------+-------------+---------------------------------------------------------------------------------------+
+   | Acción     | Argumento   | Descripción                                                                           |
+   +============+=============+=======================================================================================+
+   | limit      | rate [over] | Establece una condición que será verdadera cuando se alcance o se supere (con *over*) |
+   |            |             | el ratio espeficiado. El ratio cuenta paquetes, *bytes*, *kbytes*, *mbytes* en        |
+   |            |             | periodos de *second*, *minute*, *hour*, *day* o *week*. Puede además añadir           |
+   |            |             | :kbd:`burst` para la :ref:`definición de la ráfaga <iptables-limit>`.                 |
+   |            |             +---------------------------------------------------------------------------------------+
+   |            |             | | nft add rule filter INPUT icmp type echo-request limit rate 1/second accept         |
+   |            |             | | nft add rule filter INPUT icmp type echo-request limit rate over 1/second drop      |
+   |            |             | | nft add rule filter INPUT iff eth0 limit rate over 10/seconds burst 50 packets drop |
+   +------------+-------------+---------------------------------------------------------------------------------------+
+
+Por ejemplo, esta regla contabiliza las peticiones |ICMP| entrantes y las acepta
+mientras no se supere la ratio de un paquete al segundo::
+
+   # nft add rule filter INPUT icmp type echo-request limit rate 1/second accept
+
+los que la superen acabarán rechazados si la política predeterminada era la de
+*lista blanca*. En cambio, si la política es de **lista negra**, lo que debemos
+hacer es rechazar las peticiones que superen la tasa::
+
+   # nft add rule netdev filter INGRESS icmp type echo-request limit rate over 1/second drop
+
+.. warning:: Hay que tener presente que, por defecto, la :ref:`ráfaga admisible
+   <iptables-limit>` es de **5**, por lo que si se hacen pruebas de concepto para
+   comprobar cómo funciona la limitación es preferible limitar la ráfaga al
+   ratio (es decir para *2/second*, *2*).
+
+      # nft add rule filter INPUT icmp type echo-request limit rate 2/second burst 2 packets accept
+   
+Como ocurre con las cuotas,.para limitar teniendo en cuenta también la dirección
+|IP| de origen de los paquetes, deberíamos combinar el objeto con el uso de
+:ref:`conjuntos dinámicos <nftables-meters>` y :ref:`concatenaciones
+<nftables-concat>`, ya que cada dirección de origen distinta debería
+contabilizar la ratio o la cuota de forma independiente.
+
+Es posible, por supuesto, definir una limitación con nombre, de forma análoga a
+como se hacía con los contadores::
+
+   # nft add limit filter icmpratio {rate 1/second}
+   # nft add rule filter INPUT icmp type echo-request limit name icmpratio accept
+
+o resetearlas.
+
+.. todo:: Implementar defensa contra ataque DoS a semejanza de iptables.
+
+.. _nftables-quota:
+
+Cuotas
+------
+De modo análogo podemos definir cuotas, que funcionan como límite del tráfico
+total que cumple con la regla.
+
+.. table::
+   :class: nftables-acc-no-term
+
+   +---------+-----------+-------------------------------------------------------------------+
+   | Acción  | Argumento | Descripción                                                       |
+   +=========+===========+===================================================================+
+   | quota   | [over]    | Establece una cuota para la tranferencia. Debe añadirse           |
+   |         |           | cuál es el umbral y las unidades (*bytes*, *kbytes*, *mbytes*)    |
+   |         |           +-------------------------------------------------------------------+
+   |         |           | nft add rule filter OUTPUT tcp sport 22 quota over 10 mbytes drop |
+   +---------+-----------+-------------------------------------------------------------------+
+
+Es posible crear cuotas con nombre::
+
+   # nft add quota ssh-quota {over 10 mbytes}
+   # nft add rule filter OUTPUT tcp sport 22 quota name ssh-quota drop
+
+aunque esto establecerá un límite general para todo el tráfico |SSH| de descarga
+y no por cliente lo que exige :ref:`conjuntos dinámicos <nftables-meters>`.
+
 .. _nftables-sets:
 
 sets
@@ -70,7 +209,7 @@ características al crear el conjunto:
    | flags          | constant | El contenido del conjunto no puede cambiar mientras esté vinculado a alguna regla.   |
    |                +----------+--------------------------------------------------------------------------------------+
    |                | dynamic  | Crea conjuntos dinámicos, que añaden elementos directamente desde las reglas. Lo     |
-   |                |          | trataremos en el `epígrafe dedicado a meters <nftables-meters>`_.                    |
+   |                |          | trataremos en el :ref:`epígrafe dedicado a meters <nftables-meters>`.                |
    |                +----------+--------------------------------------------------------------------------------------+
    |                | interval | El conjunto contiene intervalos, no elementos individuales.                          |
    |                +----------+--------------------------------------------------------------------------------------+
@@ -180,39 +319,6 @@ También es posible concatenar las claves en los mapas y disccionarios.
    nftables
    <https://wiki.nftables.org/wiki-nftables/index.php/Concatenations>`_.
 
-.. _nftables-limit:
-
-limit
-=====
-:kbd:`limit` es la acción que posibilita la limitación de caudales de tráfico.
-Cuando nuestra política es de **lista blanca**, entonces deberemos aceptar paquetes
-mientras el tráfico se mantenga por debajo de un ratio. Por ejemplo, esta regla
-acepta peticiones |ICMP| que se encuentren por debajo de la tasa de un paquete
-por segundo::
-
-   # nft add rule filter INPUT icmp type echo-request limit rate 1/second accept
-
-los que la superen acabarán rechazados por la propia política predeterminada. En
-cambio, si la política es de **lista negra**, lo que debemos hacer es rechazar las peticiones 
-que superen la tasa::
-
-   # nft add rule netdev filter INGRESS icmp type echo-request limit rate over 1/second drop
-
-.. warning:: Hay que tener presente que, por defecto, la :ref:`ráfaga admisible
-   <iptables-limit>` es de **5**, por lo que si se hacen pruebas de concepto para
-   comprobar cómo funciona la limitación es preferible limitar la ráfaga a
-   **1**::
-
-      # nft add rule filter INPUT icmp type echo-request limit rate 1/second burst 1 packets accept
-   
-Esto implementaría una limitación básica (la que posibilita el módulo *limit* de
-:command:`iptables`) sin discriminación de qué máquina es la que se conecta.
-Para implementar *connlimit* y *hashlimit* deberíamos recurrir. además, al
-:ref:`uso de conjuntos dinámicos <nftables-meters>` y quizás :ref:`concatenaciones
-<nftables-concat>`.
-
-.. todo:: Implementar defensa contra ataque DoS a semejanza de iptables.
-
 .. _nftables-meters:
 
 Conjuntos dinámicos
@@ -291,6 +397,11 @@ En conjunción con las concatenaciones los *conjuntos dinámicos* permiten la
 implementación de las funcionalidades que ofrecen los módulos :ref:`hashlimit y
 connlimit <iptables-limit>` de :program:`iptables`.
 
+.. ¿Se puede usar en conjuntos dinámicos?
+   # nft add rule filter OUTPUT tcp sport 22 add @sshquota {ip daddr timeout 20m quota over 10 mbytes} drop
+   Según esto, parece que sí:
+   https://netdevconf.info/2.1/slides/apr8/ayuso-netdev-netfilter-updates-canada-2017.pdf
+
 .. _nftables-connlimit:
 
 connlimit
@@ -344,6 +455,11 @@ flowtables
 ===========
 
 .. https://wiki.nftables.org/wiki-nftables/index.php/Flowtable
+
+.. _nftables-recent:
+
+recent
+======
 
 .. |ICMP| replace:: :abbr:`ICMP (Internet Control Message Protocol)`
 .. |MAC| replace:: :abbr:`MAC (Media Access Control)`
