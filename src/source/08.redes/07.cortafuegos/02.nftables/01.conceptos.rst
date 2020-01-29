@@ -1,86 +1,3 @@
-Conceptos
-=========
-
-.. _nftables-families:
-
-Familias
---------
-:program:`nftables` permite manipular tráfico encaminado, conmutado y |ARP| por
-lo que cuando se definen tablas y cadenas es necesario especificar para qué
-familia de tráfico se crean:
-
-.. table::
-   :class: nftables-family
-
-   ========== =============== ==========================================================
-    Familia    Gestinado por   Descripción
-   ========== =============== ==========================================================
-    ip         iptables        Para |IP|\ v4.
-    ip6        ip5tables       Para |IP|\ v6.
-    inet       {ip,ip6}tables  Para las dos familias anteriores.
-    arp        arptables       Para tráfico |ARP|.
-    bridge     ebtables        Para tráfico que atraviesa interfaces *bridge*.
-    netdev     \-              Pará tráfico que acaba de procesar la tarjeta de red.
-   ========== =============== ==========================================================
-
-.. _nftables-hooks:
-
-Enganches (*hooks*)
--------------------
-Los :dfn:`enganches` son los puntos dentro del flujo del tráfico en los que se
-puede analizar éste. Puesto que el *framework* es el mismo
-(:program:`netfilter`), los enganches podemos verlos en el esquema que
-presentamos para :ref:`ebtables <ebtables>`:
-
-.. todo:: Cambiar este gráfico por otro basado en `este otro
-   <https://www.craoc.fr/articles/nftables/#route-chain>`_.
-
-.. image:: ../01.iptables/files/netfilter.png
-
-Todos los enganches no tienen sentido para todas las familias:
-
-.. table::
-   :class: nftables-hooks
-
-   ============= ======================
-    Enganche      Familia              
-   ============= ======================
-    ingress       netdev               
-    prerouting    ip, ip6, bridge      
-    input         ip, ip6, bridge, arp 
-    forward       ip, ip6, bridge
-    output        ip, ip6, bridge, arp
-    postrouting   ip, ip6, bridge
-   ============= ======================
-
-.. note:: El enganche correspondiente a *BROUTING* no esta implementado.
-
-.. _nftables-types:
-
-Tipos
------
-Los :dfn:`tipos`  de las cadenas indican cuál es el cometido de las reglas que
-contendrá la cadena:
-
-.. table::
-   :class: nftables-type
-
-   +--------+---------------+----------+------------------------------------------------+
-   | Tipo   | Enganches     | Familias | Propósito                                      |
-   +========+===============+==========+================================================+
-   | filter | Todos         | Todos    | Filtrar paquetes.                              |
-   +--------+---------------+----------+------------------------------------------------+
-   | nat    | | preroting,  | | ip,    | Realizar operaciones de |NAT|. Sólo se         |
-   |        | | input,      | | ip6,   | se aplica sobre el primer paquete              |
-   |        | | output.     | | inet   | de la conexión.                                |
-   |        | | postrouting |          |                                                |
-   +--------+---------------+----------+------------------------------------------------+
-   | route  | | ip,         | output   | Permite implementar la funcionalidad del       |
-   |        | | ip6         |          | `objetivo ROUTE`_ de :program:`iptables`.      |
-   +--------+---------------+----------+------------------------------------------------+
-
-.. _objetivo ROUTE: https://netfilter.org/documentation/HOWTO/netfilter-extensions-HOWTO-4.html#ss4.5
-
 Creación del armazón
 ====================
 Para poder escribir reglas necesitamos crear un armazón previo de tablas y
@@ -201,12 +118,11 @@ propiedades::
 
 esto es:
 
-* El :ref:`tipo de cadena <nftables-types>`.
-* A qué :ref:`punto del flujo se enganchan <nftables-hooks>`.
-* Cuál es la prioridad de la cadena. La prioridad sirve para saber, dentro de un
-  enganche al que hay asociados varias cadenas cuál es el orden en que deben
-  procesarse. Es un número entero (también negativo), de manera que cuanto menor
-  sea, mayor será la prioridad y, por tanto, antes se procesará la cadena.
+* El :ref:`tipo de cadena <netfilter-chaintypes>`.
+* A qué :ref:`punto del flujo se enganchan <netfilter-hooks>`.
+* Cuál es la :ref:`prioridad de la cadena <netfilter-prio>`. A partir de
+  :program:`nftables` v0.9.1 pueden usarse los nombres referidos en las tablas
+  de ese enlace.
 * La política se refiere a la política predeterminada para los paquetes a los
   que no sea aplicable ninguna regla. Puede indicarse cualquiera de las :ref:`acciones
   terminales <nftables-acc-term>`, excepto *reject*. Típicamente se usan
@@ -223,37 +139,7 @@ Por ejemplo::
 estas tres instrucciones crearían unas tablas para filtrar paquetes equivalentes
 a las existentes en :program:`iptables`.
 
-Como referencia. a partir de :program:`nftables` v0.9.1 pueden usarse nombres para
-prioridades predefinidas\ [#]_:
 
-.. table::
-   :class: iptables-prio
-
-   ========== =========== =================================== =============
-    Nombre     Prioridad   Familia                             Enganche
-   ========== =========== =================================== =============
-    raw          -300      ip, ip6, inet                       Todos
-    mangle       -150      ip, ip6, inet                       Todos
-    dstnat       -100      ip, ip6, inet                       prerouting
-    filter          0      ip, ip6, inet, arp, netdev          Todos
-    security       50      ip, ip6, inet                       Todos
-    srcnat        100      ip, ip6, inet                       postrouting
-   ========== =========== =================================== =============
-
-Y para la familia *bridge*:
-
-.. table::
-   :class: iptables-prio
-
-   ========== =========== =========== =============
-    Tabla      Prioridad   Familia     Enganche
-   ========== =========== =========== =============
-    dstnat     -300        bridge      prerouting
-    filter     -200        bridge      Todos
-    out         100        bridge      output
-    srcnat      300        bridge      postrouting
-   ========== =========== =========== =============
-   
 En el caso de que se cree una cadena enganchada a *ingress* es necesario,
 además, definir la interfaz a la que se conectará::
 
@@ -275,15 +161,6 @@ hacerse borrando reglas una a una o de un tirón con::
 
 .. rubric:: Notas al pie
 
-.. [#] Véase la página de manual de :manpage:`nftables(8)` o el `texto que
-   acompaña
-   <http://git.netfilter.org/nftables/commit/?id=c8a0e8c90e2d1188e6fcdd8951b295722e56d542>`_
-   la aceptación del parche. Los valores derivan de los `predefinidos en
-   iptables
-   <https://wiki.nftables.org/wiki-nftables/index.php/Configuring_chains#Base_chain_priority>`_.
-
 ..  https://www.redeszone.net/tutoriales/seguridad/nftables-firewall-linux-configuracion/
    
 
-.. |ARP| replace:: :abbr:`ARP (Address Resolution Protocol)`
-.. |NAT| replace:: :abbr:`NAT (Network Address Translation)`

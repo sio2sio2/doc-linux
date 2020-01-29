@@ -23,7 +23,7 @@
     
     <link rel="index" title="Índice" href="../../genindex.html" />
     <link rel="search" title="Búsqueda" href="../../search.html" />
-    <link rel="next" title="8.7.1. IPtables" href="01.iptables/index.html" />
+    <link rel="next" title="8.7.3.1. IPtables" href="01.iptables/index.html" />
     <link rel="prev" title="8.6.3. Escaneo de puertos" href="../06.analisis/03.nmap.html" /> 
   </head><body>
     <div class="related" role="navigation" aria-label="related navigation">
@@ -33,7 +33,7 @@
           <a href="../../genindex.html" title="Índice General"
              accesskey="I">índice</a></li>
         <li class="right" >
-          <a href="01.iptables/index.html" title="8.7.1. IPtables"
+          <a href="01.iptables/index.html" title="8.7.3.1. IPtables"
              accesskey="N">siguiente</a> |</li>
         <li class="right" >
           <a href="../06.analisis/03.nmap.html" title="8.6.3. Escaneo de puertos"
@@ -70,30 +70,419 @@ Informática</span></a>.</p>
 </li>
 </ul>
 <p>Al ser los cortafuegos piezas críticas para la seguridad del sistema operativo
-es común que su sustitución por otro sea paulatina y que durante un tiempo
-convivan el <em>firewall</em> antiguo y el nuevo, mientras se afinan, los
-administradores se acostumbran y las aplicaciones que dependen de ellos se
-actualizan. Desde hace unos cuantos años<a class="footnote-reference" href="#id2" id="id1">[1]</a>, conviven en las distribuciones
-de <em>Linux</em> <strong class="program">iptables</strong> y su sustituto <strong class="program">nftables</strong>, programas
-ambos que manipulan el <em>framework</em> de filtrado de paquetes del núcleo
-(<strong class="program">netfilter</strong>), aunque las distribuciones modernas (<em>Debian</em> desde
-<em>Buster</em>) fijan ya <strong class="program">nftables</strong> como el cortafuegos predeterminado.
-Trataremos en esta guía ambos.</p>
-<p class="rubric">Contenidos</p>
+es común que su sustitución sea lenta y los administradores necesiten un tiempo
+largo de transición. A partir de la versión <em>2.4</em> del núcleo, el <em>framework</em>
+para manejo de paquetes pasó a ser <strong class="program">netfilter</strong> y como herramienta de
+espacio de usuario se creó la familia de aplicaciones de <strong class="program">iptables</strong>
+(<strong class="command">iptables</strong>, <strong class="command">ip6tables</strong>, <strong class="command">ebtables</strong> y
+<strong class="command">arptables</strong>). En 2009, sin embargo, se lanzó una nueva herramiento de
+espacio de usuario llamada <strong class="program">nftables</strong> que promete mejor rendimiento,
+mayor claridad de sintaxis y evitar la duplicidad de código. Durante bastantes
+años<a class="footnote-reference" href="#id6" id="id1">[1]</a>, esta nueva herramienta ha convivido a la sombra de
+<strong class="program">iptables</strong>, pero las distribuciones modernas han optado ya por
+adoptarla como herramienta oficial (<em>Debian</em> desde <em>Buster</em>) por lo que es
+aconsejable el estudio de la nueva herramienta.</p>
+<p>El conocimiento de la suite de programas de <strong class="program">iptables</strong>, no obstante, no
+es inútil por varias razones:</p>
+<ul class="simple">
+<li>Al ser el <em>framework</em> el mismo, los conceptos esenciales no cambian.</li>
+<li><strong class="program">nftables</strong> incorpora una serie de programas cuyo nombre coincide con
+los de la suite de <strong class="program">iptables</strong> con la única diferencia de añadir un
+sufijo <em>-nft</em> (por ejemplo, <strong class="program">ebtables-nft</strong> como correspondiente a
+<strong class="program">ebtables</strong>), que permiten escribir la orden usando exactamente la
+misma sintaxis de los programas a los que emulan.</li>
+<li>Salvo módulos algo avanzados<a class="footnote-reference" href="#id7" id="id2">[2]</a>, la traducción será posible y el
+administrador será capaz de seguir definiendo las reglas <em>de siempre</em> usando
+las herramientas descritas.</li>
+</ul>
+<p>Antes de comenzar la explicación de una y otra herramienta, podemos establecer
+la parte común a ambas, esto es, los fundamentos de <strong class="program">netfilter</strong>.</p>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">Es importante tener presente que <strong class="program">netfilter</strong> no sólo sirve
+para filtrar tráfico no autorizado o indeseado, sino para manipularlo en
+general (p.e. cambiando los datos de origen o destino).</p>
+</div>
+<div class="section" id="conceptos">
+<span id="netfilter-conceptos"></span><h2>8.7.1. Conceptos<a class="headerlink" href="#conceptos" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Para entender cómo funcionamiento el manejo de paquetes en el núcleo de <em>Linux</em>
+es indispensable tener claros los soguientes conceptos:</p>
+<dl class="docutils" id="netfilter-families">
+<dt><em class="dfn">Familia</em> (<em>family</em>)</dt>
+<dd><p class="first">Es el término para indicar el tipo de tráfico manipulado:</p>
+<table border="1" class="nftables-family docutils">
+<colgroup>
+<col width="12%" />
+<col width="18%" />
+<col width="70%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Familia</th>
+<th class="head">Gestinado por</th>
+<th class="head">Descripción</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>ip</td>
+<td>iptables</td>
+<td><abbr title="Internet Protocol">IP</abbr>v4.</td>
+</tr>
+<tr class="row-odd"><td>ip6</td>
+<td>ip6tables</td>
+<td><abbr title="Internet Protocol">IP</abbr>v6.</td>
+</tr>
+<tr class="row-even"><td>inet</td>
+<td>{ip,ip6}tables</td>
+<td>Las dos familias anteriores.</td>
+</tr>
+<tr class="row-odd"><td>arp</td>
+<td>arptables</td>
+<td>Tráfico <abbr title="Address Resolution Protocol">ARP</abbr>.</td>
+</tr>
+<tr class="row-even"><td>bridge</td>
+<td>ebtables</td>
+<td>Tráfico que atraviesa interfaces <em>bridge</em>.</td>
+</tr>
+<tr class="row-odd"><td>netdev</td>
+<td>-</td>
+<td>Tráfico que acaba de procesar la tarjeta de red.</td>
+</tr>
+</tbody>
+</table>
+<p class="last">Una diferencia evidente entre <strong class="program">nftables</strong> e <strong class="program">iptables</strong> es que
+el primero maneja todos los tipos de tráfico, mientras que con el segundo se usa
+distinto programa según el tipo de tráfico.</p>
+</dd>
+</dl>
+<dl class="docutils" id="netfilter-rules">
+<dt><em class="dfn">Regla</em> (<em>rule</em>)</dt>
+<dd>Es cada una de las sentencias que manipula paquetes. La mayoría son
+condicionales, esto es, establecen las condiciones que las hacen aplicables
+sobre las paquetes. Estas condiciones refieren o bien características
+incluidas en el propio paquete (p.e. la dirección <abbr title="Internet Protocol">IP</abbr> de origen), o bien a
+caracteríticas derivadas del hecho de que el paquete pertenece a una conexión
+(p.e. si ese paquete es el que abre una conexión)</dd>
+</dl>
+<dl class="docutils" id="netfilter-chains">
+<dt><em class="dfn">Cadena</em> (<em>chain</em>)</dt>
+<dd><p class="first">Es una lista ordenada de reglas de un mismo <em>tipo</em>. Cuando un paquete accede
+a una cadena, comprueba las reglas una a una en el orden establecido,
+ejecutando sólo aquellas que le son aplicables. En ocasiones, la regla
+definirá una acción terminal (p.e. desechar el paquete) con lo que la
+comprobación del resto de reglas de la cadena no se llevará a cabo. Si se
+acaban las reglas de la cadena sin que esto suceda, se aplicará la política
+pretederminada: por lo general, o aceptar o desechar el paquetei, esto es. o
+una política de <em>lista negra</em> y o una política de <em>lista blanca</em>.</p>
+<p>Un aspecto importante de las cadenas, apuntado en el párrafo anterior, es la
+causa por la que un paquete accede a ella. Esto puede ser debido a una de
+estas dos razones:</p>
+<ul class="simple">
+<li>Porque en otra cadena una de las reglas ordene acceder a ella. Estas son
+las llamadas <em class="dfn">cadenas de usuario</em>.</li>
+<li>Porque al crear la cadena se asocie a un <a class="reference internal" href="#netfilter-hooks"><span class="std std-ref">punto de enganche</span></a> existente en el flujo de paquetes.` A estas cadenas se
+las llama <em class="dfn">cadenas base</em>.</li>
+</ul>
+<p id="netfilter-prio">Ahora bien, en el caso de la <em>cadenas base</em>, si hay dos cadenas asociadas a
+un mismo punto de enganche, ¿de cuál se revisan antes las reglas? Para
+determinarlo se define la <em class="dfn">prioridad</em>, que es un número entero que
+define en qué orden dentro de un mismo enganche se comprueban las cadenas, de
+modo que cuanto menor sea este número, mayor será la prioridad. Hay unas
+cuantas prioridades predefinidas<a class="footnote-reference" href="#id8" id="id3">[3]</a>:</p>
+<table border="1" class="iptables-prio docutils">
+<colgroup>
+<col width="14%" />
+<col width="16%" />
+<col width="51%" />
+<col width="19%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Nombre</th>
+<th class="head">Prioridad</th>
+<th class="head">Familia</th>
+<th class="head">Enganche</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>raw</td>
+<td>-300</td>
+<td>ip, ip6, inet</td>
+<td>Todos</td>
+</tr>
+<tr class="row-odd"><td>mangle</td>
+<td>-150</td>
+<td>ip, ip6, inet</td>
+<td>Todos</td>
+</tr>
+<tr class="row-even"><td>dstnat</td>
+<td>-100</td>
+<td>ip, ip6, inet</td>
+<td>prerouting</td>
+</tr>
+<tr class="row-odd"><td>filter</td>
+<td>0</td>
+<td>ip, ip6, inet, arp, netdev</td>
+<td>Todos</td>
+</tr>
+<tr class="row-even"><td>security</td>
+<td>50</td>
+<td>ip, ip6, inet</td>
+<td>Todos</td>
+</tr>
+<tr class="row-odd"><td>srcnat</td>
+<td>100</td>
+<td>ip, ip6, inet</td>
+<td>postrouting</td>
+</tr>
+</tbody>
+</table>
+<p>Y para la familia <em>bridge</em>:</p>
+<table border="1" class="iptables-prio docutils">
+<colgroup>
+<col width="22%" />
+<col width="24%" />
+<col width="24%" />
+<col width="29%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Tabla</th>
+<th class="head">Prioridad</th>
+<th class="head">Familia</th>
+<th class="head">Enganche</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>dstnat</td>
+<td>-300</td>
+<td>bridge</td>
+<td>prerouting</td>
+</tr>
+<tr class="row-odd"><td>filter</td>
+<td>-200</td>
+<td>bridge</td>
+<td>Todos</td>
+</tr>
+<tr class="row-even"><td>out</td>
+<td>100</td>
+<td>bridge</td>
+<td>output</td>
+</tr>
+<tr class="row-odd"><td>srcnat</td>
+<td>300</td>
+<td>bridge</td>
+<td>postrouting</td>
+</tr>
+</tbody>
+</table>
+<p id="netfilter-chaintypes">El otro aspecto citando en el primer parrafo es que todas laa reglas de una
+misma cadena son del mismo tipo, aunque se dejó sin definir cuáles son estos
+tipos:</p>
+<table border="1" class="nftables-type docutils">
+<colgroup>
+<col width="10%" />
+<col width="19%" />
+<col width="12%" />
+<col width="59%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Tipo</th>
+<th class="head">Enganches</th>
+<th class="head">Familias</th>
+<th class="head">Propósito</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>filter</td>
+<td>Todos</td>
+<td>Todos</td>
+<td>Filtrar paquetes.</td>
+</tr>
+<tr class="row-odd"><td>nat</td>
+<td><div class="first last line-block">
+<div class="line">preroting,</div>
+<div class="line">input,</div>
+<div class="line">output.</div>
+<div class="line">postrouting</div>
+</div>
+</td>
+<td><div class="first last line-block">
+<div class="line">ip,</div>
+<div class="line">ip6,</div>
+<div class="line">inet</div>
+</div>
+</td>
+<td>Realizar operaciones de <abbr title="Network Address Translation">NAT</abbr>. Sólo se
+se aplica sobre el primer paquete
+de la conexión.</td>
+</tr>
+<tr class="row-even"><td>route</td>
+<td><div class="first last line-block">
+<div class="line">ip,</div>
+<div class="line">ip6</div>
+</div>
+</td>
+<td>output</td>
+<td>POR ESCRIBIR.</td>
+</tr>
+</tbody>
+</table>
+<p>Por último, resumiendo las características de una cadena:</p>
+<ul class="last simple">
+<li>Una <em>cadena de usuario</em> se caracteriza por su nombre y su política
+predeterminada.</li>
+<li>Una <em>cadena base</em> se caracteriza por:<ul>
+<li>Su nombre.</li>
+<li>El tipo de reglas que contiene.</li>
+<li>A donde se engancha.</li>
+<li>Su prioridad.</li>
+<li>Su política predeterminada.</li>
+</ul>
+</li>
+</ul>
+</dd>
+</dl>
+<dl class="docutils" id="netfilter-hooks">
+<dt><em class="dfn">Enganche</em> (<em>hook</em>)</dt>
+<dd><p class="first">Son los puntos dentro del flujo en los cuales pueden analizarse y
+manipularse paquetes. Tomando como referencia el <a class="reference external" href="https://www.craoc.fr/articles/nftables/#packet-flow">diagrama de Croacr</a> estos son los
+enganches posibles<a class="footnote-reference" href="#id9" id="id4">[4]</a>:</p>
+<img alt="../../_images/netfilter-flow.png" src="../../_images/netfilter-flow.png" />
+<p>Entiéndase que un paquete puede aparecer:</p>
+<ul class="simple">
+<li>Porque se recibe a través de una interfaz (<em>PAQUETE ENTRANTE</em>).</li>
+<li>Porque lo genera un proceso local (<em>PAQUETE CREADO</em>).</li>
+</ul>
+<p>Por tanto, cualquier debate sobre cuál es el camino que sigue un paquete debe
+comenzar en el extremo izquierdo (<em>PAQUETE ENTRANTE</em>) o en la etiqueta de
+proceso local (<em>PAQQUETE CREADO</em>). Partiendo de uno de esos puntos, basta
+con ir respondiendo a las preguntas que se formulan en los puntos de
+bifurcación (<em>rombos anaranjados</em>). Por ejemplo, la petición de un navegador
+cliente a nuestro servidor web:</p>
+<ol class="arabic simple">
+<li>Entrará por la interfaz fisica.</li>
+<li>Como no es tráfico <abbr title="Address Resolution Protocol">ARP</abbr>, pasará por el enganche <em>ingress</em>.</li>
+<li>Si la interfaz física no estaba asociada a una interfaz <em>bridge</em>,
+alcanzará el enganche <em>prerouting</em> naranja pálido.</li>
+<li>Como somos el destino del paquete (la <abbr title="Internet Protocol">IP</abbr> de destino coincide con nuestra
+direccion <abbr title="Internet Protocol">IP</abbr>), el paquete llegará al enganche <em>hook</em>.</li>
+<li>Si no lo filtramos de ninguna manera, alcanzará el proceso local, esto es,
+el servidor web.</li>
+</ol>
+<p>Del mismo modo, la respuesta del servidor web:</p>
+<ol class="last arabic simple">
+<li>Partirá del servidor web (proceso local).</li>
+<li>Llegará al enganche <em>output</em>, donde (más nos vale) no se filtrará.</li>
+<li>Como el cliente es externo, alcanzará el enganche <em>postrouting</em>.</li>
+<li>Si la interfaz de salida no es un <em>bridge</em>, saldrá por ella<a class="footnote-reference" href="#id10" id="id5">[5]</a>.</li>
+</ol>
+</dd>
+</dl>
+<dl class="docutils" id="netfilter-tables">
+<dt><em class="dfn">Tabla</em> (<em>table</em>)</dt>
+<dd>Son, simplemente, conjuntos de cadenas.</dd>
+</dl>
+</div>
+<div class="section" id="conexion">
+<h2>8.7.2. Conexión<a class="headerlink" href="#conexion" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Al ser <strong class="program">netfilter</strong> un <a class="reference internal" href="../../10.guias/02.seg/06.cortafuegos.html#fw-stateful"><span class="std std-ref">cortafuegos de filtrado dinámico</span></a>, cuando analiza un paquete, es capaz de de tener en cuenta
+su contexto, esto es, de tener el cuenta que el paquete forma parte de una
+conexión.  En realidad, de los tres protocolos de capa de transporte (<abbr title="Transmission Control Protocol">TCP</abbr>,
+<abbr title="User Datagram Protocol">UDP</abbr> e <abbr title="Internet Control Message Protocol">ICMP</abbr>) sólo <abbr title="Transmission Control Protocol">TCP</abbr> es un protocolo orientado a conexión.
+<strong class="program">netfilter</strong>, no obstante, implementa un seguimiento de conexión común a
+los tres.</p>
+<p class="rubric">¿Cómo se establecen conexiones?</p>
+<p>A ojos de <strong class="program">netfilter</strong>, al conectarse un cliente con un servidor ocurre
+lo siguiente:</p>
+<ol class="arabic simple">
+<li>El <em>cliente</em>, usando un puerto aleatorio por encima del 1024 inicia una
+petición a un puerto prefijado del servidor (el paquete inicial tendrá estado <em>NEW</em>).</li>
+<li>El <em>servidor</em>, responde a esa petición usando el mismo canal de comunicación,
+con un paquete de estado <em>ESTABLISHED</em>.</li>
+<li>El resto de paquetes de la conexión son <em>ESTABLISHED</em>.</li>
+</ol>
+<p>Esquemáticamente, este podría ser un ejemplo:</p>
+<img alt="../../_images/conexion.png" src="../../_images/conexion.png" />
+<p>En la figura se ha representado el establecimiento de una conexión <abbr title="Transmission Control Protocol">TCP</abbr>.
+Obsérvese que, aunque desde el punto de vista del protocolo, el establecimiento
+se logra después de las tres comunicaciones representadas, desde el punto de
+vista del cortafuegos  solamente la primera comunicación es <em>NEW</em>, todas las
+demás se consideran paquetes de una conexión establecida. Para el tráfico <abbr title="User Datagram Protocol">UDP</abbr>
+e <abbr title="Internet Control Message Protocol">ICMP</abbr>, el esquema es exactamente el mismo: la primera comunicación entre
+cliente y servidor es <em>NEW</em> y el resto <em>ESTABLISHED</em>.</p>
+</div>
+<div class="section" id="herramientas-de-usuario">
+<h2>8.7.3. Herramientas de usuario<a class="headerlink" href="#herramientas-de-usuario" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Ya se ha indicado que existes dos: la antigua <strong class="program">iptables</strong> y su sustituta
+<strong class="program">nftables</strong>. Ambas toman los conceptos anteriores dado que utilizan el
+mismo <em>framework</em>, por lo que tienen mucho en común, pero difieren en la
+sintaxis y en la mayor indefinición inicial de <strong class="program">nftables</strong>.</p>
 <div class="toctree-wrapper compound">
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="01.iptables/index.html">8.7.1. IPtables</a></li>
-<li class="toctree-l1"><a class="reference internal" href="02.nftables/index.html">8.7.2. nftables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="01.iptables/index.html">8.7.3.1. IPtables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="02.nftables/index.html">8.7.3.2. nftables</a></li>
 </ul>
 </div>
+<p class="rubric">Enlaces de interes</p>
+<ul class="simple">
+<li><a class="reference external" href="https://wiki.nftables.org/wiki-nftables/index.php">La wiki de nftables</a>.</li>
+<li><a class="reference external" href="https://www.craoc.fr/articles/nftables/">Artículo en Craoc Wiki</a>.</li>
+<li><a class="reference external" href="https://wiki.archlinux.org/index.php/Nftables">Tutorial de la wiki de Archilinux</a>.</li>
+<li><a class="reference external" href="https://wiki.gentoo.org/wiki/Nftables">Tutorial de la wiki de Gentoo</a>.</li>
+<li><a class="reference external" href="https://cybercamp.es/sites/default/files/contenidos/videos/adjuntos/cybercamp18_b06_laura_garcia_liebana_0_0.pdf">Presentación de desarrolladores de netfilter en la Cybercamp 2018</a>.</li>
+</ul>
 <p class="rubric">Notas al pie</p>
-<table class="docutils footnote" frame="void" id="id2" rules="none">
+<table class="docutils footnote" frame="void" id="id6" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
 <tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td>La fecha de redacción de este párrafo es enero de 2020 y
 <strong class="program">nftables</strong> se incluyó por primera vez en el núcleo en 2014.</td></tr>
 </tbody>
 </table>
+<table class="docutils footnote" frame="void" id="id7" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id2">[2]</a></td><td>De los módulos descritos en estos apuntos, no tiene soporte directo
+<em>recent</em> y su funcionalidad debe implementarse directamente usando
+<strong class="command">nft</strong>.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id8" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id3">[3]</a></td><td>La existencia de estas prioridades predefinidas deriva de que en
+en <strong class="program">iptables</strong> las cadenas ya están definidas y, en consecuencia,
+también se encuentan <cite>predefinidas las prioridades de éstas
+&lt;https://wiki.nftables.org/wiki-nftables/index.php/Configuring_chains#Base_chain_priority&gt;</cite>.
+En <strong class="program">nftables</strong> no es así y puede usarse cualquier número, pero a
+partir de la versión v0.9.1, se han predefinido los nombres que pueden verse
+para representar las prioridades predefinidas existentes en
+<strong class="program">iptables</strong>.  Véase la página de manual de <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/nftables(8)">nftables(8)</a></em> o
+el <a class="reference external" href="http://git.netfilter.org/nftables/commit/?id=c8a0e8c90e2d1188e6fcdd8951b295722e56d542">texto que acompaña</a>
+la aceptación del parche.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id9" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id4">[4]</a></td><td>Este diagrama no coincide exactamente con <cite>el que proporciona Jan
+Engelhardt en la Wikipedia
+&lt;https://commons.wikimedia.org/wiki/File:Netfilter-packet-flow.svg&gt;</cite>,
+pero las pruebas corroboran que es más fiable el redibujado, como el autor
+original advierte en su <em>wiki</em>. Para hacer usted mismo las pruebas puede
+tomar un <em>Linux</em> con su interfaz física conectada a una interfaz <em>bridge</em>,
+cargar <a class="reference download internal" download="" href="../../_downloads/faa6665c8f0c41cef4a879027d64fa86/nftables-flow"><code class="xref download docutils literal notranslate"><span class="pre">estas</span> <span class="pre">reglas</span></code></a>, y enviar un paquete
+<abbr title="Internet Control Message Protocol">ICMP</abbr> a la máquina y enviar otro desde ella. El orden de paso por las
+cadenas (y en consecuencia por los enganches) debe quedar reflejado en el
+registro del sistema.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id10" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id5">[5]</a></td><td>En <em>egress qdisc</em> es el momento de aplicar las políticas de <a class="reference internal" href="../08.qos/index.html#qos"><span class="std std-ref">calidad de
+servicio</span></a>.</td></tr>
+</tbody>
+</table>
+</div>
 </div>
 
 
@@ -102,12 +491,22 @@ Trataremos en esta guía ambos.</p>
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
+  <h3><a href="../../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">8.7. Cortafuegos</a><ul>
+<li><a class="reference internal" href="#conceptos">8.7.1. Conceptos</a></li>
+<li><a class="reference internal" href="#conexion">8.7.2. Conexión</a></li>
+<li><a class="reference internal" href="#herramientas-de-usuario">8.7.3. Herramientas de usuario</a></li>
+</ul>
+</li>
+</ul>
+
   <h4>Tema anterior</h4>
   <p class="topless"><a href="../06.analisis/03.nmap.html"
                         title="capítulo anterior">8.6.3. Escaneo de puertos</a></p>
   <h4>Próximo tema</h4>
   <p class="topless"><a href="01.iptables/index.html"
-                        title="próximo capítulo">8.7.1. IPtables</a></p>
+                        title="próximo capítulo">8.7.3.1. IPtables</a></p>
   <div role="note" aria-label="source link">
     <h3>Esta página</h3>
     <ul class="this-page-menu">
@@ -138,7 +537,7 @@ Trataremos en esta guía ambos.</p>
           <a href="../../genindex.html" title="Índice General"
              >índice</a></li>
         <li class="right" >
-          <a href="01.iptables/index.html" title="8.7.1. IPtables"
+          <a href="01.iptables/index.html" title="8.7.3.1. IPtables"
              >siguiente</a> |</li>
         <li class="right" >
           <a href="../06.analisis/03.nmap.html" title="8.6.3. Escaneo de puertos"

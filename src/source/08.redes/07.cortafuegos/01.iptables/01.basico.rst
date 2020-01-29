@@ -4,59 +4,124 @@ Conceptos básicos
    :program:`iptables`, y añadiremos al final algunas notas para
    :program:`ebtables` y :program:`arptables`. 
 
-Es importante tener presente que el cortafuegos no sólo sirve para filtrar
-tráfico no autoriza o indeseado, sino también para manipularlo cambiando los
-datos de origen o destino, ya sean direcciones (|IP| o |MAC|) o puertos.
+Partiendo de lo explicado, en general, para :program:`netfilter`, es fácil
+particularizar para :program:`iptables`.
 
-Funcionamiento
-==============
-Antes de analizar su sintaxis y casos de usos es fundamental entender cómo
-funciona. :program:`iptables` dispone de cinco tablas (*nat*, *filter*,
-*mangle*, *raw* y *security*) y una serie de cadenas a las que se añaden las
-reglas del cortafuegos.
+Conceptos
+=========
+En :program:`iptables` casi todos los :ref:`conceptos de netfilter
+<netfilter-conceptos>` (excepto las propias reglas) están predefinidos de
+antemano.
 
-Hablamos alegremente de *cadenas*, pero ¿qué significa esta palabra en este
-contexto? Básicamente una :dfn:`cadena` expresa una lista de reglas, cada una de
-las cuales contiene una condición y una acción, de manera que se realizará esa
-acción con un determinado paquete, si éste cumple con la condición. Por ejemplo,
-una sentencia válida de :program:`iptables` es la siguiente::
+Familias
+--------
+Se usa una u otra aplicación dependiendo de cuál sea el tipo de tráfico
+(:ref:`familia <netfilter-families>`) que queramos fiscalizar:
 
-   # iptables -A FORWARD -p tcp --dport 25 -j DROP
+- Para tráfico |ARP| usaremos :command:`arptables`.
+- Para la manipulación en capa 2 de trafico que entra o sale por interfaces
+  *bridge* debe usarse :command:`ebtables`.
+- Para el resto de tráfico, manipulable en capa de red y de transporte, usaremos
+  :program:`iptables` (|IP|\ v4) o :program:`ip6tables` (|IP|\ v6).
 
-El primer :kbd:`-A FORWARD`, indica que vamos a añadir esta regla al final de la
-lista que ya haya en la cadena *FORWARD*. La acción es *DROP*, o sea, desechar;
-y la condición es :kbd:`-p tcp --dport 25`, o sea, protocolo |TCP| con puerto de
-destino el 25. Esto quiere decir que cualquier paquete que cumpla con esto
-(posiblemente sea tráfico |SMTP| de salida), está vetado y no atravesará nuestro
-cortafuegos. ¿Qué pasa con el tráfico web? Como el tráfico web es bastante
-improbable que tenga como destino el puerto 25 (no creo que haya nadie en su
-juicio que ponga a escuchar un servidor web en este puerto), no cumplirá la
-condición, y no será desechado; al menos por esta regla.
+Tablas
+------
+Ya está predefinidas sin posibilidad de añadir más:
+
+**filter**
+   Es la tabla que incluye las cadenas dedicadas a contener las reglas de
+   filtrado, (o sea, de tipo *filter*) habituales.
+
+**nat**
+   Es la tabla que incluye las cadenas dedicadas a contener reglas de tipo
+   *nat*.
+
+   .. note:: Recuérdese que este tipo de reglas sólo se aplican al primer
+      paquete de la conexión.
+
+**mangle**
+   Es una tabla que incluye cadenas con reglas de filtrado, dedicadas
+   fundamentalmente a alternar algunos de los campos de cabecera |IP| (p.e.
+   el |TTL| o el |TOS|). También se usan para alterar la *marca* del paquete, esto
+   es, una marca que no se encuentra en el propio paquete, sino en la
+   representación que el kernel hace del paquete, A efecto prácticos, dónde se
+   encuentre realmente la marca nos importa poco.
+
+**raw**
+   Es la tabla que incluye cadenas con reglas de filtrado utilizada básicamente
+   para marcar paquetes a fin de evitar el seguimiento de la conexión, o bien,
+   para desecharlos antes de cualquier otra decisión. Para el tráfico con que
+   hagamos esto, :program:`iptables` se comportará como un :ref:`cortafuegos sin
+   inspección de estado <fw-stateless>`.
+
+**security**
+   Es la tabla que incluye cadenas con reglas de filtrado para crear reglas de
+   seguridad |MAC|. Véase para más información `este artículo
+   <https://www.linux.com/tutorials/using-selinux-and-iptables-together/>`_.
+
+Enganches
+---------
+Dado que son cosa de :program:`netfilter`, son los :ref:`ya expuestos
+<netfilter-hooks>`. Ahora bien, puesto que, por ahora nos centramos
+exclusivamente en :program:`iptables`, podemos simplificar el esquema:
 
 .. _iptables-flowchart:
 
-Según entra, salen o atraviesan los paquetes el equipo, se consultan para ellos
-estas cadenas, por lo que es necesario conocer cuál es la ruta que siguen a fin
-de aplicar la regla en la cadena correcta. Obsérvese la siguiente figura de
-izquierda a derecha.
-
 .. image:: files/iptables.png
 
+.. note:: En este diagrama, los colores no identifican familias de tráfico, sino
+   caminos del paquete.
 
-Entiéndase que el "*proceso interno*", es cualquier proceso cliente o servidor
-susceptible de enviar y recibir paquetes. Un servidor web o un navegador pueden
-ser ejemplo de ello. Otro hito importante representando en la figura es el de
-"*decisión de encaminamiento*", que define hacia dónde se dirige el paquete: si
-a un proceso de la propia máquina o a una máquina externa. Obviamente, esta
-decisión viene determinada por la dirección |IP| de destino. 
+Cadenas
+-------
+Podemos definir las *cadenas de usuario* que queramos, pero las *cadenas base*
+están prestablecidas y lo único que nos será posible definir en ellas es la
+política predeterminada de aceptación (*accept*) o rechazo (*drop*). Por
+defecto, es *accept*.
 
-.. note:: En :program:`iptables` las cadenas predefinidas se *enganchan* al flujo de
-   paquetes tal y como se muestra en el gráfico (p.e. la cadena *PREROUTING* se
-   engancha justo antes de que se produzca la decisión de encaminamiento). Por ese
-   motivo, podemos, simplemente, olvidarnos de los enganches y hablar
-   directamente de las cadenas.
+Es fácil identificar las características de una *cadena base*, puesto que:
 
-Hay tres tipos de paquetes:
+- Su nombre, aunque en mayúsculas, indica el :ref:`enganche <netfilter-hooks>`
+  al que se asocia (p.e. una cadena *PREROUTING* se engancha a *prerouting*).  -
+- La tabla a la que pertenece nos refiere su :ref:`prioridad <netfilter-prio>`
+  (p.e. las cadenas de la tabla *mangle* tienen prioridad -150).
+- También la tabla refiere el tipo de reglas: las que pertenecen a *nat* son
+  cadenas de tipo de *nat* y las que pertenecen a todas las demás, de filtrado\
+  [#]_.
+
+Las cadenas predefinadas son las siguientes:
+
+.. table::
+   :class: chains-tables
+
+   ========== ============ ======= ========= ======== =============
+   \           PREROUTING   INPUT   FORWARD   OUTPUT   POSTROUTING
+   ========== ============ ======= ========= ======== =============
+   raw             Sí                           Sí
+   mangle          Sí         Sí       Sí       Sí          Sí
+   nat             Sí         Sí                Sí          Sí
+   filter                     Sí       Sí       Sí
+   security                   Sí       Sí       Sí
+   ========== ============ ======= ========= ======== =============
+
+.. note:: Como puede verse no hay ninguna cadena *INGRESS* lo que significa que
+   no hay forma de utilizar ese enganche con :program:`iptables`. De ahí, que no
+   se haya representado en el diagrama simplificado.
+
+Es preciso puntualizar por qué existen cadenas en *nat* enganchadas a *input* y
+*output*. Las cadenas de esta tabla sirven, fundamentalmente, para acciones de
+|SNAT| y |DNAT|. Para un paquete entrante, podemos llevar a cabo |DNAT| en el
+enganche *prerouting*, porque el paquete pasa por ahí. En cambio, un paquete
+creado por un proceso interno, no pasa por ese enganche, y es en *output* donde
+de ser necesario, se puede hacer el |DNAT|\ [#]_. Por otro lado, para los paquetes
+salientes se puede hacer |SNAT| en *postrouting*, pero si una
+aplicación local se comunica con otra aplicación local, el paquete nunca pasa
+por ese enganche y es en *input* donde puede llevarse a cabo la operación\ [#]_.
+
+Funcionamiento
+==============
+Si volvemos la vista al :ref:`diagrama simplificado de flujo
+<iptables-flowchart>`, comprobaremos que los paquetes siguen tres caminos:
 
 **Paquetes destinados al cortafuegos**
    Representados por la línea roja, el primer conjunto de reglas que se
@@ -83,73 +148,72 @@ Hay tres tipos de paquetes:
    alcanzará la cadena *POSTROUTING*, a partir de la cual se obrará de la misma
    forma que con el tipo anterior de paquetes.
 
-Es muy importante, además, tener presente que dentro de una cadena las reglas se
-comprueban siguiendo un orden, y que la acción que se lleva a cabo sobre el
-paquete:
+Además, en lo referente a la conexión, hay siete estados distintos
 
-* Habitualmente supone que se dejen de comprar el resto de reglas de la cadena.
+**NEW**
+   Que es el estado del paquete que origina la conexión.
 
-* Puede suponer que se sigan comprobando reglas como es el caso de la acción
-  **LOG**::
+**ESTABLISHED**
+   Que es el estado del paquete que pertenece a una conexión establecida.
 
-   # iptables -A FORWARD -p tcp --dport 25 -j LOG --log-prefix "Cliente hace petición SMTP"
-   # iptables -A FORWARD -p tcp --dport 25 -j DROP
+**RELATED**
+   Que es el estado del paquete que origina una conexión que se puede relacionar
+   con otra que ya ha sido establecida. Por ejemplo, imaginemos que intentamos establecer
+   una conexión |TCP| con un servidor remoto y este nos responde con un paquete |ICMP| de rechazo.
+   El estado de este segundo paquete sería **RELATED**, ya que no forma parte de la conexión
+   anterior, pero está relacionado con ella. También en el :ref:`tráfico FTP <iptables-ftp>` el paquete
+   que abre la conexión de datos es es **RELATED** puesto que tal conexión está relacionada con la
+   conexión de control.
 
-En este punto está claro qué es una cadena, pero no hemos aclarado qué son o
-para qué sirven las tablas. Las :dfn:`tablas` sirven, simplemente para 
-organizar las reglas según el tipo de decisión que supongan, de modo que:
+**INVALID**
+   Que es el estado de los paquetes que no se pueden relacionar con ninguna conexión establecida.
 
-**filter**
-   Es la tabla en la que se apuntan reglas de filtrado, esto es, reglas que
-   permite o deniegan el paso de los paquetes.
+**UNTRACKED**
+   Que es el estado de los paquetes de los que se decidió no hacer seguimiento
+   de la conexión (con *NOTRACK*).
 
-**nat**
-   Es la tabla en la que se apuntan reglas de |NAT|, esto es, reglas que
-   medifican el origen o el destino de los paquetes. Es conveniente señalar
-   que las reglas de esta tabla sólo se aplican al primer paquete de una
-   conexión, de manera que cualquier decisión que se toma para este primer
-   paquete se aplica al resto. Adenás, si se aplica una modificación en un
-   sentido, sobre el tráfico de vuelta se deshace automáticamente tal
-   modificación.
+**SNAT**
+   Que es el estado de los paquetes sobre los que se llevó a cabo un cambio
+   en la |IP| de origen. También tiene este estado los paquetes de respuesta.
 
-**mangle**
-   Es la tabla que permite alternar algunas de los campos de cabecera |IP| (p.e.
-   el |TTL| o el |TOS|). También permite alterar la *marca* del paquete que no
-   se encuentra en el propio paquete, sino en la representación que el kernel
-   hace del paquete, lo cual a efectos prácticos importa poco.
+**DNAT**
+   Que es el estado de los paquetes sobre los que se llevó a cabo un cambio
+   en la |IP| de destinoo. También tiene este estado los paquetes de respuesta.
 
-**raw**
-   Es la tabla utilizada básicamente para marcar paquetes a fin de evitar el
-   seguimiento de la conexión, o bien, para desecharlos antes de cualquier otra
-   decisión. Para el tráfico con que hagamos esto, :program:`iptables` se
-   comportará como un :ref:`cortafuegos sin inspección de estado
-   <fw-stateless>`.
-
-**security**
-   Es la tabla para crear reglas de seguridad |MAC|. Véase para más información
-   `este artículo
-   <https://www.linux.com/tutorials/using-selinux-and-iptables-together/>`_.
-
-No todas las cadenas se implementan en todas las tablas:
-
-.. table::
-   :class: chains-tables
-
-   ========== ============ ======= ========= ======== =============
-   \           PREROUTING   INPUT   FORWARD   OUTPUT   POSTROUTING
-   ========== ============ ======= ========= ======== =============
-   raw             Sí                           Sí
-   mangle          Sí         Sí       Sí       Sí          Sí
-   nat             Sí                           Sí          Sí
-   filter                     Sí       Sí       Sí
-   security                   Sí       Sí       Sí
-   ========== ============ ======= ========= ======== =============
-
+Estos estados no son excluyentes en todos los casos. Por ejemplo, un paquete
+puede a la vez ser parte de una conexión establecida a la que se aplica
+enmascaramiento (o sea, |SNAT|)\ [#]_.
 .. _iptables-sintaxis:
 
 Sintaxis
 ========
-Toda sentencia de :program:`iptables` tiene este aspecto::
+Dado que la estructura de tablas y cadenas está ya predefinida, las reglas de
+:program:`iptables` consiste básicamente en definir las reglas.
+Por ejemplo, esta es una sentencia válida::
+
+   # iptables -A FORWARD -p tcp --dport 25 -j DROP
+
+El primer :kbd:`-A FORWARD`, indica que vamos a añadir esta regla al final de la
+cadena *FORWARD*. La acción es *DROP*, o sea, desechar; y la condición es
+:kbd:`-p tcp --dport 25`, o sea, protocolo |TCP| con puerto de destino el 25.
+Esto quiere decir que cualquier paquete que cumpla con esto (posiblemente sea
+tráfico |SMTP| de salida), está vetado y no atravesará nuestro cortafuegos. ¿Qué
+pasa con el tráfico web? Como el tráfico web es bastante improbable que tenga
+como destino el puerto 25, no cumplirá la condición, y no será desechado; al
+menos por esta regla.
+
+Es muy importante recordar que dentro de una cadena las reglas se comprueban
+siguiendo un orden, y que las acciones pueden ser terminales (se dejan de
+comparar el resto de las reglas) como en el caso de ejemplo, o no serlo como por
+ejemplo::
+
+   # iptables -A FORWARD -p tcp --dport 25 -j LOG --log-prefix "Cliente hace petición SMTP"
+   # iptables -A FORWARD -p tcp --dport 25 -j DROP
+
+En este caso primero se registra el paquete, pero como la regla no es termina,
+la siguiente desecha el paquete.
+
+En general las sentencia que crean reglas tiene este aspecto::
 
    # iptables [-t TABLA] [opciones] -ACCIÓN CADENA [condiciones] [-j OBJETIVO [opciones_del_objetivo]]
 
@@ -158,13 +222,7 @@ en donde se observa que hay cuatro partes fundamentales:
 * la elección de la tabla, 
 * Cuál es la acción que se quiere llevar a cabo y sobre qué cadena.
 * La condición o condiciones que debe cumplir un paquete para que se le apliqye la regla;
-* El objetivo.
-
-Tabla
-------
-Ya se estableció que la tabla identificaba la naturaleza de la regla y para qué
-servía cada una en particular. La expresión de la tabla es opcional y, si no se
-incluya, se sobreentiende que es *filter*.
+* El objetivo u acción.
 
 Acción
 ------
@@ -210,13 +268,13 @@ alternarla y sobre qué cadena se lleva a cabo tal acción:
    |                                +---------------------------------------------------------------------------------+
    |                                | iptables -Z                                                                     |
    +--------------------------------+---------------------------------------------------------------------------------+
-   | -N <nueva_cadena>              | Crea una nueva cadena. Para que los paquetes comprueben sus reglas, será        |
+   | -N <cadena_de_usaurio>         | Crea una nueva cadena. Para que los paquetes comprueben sus reglas, será        |
    |                                | necesario saltar a ella desde una de las cadenas predefinidas. Hay un objetivo  |
    |                                | para ello.                                                                      |
    |                                +---------------------------------------------------------------------------------+
    |                                | iptables -N proxy                                                               |
    +--------------------------------+---------------------------------------------------------------------------------+
-   | -X <cadena>                    | Borra una cadena creada anteriormente.                                          |
+   | -X <cadena_de_usuario>         | Borra una cadena creada anteriormente.                                          |
    |                                +---------------------------------------------------------------------------------+
    |                                | iptables -X proxy                                                               |
    +--------------------------------+---------------------------------------------------------------------------------+
@@ -514,74 +572,27 @@ Además, trataremos más adelante:
 
 .. _iptables-packet-type:
 
-Conexiones
-==========
-Al ser :program:`iptables` un cortafuegos de filtrado dinámico, es capaz al analizar un paquete
-de tener en cuenta su contexto, esto es, tener el cuenta que el paquete forma parte de una conexión.
-En realidad, de los tres protocolos de capa de transporte (|TCP|, |UDP| e |ICMP|) sólo |TCP| es un
-protocolo orientado a conexión. :program:`iptables`, no obstante, implementa un seguimiento de
-conexión común a los tres. En relación a la conexión, se consideran siete estados distintos para los paquetes:
+.. rubric:: Notas al pie
 
-**NEW**
-   Que es el estado del paquete que origina la conexión.
-
-**ESTABLISHED**
-   Que es el estado del paquete que pertenece a una conexión establecida.
-
-**RELATED**
-   Que es el estado del paquete que origina una conexión que se puede relacionar
-   con otra que ya ha sido establecida. Por ejemplo, imaginemos que intentamos establecer
-   una conexión |TCP| con un servidor remoto y este nos responde con un paquete |ICMP| de rechazo.
-   El estado de este segundo paquete sería **RELATED**, ya que no forma parte de la conexión
-   anterior, pero está relacionado con ella. También en el :ref:`tráfico FTP <iptables-ftp>` el paquete
-   que abre la conexión de datos es es **RELATED** puesto que tal conexión está relacionada con la
-   conexión de control.
-
-**INVALID**
-   Que es el estado de los paquetes que no se pueden relacionar con ninguna conexión establecida.
-
-**UNTRACKED**
-   Que es el estado de los paquetes de los que se decidió no hacer seguimiento
-   de la conexión (con *NOTRACK*).
-
-**SNAT**
-   Que es el estado de los paquetes sobre los que se llevó a cabo un cambio
-   en la |IP| de origen. También tiene este estado los paquetes de respuesta.
-
-**DNAT**
-   Que es el estado de los paquetes sobre los que se llevó a cabo un cambio
-   en la |IP| de destinoo. También tiene este estado los paquetes de respuesta.
-
-.. rubric:: ¿Cómo se establecen conexiones?
-
-A ojos de :program:`iptables`, al conectarse un cliente con un servidor ocurre lo siguiente:
-
-#. El *cliente*, usando un puerto aleatorio por encima del 1024 inicia una
-   petición a un puerto prefijado del servidor (el paquete inicial tendrá estado *NEW*).
-#. El *servidor*, responde a esa petición usando el mismo canal de comunicación,
-   con un paquete de estado *ESTABLISHED*.
-#. El resto de paquetes son *ESTABLISHED*.
-
-Esquemáticamente, este podría ser un ejemplo:
-
-.. image:: files/conexion.png
-
-En la figura se ha representado el establecimiento de una conexión |TCP|.
-Obsérvese que, aunque desde el punto de vista del protocolo, el establecimiento
-se logra después de las tres comunicaciones representadas, desde el punto de
-vista de iptables solamente la primera comunicación es *NEW*, todas las demás se
-consideran establecidas. Para el tráfico |UDP| e |ICMP|, el esquema es
-exactamente el mismo en lo referente a iptables: la primera comunicación entre
-cliente y servidor es *NEW* y el resto *ESTABLISHED*.
-
-.. https://www.digitalocean.com/community/tutorials/a-deep-dive-into-iptables-and-netfilter-architecture
-
+.. [#] No hay reglas de tipo *route*.
+.. [#] Porque queremos engañar a la máquina con la que nos comunicamos
+   haciéndole creer que somos otra. Obviamente, la única manera de que esto
+   funcione, es que los paquetes que nuestra comunicamte envía a la máquina
+   suplantada, pasen forzosamente por la nuestra.
+.. [#] En este caso, para hacer crear a nuestra aplicación que se comunica con
+   una aplicación externa.
+.. [#] De hecho, en :program:`nftables` se distingue entre :kbd:`state` (*new*,
+   *established*, *related*, *invalid* o *untracked*) y :kbd:`status` (*snat* o
+   *dnat*).
 
 .. |MAC| replace:: :abbr:`MAC (Media Access Control)`
 .. |TCP| replace:: :abbr:`TCP (Transmission Control Protocol)`
 .. |UDP| replace:: :abbr:`UDP (User Datagram Protocol)`
 .. |ICMP| replace:: :abbr:`ICMP (Unternet Control Message Protocol)`
 .. |NAT| replace:: :abbr:`NAT (Network Address Translation)`
+.. |DNAT| replace:: :abbr:`DNAT (Destination NAT)`
+.. |SNAT| replace:: :abbr:`SNAT (Source NAT)`
 .. |TTL| replace:: :abbr:`TTL (Time To Live)`
 .. |TOS| replace:: :abbr:`TOS (Type Of Service)`
 .. |CIDR| replace:: :abbr:`CIDR (Classless Inter-Domain Routing)`
+.. |ARP| replace:: :abbr:`Address Resolution Protocol`
