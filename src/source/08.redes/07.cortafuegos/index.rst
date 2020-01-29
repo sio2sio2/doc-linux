@@ -24,13 +24,13 @@ largo de transición. A partir de la versión *2.4* del núcleo, el *framework*
 para manejo de paquetes pasó a ser :program:`netfilter` y como herramienta de
 espacio de usuario se creó la familia de aplicaciones de :program:`iptables`
 (:command:`iptables`, :command:`ip6tables`, :command:`ebtables` y
-:command:`arptables`). En 2009, sin embargo, se lanzó una nueva herramiento de
+:command:`arptables`). En 2009, sin embargo, se lanzó una nueva herramienta de
 espacio de usuario llamada :program:`nftables` que promete mejor rendimiento,
 mayor claridad de sintaxis y evitar la duplicidad de código. Durante bastantes
 años\ [#]_, esta nueva herramienta ha convivido a la sombra de
 :program:`iptables`, pero las distribuciones modernas han optado ya por
-adoptarla como herramienta oficial (*Debian* desde *Buster*) por lo que es
-aconsejable el estudio de la nueva herramienta.
+adoptarla como herramienta oficial (*Debian* desde *Buster*) por lo que su
+estudio es, más que aconsejable, obligatorio
 
 El conocimiento de la suite de programas de :program:`iptables`, no obstante, no
 es inútil por varias razones:
@@ -57,7 +57,7 @@ la parte común a ambas, esto es, los fundamentos de :program:`netfilter`.
 Conceptos
 =========
 Para entender cómo funcionamiento el manejo de paquetes en el núcleo de *Linux*
-es indispensable tener claros los soguientes conceptos:
+es indispensable tener claros los siguientes conceptos:
 
 .. _netfilter-families:
 
@@ -79,8 +79,9 @@ es indispensable tener claros los soguientes conceptos:
       ========== =============== ==========================================================
 
    Una diferencia evidente entre :program:`nftables` e :program:`iptables` es que
-   el primero maneja todos los tipos de tráfico, mientras que con el segundo se usa
-   distinto programa según el tipo de tráfico.
+   el primero maneja todos los tipos de tráfico con una única aplicación
+   (:command:`nft`), mientras que con el segundo se usa distinto programa según
+   el tipo de tráfico.
 
 .. _netfilter-rules:
 
@@ -88,7 +89,7 @@ es indispensable tener claros los soguientes conceptos:
    Es cada una de las sentencias que manipula paquetes. La mayoría son
    condicionales, esto es, establecen las condiciones que las hacen aplicables
    sobre las paquetes. Estas condiciones refieren o bien características
-   incluidas en el propio paquete (p.e. la dirección |IP| de origen), o bien a
+   incluidas en el propio paquete (p.e. la dirección |IP| de origen), o bien
    caracteríticas derivadas del hecho de que el paquete pertenece a una conexión
    (p.e. si ese paquete es el que abre una conexión)
 
@@ -119,9 +120,9 @@ es indispensable tener claros los soguientes conceptos:
    Ahora bien, en el caso de la *cadenas base*, si hay dos cadenas asociadas a
    un mismo punto de enganche, ¿de cuál se revisan antes las reglas? Para
    determinarlo se define la :dfn:`prioridad`, que es un número entero que
-   define en qué orden dentro de un mismo enganche se comprueban las cadenas, de
-   modo que cuanto menor sea este número, mayor será la prioridad. Hay unas
-   cuantas prioridades predefinidas\ [#]_:
+   determina el orden en que dentro de un mismo enganche se comprueban las
+   cadenas, de modo que cuanto menor sea este número, mayor será la prioridad.
+   Hay unas cuantas prioridades predefinidas\ [#]_:
 
    .. table::
       :class: iptables-prio
@@ -174,7 +175,7 @@ es indispensable tener claros los soguientes conceptos:
       |        | | ip6         |          |                                                |
       +--------+---------------+----------+------------------------------------------------+
 
-   Por último, resumiendo las características de una cadena:
+   Por último, si resumimos las características de una cadena:
 
    - Una *cadena de usuario* se caracteriza por su nombre y su política
      predeterminada.
@@ -190,7 +191,7 @@ es indispensable tener claros los soguientes conceptos:
 
 :dfn:`Enganche` (*hook*)
    Son los puntos dentro del flujo en los cuales pueden analizarse y
-   manipularse paquetes. Tomando como referencia el `diagrama de Croacr
+   manipularse paquetes. Tomando como referencia el `diagrama de Craoc
    <https://www.craoc.fr/articles/nftables/#packet-flow>`_ estos son los
    enganches posibles\ [#]_:
 
@@ -203,7 +204,7 @@ es indispensable tener claros los soguientes conceptos:
 
    Por tanto, cualquier debate sobre cuál es el camino que sigue un paquete debe
    comenzar en el extremo izquierdo (*PAQUETE ENTRANTE*) o en la etiqueta de
-   proceso local (*PAQQUETE CREADO*). Partiendo de uno de esos puntos, basta
+   proceso local (*PAQUETE CREADO*). Partiendo de uno de esos puntos, basta
    con ir respondiendo a las preguntas que se formulan en los puntos de
    bifurcación (*rombos anaranjados*). Por ejemplo, la petición de un navegador
    cliente a nuestro servidor web:
@@ -213,7 +214,7 @@ es indispensable tener claros los soguientes conceptos:
    #. Si la interfaz física no estaba asociada a una interfaz *bridge*,
       alcanzará el enganche *prerouting* naranja pálido.
    #. Como somos el destino del paquete (la |IP| de destino coincide con nuestra
-      direccion |IP|), el paquete llegará al enganche *hook*.
+      direccion |IP|), el paquete llegará al enganche *input*.
    #. Si no lo filtramos de ninguna manera, alcanzará el proceso local, esto es,
       el servidor web.
 
@@ -237,12 +238,8 @@ su contexto, esto es, de tener el cuenta que el paquete forma parte de una
 conexión.  En realidad, de los tres protocolos de capa de transporte (|TCP|,
 |UDP| e |ICMP|) sólo |TCP| es un protocolo orientado a conexión.
 :program:`netfilter`, no obstante, implementa un seguimiento de conexión común a
-los tres. 
-
-.. rubric:: ¿Cómo se establecen conexiones?
-
-A ojos de :program:`netfilter`, al conectarse un cliente con un servidor ocurre
-lo siguiente:
+los tres. A sus ojos, al conectarse un cliente con un servidor ocurre lo
+siguiente:
 
 #. El *cliente*, usando un puerto aleatorio por encima del 1024 inicia una
    petición a un puerto prefijado del servidor (el paquete inicial tendrá estado *NEW*).

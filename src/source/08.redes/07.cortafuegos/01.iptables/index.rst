@@ -3,7 +3,7 @@
 IPtables
 ********
 Desde *Woody* a *Stretch* la herramienta de usuario para la definición del
-cortafuegos ha venido siendo la suite de progtramas de :program:`iptables`:
+cortafuegos ha venido siendo la suite de programas de :program:`iptables`:
 
 * :program:`iptables` e :program:`ip6tables` para la inspección en capa de red y
   de transporte.
