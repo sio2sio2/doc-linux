@@ -13,7 +13,7 @@ cortafuegos ha venido siendo la suite de programas de :program:`iptables`:
 
 En las nuevas versiones, los ejecutables que usan realmente la herramienta
 antigua y no ocultamente :program:`nftables` han pasado a añadir al nombre
-de programa el sifijo :kbd:`-legacy`. Así, :program:`iptables-legacy` es el
+de programa el sufijo :kbd:`-legacy`. Así, :program:`iptables-legacy` es el
 :program:`iptables` y, por defecto, :program:`iptables` una alternativa que
 apunta a :program:`iptables-nft`.
 

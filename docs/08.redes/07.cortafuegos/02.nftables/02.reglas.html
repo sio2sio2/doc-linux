@@ -57,11 +57,11 @@ usando la <a class="reference internal" href="../01.iptables/01.basico.html#ipta
 de órdenes <strong class="program">iptables-nft</strong>, <strong class="program">ip6tables-nft</strong>,
 <strong class="program">ebtables-nft</strong> y <strong class="program">arptables-nft</strong> sin preocuparnos siquiera de crear
 tablas ni cadenas, puesto que estas órdenes, al ser ejecutadas, crean las
-cadenas pertinentes. Así pues<a class="footnote-reference" href="#id3" id="id1">[1]</a>:</p>
+cadenas pertinentes. Así pues<a class="footnote-reference" href="#id4" id="id1">[1]</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> iptables-nft -vnL
 </pre></div>
 </div>
-<p>creará las cadenas incluidas en las tablas <em>filter</em><a class="footnote-reference" href="#id4" id="id2">[2]</a>:</p>
+<p>creará las cadenas incluidas en las tablas <em>filter</em><a class="footnote-reference" href="#id5" id="id2">[2]</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft list table filter
 <span class="go">table ip filter {</span>
 <span class="go">   chain INPUT {</span>
@@ -125,7 +125,7 @@ el tráfico al que afecta.</li>
 <p>en este caso, hay una condición, que la dirección de destino esté en la red
 <em>10.0.0.0/8</em>; y una acción terminal: aceptar el tráfico. Puede no incluirse
 acción alguna, en cuyo caso, la regla comprobará la condición… pero no
-hará nada en particular (aunque puede tener sentido si <a class="reference internal" href="04.ext.html#nftables-counter"><span class="std std-ref">se quieren contar
+hará nada en particular (aunque puede tener sentido si <a class="reference internal" href="#nftables-counter"><span class="std std-ref">se quieren contar
 paquetes</span></a>).</p>
 <p>Para listar reglas podemos:</p>
 <ul>
@@ -555,10 +555,262 @@ cadena de registro y <kbd class="kbd docutils literal notranslate">level</kbd> i
 </table>
 </div>
 </div>
+<div class="section" id="objetos-de-estado">
+<h2>8.7.3.2.2.2. Objetos de estado<a class="headerlink" href="#objetos-de-estado" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Se distinguen tres:</p>
+<ul class="simple">
+<li>Los contadores.</li>
+<li>Los caudales de tráfico (o límites de ratio de tráfico si se prefiere).</li>
+<li>Las cuotas.</li>
+</ul>
+<p>Los tres se caracterizan porque:</p>
+<ul>
+<li><p class="first">Pueden ser anónimos o definidos con un nombre. En el primer caso se crean
+sobre la marcha al definir una regla, mientras que en el segundo se crean antes
+y se usan luego en una o más reglas utilizando el nombre creado.</p>
+</li>
+<li><p class="first">Son afectados por la regla en la que se encuentran. Por ejemplo, el contador:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add filter input tcp dport ssh counter
+</pre></div>
+</div>
+<p>incrementa en uno su valor al cumplir un paquete las condiciones incluidas en
+la regla anteriores a su declaración. Por tanto cualquier paquete entrante de
+trafico <abbr title="Security SHell">SSH</abbr> incrementará el valor del contador. En cambio, en este otro
+caso de dos contadores:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add filter input tcp dport ssh counter ct state new counter
+</pre></div>
+</div>
+<p>hay dos contadores, el primero de los cuales se actualiza con cualquier
+paquete entrante <abbr title="Security SHell">SSH</abbr>, pero el segundo sólo cuando uno de estos paquetes
+inicia una conexión.</p>
+</li>
+<li><p class="first">Un contador es una acción (se actualizan), pero no suponen ninguna condición;
+mientras que el ratio y la cuota son ambas cosas: son acción porque se
+actualizan y son condición porque establecen unos umbrales.</p>
+</li>
+</ul>
+<div class="section" id="contadores">
+<span id="nftables-counter"></span><h3>8.7.3.2.2.2.1. Contadores<a class="headerlink" href="#contadores" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Partiendo de esto:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add table filter
+<span class="gp">#</span> nft add chain filter INPUT <span class="s2">&quot;{type filter hook input prority 0;}&quot;</span>
+<span class="gp">#</span> nft add rule filter INPUT icmp <span class="nb">type</span> echo-request counter
+<span class="gp">#</span> nft list table filter
+</pre></div>
+</div>
+<p>hemos creado un contador anónimo que contabilizará las peticiones <abbr title="Internet Control Message Protocol">ICMP</abbr> entrantes.
+Podríamos en cambio haber creado un contador con nombre asociado a la tabla y
+usarlo en la regla:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add counter filter pines
+<span class="gp">#</span> nft add rule filter INPUT ip protocol icmp counter name pines
+</pre></div>
+</div>
+<p>Los contadores con nombre pueden usarse en varias reglas y, además, resetear su
+valor:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft reset counter filter pines
+</pre></div>
+</div>
+</div>
+<div class="section" id="caudales">
+<span id="nftables-limit"></span><h3>8.7.3.2.2.2.2. Caudales<a class="headerlink" href="#caudales" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>El objeto <em>limit</em> permite contabilizar el tráfico de datos y mantenerlo dentro
+de un umbral máximo.</p>
+<table border="1" class="nftables-acc-no-term docutils">
+<colgroup>
+<col width="11%" />
+<col width="12%" />
+<col width="78%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Acción</th>
+<th class="head">Argumento</th>
+<th class="head">Descripción</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td rowspan="2">limit</td>
+<td rowspan="2">rate [over]</td>
+<td>Establece una condición que será verdadera mientras no se supere (o sí con <em>over</em>)
+el ratio espeficiado. El ratio cuenta paquetes, <em>bytes</em>, <em>kbytes</em>, <em>mbytes</em> en
+periodos de <em>second</em>, <em>minute</em>, <em>hour</em>, <em>day</em> o <em>week</em>. Puede además añadir
+<kbd class="kbd docutils literal notranslate">burst</kbd> para la <a class="reference internal" href="../01.iptables/03.ext.html#iptables-limit"><span class="std std-ref">definición de la ráfaga</span></a>.</td>
+</tr>
+<tr class="row-odd"><td><div class="first last line-block">
+<div class="line">nft add rule filter INPUT icmp type echo-request limit rate 1/second accept</div>
+<div class="line">nft add rule filter INPUT icmp type echo-request limit rate over 1/second drop</div>
+<div class="line">nft add rule filter INPUT iff eth0 limit rate over 10/seconds burst 50 packets drop</div>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Por ejemplo, esta regla contabiliza las peticiones <abbr title="Internet Control Message Protocol">ICMP</abbr> entrantes y las acepta
+mientras no se supere la ratio de un paquete al segundo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add rule filter INPUT icmp <span class="nb">type</span> echo-request limit rate <span class="m">1</span>/second accept
+</pre></div>
+</div>
+<p>los que la superen acabarán rechazados si la política predeterminada es la de
+<em>lista blanca</em>. En cambio, si la política es de <strong>lista negra</strong>, lo que debemos
+hacer es rechazar las peticiones que superen la tasa:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add rule netdev filter INGRESS icmp <span class="nb">type</span> echo-request limit rate over <span class="m">1</span>/second drop
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p>Hay que tener presente que, por defecto, la <a class="reference internal" href="../01.iptables/03.ext.html#iptables-limit"><span class="std std-ref">ráfaga admisible</span></a> es de <strong>5</strong>, por lo que si se hacen pruebas de concepto para
+comprobar cómo funciona la limitación es preferible limitar la ráfaga al
+ratio (es decir para <em>2/second</em>, <em>2</em>):</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add rule filter INPUT icmp <span class="nb">type</span> echo-request limit rate <span class="m">2</span>/second burst <span class="m">2</span> packets accept
+</pre></div>
+</div>
+</div>
+<p>Como ocurre con las cuotas, para limitar teniendo en cuenta también la dirección
+<abbr title="Internet Protocol">IP</abbr> de origen de los paquetes, deberíamos combinar el objeto con el uso de
+<a class="reference internal" href="04.ext.html#nftables-meters"><span class="std std-ref">conjuntos dinámicos</span></a> y <a class="reference internal" href="04.ext.html#nftables-concat"><span class="std std-ref">concatenaciones</span></a>, ya que cada dirección de origen distinta debería
+contabilizar la ratio o la cuota de forma independiente.</p>
+<p>Es posible, por supuesto, definir una limitación con nombre, de forma análoga a
+como se hacía con los contadores:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add limit filter icmpratio <span class="o">{</span>rate <span class="m">1</span>/second<span class="o">}</span>
+<span class="gp">#</span> nft add rule filter INPUT icmp <span class="nb">type</span> echo-request limit name icmpratio accept
+</pre></div>
+</div>
+<p>o resetearlas.</p>
+<div class="admonition-todo admonition" id="index-0">
+<p class="first admonition-title">Por hacer</p>
+<p class="last">Implementar defensa contra ataque DoS a semejanza de iptables.</p>
+</div>
+</div>
+<div class="section" id="cuotas">
+<span id="nftables-quota"></span><h3>8.7.3.2.2.2.3. Cuotas<a class="headerlink" href="#cuotas" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>De modo análogo podemos definir cuotas, que funcionan como límite del tráfico
+total que cumple con la regla.</p>
+<table border="1" class="nftables-acc-no-term docutils">
+<colgroup>
+<col width="10%" />
+<col width="13%" />
+<col width="77%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Acción</th>
+<th class="head">Argumento</th>
+<th class="head">Descripción</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td rowspan="2">quota</td>
+<td rowspan="2">[over]</td>
+<td>Establece una cuota para la tranferencia. Debe añadirse
+cuál es el umbral y las unidades (<em>bytes</em>, <em>kbytes</em>, <em>mbytes</em>)</td>
+</tr>
+<tr class="row-odd"><td>nft add rule filter OUTPUT tcp sport 22 quota over 10 mbytes drop</td>
+</tr>
+</tbody>
+</table>
+<p>Es posible crear cuotas con nombre:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add quota ssh-quota <span class="o">{</span>over <span class="m">10</span> mbytes<span class="o">}</span>
+<span class="gp">#</span> nft add rule filter OUTPUT tcp sport <span class="m">22</span> quota name ssh-quota drop
+</pre></div>
+</div>
+<p>aunque esto establecerá un límite general para todo el tráfico <abbr title="Security SHell">SSH</abbr> de descarga
+y no por cliente lo que exige <a class="reference internal" href="04.ext.html#nftables-meters"><span class="std std-ref">conjuntos dinámicos</span></a>.</p>
+</div>
+</div>
 <div class="section" id="persistencia">
-<h2>8.7.3.2.2.2. Persistencia<a class="headerlink" href="#persistencia" title="Enlazar permanentemente con este título">¶</a></h2>
+<h2>8.7.3.2.2.3. Persistencia<a class="headerlink" href="#persistencia" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>A diferencia de <a class="reference internal" href="../01.iptables/index.html#iptables"><span class="std std-ref">iptables</span></a>, <strong class="program">nftables</strong> tiene una
+pequeña capacidad de generación de <em>scripts</em> que permite definir reglas, incluir
+reglas definidas en otros ficheros, definir variables y añadir comentarios. No
+hay, sin embargo, ni sentencias condicionales ni bucles.</p>
+<p>Un script de estas características tenemos dos formas de ejecutarlo:</p>
+<ol class="arabic">
+<li><p class="first">Con <strong class="command">nft</strong>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft -f reglas,nft
+</pre></div>
+</div>
+</li>
+<li><p class="first">Incluyendo en él una primera línea de <em>sheebang</em> y dándole permisos de
+ejecución:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="ch">#!/usr/sbin/nft -f</span>
+
+<span class="c1"># Borra todas las reglas</span>
+flush ruleset
+
+<span class="c1"># Configuración del cortafuegos ...</span>
+</pre></div>
+</div>
+</li>
+</ol>
+<p>Particularmente, en <em>Debian</em> existe deshabilitado un servicio <em>nftables</em> que si
+se habilita, lee el contenido del fichero <code class="file docutils literal notranslate"><span class="pre">/etc/nftables.conf</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> systemctl status nftables
+<span class="go">● nftables.service - nftables</span>
+<span class="go">   Loaded: loaded (/lib/systemd/system/nftables.service; disabled; vendor</span>
+<span class="go">preset: enabled)</span>
+<span class="go">   Active: inactive (dead)</span>
+<span class="go">     Docs: man:nft(8)</span>
+<span class="go">           http://wiki.nftables.org</span>
+</pre></div>
+</div>
+<p>así que el modo más sencillo de configurar el cortafuegos es escribir dentro de
+este fichero las reglas y habilitar el servicio.</p>
+<div class="section" id="sentencias-adicionales">
+<h3>8.7.3.2.2.3.1. Sentencias adicionales<a class="headerlink" href="#sentencias-adicionales" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Pueden ser:</p>
+<dl class="docutils">
+<dt><strong>Comentarios</strong></dt>
+<dd>Se notan, como en el lenguaje de la <em>shell</em> con «#». Cualquier texto incluido
+tras uno, no se procesa.</dd>
+<dt><strong>Inclusión de ficheros externos</strong></dt>
+<dd><p class="first">Se hace mediante la sentencia <kbd class="kbd docutils literal notranslate">include</kbd> y un argumento que indica el
+fichero a leeri para el cual:</p>
+<ul class="simple">
+<li>Se permiten comodines.</li>
+<li>No se leen ficheros ocultos.</li>
+<li>Si se indca una ruta es relativa, esta es relativa al directorio que se haya
+indicado mediante la opción <kbd class="kbd docutils literal notranslate">--includepath</kbd> y, si esta no se incluye, a
+un directorio predefinido en tiempo de compilación que en <em>Debian</em> es
+<code class="file docutils literal notranslate"><span class="pre">/etc/</span></code>.</li>
+</ul>
+<p>Por tanto, si incluímos dentro de <code class="file docutils literal notranslate"><span class="pre">/etc/nftables,conf</span></code> la línea:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">include</span> <span class="n">&quot;nftables.d/*.nft&quot;</span>
+</pre></div>
+</div>
+<p class="last">podremos crear el directorio <code class="file docutils literal notranslate"><span class="pre">/etc/nftables.d</span></code> y, dentro de él, crear
+varios ficheros de extensión <code class="file docutils literal notranslate"><span class="pre">.nft</span></code> para una configuración modular.</p>
+</dd>
+<dt><strong>Definición de variables</strong></dt>
+<dd><p class="first">Que pueden usarse luego en la definición de las reglas anteponiendo un «$» al
+nombre:</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> /etc/nftables.d/prueba.nft
+
+<span class="go">define entrada eth0</span>
+
+<span class="go">add rule inet filter iif $entrada counter</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+</div>
+<div class="section" id="id3">
+<h3>8.7.3.2.2.3.2. Reglas<a class="headerlink" href="#id3" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Las definición reglas dentro del fichero puede hacerse mediante dos formatos
+distintos:</p>
+<ul>
+<li><p class="first">El que se usaría para escribir una regla con la orden <strong class="command">nft</strong>, pero sin
+incluir el propio <kbd class="kbd docutils literal notranslate">nft</kbd>. La regla con que acaba el epígrafe anterior es
+un ejemplo.</p>
+</li>
+<li><p class="first">Utilizando el mismo formato que devuelve una orden <kbd class="kbd docutils literal notranslate">nft list</kbd>. Por
+ejemplo, esto funciona perfectamente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="nb">echo</span> <span class="s2">&quot;flush ruleset&quot;</span> &gt; script.nft
+<span class="gp">#</span> nft list ruleset &gt;&gt; script.nft
+<span class="gp">#</span> nft -f script.nft
+</pre></div>
+</div>
+</li>
+</ul>
 <p class="rubric">Notas al pie</p>
-<table class="docutils footnote" frame="void" id="id3" rules="none">
+<table class="docutils footnote" frame="void" id="id4" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
 <tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td>EN <em>Buster</em> basta con utilizar <strong class="command">iptables</strong>, puesto que es la
@@ -566,7 +818,7 @@ alternativa predeterminada frente al antiguo <strong class="command">iptables</s
 pasado a renombrase como <strong class="command">iptables-legacy</strong>.</td></tr>
 </tbody>
 </table>
-<table class="docutils footnote" frame="void" id="id4" rules="none">
+<table class="docutils footnote" frame="void" id="id5" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
 <tr><td class="label"><a class="fn-backref" href="#id2">[2]</a></td><td>No debe entenderse de lo dicho que para crear las tablas, hay que usar la
@@ -574,6 +826,7 @@ orden de listado primero. Insertar una regla, por ejemplo, ya crea la
 infraestructura necesaria.</td></tr>
 </tbody>
 </table>
+</div>
 </div>
 </div>
 
@@ -591,7 +844,17 @@ infraestructura necesaria.</td></tr>
 <li><a class="reference internal" href="#acciones">8.7.3.2.2.1.2. Acciones</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#persistencia">8.7.3.2.2.2. Persistencia</a></li>
+<li><a class="reference internal" href="#objetos-de-estado">8.7.3.2.2.2. Objetos de estado</a><ul>
+<li><a class="reference internal" href="#contadores">8.7.3.2.2.2.1. Contadores</a></li>
+<li><a class="reference internal" href="#caudales">8.7.3.2.2.2.2. Caudales</a></li>
+<li><a class="reference internal" href="#cuotas">8.7.3.2.2.2.3. Cuotas</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#persistencia">8.7.3.2.2.3. Persistencia</a><ul>
+<li><a class="reference internal" href="#sentencias-adicionales">8.7.3.2.2.3.1. Sentencias adicionales</a></li>
+<li><a class="reference internal" href="#id3">8.7.3.2.2.3.2. Reglas</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>

@@ -23,7 +23,7 @@
     
     <link rel="index" title="Índice" href="../../../genindex.html" />
     <link rel="search" title="Búsqueda" href="../../../search.html" />
-    <link rel="next" title="8.8. Calidad de servicio" href="../../08.qos/index.html" />
+    <link rel="next" title="8.7.3.2.5. Bridges" href="05.bridge.html" />
     <link rel="prev" title="8.7.3.2.3. Uso práctico" href="03.conn.html" /> 
   </head><body>
     <div class="related" role="navigation" aria-label="related navigation">
@@ -33,7 +33,7 @@
           <a href="../../../genindex.html" title="Índice General"
              accesskey="I">índice</a></li>
         <li class="right" >
-          <a href="../../08.qos/index.html" title="8.8. Calidad de servicio"
+          <a href="05.bridge.html" title="8.7.3.2.5. Bridges"
              accesskey="N">siguiente</a> |</li>
         <li class="right" >
           <a href="03.conn.html" title="8.7.3.2.3. Uso práctico"
@@ -52,168 +52,8 @@
             
   <div class="section" id="uso-avanzado">
 <h1>8.7.3.2.4. Uso avanzado<a class="headerlink" href="#uso-avanzado" title="Enlazar permanentemente con este título">¶</a></h1>
-<div class="section" id="objetos-de-conexion">
-<h2>8.7.3.2.4.1. Objetos de conexión<a class="headerlink" href="#objetos-de-conexion" title="Enlazar permanentemente con este título">¶</a></h2>
-<p>Se distinguen tres:</p>
-<ul class="simple">
-<li>Los contadores.</li>
-<li>Los caudales de tráfico (o límites de ratio de tráfico si se prefiere).</li>
-<li>Las cuotas.</li>
-</ul>
-<p>Los tres se caracterizan porque:</p>
-<ul>
-<li><p class="first">Pueden ser anónimos o definidos con un nombre. En el primer caso se crean
-sobre la marcha al definir una regla, mientras que en el segundo se crean antes
-y se usan luego en una o más reglas utilizando el nombre creado.</p>
-</li>
-<li><p class="first">Son afectados por la regla en la que se encuentran. Por ejemplo, el contador:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add filter input tcp dport ssh counter
-</pre></div>
-</div>
-<p>incrementa en uno su valor al cumplir un paquete las condiciones incluidas en
-la regla anteriores a su declaración. Por tanto cualquier paquete entrante de
-trafico <abbr title="Security SHell">SSH</abbr> incrementará el valor del contador. En cambio, en este otro
-caso de dos contadores:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add filter input tcp dport ssh counter ct state new counter
-</pre></div>
-</div>
-<p>hay dos contadores, el primero de los cuales se actualiza con cualquier
-paquete entrante <abbr title="Security SHell">SSH</abbr>, pero el segundo sólo cuando uno de estos paquetes
-inicia una conexión.</p>
-</li>
-<li><p class="first">Un contador es una acción (se actualizan), pero no suponen ninguna condición;
-mientras que el ratio y la cuota son ambas cosas: son acción porque se
-actualizan y son condición porque establecen unos umbrales.</p>
-</li>
-</ul>
-<div class="section" id="contadores">
-<span id="nftables-counter"></span><h3>8.7.3.2.4.1.1. Contadores<a class="headerlink" href="#contadores" title="Enlazar permanentemente con este título">¶</a></h3>
-<p>Partiendo de esto:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add table filter
-<span class="gp">#</span> nft add chain filter INPUT <span class="s2">&quot;{type filter hook input prority 0;}&quot;</span>
-<span class="gp">#</span> nft add rule filter INPUT icmp <span class="nb">type</span> echo-request counter
-<span class="gp">#</span> nft list table filter
-</pre></div>
-</div>
-<p>hemos creado un contador anónimo que contabilizará las peticiones <abbr title="Internet Control Message Protocol">ICMP</abbr> entrantes.
-Podríamos en cambio haber creado un contador con nombre asociado a la tabla y
-usarlo en la regla:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add counter filter pines
-<span class="gp">#</span> nft add rule filter INPUT ip protocol icmp counter name pines
-</pre></div>
-</div>
-<p>Los contadores con nombre pueden usarse en varias reglas y, además, resetear su
-valor:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft reset counter filter pines
-</pre></div>
-</div>
-</div>
-<div class="section" id="caudales">
-<span id="nftables-limit"></span><h3>8.7.3.2.4.1.2. Caudales<a class="headerlink" href="#caudales" title="Enlazar permanentemente con este título">¶</a></h3>
-<p>El objeto <em>limit</em> permite contabilizar el tráfico de datos y mantenerlo dentro
-de un umbral máximo.</p>
-<table border="1" class="nftables-acc-no-term docutils">
-<colgroup>
-<col width="11%" />
-<col width="12%" />
-<col width="78%" />
-</colgroup>
-<thead valign="bottom">
-<tr class="row-odd"><th class="head">Acción</th>
-<th class="head">Argumento</th>
-<th class="head">Descripción</th>
-</tr>
-</thead>
-<tbody valign="top">
-<tr class="row-even"><td rowspan="2">limit</td>
-<td rowspan="2">rate [over]</td>
-<td>Establece una condición que será verdadera mientras no se supere (o sí con <em>over</em>)
-el ratio espeficiado. El ratio cuenta paquetes, <em>bytes</em>, <em>kbytes</em>, <em>mbytes</em> en
-periodos de <em>second</em>, <em>minute</em>, <em>hour</em>, <em>day</em> o <em>week</em>. Puede además añadir
-<kbd class="kbd docutils literal notranslate">burst</kbd> para la <a class="reference internal" href="../01.iptables/03.ext.html#iptables-limit"><span class="std std-ref">definición de la ráfaga</span></a>.</td>
-</tr>
-<tr class="row-odd"><td><div class="first last line-block">
-<div class="line">nft add rule filter INPUT icmp type echo-request limit rate 1/second accept</div>
-<div class="line">nft add rule filter INPUT icmp type echo-request limit rate over 1/second drop</div>
-<div class="line">nft add rule filter INPUT iff eth0 limit rate over 10/seconds burst 50 packets drop</div>
-</div>
-</td>
-</tr>
-</tbody>
-</table>
-<p>Por ejemplo, esta regla contabiliza las peticiones <abbr title="Internet Control Message Protocol">ICMP</abbr> entrantes y las acepta
-mientras no se supere la ratio de un paquete al segundo:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add rule filter INPUT icmp <span class="nb">type</span> echo-request limit rate <span class="m">1</span>/second accept
-</pre></div>
-</div>
-<p>los que la superen acabarán rechazados si la política predeterminada es la de
-<em>lista blanca</em>. En cambio, si la política es de <strong>lista negra</strong>, lo que debemos
-hacer es rechazar las peticiones que superen la tasa:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add rule netdev filter INGRESS icmp <span class="nb">type</span> echo-request limit rate over <span class="m">1</span>/second drop
-</pre></div>
-</div>
-<div class="admonition warning">
-<p class="first admonition-title">Advertencia</p>
-<p>Hay que tener presente que, por defecto, la <a class="reference internal" href="../01.iptables/03.ext.html#iptables-limit"><span class="std std-ref">ráfaga admisible</span></a> es de <strong>5</strong>, por lo que si se hacen pruebas de concepto para
-comprobar cómo funciona la limitación es preferible limitar la ráfaga al
-ratio (es decir para <em>2/second</em>, <em>2</em>):</p>
-<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add rule filter INPUT icmp <span class="nb">type</span> echo-request limit rate <span class="m">2</span>/second burst <span class="m">2</span> packets accept
-</pre></div>
-</div>
-</div>
-<p>Como ocurre con las cuotas, para limitar teniendo en cuenta también la dirección
-<abbr title="Internet Protocol">IP</abbr> de origen de los paquetes, deberíamos combinar el objeto con el uso de
-<a class="reference internal" href="#nftables-meters"><span class="std std-ref">conjuntos dinámicos</span></a> y <a class="reference internal" href="#nftables-concat"><span class="std std-ref">concatenaciones</span></a>, ya que cada dirección de origen distinta debería
-contabilizar la ratio o la cuota de forma independiente.</p>
-<p>Es posible, por supuesto, definir una limitación con nombre, de forma análoga a
-como se hacía con los contadores:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add limit filter icmpratio <span class="o">{</span>rate <span class="m">1</span>/second<span class="o">}</span>
-<span class="gp">#</span> nft add rule filter INPUT icmp <span class="nb">type</span> echo-request limit name icmpratio accept
-</pre></div>
-</div>
-<p>o resetearlas.</p>
-<div class="admonition-todo admonition" id="index-0">
-<p class="first admonition-title">Por hacer</p>
-<p class="last">Implementar defensa contra ataque DoS a semejanza de iptables.</p>
-</div>
-</div>
-<div class="section" id="cuotas">
-<span id="nftables-quota"></span><h3>8.7.3.2.4.1.3. Cuotas<a class="headerlink" href="#cuotas" title="Enlazar permanentemente con este título">¶</a></h3>
-<p>De modo análogo podemos definir cuotas, que funcionan como límite del tráfico
-total que cumple con la regla.</p>
-<table border="1" class="nftables-acc-no-term docutils">
-<colgroup>
-<col width="10%" />
-<col width="13%" />
-<col width="77%" />
-</colgroup>
-<thead valign="bottom">
-<tr class="row-odd"><th class="head">Acción</th>
-<th class="head">Argumento</th>
-<th class="head">Descripción</th>
-</tr>
-</thead>
-<tbody valign="top">
-<tr class="row-even"><td rowspan="2">quota</td>
-<td rowspan="2">[over]</td>
-<td>Establece una cuota para la tranferencia. Debe añadirse
-cuál es el umbral y las unidades (<em>bytes</em>, <em>kbytes</em>, <em>mbytes</em>)</td>
-</tr>
-<tr class="row-odd"><td>nft add rule filter OUTPUT tcp sport 22 quota over 10 mbytes drop</td>
-</tr>
-</tbody>
-</table>
-<p>Es posible crear cuotas con nombre:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add quota ssh-quota <span class="o">{</span>over <span class="m">10</span> mbytes<span class="o">}</span>
-<span class="gp">#</span> nft add rule filter OUTPUT tcp sport <span class="m">22</span> quota name ssh-quota drop
-</pre></div>
-</div>
-<p>aunque esto establecerá un límite general para todo el tráfico <abbr title="Security SHell">SSH</abbr> de descarga
-y no por cliente lo que exige <a class="reference internal" href="#nftables-meters"><span class="std std-ref">conjuntos dinámicos</span></a>.</p>
-</div>
-</div>
-<div class="section" id="sets">
-<span id="nftables-sets"></span><h2>8.7.3.2.4.2. sets<a class="headerlink" href="#sets" title="Enlazar permanentemente con este título">¶</a></h2>
+<div class="section" id="conjuntos">
+<span id="nftables-sets"></span><h2>8.7.3.2.4.1. Conjuntos<a class="headerlink" href="#conjuntos" title="Enlazar permanentemente con este título">¶</a></h2>
 <p>En <strong class="program">nftables</strong> hay dos tipos de conjuntos:</p>
 <ul>
 <li><p class="first"><strong>Anónimos</strong> que son aquellos invariables que se añaden directamente a las
@@ -358,8 +198,31 @@ fijar un tamaño máximo y un tiempo de vida del elemento en el conjunto.</p>
 </div>
 <p>siempre y cuando no estén vinculados a ninguna regla.</p>
 </div>
-<div class="section" id="maps">
-<span id="nftables-maps"></span><h2>8.7.3.2.4.3. maps<a class="headerlink" href="#maps" title="Enlazar permanentemente con este título">¶</a></h2>
+<div class="section" id="concatenaciones">
+<span id="nftables-concat"></span><h2>8.7.3.2.4.2. Concatenaciones<a class="headerlink" href="#concatenaciones" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Las <em class="dfn">concatenaciones</em> permiten agrupar selectores (o sea, condiciones) para
+tratarlas de modo conjunto. Como operador se usa el punto («.»). Por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add filter FORWARD ip saddr . ip daddr <span class="o">{</span><span class="m">10</span>.0.0.4 . <span class="m">10</span>.0.0.8, <span class="m">10</span>.0.0.5 . <span class="m">10</span>.0.0.10<span class="o">}</span> counter
+</pre></div>
+</div>
+<p>En este caso, el selector vandŕa tanto para si la conexión es entre <em>10.0.0.4</em> y
+<em>10.0.0.8</em> como si es entre <em>10.0.0.5</em> y <em>10.0.0.10</em>.</p>
+<p>Esta es una expresión literal, pero podría haberse construido también un
+conjunto nomimal concatenado los dos valores necesarios:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add <span class="nb">set</span> filter orig-dest <span class="o">{</span><span class="nb">type</span> ipv4_addr . ipv4_addr<span class="se">\;</span><span class="o">}</span>
+<span class="gp">#</span> nft add element filter orig-dest <span class="o">{</span><span class="m">10</span>.0.0.4 . <span class="m">10</span>.0.0.8, <span class="m">10</span>.0.0.5 . <span class="m">10</span>.0.0.10<span class="o">}</span>
+<span class="gp">#</span> nft add filter FORWARD ip saddr . ip daddr @orig-dest counter
+</pre></div>
+</div>
+<p>También es posible concatenar las claves en los mapas y disccionarios.</p>
+<div class="admonition seealso">
+<p class="first admonition-title">Ver también</p>
+<p class="last">Échele un vistazo al <a class="reference external" href="https://wiki.nftables.org/wiki-nftables/index.php/Concatenations">epigrafe de concatenaciones de la wiki de
+nftables</a>.</p>
+</div>
+</div>
+<div class="section" id="mapas">
+<span id="nftables-maps"></span><h2>8.7.3.2.4.3. Mapas<a class="headerlink" href="#mapas" title="Enlazar permanentemente con este título">¶</a></h2>
 <p>Los <em class="dfn">mapas</em> son conjuntos de valores a los que se accede a través de una clave.
 Como en el caso de los conjuntos:</p>
 <ul class="simple">
@@ -397,32 +260,9 @@ otra cadena de usuario:</p>
 </div>
 <p>También es posible hacer diccionarios nominados.</p>
 </div>
-<div class="section" id="concatenaciones">
-<span id="nftables-concat"></span><h2>8.7.3.2.4.5. Concatenaciones<a class="headerlink" href="#concatenaciones" title="Enlazar permanentemente con este título">¶</a></h2>
-<p>Las <em class="dfn">concatenaciones</em> permiten agrupar selectores (o sea, condiciones) para
-tratarlas de modo conjunto. Como operador se usa el punto («.»). Por ejemplo:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add filter FORWARD ip saddr . ip daddr <span class="o">{</span><span class="m">10</span>.0.0.4 . <span class="m">10</span>.0.0.8, <span class="m">10</span>.0.0.5 . <span class="m">10</span>.0.0.10<span class="o">}</span> counter
-</pre></div>
-</div>
-<p>En este caso, el selector vandŕa tanto para si la conexión es entre <em>10.0.0.4</em> y
-<em>10.0.0.8</em> como si es entre <em>10.0.0.5</em> y <em>10.0.0.10</em>.</p>
-<p>Esta es una expresión literal, pero podría haberse construido también un
-conjunto nomimal concatenado los dos valores necesarios:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add <span class="nb">set</span> filter orig-dest <span class="o">{</span><span class="nb">type</span> ipv4_addr . ipv4_addr<span class="se">\;</span><span class="o">}</span>
-<span class="gp">#</span> nft add element filter orig-dest <span class="o">{</span><span class="m">10</span>.0.0.4 . <span class="m">10</span>.0.0.8, <span class="m">10</span>.0.0.5 . <span class="m">10</span>.0.0.10<span class="o">}</span>
-<span class="gp">#</span> nft add filter FORWARD ip saddr . ip daddr @orig-dest counter
-</pre></div>
-</div>
-<p>También es posible concatenar las claves en los mapas y disccionarios.</p>
-<div class="admonition seealso">
-<p class="first admonition-title">Ver también</p>
-<p class="last">Échele un vistazo al <a class="reference external" href="https://wiki.nftables.org/wiki-nftables/index.php/Concatenations">epigrafe de concatenaciones de la wiki de
-nftables</a>.</p>
-</div>
-</div>
 <div class="section" id="conjuntos-dinamicos">
-<span id="nftables-meters"></span><h2>8.7.3.2.4.6. Conjuntos dinámicos<a class="headerlink" href="#conjuntos-dinamicos" title="Enlazar permanentemente con este título">¶</a></h2>
-<div class="admonition-todo admonition" id="index-1">
+<span id="nftables-meters"></span><h2>8.7.3.2.4.5. Conjuntos dinámicos<a class="headerlink" href="#conjuntos-dinamicos" title="Enlazar permanentemente con este título">¶</a></h2>
+<div class="admonition-todo admonition" id="index-0">
 <p class="first admonition-title">Por hacer</p>
 <p class="last">Repasar este apartado para aclarar el concepto y usar también
 ejemplos con quota.</p>
@@ -493,7 +333,7 @@ ratio individual.</p>
 implementación de las funcionalidades que ofrecen los módulos <a class="reference internal" href="../01.iptables/03.ext.html#iptables-limit"><span class="std std-ref">hashlimit y
 connlimit</span></a> de <strong class="program">iptables</strong>.</p>
 <div class="section" id="connlimit">
-<span id="nftables-connlimit"></span><h3>8.7.3.2.4.6.1. connlimit<a class="headerlink" href="#connlimit" title="Enlazar permanentemente con este título">¶</a></h3>
+<span id="nftables-connlimit"></span><h3>8.7.3.2.4.5.1. connlimit<a class="headerlink" href="#connlimit" title="Enlazar permanentemente con este título">¶</a></h3>
 <p>Dependiendo de cuáles sean las conexiones que queremos limitar, así tendremos
 que obrar. Consideraremos una política de <em>lista blanca</em> en nuestro servidor:</p>
 <dl class="docutils">
@@ -529,7 +369,7 @@ implementación con <em>dynamic</em> es trivial.</p>
 </div>
 </div>
 <div class="section" id="hashlimit">
-<span id="nftables-hashlimit"></span><h3>8.7.3.2.4.6.2. hashlimit<a class="headerlink" href="#hashlimit" title="Enlazar permanentemente con este título">¶</a></h3>
+<span id="nftables-hashlimit"></span><h3>8.7.3.2.4.5.2. hashlimit<a class="headerlink" href="#hashlimit" title="Enlazar permanentemente con este título">¶</a></h3>
 <p>El módulo <em>hashlimit</em> de <strong class="program">iptables</strong> permite limitar el flujo de paquete
 según cual sea el origen o destino de las conexión. A diferencia de <em>limit</em>, que
 limita el flujo de paquetes global. Para implementar esta funcionalidad en
@@ -544,7 +384,7 @@ dinámicos y la concatenación. Por ejemplo, para limitar la descarga a través 
 </div>
 </div>
 <div class="section" id="flowtables">
-<span id="nftables-flowtables"></span><h2>8.7.3.2.4.7. flowtables<a class="headerlink" href="#flowtables" title="Enlazar permanentemente con este título">¶</a></h2>
+<span id="nftables-flowtables"></span><h2>8.7.3.2.4.6. flowtables<a class="headerlink" href="#flowtables" title="Enlazar permanentemente con este título">¶</a></h2>
 <p>Las <em class="dfn">flowtables</em> son un mecanismo para acelerar el paso de los paquetes
 por la máquina haciendo que fluyan directamente entre la entrada (el enganche
 <em>ingress</em>) y la interfaz de salida sin tener que atravesar todo los enganches
@@ -618,10 +458,10 @@ de <em>eth0</em>, seguiríamos pudiendo acelerar la intermediación de los paque
 </div>
 </div>
 <div class="section" id="marcas">
-<span id="nftables-marcas"></span><h2>8.7.3.2.4.8. Marcas<a class="headerlink" href="#marcas" title="Enlazar permanentemente con este título">¶</a></h2>
+<span id="nftables-marcas"></span><h2>8.7.3.2.4.7. Marcas<a class="headerlink" href="#marcas" title="Enlazar permanentemente con este título">¶</a></h2>
 </div>
-<div class="section" id="recent">
-<span id="nftables-recent"></span><h2>8.7.3.2.4.9. recent<a class="headerlink" href="#recent" title="Enlazar permanentemente con este título">¶</a></h2>
+<div class="section" id="emulacion-de-recent">
+<span id="nftables-recent"></span><h2>8.7.3.2.4.8. Emulación de recent<a class="headerlink" href="#emulacion-de-recent" title="Enlazar permanentemente con este título">¶</a></h2>
 </div>
 </div>
 
@@ -634,24 +474,18 @@ de <em>eth0</em>, seguiríamos pudiendo acelerar la intermediación de los paque
   <h3><a href="../../../index.html">Table of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">8.7.3.2.4. Uso avanzado</a><ul>
-<li><a class="reference internal" href="#objetos-de-conexion">8.7.3.2.4.1. Objetos de conexión</a><ul>
-<li><a class="reference internal" href="#contadores">8.7.3.2.4.1.1. Contadores</a></li>
-<li><a class="reference internal" href="#caudales">8.7.3.2.4.1.2. Caudales</a></li>
-<li><a class="reference internal" href="#cuotas">8.7.3.2.4.1.3. Cuotas</a></li>
-</ul>
-</li>
-<li><a class="reference internal" href="#sets">8.7.3.2.4.2. sets</a></li>
-<li><a class="reference internal" href="#maps">8.7.3.2.4.3. maps</a></li>
+<li><a class="reference internal" href="#conjuntos">8.7.3.2.4.1. Conjuntos</a></li>
+<li><a class="reference internal" href="#concatenaciones">8.7.3.2.4.2. Concatenaciones</a></li>
+<li><a class="reference internal" href="#mapas">8.7.3.2.4.3. Mapas</a></li>
 <li><a class="reference internal" href="#diccionarios">8.7.3.2.4.4. Diccionarios</a></li>
-<li><a class="reference internal" href="#concatenaciones">8.7.3.2.4.5. Concatenaciones</a></li>
-<li><a class="reference internal" href="#conjuntos-dinamicos">8.7.3.2.4.6. Conjuntos dinámicos</a><ul>
-<li><a class="reference internal" href="#connlimit">8.7.3.2.4.6.1. connlimit</a></li>
-<li><a class="reference internal" href="#hashlimit">8.7.3.2.4.6.2. hashlimit</a></li>
+<li><a class="reference internal" href="#conjuntos-dinamicos">8.7.3.2.4.5. Conjuntos dinámicos</a><ul>
+<li><a class="reference internal" href="#connlimit">8.7.3.2.4.5.1. connlimit</a></li>
+<li><a class="reference internal" href="#hashlimit">8.7.3.2.4.5.2. hashlimit</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#flowtables">8.7.3.2.4.7. flowtables</a></li>
-<li><a class="reference internal" href="#marcas">8.7.3.2.4.8. Marcas</a></li>
-<li><a class="reference internal" href="#recent">8.7.3.2.4.9. recent</a></li>
+<li><a class="reference internal" href="#flowtables">8.7.3.2.4.6. flowtables</a></li>
+<li><a class="reference internal" href="#marcas">8.7.3.2.4.7. Marcas</a></li>
+<li><a class="reference internal" href="#emulacion-de-recent">8.7.3.2.4.8. Emulación de recent</a></li>
 </ul>
 </li>
 </ul>
@@ -660,8 +494,8 @@ de <em>eth0</em>, seguiríamos pudiendo acelerar la intermediación de los paque
   <p class="topless"><a href="03.conn.html"
                         title="capítulo anterior">8.7.3.2.3. Uso práctico</a></p>
   <h4>Próximo tema</h4>
-  <p class="topless"><a href="../../08.qos/index.html"
-                        title="próximo capítulo">8.8. Calidad de servicio</a></p>
+  <p class="topless"><a href="05.bridge.html"
+                        title="próximo capítulo">8.7.3.2.5. Bridges</a></p>
   <div role="note" aria-label="source link">
     <h3>Esta página</h3>
     <ul class="this-page-menu">
@@ -692,7 +526,7 @@ de <em>eth0</em>, seguiríamos pudiendo acelerar la intermediación de los paque
           <a href="../../../genindex.html" title="Índice General"
              >índice</a></li>
         <li class="right" >
-          <a href="../../08.qos/index.html" title="8.8. Calidad de servicio"
+          <a href="05.bridge.html" title="8.7.3.2.5. Bridges"
              >siguiente</a> |</li>
         <li class="right" >
           <a href="03.conn.html" title="8.7.3.2.3. Uso práctico"

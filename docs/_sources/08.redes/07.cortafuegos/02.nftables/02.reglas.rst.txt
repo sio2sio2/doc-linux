@@ -397,8 +397,239 @@ condición adicional
    |            |             | nft add rule filter INPUT icmp type echo-request add @testers {ip saddr timeout 2m}   |
    +------------+-------------+---------------------------------------------------------------------------------------+
 
+Objetos de estado
+=================
+Se distinguen tres:
+
+- Los contadores.
+- Los caudales de tráfico (o límites de ratio de tráfico si se prefiere).
+- Las cuotas.
+
+Los tres se caracterizan porque:
+
+- Pueden ser anónimos o definidos con un nombre. En el primer caso se crean
+  sobre la marcha al definir una regla, mientras que en el segundo se crean antes
+  y se usan luego en una o más reglas utilizando el nombre creado.
+
+- Son afectados por la regla en la que se encuentran. Por ejemplo, el contador::
+
+   # nft add filter input tcp dport ssh counter
+
+  incrementa en uno su valor al cumplir un paquete las condiciones incluidas en
+  la regla anteriores a su declaración. Por tanto cualquier paquete entrante de
+  trafico |SSH| incrementará el valor del contador. En cambio, en este otro
+  caso de dos contadores::
+
+   # nft add filter input tcp dport ssh counter ct state new counter
+
+  hay dos contadores, el primero de los cuales se actualiza con cualquier
+  paquete entrante |SSH|, pero el segundo sólo cuando uno de estos paquetes
+  inicia una conexión.
+
+- Un contador es una acción (se actualizan), pero no suponen ninguna condición;
+  mientras que el ratio y la cuota son ambas cosas: son acción porque se
+  actualizan y son condición porque establecen unos umbrales.
+
+.. _nftables-counter:
+
+Contadores
+----------
+Partiendo de esto::
+
+   # nft add table filter
+   # nft add chain filter INPUT "{type filter hook input prority 0;}"
+   # nft add rule filter INPUT icmp type echo-request counter
+   # nft list table filter
+
+hemos creado un contador anónimo que contabilizará las peticiones |ICMP| entrantes.
+Podríamos en cambio haber creado un contador con nombre asociado a la tabla y
+usarlo en la regla::
+
+   # nft add counter filter pines
+   # nft add rule filter INPUT ip protocol icmp counter name pines
+
+Los contadores con nombre pueden usarse en varias reglas y, además, resetear su
+valor::
+
+   # nft reset counter filter pines
+
+.. _nftables-limit:
+
+Caudales
+--------
+El objeto *limit* permite contabilizar el tráfico de datos y mantenerlo dentro
+de un umbral máximo.
+
+.. table::
+   :class: nftables-acc-no-term
+
+   +------------+-------------+---------------------------------------------------------------------------------------+
+   | Acción     | Argumento   | Descripción                                                                           |
+   +============+=============+=======================================================================================+
+   | limit      | rate [over] | Establece una condición que será verdadera mientras no se supere (o sí con *over*)    |
+   |            |             | el ratio espeficiado. El ratio cuenta paquetes, *bytes*, *kbytes*, *mbytes* en        |
+   |            |             | periodos de *second*, *minute*, *hour*, *day* o *week*. Puede además añadir           |
+   |            |             | :kbd:`burst` para la :ref:`definición de la ráfaga <iptables-limit>`.                 |
+   |            |             +---------------------------------------------------------------------------------------+
+   |            |             | | nft add rule filter INPUT icmp type echo-request limit rate 1/second accept         |
+   |            |             | | nft add rule filter INPUT icmp type echo-request limit rate over 1/second drop      |
+   |            |             | | nft add rule filter INPUT iff eth0 limit rate over 10/seconds burst 50 packets drop |
+   +------------+-------------+---------------------------------------------------------------------------------------+
+
+Por ejemplo, esta regla contabiliza las peticiones |ICMP| entrantes y las acepta
+mientras no se supere la ratio de un paquete al segundo::
+
+   # nft add rule filter INPUT icmp type echo-request limit rate 1/second accept
+
+los que la superen acabarán rechazados si la política predeterminada es la de
+*lista blanca*. En cambio, si la política es de **lista negra**, lo que debemos
+hacer es rechazar las peticiones que superen la tasa::
+
+   # nft add rule netdev filter INGRESS icmp type echo-request limit rate over 1/second drop
+
+.. warning:: Hay que tener presente que, por defecto, la :ref:`ráfaga admisible
+   <iptables-limit>` es de **5**, por lo que si se hacen pruebas de concepto para
+   comprobar cómo funciona la limitación es preferible limitar la ráfaga al
+   ratio (es decir para *2/second*, *2*)::
+
+      # nft add rule filter INPUT icmp type echo-request limit rate 2/second burst 2 packets accept
+   
+Como ocurre con las cuotas, para limitar teniendo en cuenta también la dirección
+|IP| de origen de los paquetes, deberíamos combinar el objeto con el uso de
+:ref:`conjuntos dinámicos <nftables-meters>` y :ref:`concatenaciones
+<nftables-concat>`, ya que cada dirección de origen distinta debería
+contabilizar la ratio o la cuota de forma independiente.
+
+Es posible, por supuesto, definir una limitación con nombre, de forma análoga a
+como se hacía con los contadores::
+
+   # nft add limit filter icmpratio {rate 1/second}
+   # nft add rule filter INPUT icmp type echo-request limit name icmpratio accept
+
+o resetearlas.
+
+.. todo:: Implementar defensa contra ataque DoS a semejanza de iptables.
+
+.. _nftables-quota:
+
+Cuotas
+------
+De modo análogo podemos definir cuotas, que funcionan como límite del tráfico
+total que cumple con la regla.
+
+.. table::
+   :class: nftables-acc-no-term
+
+   +---------+-----------+-------------------------------------------------------------------+
+   | Acción  | Argumento | Descripción                                                       |
+   +=========+===========+===================================================================+
+   | quota   | [over]    | Establece una cuota para la tranferencia. Debe añadirse           |
+   |         |           | cuál es el umbral y las unidades (*bytes*, *kbytes*, *mbytes*)    |
+   |         |           +-------------------------------------------------------------------+
+   |         |           | nft add rule filter OUTPUT tcp sport 22 quota over 10 mbytes drop |
+   +---------+-----------+-------------------------------------------------------------------+
+
+Es posible crear cuotas con nombre::
+
+   # nft add quota ssh-quota {over 10 mbytes}
+   # nft add rule filter OUTPUT tcp sport 22 quota name ssh-quota drop
+
+aunque esto establecerá un límite general para todo el tráfico |SSH| de descarga
+y no por cliente lo que exige :ref:`conjuntos dinámicos <nftables-meters>`.
+
 Persistencia
 ============
+A diferencia de :ref:`iptables <iptables>`, :program:`nftables` tiene una
+pequeña capacidad de generación de *scripts* que permite definir reglas, incluir
+reglas definidas en otros ficheros, definir variables y añadir comentarios. No
+hay, sin embargo, ni sentencias condicionales ni bucles.
+
+Un script de estas características tenemos dos formas de ejecutarlo:
+
+#. Con :command:`nft`::
+
+      # nft -f reglas,nft
+
+#. Incluyendo en él una primera línea de *sheebang* y dándole permisos de
+   ejecución:
+
+   .. code-block:: bash
+
+      #!/usr/sbin/nft -f
+
+      # Borra todas las reglas
+      flush ruleset
+
+      # Configuración del cortafuegos ...
+
+Particularmente, en *Debian* existe deshabilitado un servicio *nftables* que si
+se habilita, lee el contenido del fichero :file:`/etc/nftables.conf`::
+
+   # systemctl status nftables
+   ● nftables.service - nftables
+      Loaded: loaded (/lib/systemd/system/nftables.service; disabled; vendor
+   preset: enabled)
+      Active: inactive (dead)
+        Docs: man:nft(8)
+              http://wiki.nftables.org
+
+así que el modo más sencillo de configurar el cortafuegos es escribir dentro de
+este fichero las reglas y habilitar el servicio.
+
+Sentencias adicionales
+----------------------
+Pueden ser:
+
+**Comentarios**
+   Se notan, como en el lenguaje de la *shell* con "#". Cualquier texto incluido
+   tras uno, no se procesa.
+
+**Inclusión de ficheros externos**
+   Se hace mediante la sentencia :kbd:`include` y un argumento que indica el
+   fichero a leeri para el cual:
+
+   - Se permiten comodines.
+   - No se leen ficheros ocultos.
+   - Si se indca una ruta es relativa, esta es relativa al directorio que se haya
+     indicado mediante la opción :kbd:`--includepath` y, si esta no se incluye, a
+     un directorio predefinido en tiempo de compilación que en *Debian* es
+     :file:`/etc/`.
+
+   Por tanto, si incluímos dentro de :file:`/etc/nftables,conf` la línea:
+
+   .. code-block:: nginx
+
+      include "nftables.d/*.nft"
+
+   podremos crear el directorio :file:`/etc/nftables.d` y, dentro de él, crear
+   varios ficheros de extensión :file:`.nft` para una configuración modular.
+
+**Definición de variables**
+   Que pueden usarse luego en la definición de las reglas anteponiendo un "$" al
+   nombre::
+
+      # /etc/nftables.d/prueba.nft
+
+      define entrada eth0
+
+      add rule inet filter iif $entrada counter
+
+Reglas
+------
+Las definición reglas dentro del fichero puede hacerse mediante dos formatos
+distintos:
+
+* El que se usaría para escribir una regla con la orden :command:`nft`, pero sin
+  incluir el propio :kbd:`nft`. La regla con que acaba el epígrafe anterior es
+  un ejemplo.
+
+* Utilizando el mismo formato que devuelve una orden :kbd:`nft list`. Por
+  ejemplo, esto funciona perfectamente::
+
+      # echo "flush ruleset" > script.nft
+      # nft list ruleset >> script.nft
+      # nft -f script.nft
+
 
 .. rubric:: Notas al pie
 

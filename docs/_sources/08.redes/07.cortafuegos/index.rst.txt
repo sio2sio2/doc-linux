@@ -154,7 +154,7 @@ es indispensable tener claros los siguientes conceptos:
 
    .. _netfilter-chaintypes:
 
-   El otro aspecto citando en el primer parrafo es que todas laa reglas de una
+   El otro aspecto citado en el primer parrafo es que todas laa reglas de una
    misma cadena son del mismo tipo, aunque se dejó sin definir cuáles son estos
    tipos:
 
@@ -174,7 +174,7 @@ es indispensable tener claros los siguientes conceptos:
       | route  | | ip,         | output   | Modificar la cabecera o la marca del paquete   |
       |        | | ip6         |          | para afectar a la decisión de encaminamiento   |
       |        |               |          | que se produce tras *output* (sólo             |
-      |        |               |          | :program:`nftablea`)\ [#]_.                    |
+      |        |               |          | :program:`nftables`)\ [#]_.                    |
       +--------+---------------+----------+------------------------------------------------+
 
    Por último, si resumimos las características de una cadena:
