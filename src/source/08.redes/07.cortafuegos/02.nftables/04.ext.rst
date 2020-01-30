@@ -12,7 +12,7 @@ Se distinguen tres:
 Los tres se caracterizan porque:
 
 - Pueden ser anónimos o definidos con un nombre. En el primer caso se crean
-  sobre la marca al definir una regla, mientras que en el segundo se crean antes
+  sobre la marcha al definir una regla, mientras que en el segundo se crean antes
   y se usan luego en una o más reglas utilizando el nombre creado.
 
 - Son afectados por la regla en la que se encuentran. Por ejemplo, el contador::
@@ -20,7 +20,7 @@ Los tres se caracterizan porque:
    # nft add filter input tcp dport ssh counter
 
   incrementa en uno su valor al cumplir un paquete las condiciones incluidas en
-  la regla anteriores a su declaración. Por tanto cualquier paquete enrante de
+  la regla anteriores a su declaración. Por tanto cualquier paquete entrante de
   trafico |SSH| incrementará el valor del contador. En cambio, en este otro
   caso de dos contadores::
 
@@ -46,13 +46,14 @@ Partiendo de esto::
    # nft list table filter
 
 hemos creado un contador anónimo que contabilizará las peticiones |ICMP| entrantes.
-Podríamos en cambios haber creado un contador con nombre asociado a la tabla y
+Podríamos en cambio haber creado un contador con nombre asociado a la tabla y
 usarlo en la regla::
 
    # nft add counter filter pines
    # nft add rule filter INPUT ip protocol icmp counter name pines
 
-Los contadores con nombre pueden usarse en varias reglas y, además, resetear valor::
+Los contadores con nombre pueden usarse en varias reglas y, además, resetear su
+valor::
 
    # nft reset counter filter pines
 
@@ -69,7 +70,7 @@ de un umbral máximo.
    +------------+-------------+---------------------------------------------------------------------------------------+
    | Acción     | Argumento   | Descripción                                                                           |
    +============+=============+=======================================================================================+
-   | limit      | rate [over] | Establece una condición que será verdadera cuando se alcance o se supere (con *over*) |
+   | limit      | rate [over] | Establece una condición que será verdadera mientras no se supere (o sí con *over*)    |
    |            |             | el ratio espeficiado. El ratio cuenta paquetes, *bytes*, *kbytes*, *mbytes* en        |
    |            |             | periodos de *second*, *minute*, *hour*, *day* o *week*. Puede además añadir           |
    |            |             | :kbd:`burst` para la :ref:`definición de la ráfaga <iptables-limit>`.                 |
@@ -84,7 +85,7 @@ mientras no se supere la ratio de un paquete al segundo::
 
    # nft add rule filter INPUT icmp type echo-request limit rate 1/second accept
 
-los que la superen acabarán rechazados si la política predeterminada era la de
+los que la superen acabarán rechazados si la política predeterminada es la de
 *lista blanca*. En cambio, si la política es de **lista negra**, lo que debemos
 hacer es rechazar las peticiones que superen la tasa::
 
@@ -93,11 +94,11 @@ hacer es rechazar las peticiones que superen la tasa::
 .. warning:: Hay que tener presente que, por defecto, la :ref:`ráfaga admisible
    <iptables-limit>` es de **5**, por lo que si se hacen pruebas de concepto para
    comprobar cómo funciona la limitación es preferible limitar la ráfaga al
-   ratio (es decir para *2/second*, *2*).
+   ratio (es decir para *2/second*, *2*)::
 
       # nft add rule filter INPUT icmp type echo-request limit rate 2/second burst 2 packets accept
    
-Como ocurre con las cuotas,.para limitar teniendo en cuenta también la dirección
+Como ocurre con las cuotas, para limitar teniendo en cuenta también la dirección
 |IP| de origen de los paquetes, deberíamos combinar el objeto con el uso de
 :ref:`conjuntos dinámicos <nftables-meters>` y :ref:`concatenaciones
 <nftables-concat>`, ya que cada dirección de origen distinta debería
@@ -323,6 +324,10 @@ También es posible concatenar las claves en los mapas y disccionarios.
 
 Conjuntos dinámicos
 ===================
+
+.. todo:: Repasar este apartado para aclarar el concepto y usar también
+   ejemplos con quota.
+
 Los :dfn:`conjuntos dinámicos` permiten incluir elementos atendiendo al estado
 de la conexión. La diferencia con un conjunto a secas es que éstos últimos
 incluyen, por ejemplo, una dirección |IP| a secas, mientras que los dinámicos
@@ -453,8 +458,87 @@ que limitará a 100 KiB/s el tráfico de descarga para cada uno de los clientes.
 
 flowtables
 ===========
+Las :dfn:`flowtables` son un mecanismo para acelerar el paso de los paquetes
+por la máquina haciendo que fluyan directamente entre la entrada (el enganche
+*ingress*) y la interfaz de salida sin tener que atravesar todo los enganches
+intermedios:
+
+.. image:: files/netfilter-flowtable.png
+
+Para lograrlo, el paquete que abre conexión sí debe realizar el camino habitual,
+especificar que los paquetes utilizarán el atajo y, obviamente lograr alcanzar
+su destino.
+
+.. warning:: Hasta la versión 0.8.0, los :ref:`conjuntos dinámicos
+   <nftables-meters>` se denominaron *flowtables* y se usaba la palabra
+   :kbd:`flowtable` en vez de :kbd:`meter`. Pese a ello, son dos conceptos
+   absolutamente distintos: téngalo en cuenta si ve en internet algún ejemplo de
+   uso antiguo.
+
+Para ilustrarlo supongamos que a través del cortafuegos deseamos alcanzar un
+servidor |SSH| que se encuentra en el otro extremo::
+
+   table ip filter {
+      flowtable sshpass {
+         hook ingress priority 0
+         devices = {eth0, eth1}
+      }
+
+      chain FORWARD {
+         type filter hook forward priority 0
+         policy drop
+
+         tcp dport ssh flow add @sshpass 
+         tcp dport ssh counter accept
+         
+      }
+   }
+
+donde se ha supuesto que *eth0* y *eth1* son las interfaces del router. En la
+cadena *FORWARD*, declaramos que queremos que el tráfico |SSH| use "sshpass" y,
+además, aceptamos el paquete para que llegue a su destino. Incluímos un contador
+para comprobar que los siguientes paquetes de la conexión no lo aumentan, ya que
+jamás pasan por la cadena. Si incluyeremas un contador para el tráfico de
+réplica, veríamos que ocurre otro tanto.
+
+La técnica también soporta |NAT|, de modo que si el servidor se encontrara en
+una red interna que el cortafuegos oculta haciendo enmascaramiento a la salida
+de *eth0*, seguiríamos pudiendo acelerar la intermediación de los paquetes::
+
+   table ip filter {
+      flowtable sshpass {
+         hook ingress priority 0
+         devices = { eth0, eth1 }
+      }
+
+      chain POSTROUTING {
+         type nat hook postrouting priority 100
+
+         oif "eth0" masquerade comment "Ocultamos la red 192.168.255.0/24"
+      }
+
+      chain PREROUTING {
+         type nat hook prerouting priority -100
+
+         iif "eth0" tcp dport 10022 dnat to 192.168.255.2:22 comment "DNAT al servidor SSH"
+      }
+
+      chain FORWARD {
+         type filter hook forward priority filter
+         policy drop
+
+         ct status dnat flow add @sshpass comment "Aceleramos el tránsito hacia los servidores"
+         ct status dnat accept
+      }
+   }
 
 .. https://wiki.nftables.org/wiki-nftables/index.php/Flowtable
+   https://github.com/torvalds/linux/blob/master/Documentation/networking/nf_flowtable.txt
+
+.. _nftables-marcas:
+
+Marcas
+======
 
 .. _nftables-recent:
 
@@ -463,3 +547,4 @@ recent
 
 .. |ICMP| replace:: :abbr:`ICMP (Internet Control Message Protocol)`
 .. |MAC| replace:: :abbr:`MAC (Media Access Control)`
+.. |NAT| replace:: :abbr:`NAT (Network Address Translation)`
