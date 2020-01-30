@@ -91,7 +91,7 @@ es indispensable tener claros los siguientes conceptos:
    sobre las paquetes. Estas condiciones refieren o bien características
    incluidas en el propio paquete (p.e. la dirección |IP| de origen), o bien
    caracteríticas derivadas del hecho de que el paquete pertenece a una conexión
-   (p.e. si ese paquete es el que abre una conexión)
+   (p.e. si ese paquete es el que abre una conexión).
 
 .. _netfilter-chains:
 
@@ -171,8 +171,10 @@ es indispensable tener claros los siguientes conceptos:
       |        | | output.     | | inet   | de la conexión.                                |
       |        | | postrouting |          |                                                |
       +--------+---------------+----------+------------------------------------------------+
-      | route  | | ip,         | output   | POR ESCRIBIR.                                  |
-      |        | | ip6         |          |                                                |
+      | route  | | ip,         | output   | Modificar la cabecera o la marca del paquete   |
+      |        | | ip6         |          | para afectar a la decisión de encaminamiento   |
+      |        |               |          | que se produce tras *output* (sólo             |
+      |        |               |          | :program:`nftablea`)\ [#]_.                    |
       +--------+---------------+----------+------------------------------------------------+
 
    Por último, si resumimos las características de una cadena:
@@ -298,7 +300,7 @@ sintaxis y en la mayor indefinición inicial de :program:`nftables`.
 .. [#] La existencia de estas prioridades predefinidas deriva de que en
    en :program:`iptables` las cadenas ya están definidas y, en consecuencia,
    también se encuentan `predefinidas las prioridades de éstas
-   <https://wiki.nftables.org/wiki-nftables/index.php/Configuring_chains#Base_chain_priority>`.
+   <https://wiki.nftables.org/wiki-nftables/index.php/Configuring_chains#Base_chain_priority>`_.
    En :program:`nftables` no es así y puede usarse cualquier número, pero a
    partir de la versión v0.9.1, se han predefinido los nombres que pueden verse
    para representar las prioridades predefinidas existentes en
@@ -307,9 +309,12 @@ sintaxis y en la mayor indefinición inicial de :program:`nftables`.
    <http://git.netfilter.org/nftables/commit/?id=c8a0e8c90e2d1188e6fcdd8951b295722e56d542>`_
    la aceptación del parche.
 
+.. [#] Es indispensable leer las `aclaraciones de Croac
+   <https://www.craoc.fr/articles/nftables/#route-chaine-type>`_.
+
 .. [#] Este diagrama no coincide exactamente con `el que proporciona Jan
    Engelhardt en la Wikipedia
-   <https://commons.wikimedia.org/wiki/File:Netfilter-packet-flow.svg>`,
+   <https://commons.wikimedia.org/wiki/File:Netfilter-packet-flow.svg>`_,
    pero las pruebas corroboran que es más fiable el redibujado, como el autor
    original advierte en su *wiki*. Para hacer usted mismo las pruebas puede
    tomar un *Linux* con su interfaz física conectada a una interfaz *bridge*,
