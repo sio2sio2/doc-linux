@@ -51,7 +51,575 @@
           <div class="body" role="main">
             
   <div class="section" id="uso-practico">
-<h1>8.7.3.2.3. Uso práctico<a class="headerlink" href="#uso-practico" title="Enlazar permanentemente con este título">¶</a></h1>
+<span id="nftables-uso"></span><h1>8.7.3.2.3. Uso práctico<a class="headerlink" href="#uso-practico" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>Se tratarán, porque ayudan a ilustrar el uso del cortafuegos, <a class="reference internal" href="../01.iptables/02.conn.html#iptables-uso"><span class="std std-ref">los mismos
+casos que se estudiaron con iptables</span></a>. Como en aquella ocasión,
+se aplicará siempre una política de <strong>lista blanca</strong>.</p>
+<div class="section" id="casos-ejemplares">
+<h2>8.7.3.2.3.1. Casos ejemplares<a class="headerlink" href="#casos-ejemplares" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Los tres casos que ayudan a entender el seguimiento de las conexiones son:</p>
+<div class="section" id="conexion-a-servidor-generico">
+<h3>8.7.3.2.3.1.1. Conexión a servidor genérico<a class="headerlink" href="#conexion-a-servidor-generico" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Se considera el siguiente esquema:</p>
+<img alt="../../../_images/casos-conexion-simple1.png" src="../../../_images/casos-conexion-simple1.png" />
+<p>en el que nuestro cortafuegos se interpone entre una red interna de clientes y
+el exterior. Esta red externa puede o no ser internet. Lo que realmente
+distingue a la red externa de la interna es que en la interfaz con la que
+conecta el cortafuegos (<em>eth0</em>) se hace enmascaramiento, de manera que los
+clientes internos son conscientes de que se comunican con el exterior, mientras
+que las máquinas externas no son capaces de ver más allá de esta interfaz. Así
+pues, será necesaria una regla de enmascaramiento.</p>
+<p>Estudiemos dos casos de distintos de conexión de un cliente a un servidor:</p>
+<ul class="simple">
+<li>El caso en que un cliente interno quiere conectar con un servidor web externo.</li>
+<li>El caso en que un cliente externo quiere conectar con un servidor web de la red
+interna (supondremos su <abbr title="Internet Protocol">IP</abbr> <em>192.168.255.2</em>).</li>
+</ul>
+<p id="nftables-lista-blanca">Tomaremos como base la siguiente configuración:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="ch">#!/usr/sbin/nft -f</span>
+
+flush ruleset
+
+table ip filter <span class="o">{</span>
+   chain INPUT <span class="o">{</span>
+      <span class="nb">type</span> filter hook input priority filter
+      policy drop
+
+      iiftype loopback accept
+   <span class="o">}</span>
+
+   chain OUTPUT <span class="o">{</span>
+      <span class="nb">type</span> filter hook output priority filter
+      policy drop
+
+      oiftype loopback accept
+   <span class="o">}</span>
+
+   chain FORWARD <span class="o">{</span>
+      <span class="nb">type</span> filter hook forward priority filter
+      policy drop
+   <span class="o">}</span>
+<span class="o">}</span>
+
+include <span class="s2">&quot;./nftables.d/*.nft&quot;</span>
+</pre></div>
+</div>
+<p id="nftables-masq">A la cual añadiremos esta (por ejemplo, en el fichero
+<code class="file docutils literal notranslate"><span class="pre">99-masquerade.nft</span></code>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> /etc/nftables/99-masquerade.nft
+
+<span class="go">table ip nat {</span>
+<span class="go">   chain POSTROUTING {</span>
+<span class="go">      type nat hook postrouting priority srcnat</span>
+
+<span class="go">      oif eth0 snat to 172.22.0.2</span>
+<span class="go">   }</span>
+<span class="go">}</span>
+</pre></div>
+</div>
+<dl class="docutils">
+<dt><strong>Servidor externo</strong></dt>
+<dd><p class="first">Las claves para la configuración son:</p>
+<ul class="simple">
+<li>Los clientes deben ser capaces de hacer la petición web atravesando el
+cortafuegos y, por supuesto, el tráfico consecuente debe atravesarlo también.</li>
+<li>Para navegar es necesario resolver nombres, de modo que las peticiones
+<abbr title="Domain Name Server">DNS</abbr> también deben poder atravesar el <em>router</em>.</li>
+</ul>
+<p>Esto podemos implementarlo añadiendo la siguiente configuración:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/nftables/10-external.nft</span>
+<span class="c1">#</span>
+<span class="c1"># Servicios del exterior accesibles desde la red interna.</span>
+<span class="c1">#</span>
+
+table ip filter <span class="o">{</span>
+   chain FORWARD <span class="o">{</span>
+      ct state established accept
+
+      oif eth0 tcp dport <span class="o">{</span>http, https<span class="o">}</span> accept comment <span class="s2">&quot;Acceso Web&quot;</span>
+      oif eth0 udp dport domain accept comment <span class="s2">&quot;Resolución de nombres&quot;</span>
+      oif eth0 tcp dport domain accept comment <span class="s2">&quot;Resolución de nombres&quot;</span>
+   <span class="o">}</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">Como la cadena ya existe, las reglas se añaden. No es esto, aunque
+lo parezca, una cadena de usuario.</p>
+</div>
+<div class="last admonition note">
+<p class="first admonition-title">Nota</p>
+<p>Dado que queremos que el tráfico de los clientes fluya
+libremente por el servidor, podríamos mejorar el rendimiento de la
+solución usando <a class="reference internal" href="04.ext.html#nftables-flowtables"><span class="std std-ref">flowtables</span></a>, que consiste
+en sustituir el código de la cadena <em>CHAIN</em> por el siguiente:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/nftables/10-external.nft</span>
+<span class="c1">#</span>
+<span class="c1"># Servicios del exterior accesibles desde la red interna.</span>
+<span class="c1">#</span>
+
+table ip filter <span class="o">{</span>
+   flowtable bypass <span class="o">{</span>
+      hook ingress priority <span class="m">0</span>
+      <span class="nv">devices</span> <span class="o">=</span> <span class="o">{</span>eth0, eth1<span class="o">}</span>
+   <span class="o">}</span>
+
+   chain atajo <span class="o">{</span>
+      flow add @bypass
+      accept
+   <span class="o">}</span>
+
+   chain FORWARD <span class="o">{</span>
+      oif eth0 tcp dport <span class="o">{</span>http, https<span class="o">}</span> jump atajo
+      oif eth0 udp dport domain jump atajo
+      oif eth0 tcp dport domain jump atajo
+
+      <span class="c1"># ¿Por qué es necesario esto para que no se eternice el DNS?</span>
+      ct state established accept
+   <span class="o">}</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+<p class="last">No volveremos a tratar esta posibilidad en los ejemplos, pero téngala en
+consideración.</p>
+</div>
+</dd>
+<dt><strong>Servidor interno</strong></dt>
+<dd><p class="first">La diferencia radical es que los clientes, que están en la red externa,
+desconocen por completo que el servidor web es en realidad una máquina interna
+e intentan la conexión directamente al cortafuegos. Por tanto, el cortafuegos
+deberá hacer una redirección hacia la máquina servidor:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/nftables.d/10-internal.nft</span>
+
+table ip nat <span class="o">{</span>
+   chain PREROUTING <span class="o">{</span>
+      <span class="nb">type</span> nat hook prerouting priority dstnat
+
+      iif eth0 tcp dport <span class="o">{</span>http, https<span class="o">}</span> dnat to <span class="m">192</span>.168.255.2 comment <span class="s2">&quot;Acceso al servidor web&quot;</span>
+   <span class="o">}</span>
+<span class="o">}</span>
+
+table ip filter <span class="o">{</span>
+   chain FORWARD <span class="o">{</span>
+      ct status dnat accept
+
+      <span class="c1"># Es probable que se quiera que el servidor acceda al exterior...</span>
+   <span class="o">}</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+<p class="last">Es probable que el servidor web, para funcionar correctamente, requiera
+poder conectarse al exterior, pero deberá analizarse en cada caso.</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="conexion-a-servidor-ftp">
+<h3>8.7.3.2.3.1.2. Conexión a servidor <abbr title="File Transfer Protocol">FTP</abbr><a class="headerlink" href="#conexion-a-servidor-ftp" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>La dificultad de este protocolo es que utiliza dos canales de comunicación: el
+de control y el de datos.</p>
+<div class="admonition seealso">
+<p class="first admonition-title">Ver también</p>
+<p class="last">Lea con atención el epígrafe sobre los <a class="reference internal" href="../../../07.serre/01.ftp/01.desc.html#ftp-modos"><span class="std std-ref">modos de
+funcionamiento de FTP</span></a>.</p>
+</div>
+<p>La dificultad del protocolo radica en el establecimiento del canal de datos
+relacionado con el de control, sobre todo en el caso del modo activo, en el cual
+el canal lo abre el servidor, no el cliente. Los cortafuegos de inspección de
+estado son capaces de lidiar con esta dificultad gracias a que son capaces de
+distinguir conexiones y estimar si una conexión está relacionada con otra.</p>
+<p>Antes de pasar a analizar las reglas concretas, deben tenerse presente tres
+cosas:</p>
+<ul>
+<li><p class="first">Para que <strong class="program">netfilter</strong> sea capaz de identificar el canal de datos como
+conexión relacionada, necesita entender y analizar la conexión <abbr title="File Transfer Protocol">FTP</abbr>. Esto
+se logra cargando un módulo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> modprobe nf_conntrack_ftp
+</pre></div>
+</div>
+</li>
+<li><p class="first">Cuando en un <em>router</em> se lleva a cabo enmascaramiento (como es el caso de
+nuestro cortafuegos), las máquinas externas creen estar comunicándose con el
+<em>router</em>, no con una máquina interna, lo cual provocará que:</p>
+<ul class="simple">
+<li>En el <em>modo activo</em> cuando el servidor es externo, éste intentará abrir el
+canal de datos con el <em>router</em>, no con cliente, por lo que el <em>router</em>
+tendrá que hacer un <abbr title="Destination NAT">DNAT</abbr>. Esta dificultad es fácil de solucionar, porque
+el puerto de origen siempre es el <em>20/TCP</em>.</li>
+<li>En el <em>modo pasivo</em> cuando el servidor es interno, el cliente intentará
+abrir el canal de datos con el <em>router</em>, no con el servidor, po lo que habrá
+que hacer <abbr title="Destination NAT">DNAT</abbr>. El problema es que no hay definidos puertos típicos para
+este canal de datios, sino que los puertos de cliente y servidor varían
+de conexión a conexiín. En consecuencia, es imposible hacer una regla
+estática que nos resuelva este problema.</li>
+</ul>
+<p>Afoortunadamente, el núcleo de <em>linux</em> incorpora otro módulo que es capaz de
+reconocer cuándo debe hacerse el <abbr title="Destination NAT">DNAT</abbr> y lo lleva a cabo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> modprobe nf_nat_ftp
+</pre></div>
+</div>
+</li>
+<li><p class="first">Para que lo anterior funcione, es necesario que el núcleo sepa cuáles son las
+conexiones que debe monitorizar en busca de conexiones relacionadas. Estos
+monitores reciben el nombre de <em class="dfn">helpers</em> y hay un puñado de ellos
+definidos. <abbr title="File Transfer Protocol">FTP</abbr> tiene el suyo y hay también que declarar que quiere usarse.
+Si se trabaja con <strong class="program">iptables</strong>, debe cambiarse un parámetro del núcleo,
+pero con <strong class="program">nftables</strong> la declaración del <em>helper</em> se lleva a cabo
+dentro de la propia configuración.</p>
+</li>
+</ul>
+<div class="admonition note" id="nftables-modulos-ftp">
+<p class="first admonition-title">Nota</p>
+<p>Para automatizar en el arranque la carga de los dos módulos anteriores
+lo más cómodo es hacer:</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cat &gt; /etc/modules-load.d/ftp.conf
+<span class="go">nf_conntrack_ftp</span>
+<span class="go">nf_nat_ftp</span>
+</pre></div>
+</div>
+</div>
+<p>Resolvamos ahora el mismo caso que para el servidor genérico, pero
+particularizado para el servicio <abbr title="File Transfer Protocol">FTP</abbr> (o cualquier otro que abra una conexión
+relacionada). Tengamos presente que permitir la comunicación por el canal de
+control es exactamente el mismo caso que el del servidor genérico, pero que en
+este caso:</p>
+<ul class="simple">
+<li>Debemos cargar los módulos ya mencionados.</li>
+<li>Debemos definir el <em>helper</em> para que monitorice el canal de control.</li>
+<li>Debemos permitir el canal de datos, esto es, el tráfico relacionado.</li>
+</ul>
+<dl class="docutils">
+<dt><strong>Servidor externo</strong></dt>
+<dd><p class="first">Tomando como base la solución para el servidor genérico:</p>
+<div class="last highlight-bash notranslate"><div class="highlight"><pre><span></span>table ip filter <span class="o">{</span>
+<span class="hll">   ct helper ftp-standard <span class="o">{</span>
+</span><span class="hll">      <span class="nb">type</span> <span class="s2">&quot;ftp&quot;</span> protocol tcp<span class="p">;</span>
+</span><span class="hll">   <span class="o">}</span>
+</span>
+   chain FORWARD <span class="o">{</span>
+<span class="hll">      ct state <span class="o">{</span>established, related<span class="o">}</span> accept
+</span>
+<span class="hll">      oif eth0 tcp dport ftp ct helper <span class="nb">set</span> <span class="s2">&quot;ftp-standard&quot;</span> accept comment <span class="s2">&quot;FTP&quot;</span>
+</span>      oif eth0 udp dport domain accept comment <span class="s2">&quot;Resolución de nombres&quot;</span>
+      oif eth0 tcp dport domain accept comment <span class="s2">&quot;Resolución de nombres&quot;</span>
+   <span class="o">}</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+</dd>
+<dt><strong>Servidor interno</strong></dt>
+<dd><p class="first">La solución difiere un poco respecto a la del servidor genérico:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>table ip nat <span class="o">{</span>
+   chain PREROUTING <span class="o">{</span>
+      <span class="nb">type</span> nat hook prerouting priority dstnat
+
+      iif eth0 tcp dport ftp dnat to <span class="m">192</span>.168.255.2 comment <span class="s2">&quot;Acceso al servidor FTP&quot;</span>
+   <span class="o">}</span>
+<span class="o">}</span>
+
+table ip filter <span class="o">{</span>
+   ct helper ftp-standard <span class="o">{</span>
+    <span class="nb">type</span> <span class="s2">&quot;ftp&quot;</span> protocol tcp
+   <span class="o">}</span>
+
+   chain FORWARD <span class="o">{</span>
+      iif eth0 tcp dport ftp ct helper <span class="nb">set</span> <span class="s2">&quot;ftp-standard&quot;</span> accept
+      ct state <span class="o">{</span>related, established<span class="o">}</span> accept
+
+      <span class="c1"># Es probable que se quiera que el servidor acceda al exterior...</span>
+   <span class="o">}</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+<p class="last">ya que hay que definir el <em>helper</em> y además indicar cuándo se debe usar. Esto
+hace que sea no podamos ser tán vagos como en el caso anterior en que
+aceptamos cualquier tráfico que hubiera sufrido <abbr title="Destination NAT">DNAT</abbr>.</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="conexion-a-un-servidor-antipatico">
+<h3>8.7.3.2.3.1.3. Conexión a un servidor <em>antipático</em><a class="headerlink" href="#conexion-a-un-servidor-antipatico" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Consideremos la siguiente red:</p>
+<img alt="../../../_images/servcli1.png" src="../../../_images/servcli1.png" />
+<p>en la cual el servidor web sólo admite comunicaciones con el cortaguegos
+(<em>192.168.255.1</em>), por lo que el cliente no puede comunicarse directamente con
+él, por lo que el cliente deberá pedir las páginas al cortafuegos y éste
+redirigir ese tráfico al servidor.</p>
+<p>Podríamos, como en los casos anterior, redirigir en el cortafuegos la petición
+del cliente hacia el servidor, pero la cosa seguirá sin funcionar por dos
+razones:</p>
+<ul class="simple">
+<li>El servidor no responderá, puerto que sólo se comunica con la <em>192.168.255.1</em>
+y la petición procede de <em>192.168.255.3</em>.</li>
+<li>Aun en el supuesto de que respondiera, la <abbr title="Internet Protocol">IP</abbr> de destino de la respuesta sería
+<em>192.168.255.3</em>, y el servidor respondería directamente a esta ella puesto que
+se encuentra en la misma red. El cliente recibiría un paquete procedente de
+<em>192.168.255.2</em>, no de <em>192.168.255.1</em> y no sabiendo qué hacer con él lo
+desechará.</li>
+</ul>
+<p>La solución es que el cortafuegos además del <abbr title="Destination NAT">DNAT</abbr> hacia el servidor a la
+entrada, haga un <abbr title="Source NAT">SNAT</abbr> arrogándose él el paquete, a fin de que el servidor web
+lo tome a él como el origen, de modo que no lo rechaza y le envíe envíe la
+respuesta. Ya en el cortafuegos, se desarán los cambios y la respuesta regresará
+al cliente como si la hubiera hecho el propio cortafuegos.</p>
+<p>Para llevar a cabo tal estrategia:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>table ip nat <span class="o">{</span>
+   chain PREROUTING <span class="o">{</span>
+      <span class="nb">type</span> nat hook prerouting priority dstnat
+
+      tcp dport <span class="o">{</span>http, https<span class="o">}</span> dnat to <span class="m">192</span>.168.255.2
+   <span class="o">}</span>
+
+   chain POSTROUTING <span class="o">{</span>
+      <span class="nb">type</span> nat hook postrouting priority srcnat
+
+      ct status dnat snat to <span class="m">192</span>.168.255.1
+   <span class="o">}</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+<div class="admonition seealso">
+<p class="first admonition-title">Ver también</p>
+<p class="last">Vea la tabla resumen del recorrido del paquete en el <a class="reference internal" href="../01.iptables/02.conn.html#iptables-antipatico-tabla"><span class="std std-ref">epígrafe
+gemelo escrito para iptables</span></a>.</p>
+</div>
+</div>
+</div>
+<div class="section" id="casos-practicos">
+<h2>8.7.3.2.3.2. Casos prácticos<a class="headerlink" href="#casos-practicos" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>En rodos estos casos, la base de la configuración es la <a class="reference internal" href="#nftables-lista-blanca"><span class="std std-ref">la política de
+lista blanca del primer caso ejemplar</span></a> y el
+<a class="reference internal" href="#nftables-masq"><span class="std std-ref">enmascaramiento</span></a>. Sobre ella, añadiremos otros ficheros
+para resolver los casos.</p>
+<div class="section" id="acceso-simple">
+<h3>8.7.3.2.3.2.1. Acceso simple<a class="headerlink" href="#acceso-simple" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Se dispone de un cortafuegos con <abbr title="Security SHell">SSH</abbr> instalado para configurarlo exclusivamente
+desde la red interna. Los clientes internos deberían ser capaces de navegador.</p>
+<img alt="../../../_images/caso11.png" src="../../../_images/caso11.png" />
+<ul>
+<li><p class="first">Para permitir el acceso <abbr title="Security SHell">SSH</abbr> desde la red interna:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/nftables.d/05-firewall.nft</span>
+
+table ip filter <span class="o">{</span>
+   chain INPUT <span class="o">{</span>
+      ct state established accept
+
+      iif eth1 tcp dport ssh accept comment <span class="s2">&quot;Administración SSH&quot;</span>
+   <span class="o">}</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">Para permitir el tráfico web de los clientes y sus consultas <abbr title="Domain Name Server">DNS</abbr>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/nftables.d/10-external.nft</span>
+
+table ip filter <span class="o">{</span>
+    chain FORWARD <span class="o">{</span>
+       ct state established accept
+
+       oif eth0 tcp dport <span class="o">{</span>http, https<span class="o">}</span> accept comment <span class="s2">&quot;Acceso Web&quot;</span>
+       oif eth0 udp dport domain accept comment <span class="s2">&quot;Resolución de nombres&quot;</span>
+       oif eth0 tcp dport domain accept comment <span class="s2">&quot;Resolución de nombres&quot;</span>
+    <span class="o">}</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</div>
+<div class="section" id="acceso-con-dns-propio">
+<h3>8.7.3.2.3.2.2. Acceso con <abbr title="Domain Name Server">DNS</abbr> propio<a class="headerlink" href="#acceso-con-dns-propio" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Al caso anterior, se añade un servidor <abbr title="Domain Name Server">DNS</abbr> para agilizar las consultas</p>
+<img alt="../../../_images/caso21.png" src="../../../_images/caso21.png" />
+<ul>
+<li><p class="first">Para permitir el acceso <abbr title="Domain Name Server">DNS</abbr> y el <abbr title="Security SHell">SSH</abbr>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/nftables.d/05-firewall.nft</span>
+
+table ip filter <span class="o">{</span>
+   chain INPUT <span class="o">{</span>
+      ct state established accept
+
+      iif eth1 tcp dport domain accept comment <span class="s2">&quot;Servicio DNS&quot;</span>
+      iif eth1 tcp dport domain accept comment <span class="s2">&quot;Servicio DNS&quot;</span>
+
+      iif eth1 tcp dport ssh accept comment <span class="s2">&quot;Administración SSH&quot;</span>
+   <span class="o">}</span>
+
+   chain OUTPUT <span class="o">{</span>
+      ct state established accept
+
+      oif eth0 tcp dport domain accept comment <span class="s2">&quot;Consulta DNS&quot;</span>
+      oif eth0 tcp dport domain accept comment <span class="s2">&quot;Consulta DNS&quot;</span>
+   <span class="o">}</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">Para permitir el tráfico web de los clientes:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/nftables.d/10-external.nft</span>
+
+table ip filter <span class="o">{</span>
+    chain FORWARD <span class="o">{</span>
+       ct state established accept
+
+       oif eth0 tcp dport <span class="o">{</span>http, https<span class="o">}</span> accept
+    <span class="o">}</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</div>
+<div class="section" id="acceso-mediante-squid-modo-transparente">
+<h3>8.7.3.2.3.2.3. Acceso mediante <strong class="program">squid</strong> (modo transparente)<a class="headerlink" href="#acceso-mediante-squid-modo-transparente" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>A la configuración anterior se añade que se quiere forzar a que la navegación no
+segura se haga a través de un proxy <strong class="program">squid</strong> configurado en modo
+transparente en el cortafuegos. Supóngase que el puerto de escucha de
+<strong class="program">squid</strong> es el <em>3128</em>.</p>
+<img alt="../../../_images/caso31.png" src="../../../_images/caso31.png" />
+<p>En este caso, para el tráfico <abbr title="HyperText Transfer Protocol">HTTP</abbr> (no el <abbr title="HyperText Transfer Protocol">HTTP</abbr>s) es en realidad el
+cortafuegos el que hace las consultas al exterior.</p>
+<ul>
+<li><p class="first">Accesos del servidor o al servidor:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/nftables.d/05-firewall.nft</span>
+
+table ip filter <span class="o">{</span>
+   chain INPUT <span class="o">{</span>
+      ct state established accept
+      ct status dnat accept
+
+      iif eth1 tcp dport domain accept comment <span class="s2">&quot;Servicio DNS&quot;</span>
+      iif eth1 tcp dport domain accept comment <span class="s2">&quot;Servicio DNS&quot;</span>
+
+      iif eth1 tcp dport ssh accept comment <span class="s2">&quot;Administración SSH&quot;</span>
+   <span class="o">}</span>
+
+   chain OUTPUT <span class="o">{</span>
+      ct state established accept
+
+      oif eth0 tcp dport http accept comment <span class="s2">&quot;Consultas web&quot;</span>
+      oif eth0 tcp dport domain accept comment <span class="s2">&quot;Consulta DNS&quot;</span>
+      oif eth0 tcp dport domain accept comment <span class="s2">&quot;Consulta DNS&quot;</span>
+   <span class="o">}</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">Accesos de la red interna al exterior:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/nftables.d/10-external.nft</span>
+
+table ip nat <span class="o">{</span>
+    chain PREROUTING <span class="o">{</span>
+       <span class="nb">type</span> nat hook prerouting priority dstnat
+
+       tcp dport http redirect to :3128  comment <span class="s2">&quot;Redirección a SQUID&quot;</span>
+    <span class="o">}</span>
+<span class="o">}</span>
+
+table ip filter <span class="o">{</span>
+    chain FORWARD <span class="o">{</span>
+       ct state established accept
+
+       oif eth0 tcp dport https accept comment <span class="s2">&quot;Acceso HTTPs al exterior&quot;</span>
+    <span class="o">}</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</div>
+<div class="section" id="acceso-mediante-squid-modo-directo">
+<h3>8.7.3.2.3.2.4. Acceso mediante <strong class="program">squid</strong> (modo directo)<a class="headerlink" href="#acceso-mediante-squid-modo-directo" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>La misma configuración, pero en este caso, <strong class="program">squid</strong> se configura en modo
+directo en el puerto <em>8080</em> tanto para tráfico web seguro como no seguro.</p>
+<img alt="../../../_images/caso41.png" src="../../../_images/caso41.png" />
+<p>En este caso no hay tráfico que atraviese el servidor ya que tanto las consultas
+<abbr title="Domain Name Server">DNS</abbr> como todas las consultas web las hace el servidor:</p>
+<blockquote>
+<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/nftables.d/05-firewall.nft</span>
+
+table ip filter <span class="o">{</span>
+   chain INPUT <span class="o">{</span>
+      ct state established accept
+
+      iif eth1 tcp dport domain accept comment <span class="s2">&quot;Servicio DNS&quot;</span>
+      iif eth1 tcp dport domain accept comment <span class="s2">&quot;Servicio DNS&quot;</span>
+
+      iif eth1 tcp dport http-alt accept comment <span class="s2">&quot;Acceso s SQUID&quot;</span>
+
+      iif eth1 tcp dport ssh accept comment <span class="s2">&quot;Administración SSH&quot;</span>
+   <span class="o">}</span>
+
+   chain OUTPUT <span class="o">{</span>
+      ct state established accept
+
+      oif eth0 tcp dport <span class="o">{</span>http, https<span class="o">}</span> accept comment <span class="s2">&quot;Consultas web&quot;</span>
+      oif eth0 tcp dport domain accept comment <span class="s2">&quot;Consulta DNS&quot;</span>
+      oif eth0 tcp dport domain accept comment <span class="s2">&quot;Consulta DNS&quot;</span>
+   <span class="o">}</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+</div></blockquote>
+</div>
+<div class="section" id="servidor-web-interno">
+<h3>8.7.3.2.3.2.5. Servidor web interno<a class="headerlink" href="#servidor-web-interno" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>El supuesto es parecido al primero (una red interna a la que se quiere permitir
+navegar), pero añade la existencia de un servidor web interno en <em>192.168.255.100</em>
+al que se quiere permitir acceso desde el exterior.</p>
+<img alt="../../../_images/caso51.png" src="../../../_images/caso51.png" />
+<p>A la configuración del primer supuesto, habrá que añadir la que permite el
+acceso al servidor web interno:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/nftables.d/25-servint.nft</span>
+
+table ip nat <span class="o">{</span>
+   chain PREROUTING <span class="o">{</span>
+      <span class="nb">type</span> nat hook prerouting priority dstnat
+
+      tcp dport <span class="o">{</span>http, https<span class="o">}</span> dnat to <span class="m">192</span>.168.255.100
+   <span class="o">}</span>
+<span class="o">}</span>
+
+table iip filter <span class="o">{</span>
+   chain FORWARD <span class="o">{</span>
+      ct status dnat accept
+   <span class="o">}</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="servidores-web-y-ftp-internos">
+<h3>8.7.3.2.3.2.6. Servidores web y <abbr title="File Transfer Protocol">FTP</abbr> internos<a class="headerlink" href="#servidores-web-y-ftp-internos" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Al caso anterior, añadimos un servidor <abbr title="File Transfer Protocol">FTP</abbr> n la misma máquina que el servidor
+web:</p>
+<img alt="../../../_images/caso61.png" src="../../../_images/caso61.png" />
+<p>Reescribimos el fichero anterior:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/nftables.d/25-servint.nft</span>
+
+table ip nat <span class="o">{</span>
+   chain PREROUTING <span class="o">{</span>
+      <span class="nb">type</span> nat hook prerouting priority dstnat
+
+      tcp dport <span class="o">{</span>ftp, http, https<span class="o">}</span> dnat to <span class="m">192</span>.168.255.100
+   <span class="o">}</span>
+<span class="o">}</span>
+
+table iip filter <span class="o">{</span>
+   ct helper ftp-standard <span class="o">{</span>
+      <span class="nb">type</span> <span class="s2">&quot;ftp&quot;</span> protocol tcp
+   <span class="o">}</span>
+
+   chain FORWARD <span class="o">{</span>
+      iif eth0 tcp dport ftp ct helper <span class="nb">set</span> <span class="s2">&quot;ftp-standard&quot;</span> accept
+      ct status dnat accept
+      ct state <span class="o">{</span>related, established<span class="o">}</span> accept
+   <span class="o">}</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+<p>Y, además, debemos cargar los <a class="reference internal" href="#nftables-modulos-ftp"><span class="std std-ref">módulos apropiados del núcleo</span></a>.</p>
+</div>
+</div>
 </div>
 
 
@@ -60,6 +628,28 @@
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
+  <h3><a href="../../../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">8.7.3.2.3. Uso práctico</a><ul>
+<li><a class="reference internal" href="#casos-ejemplares">8.7.3.2.3.1. Casos ejemplares</a><ul>
+<li><a class="reference internal" href="#conexion-a-servidor-generico">8.7.3.2.3.1.1. Conexión a servidor genérico</a></li>
+<li><a class="reference internal" href="#conexion-a-servidor-ftp">8.7.3.2.3.1.2. Conexión a servidor <abbr title="File Transfer Protocol">FTP</abbr></a></li>
+<li><a class="reference internal" href="#conexion-a-un-servidor-antipatico">8.7.3.2.3.1.3. Conexión a un servidor <em>antipático</em></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#casos-practicos">8.7.3.2.3.2. Casos prácticos</a><ul>
+<li><a class="reference internal" href="#acceso-simple">8.7.3.2.3.2.1. Acceso simple</a></li>
+<li><a class="reference internal" href="#acceso-con-dns-propio">8.7.3.2.3.2.2. Acceso con <abbr title="Domain Name Server">DNS</abbr> propio</a></li>
+<li><a class="reference internal" href="#acceso-mediante-squid-modo-transparente">8.7.3.2.3.2.3. Acceso mediante <strong class="program">squid</strong> (modo transparente)</a></li>
+<li><a class="reference internal" href="#acceso-mediante-squid-modo-directo">8.7.3.2.3.2.4. Acceso mediante <strong class="program">squid</strong> (modo directo)</a></li>
+<li><a class="reference internal" href="#servidor-web-interno">8.7.3.2.3.2.5. Servidor web interno</a></li>
+<li><a class="reference internal" href="#servidores-web-y-ftp-internos">8.7.3.2.3.2.6. Servidores web y <abbr title="File Transfer Protocol">FTP</abbr> internos</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
   <h4>Tema anterior</h4>
   <p class="topless"><a href="02.reglas.html"
                         title="capítulo anterior">8.7.3.2.2. Reglas</a></p>

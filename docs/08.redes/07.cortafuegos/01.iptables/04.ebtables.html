@@ -23,7 +23,7 @@
     
     <link rel="index" title="Índice" href="../../../genindex.html" />
     <link rel="search" title="Búsqueda" href="../../../search.html" />
-    <link rel="next" title="8.7.3.1.5. ARPtables" href="05.arptables.html" />
+    <link rel="next" title="8.7.3.1.5. |ARP|tables" href="05.arptables.html" />
     <link rel="prev" title="8.7.3.1.3. Extensiones" href="03.ext.html" /> 
   </head><body>
     <div class="related" role="navigation" aria-label="related navigation">
@@ -33,7 +33,7 @@
           <a href="../../../genindex.html" title="Índice General"
              accesskey="I">índice</a></li>
         <li class="right" >
-          <a href="05.arptables.html" title="8.7.3.1.5. ARPtables"
+          <a href="05.arptables.html" title="8.7.3.1.5. |ARP|tables"
              accesskey="N">siguiente</a> |</li>
         <li class="right" >
           <a href="03.ext.html" title="8.7.3.1.3. Extensiones"
@@ -52,7 +52,156 @@
             
   <div class="section" id="ebtables">
 <span id="id1"></span><h1>8.7.3.1.4. ebtables<a class="headerlink" href="#ebtables" title="Enlazar permanentemente con este título">¶</a></h1>
-<img alt="../../../_images/netfilter.png" id="ebables-flowchart" src="../../../_images/netfilter.png" />
+<p><strong class="command">ebtables</strong> tiene por propósito manipular un datagrama que accede o
+abandona nuestro servidor a través de una <a class="reference internal" href="../../03.bridge.html#bridge"><span class="std std-ref">interfaz bridge</span></a>. Es
+posible realizar muchas manipulaciones, pero nos centraremos básicamente en:</p>
+<ul class="simple">
+<li>Entender cómo funciona.</li>
+<li>Utilizarlo para conocer cuál es el puerto físico que visita el paquete cuando
+entra o sale por una <a class="reference internal" href="../../03.bridge.html#bridge"><span class="std std-ref">interfaz bridge</span></a>.</li>
+<li>Sacar el paquete del <em>bridge</em> para forzar su encaminamiento.</li>
+</ul>
+<div class="section" id="como-funciona">
+<h2>8.7.3.1.4.1. ¿Cómo funciona?<a class="headerlink" href="#como-funciona" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Para entender su funcionamiento, es imprescindible conocer cuál es el camino que
+sigue el paquete durante su procesamiento<a class="footnote-reference" href="#id4" id="id2">[1]</a>:</p>
+<img alt="../../../_images/ebtables.png" id="ebables-flowchart" src="../../../_images/ebtables.png" />
+<p>Obsérvese que cuando un paquete entra o sale por una interfaz por una
+<a class="reference internal" href="../../03.bridge.html#bridge"><span class="std std-ref">interfaz bridge</span></a> también atraviesa cadenas de <strong class="command">iptables</strong>
+en las que podremos hacer comprobaciones de procoolos de más alto nivel que los
+que permite <strong class="command">ebtables</strong>. En cambio, en estas cadenas es probable que
+tengamos dificultades para conocer por qué puerto físico del <em>bridge</em> entra o
+sale el paquete y tengamos que contentarnos con hacer comprobaciones sobre la
+interfaz <em>bridge</em> virtual. Sea como sea, el paso por estas cadenas está
+propiciado porque por defecto este parámetro del núcleo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> cat /proc/sys/net/bridge/bridge-nf-call-iptables
+<span class="go">1</span>
+</pre></div>
+</div>
+<p>lo habilitado por defecto. Si se deshabilita, dejarán de hacerse comprobaciones
+en estas cadenas y ninguna regla de <strong class="command">iptables</strong> afectará a los paquetes<a class="footnote-reference" href="#id5" id="id3">[2]</a>.</p>
+<p>Por lo demás, la lectura del diagrama es sencilla: hay que empezar a leer en el
+punto en que se encuentra el paquete entrante. Obsérvese que lo primero que se
+hace para saber qué flujo sera aplicable, es determinar si la interfaz de entrada es
+una <a class="reference internal" href="../../03.bridge.html#bridge"><span class="std std-ref">interfaz bridge</span></a>. Si no lo es, el flujo será el estudiado con
+<strong class="program">iptables</strong>. Así será hasta que salgamos de la cadena <em>POSTROUTING</em> en que
+podemos encontrarnos con que la interfaz de salida es un <em>bridge</em> y se podrá
+atravesar algunas cadenas de <strong class="command">ebtables</strong>.</p>
+<p>Si por el contrario, la interfaz de entrada sí era una interfaz <em>bridge</em>,
+entonces el flujo será distinto y podremos manipular el paquete/datagrama ora
+con ebtables, ora iptables. La cadena <em>BROUTING</em> permite dirigir el paquete
+hacia la interfaz física y que siga el flujo de un paquete encaminado, pero esto
+no nos interesa ahora, sino seguir el paquete hasta el momento en que se
+encuentra con la decisión de conmutación. El paquete atraverá el <em>bridge</em> si la
+dirección <abbr title="Media Access Control">MAC</abbr> de destino no es la de la interfaz <em>bridge</em>. Si por el contrario
+sí lo es, esto se debe bien a que el destino era la propia máquina, bien a que
+la máquina es la puerta de enlace hacia otra red. Por ello, tras atravesar la
+cadena <em>INPUT</em> de <strong class="command">ebtables</strong>, el paquete se encuentra con la decisión
+de encaminamiento y bien seguirá hacia la capa de aplicación para ser tratado
+por alguna aplicación, bien atravesará la máquina para llegar a la interfaz de
+salida por la que saldrá hacia otra red (la cual a su vez, podrá ser también una
+interfaz <em>bridge</em>).</p>
+</div>
+<div class="section" id="puerto-de-entrada-o-salida">
+<h2>8.7.3.1.4.2. Puerto de entrada o salida<a class="headerlink" href="#puerto-de-entrada-o-salida" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Supongamos el siguiente esquema:</p>
+<img alt="../../../_images/fw-brouter2.png" src="../../../_images/fw-brouter2.png" />
+<p>Con <strong class="command">iptables</strong> y su módulo <em>physdev</em> podremos determinar si el puerto
+físico de <em>br0</em> (o sea, <em>eth0</em> o <em>eth1</em>) sólo si el paquete no sale del puente,
+esto es si circula entre ambos puertos. Sin embargo, si el tráfico procede o se
+dirige a la otra red (esto es, si entra o sale por <em>eth2</em>), el módulo es
+absolutamente inútil y no llegaremos más que a saber que entra o sale por <em>br0</em>.
+Este es un caso en que <strong class="command">ebtables</strong> puede ayudarnos.</p>
+<p class="rubric">Entrada</p>
+<p>Por ejemplo, si nos interesa permitir el acceso <abbr title="Security SHell">SSH</abbr> al segmento 2, pero no al
+1:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> ebtables -A INPUT -i eth0 -p ipv4 -j mark --mark-set 0x1 --mark-target CONTINUE
+<span class="gp">#</span> iptables -A INPUT -m mark --mark 0x1 -p tcp --dport <span class="m">22</span> -j REJECT
+</pre></div>
+</div>
+<p class="rubric">Salida</p>
+<p>Por ejemplo, si queremos evitar que la <em>Red 2</em> acceda al <em>Segmento 2</em> de la <em>Red
+1</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> iptables -A FORWARD -i eth2 -p icmp -j MARK --set-mark 0x2
+<span class="gp">#</span> ebtables -A OUTPUT -o eth1 --mark 0x2 -j DROP
+</pre></div>
+</div>
+</div>
+<div class="section" id="captura-de-paquetes">
+<h2>8.7.3.1.4.3. Captura de paquetes<a class="headerlink" href="#captura-de-paquetes" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Añadamos al caso anterior una salida a internet:</p>
+<img alt="../../../_images/fw-brouter3.png" src="../../../_images/fw-brouter3.png" />
+<p>de modo que las máquinas del <em>Segmento 2</em> acceden a internet mediante un
+<em>router</em> situado en el <em>Segmento 1</em>. Como esto es así, a todas las máquinas de
+este segmento se les ha configurado como única puerta de enlace el <em>router</em>.
+Esto, sin embargo, es un problema si nuestra intención es que estas máquinas
+puedan acceder a la <em>Red 2</em>, ya que los paquetes atravesarán el cortafuegos sin
+que este los encamine hacia su destino. Podríamos, obviamente, añadir una entrada a
+la tabla de encaminamiento de las máquinas del <em>Segmento 2</em> o al propio
+<em>router</em>, pero existe otra solución y es hacer que <strong class="program">nerfilter</strong> fuerce
+el encaminamiento del paquete. Para ello tenemos dos posibilidades:</p>
+<ul>
+<li><p class="first">Usar el enganche en <em>brouting</em> y obrar de este modo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span>  ebtables -t broute -A BROUTING -i eth1 -p ipv4 --ip-dst <span class="m">192</span>.168.254.0/24 -j redirect --redirect-target DROP
+</pre></div>
+</div>
+<p>que significa que para paquetes cuya dirección sea la <em>Red 2</em>, s obra una
+redirección que consiste en sustituir la <abbr title="Media Access Control">MAC</abbr> de destino del router por la
+<abbr title="Media Access Control">MAC</abbr> del propio puente y, a continuación, sacar el apquete del flujo
+conmutado.</p>
+</li>
+<li><p class="first">Redireccionar en <em>PREROUTING</em> hacia la propia máquina:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> ebtables -t nat -A PREROUTING --logical-in br0 -p ipv4 --ip-dst <span class="m">192</span>.168.254.0/24 -j redirect --redirect-target ACCEPT
+</pre></div>
+</div>
+<p>La diferencia con la solución anterior es que en este caso <strong class="command">iptables</strong>
+entenderá el paquete como proviniente de <em>br0</em>, mientras que el primero lo
+entenderá proviviente de <em>eth1</em>.</p>
+</li>
+</ul>
+</div>
+<div class="section" id="recetas">
+<span id="ebtables-recetas"></span><h2>8.7.3.1.4.4. Recetas<a class="headerlink" href="#recetas" title="Enlazar permanentemente con este título">¶</a></h2>
+<ul>
+<li><p class="first">Responder automáticamente a una petición ARP con una determinada dirección
+MAC:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> ebtables -t nat -A PREROUTING --logical-in br0 -p arp --arp-ip-dst <span class="m">192</span>.168.255.100 <span class="se">\</span>
+   --arp-opcode Request -j arpreply --arpreply-mac <span class="m">00</span>:11:22:33:44:55
+</pre></div>
+</div>
+</li>
+<li><p class="first">Comunicarse exclusivamente con un máquina impidiendo el tráfico ARP:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> ebtables -A OUTPUT --logical-out br0 -p arp --arp-ip-dst ! <span class="m">192</span>.168.255.2 -j DROP
+<span class="gp">#</span> ebtables -A INPUT --logical-in br0 -p arp --arp-ip-src ! <span class="m">192</span>.168.255.2 -j DROP
+</pre></div>
+</div>
+</li>
+<li><p class="first">Fijar la relación entre una <abbr title="Internet Protocol">IP</abbr> y una <abbr title="Media Access Control">MAC</abbr> para impedir el envenamiento <abbr title="Address Resolution Protocol">ARP</abbr> (se
+hace apunte, además, en los log del sistema):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> ebtables -A INPUT --logical-in br0 -p arp --arp-ip-src <span class="m">192</span>.168.255.2 -s !  <span class="m">00</span>:11:22:33:44:55 <span class="se">\</span>
+    --log-arp --log-prefix <span class="s2">&quot;ARP SPOOFING: &quot;</span> -j DROP
+</pre></div>
+</div>
+</li>
+</ul>
+<p class="rubric">Notas al pie</p>
+<table class="docutils footnote" frame="void" id="id4" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id2">[1]</a></td><td>Recuerde que el esquema sólo es válido para el <strong class="command">ebtables</strong>
+genuino, o sea, para el presente en <em>Linux</em> más antiguos o la versión
+<em>legacy</em> en los más recientes.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id5" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id3">[2]</a></td><td>Con <strong class="program">nftables</strong> el <a class="reference internal" href="../index.html#netfilter-hooks"><span class="std std-ref">flujo es distinto</span></a>
+y todo lo comentado deja de tener sentido (incluido el parámetro, que no
+existirá).</td></tr>
+</tbody>
+</table>
+</div>
 </div>
 
 
@@ -61,12 +210,23 @@
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
+  <h3><a href="../../../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">8.7.3.1.4. ebtables</a><ul>
+<li><a class="reference internal" href="#como-funciona">8.7.3.1.4.1. ¿Cómo funciona?</a></li>
+<li><a class="reference internal" href="#puerto-de-entrada-o-salida">8.7.3.1.4.2. Puerto de entrada o salida</a></li>
+<li><a class="reference internal" href="#captura-de-paquetes">8.7.3.1.4.3. Captura de paquetes</a></li>
+<li><a class="reference internal" href="#recetas">8.7.3.1.4.4. Recetas</a></li>
+</ul>
+</li>
+</ul>
+
   <h4>Tema anterior</h4>
   <p class="topless"><a href="03.ext.html"
                         title="capítulo anterior">8.7.3.1.3. Extensiones</a></p>
   <h4>Próximo tema</h4>
   <p class="topless"><a href="05.arptables.html"
-                        title="próximo capítulo">8.7.3.1.5. ARPtables</a></p>
+                        title="próximo capítulo">8.7.3.1.5. |ARP|tables</a></p>
   <div role="note" aria-label="source link">
     <h3>Esta página</h3>
     <ul class="this-page-menu">
@@ -97,7 +257,7 @@
           <a href="../../../genindex.html" title="Índice General"
              >índice</a></li>
         <li class="right" >
-          <a href="05.arptables.html" title="8.7.3.1.5. ARPtables"
+          <a href="05.arptables.html" title="8.7.3.1.5. |ARP|tables"
              >siguiente</a> |</li>
         <li class="right" >
           <a href="03.ext.html" title="8.7.3.1.3. Extensiones"

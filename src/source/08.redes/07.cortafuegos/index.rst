@@ -227,6 +227,17 @@ es indispensable tener claros los siguientes conceptos:
    #. Como el cliente es externo, alcanzará el enganche *postrouting*.
    #. Si la interfaz de salida no es un *bridge*, saldrá por ella\ [#]_.
 
+   .. warning:: El diagrama de flujo dibujado es el utilizado cuando se usa
+      :program:`nftables` y se cargan sus módulos correspondientes del núcleo.
+      En *linux* antiguos, o cuando se usen las versiones *legacy* de la suite de
+      :program:`iptables` en los nuevos, se cargan otros módulos distintos
+      (*xf_\**) y es
+      probable que el esquema de flujo se asemeje más `al de Jan Engelhardt para
+      la Wikipedia
+      <https://commons.wikimedia.org/wiki/File:Netfilter-packet-flow.svg>`_.
+      Mientras no tengamos :ref:`interfaces bridge <bridge>` en nuestro servidor
+      es probable que las diferencias no sean relevantes.
+
 .. _netfilter-tables:
 
 :dfn:`Tabla` (*table*)
@@ -314,14 +325,14 @@ sintaxis y en la mayor indefinición inicial de :program:`nftables`.
 
 .. [#] Este diagrama no coincide exactamente con `el que proporciona Jan
    Engelhardt en la Wikipedia
-   <https://commons.wikimedia.org/wiki/File:Netfilter-packet-flow.svg>`_,
-   pero las pruebas corroboran que es más fiable el redibujado, como el autor
-   original advierte en su *wiki*. Para hacer usted mismo las pruebas puede
-   tomar un *Linux* con su interfaz física conectada a una interfaz *bridge*,
-   cargar :download:`estas reglas <files/nftables-flow>`, y enviar un paquete
-   |ICMP| a la máquina y enviar otro desde ella. El orden de paso por las
-   cadenas (y en consecuencia por los enganches) debe quedar reflejado en el
-   registro del sistema.
+   <https://commons.wikimedia.org/wiki/File:Netfilter-packet-flow.svg>`_, pero
+   las pruebas corroboran que es más fiable el de Croac, como el mismo autor
+   advierte en su *wiki*. Para hacer usted mismo las pruebas puede tomar un
+   *Linux* con su interfaz física conectada a una interfaz *bridge*, cargar
+   :download:`estas reglas <files/nftables-flow>`, y enviar un paquete |ICMP| a
+   la máquina y enviar otro desde ella. El orden de paso por las cadenas (y en
+   consecuencia por los enganches) debe quedar reflejado en el registro del
+   sistema.
 
 .. [#] En *egress qdisc* es el momento de aplicar las políticas de :ref:`calidad de
    servicio <qos>`.
