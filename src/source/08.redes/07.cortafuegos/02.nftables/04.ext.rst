@@ -371,17 +371,30 @@ que obrar. Consideraremos una política de *lista blanca* en nuestro servidor:
 
 hashlimit
 ---------
-El módulo *hashlimit* de :program:`iptables` permite limitar el flujo de paquete
-según cual sea el origen o destino de las conexión. A diferencia de *limit*, que
-limita el flujo de paquetes global. Para implementar esta funcionalidad en
-:program:`nftables` basta con utilizar *limit* en conjunción con los conjuntos
-dinámicos y la concatenación. Por ejemplo, para limitar la descarga a través de
-|SSH| con cada cliente podemos hacer::
+El :ref:`módulo hashlimit de iptables <iptables-limit>` permite limitar el
+flujo de paquete según cuál sea el origen o destino de las conexión. A
+diferencia de *limit*, que limita el flujo de paquetes global. Para implementar
+esta funcionalidad en :program:`nftables` basta con utilizar *limit* en
+conjunción con los conjuntos dinámicos y la concatenación. Por ejemplo, para
+limitar la descarga a través de |SSH| con cada cliente podemos hacer::
 
    # nft add rule filter OUTPUT tcp sport ssh \
       meter sshlimit size 65535 {tcp sport . ip daddr timeout 10s limit rate over 100kbytes/second} drop
 
 que limitará a 100 KiB/s el tráfico de descarga para cada uno de los clientes.
+
+.. note:: :program:`nftables` no tiene ningún equivalente exacto para el
+   :ref:`modulo recent de iptables <iptables-recent>`, pero usar esta técnica se
+   aproxima mucho. Recordemos que *recent* permite comprobar si en un periodo de
+   tiempo determinado se ha accedido un determinado número de veces (p.e. haber
+   accedido más de 5 veces al servicio |SSH| en el último minito). Aplicando
+   conjuntos dinámicos podríamos establecer un caudal límite de 5 conexiones por
+   minuto con una ráfaga de 5. No es exactamente lo mismo, porque si
+   inmediatamente consumimos las 5 conexiones, con *recent* deberíamos esperar
+   el minuto entero, mientras que aplicando el caudal límite no debemos esperar
+   el minuto completo, sino que a los veinte segundos ya podríamos establecer
+   una conexión más. Véase la aplicación de estas técnicas para evitar
+   :ref:`ataques de fuerza bruta con nftables <nftables-bruta>`.
 
 .. _nftables-flowtables:
 
@@ -468,11 +481,7 @@ de *eth0*, seguiríamos pudiendo acelerar la intermediación de los paquetes::
 
 Zonas
 *****
-
-.. _nftables-recent:
-
-Emulación de recent
-*******************
+.. https://serverfault.com/questions/741104/iptables-redirect-works-only-for-first-packet/741108
 
 .. _nftables-bridge:
 
