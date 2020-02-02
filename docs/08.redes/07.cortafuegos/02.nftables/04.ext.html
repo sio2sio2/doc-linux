@@ -449,17 +449,32 @@ implementación con <em>dynamic</em> es trivial.</p>
 </div>
 <div class="section" id="hashlimit">
 <span id="nftables-hashlimit"></span><h4>8.7.3.2.4.2.5.2. hashlimit<a class="headerlink" href="#hashlimit" title="Enlazar permanentemente con este título">¶</a></h4>
-<p>El módulo <em>hashlimit</em> de <strong class="program">iptables</strong> permite limitar el flujo de paquete
-según cual sea el origen o destino de las conexión. A diferencia de <em>limit</em>, que
-limita el flujo de paquetes global. Para implementar esta funcionalidad en
-<strong class="program">nftables</strong> basta con utilizar <em>limit</em> en conjunción con los conjuntos
-dinámicos y la concatenación. Por ejemplo, para limitar la descarga a través de
-<abbr title="Security SHell">SSH</abbr> con cada cliente podemos hacer:</p>
+<p>El <a class="reference internal" href="../01.iptables/03.ext.html#iptables-limit"><span class="std std-ref">módulo hashlimit de iptables</span></a> permite limitar el
+flujo de paquete según cuál sea el origen o destino de las conexión. A
+diferencia de <em>limit</em>, que limita el flujo de paquetes global. Para implementar
+esta funcionalidad en <strong class="program">nftables</strong> basta con utilizar <em>limit</em> en
+conjunción con los conjuntos dinámicos y la concatenación. Por ejemplo, para
+limitar la descarga a través de <abbr title="Security SHell">SSH</abbr> con cada cliente podemos hacer:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add rule filter OUTPUT tcp sport ssh <span class="se">\</span>
    meter sshlimit size <span class="m">65535</span> <span class="o">{</span>tcp sport . ip daddr timeout 10s limit rate over 100kbytes/second<span class="o">}</span> drop
 </pre></div>
 </div>
 <p>que limitará a 100 KiB/s el tráfico de descarga para cada uno de los clientes.</p>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last"><strong class="program">nftables</strong> no tiene ningún equivalente exacto para el
+<a class="reference internal" href="../01.iptables/03.ext.html#iptables-recent"><span class="std std-ref">modulo recent de iptables</span></a>, pero usar esta técnica se
+aproxima mucho. Recordemos que <em>recent</em> permite comprobar si en un periodo de
+tiempo determinado se ha accedido un determinado número de veces (p.e. haber
+accedido más de 5 veces al servicio <abbr title="Security SHell">SSH</abbr> en el último minito). Aplicando
+conjuntos dinámicos podríamos establecer un caudal límite de 5 conexiones por
+minuto con una ráfaga de 5. No es exactamente lo mismo, porque si
+inmediatamente consumimos las 5 conexiones, con <em>recent</em> deberíamos esperar
+el minuto entero, mientras que aplicando el caudal límite no debemos esperar
+el minuto completo, sino que a los veinte segundos ya podríamos establecer
+una conexión más. Véase la aplicación de estas técnicas para evitar
+<a class="reference internal" href="../../99.ataques/02.tecnicas/03.brute.html#nftables-bruta"><span class="std std-ref">ataques de fuerza bruta con nftables</span></a>.</p>
+</div>
 </div>
 </div>
 <div class="section" id="flowtables">
@@ -540,11 +555,8 @@ de <em>eth0</em>, seguiríamos pudiendo acelerar la intermediación de los paque
 <div class="section" id="zonas">
 <span id="nftables-zones"></span><h2>8.7.3.2.4.3. Zonas<a class="headerlink" href="#zonas" title="Enlazar permanentemente con este título">¶</a></h2>
 </div>
-<div class="section" id="emulacion-de-recent">
-<span id="nftables-recent"></span><h2>8.7.3.2.4.4. Emulación de recent<a class="headerlink" href="#emulacion-de-recent" title="Enlazar permanentemente con este título">¶</a></h2>
-</div>
 <div class="section" id="bridges">
-<span id="nftables-bridge"></span><h2>8.7.3.2.4.5. Bridges<a class="headerlink" href="#bridges" title="Enlazar permanentemente con este título">¶</a></h2>
+<span id="nftables-bridge"></span><h2>8.7.3.2.4.4. Bridges<a class="headerlink" href="#bridges" title="Enlazar permanentemente con este título">¶</a></h2>
 <p>El tratamiento de las <a class="reference internal" href="../../03.bridge.html#bridge"><span class="std std-ref">interfaces bridge</span></a> se hace también con
 <strong class="command">nft</strong>. Ahora bien, si se observa el <a class="reference internal" href="../index.html#netfilter-hooks"><span class="std std-ref">diagrama de flujo</span></a> (eliminando el flujo para tráfico <abbr title="Address Resolution Protocol">ARP</abbr>):</p>
 <img alt="../../../_images/ebtables1.png" src="../../../_images/ebtables1.png" />
@@ -623,7 +635,7 @@ Véase <a class="reference external" href="https://wiki.nftables.org/wiki-nftabl
 </div>
 </div>
 <div class="section" id="trafico-arp">
-<span id="nftables-arp"></span><h2>8.7.3.2.4.6. Tráfico <abbr title="Address Resolution Protocol">ARP</abbr><a class="headerlink" href="#trafico-arp" title="Enlazar permanentemente con este título">¶</a></h2>
+<span id="nftables-arp"></span><h2>8.7.3.2.4.5. Tráfico <abbr title="Address Resolution Protocol">ARP</abbr><a class="headerlink" href="#trafico-arp" title="Enlazar permanentemente con este título">¶</a></h2>
 <p>Lo que podemos hacer con este tráfico es, básicamente, dejar de responder a
 peticiones <abbr title="Address Resolution Protocol">ARP</abbr> o evitar aceptar respuestas <abbr title="Address Resolution Protocol">ARP</abbr>.</p>
 <img alt="../../../_images/arptables.png" src="../../../_images/arptables.png" />
@@ -705,9 +717,8 @@ peticiones <abbr title="Address Resolution Protocol">ARP</abbr> o evitar aceptar
 </ul>
 </li>
 <li><a class="reference internal" href="#zonas">8.7.3.2.4.3. Zonas</a></li>
-<li><a class="reference internal" href="#emulacion-de-recent">8.7.3.2.4.4. Emulación de recent</a></li>
-<li><a class="reference internal" href="#bridges">8.7.3.2.4.5. Bridges</a></li>
-<li><a class="reference internal" href="#trafico-arp">8.7.3.2.4.6. Tráfico <abbr title="Address Resolution Protocol">ARP</abbr></a></li>
+<li><a class="reference internal" href="#bridges">8.7.3.2.4.4. Bridges</a></li>
+<li><a class="reference internal" href="#trafico-arp">8.7.3.2.4.5. Tráfico <abbr title="Address Resolution Protocol">ARP</abbr></a></li>
 </ul>
 </li>
 </ul>

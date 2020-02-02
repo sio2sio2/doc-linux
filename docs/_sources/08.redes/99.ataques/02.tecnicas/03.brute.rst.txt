@@ -412,12 +412,13 @@ De los métodos de ataque anteriores, debemos de entresacar dos enseñanzas:
      pero no al servidor web. Este mecanismo de veto era el que usaba
      denyhosts_\ [#]_.
 
-     **Cortafuegos** (por lo general, :ref:`iptables <iptables>`)
-      Consiste en crear reglas para las máquinas sospechosas que impidan el
-      acceso a los servicios disponibles. El mecanismo es mucho más versátil ya
-      que se podrá aplicar a servicios individuales y será aplicable a todo
-      servicio\ [#]_. Las soluciones con :ref:`el módulo recent de iptables
-      <ipt-limit>` y :ref:`fail2ban <fail2ban>` usan esta técnica.
+     **Cortafuegos** (por lo general, :ref:`iptables <iptables>` o
+     :ref:`nftables <nftables>`). Consiste en crear reglas para las máquinas
+     sospechosas que impidan el acceso a los servicios disponibles. El mecanismo
+     es mucho más versátil ya que se podrá aplicar a servicios individuales y
+     será aplicable a todo servicio\ [#]_. Las soluciones con :ref:`el módulo
+     recent de iptables <ipt-limit>` y :ref:`fail2ban <fail2ban>` usan esta
+     técnica.
 
      .. note:: Se use uno u otro mecanismo, las listas de direcciones vetadas
         son dinámicas, así que debe habilitarse algún medio para
@@ -579,10 +580,65 @@ antes hacer :download:`lo siguiente <files/ssh.sh>`:
    .. literalinclude:: files/port-knocking-1
       :language: bash
 
+.. _nftables-bruta:
+
 nftables
 ========
+Como habrá que ir jubilando el viejo :ref:`iptables <iptables>`, es preciso
+buscar alternativas con :program:`nftables`.
 
-.. todo:: Por estudiar las soluciones equivalentes con :ref:`nftables
+Limitación de accesos
+---------------------
+Mediante el uso de la :ref:`limitación del caudal <nftables-limit>` y los :ref:`conjuntos
+dinámicos <nftables-meters>`, puede definirse una limitación efectiva. Es
+conveniente, además, que lea las consideración vertidas en el :ref:`epígrafe
+correspondiente para la implementación con iptables <ipt-limit>`, porque son
+pertinentes también para nftables.
+
+Como en aquel epígrafe, prepararemos una solución para proteger los servicios
+|SMTP| y |SSH|. Partiremos de que tomamos como base la :ref:`política de lista
+blanca propuesta para la resolución de los casos de uso <nftables-lista-blanca>`
+a la cual añadimos :download:`este fíchero que implementa la defensa
+<files/nftables-brute.nft>`:
+
+.. literalinclude:: files/nftables-brute.nft
+   :language: bash
+
+Posteriormente, en el fichero en que definamos los servicios accesibles podemos
+escribir algo como esto::
+
+   # /etc/nftables/90-whitelist.nft
+
+   table ip filter {
+      set protected_ports {
+         type inet_service
+         flags constant
+         elements = {
+            ssh,
+            urd,
+            submission 
+         }
+      }
+
+      chain OUTPUT {
+         ct state {established, related} accept
+      }
+
+      chain INPUT {
+         ct state {established, related} accept
+
+         tcp dport @protected goto PROTECTOR comment "Servicios protegidos contra fuerza bruta"
+         tcp dport {http, https} accept comment "Servicio WEB"  # Servicio no protegido
+      }
+   }
+
+port-knocking
+-------------
+
+.. Bug: https://bugzilla.netfilter.org/show_bug.cgi?id=1249
+   delete: https://lwn.net/Articles/806177/
+
+.. todo:: Por estudiar la solución equivalente con :ref:`nftables
    <nftables>`.
 
 .. _fail2ban:
