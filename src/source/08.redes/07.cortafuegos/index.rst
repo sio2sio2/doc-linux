@@ -24,13 +24,14 @@ largo de transición. A partir de la versión *2.4* del núcleo, el *framework*
 para manejo de paquetes pasó a ser :program:`netfilter` y como herramienta de
 espacio de usuario se creó la familia de aplicaciones de :program:`iptables`
 (:command:`iptables`, :command:`ip6tables`, :command:`ebtables` y
-:command:`arptables`). En 2009, sin embargo, se lanzó una nueva herramienta de
-espacio de usuario llamada :program:`nftables` que promete mejor rendimiento,
-mayor claridad de sintaxis y evitar la duplicidad de código. Durante bastantes
-años\ [#]_, esta nueva herramienta ha convivido a la sombra de
-:program:`iptables`, pero las distribuciones modernas han optado ya por
-adoptarla como herramienta oficial (*Debian* desde *Buster*) por lo que su
-estudio es, más que aconsejable, obligatorio
+:command:`arptables`), a veces referidas en su conjunto como :program:`xtables`.
+En 2009, sin embargo, se lanzó una nueva herramienta de espacio de usuario
+llamada :program:`nftables` que promete mejor rendimiento, mayor claridad de
+sintaxis y evitar la duplicidad de código. Durante bastantes años\ [#]_, esta
+nueva herramienta ha convivido a la sombra de :program:`xtables`, pero las
+distribuciones modernas han optado ya por adoptarla como herramienta oficial
+(*Debian* desde *Buster*) por lo que su estudio es, más que aconsejable,
+obligatorio
 
 El conocimiento de la suite de programas de :program:`iptables`, no obstante, no
 es inútil por varias razones:
@@ -74,11 +75,11 @@ es indispensable tener claros los siguientes conceptos:
        ip6        ip6tables       |IP|\ v6.
        inet       {ip,ip6}tables  Las dos familias anteriores.
        arp        arptables       Tráfico |ARP|.
-       bridge     ebtables        Tráfico que atraviesa interfaces *bridge*.
+       bridge     ebtables        Tráfico que atraviesa :ref:`interfaces bridge <bridge>`.
        netdev     \-              Tráfico que acaba de procesar la tarjeta de red.
       ========== =============== ==========================================================
 
-   Una diferencia evidente entre :program:`nftables` e :program:`iptables` es que
+   Una diferencia evidente entre :program:`nftables` y :program:`xtables` es que
    el primero maneja todos los tipos de tráfico con una única aplicación
    (:command:`nft`), mientras que con el segundo se usa distinto programa según
    el tipo de tráfico.
@@ -213,7 +214,8 @@ es indispensable tener claros los siguientes conceptos:
 
    #. Entrará por la interfaz fisica.
    #. Como no es tráfico |ARP|, pasará por el enganche *ingress*.
-   #. Si la interfaz física no estaba asociada a una interfaz *bridge*,
+   #. Si la interfaz física no estaba asociada a una :ref:`interfaz bridge
+      <bridge>`,
       alcanzará el enganche *prerouting* naranja pálido.
    #. Como somos el destino del paquete (la |IP| de destino coincide con nuestra
       direccion |IP|), el paquete llegará al enganche *input*.
@@ -227,16 +229,15 @@ es indispensable tener claros los siguientes conceptos:
    #. Como el cliente es externo, alcanzará el enganche *postrouting*.
    #. Si la interfaz de salida no es un *bridge*, saldrá por ella\ [#]_.
 
-   .. warning:: El diagrama de flujo dibujado es el utilizado cuando se usa
-      :program:`nftables` y se cargan sus módulos correspondientes del núcleo.
-      En *linux* antiguos, o cuando se usen las versiones *legacy* de la suite de
-      :program:`iptables` en los nuevos, se cargan otros módulos distintos
-      (*xf_\**) y es
-      probable que el esquema de flujo se asemeje más `al de Jan Engelhardt para
-      la Wikipedia
+   .. warning:: El diagrama de flujo dibujado es el utilizado por los módulos
+      con los que opera :program:`nftables`. En :program:`xtables`, o sea, 
+      en *Linux* antiguos o si se usan las versiones *legacy* del cortafuegos
+      en los modernos,, los módulos *xf_\**, utilizan un esquema de flujo
+      distinto que es `el dibujado por Jan Engelhardt para la Wikipedia
       <https://commons.wikimedia.org/wiki/File:Netfilter-packet-flow.svg>`_.
-      Mientras no tengamos :ref:`interfaces bridge <bridge>` en nuestro servidor
-      es probable que las diferencias no sean relevantes.
+      En cualquier caso, mientras no lidiemos con tráfico |ARP| o tráfico
+      de :ref:`interfaces bridge <bridge>` es probable que las diferencias no
+      sean relevantes.
 
 .. _netfilter-tables:
 
@@ -276,7 +277,7 @@ cliente y servidor es *NEW* y el resto *ESTABLISHED*.
 
 Herramientas de usuario
 =======================
-Ya se ha indicado que existes dos: la antigua :program:`iptables` y su sustituta
+Ya se ha indicado que existes dos: la antigua :program:`xtables` y su sustituta
 :program:`nftables`. Ambas toman los conceptos anteriores dado que utilizan el
 mismo *framework*, por lo que tienen mucho en común, pero difieren en la
 sintaxis y en la mayor indefinición inicial de :program:`nftables`.
@@ -309,7 +310,7 @@ sintaxis y en la mayor indefinición inicial de :program:`nftables`.
    :command:`nft`.
 
 .. [#] La existencia de estas prioridades predefinidas deriva de que en
-   en :program:`iptables` las cadenas ya están definidas y, en consecuencia,
+   en :program:`xtables` las cadenas ya están definidas y, en consecuencia,
    también se encuentan `predefinidas las prioridades de éstas
    <https://wiki.nftables.org/wiki-nftables/index.php/Configuring_chains#Base_chain_priority>`_.
    En :program:`nftables` no es así y puede usarse cualquier número, pero a

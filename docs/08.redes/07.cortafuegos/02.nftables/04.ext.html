@@ -23,7 +23,7 @@
     
     <link rel="index" title="Índice" href="../../../genindex.html" />
     <link rel="search" title="Búsqueda" href="../../../search.html" />
-    <link rel="next" title="8.7.3.2.5. Bridges" href="05.bridge.html" />
+    <link rel="next" title="8.8. Calidad de servicio" href="../../08.qos/index.html" />
     <link rel="prev" title="8.7.3.2.3. Uso práctico" href="03.conn.html" /> 
   </head><body>
     <div class="related" role="navigation" aria-label="related navigation">
@@ -33,7 +33,7 @@
           <a href="../../../genindex.html" title="Índice General"
              accesskey="I">índice</a></li>
         <li class="right" >
-          <a href="05.bridge.html" title="8.7.3.2.5. Bridges"
+          <a href="../../08.qos/index.html" title="8.8. Calidad de servicio"
              accesskey="N">siguiente</a> |</li>
         <li class="right" >
           <a href="03.conn.html" title="8.7.3.2.3. Uso práctico"
@@ -52,8 +52,87 @@
             
   <div class="section" id="uso-avanzado">
 <h1>8.7.3.2.4. Uso avanzado<a class="headerlink" href="#uso-avanzado" title="Enlazar permanentemente con este título">¶</a></h1>
+<div class="section" id="marcas">
+<span id="nftables-marcas"></span><h2>8.7.3.2.4.1. Marcas<a class="headerlink" href="#marcas" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Las <em class="dfn">marcas</em> son señales que pueden establecerse sobre los paquetes a fin
+de reconocerlos más adelante en el flujo. Por ejemplo, en un enganche de la
+familia <em>bridge</em> somos capaces de reconocer cuál es la interfaz física (el
+puerto) por el que entró un paquete, mientras que un enganche de la familia
+<em>ip</em>, sólo somos capaces de reconocer la <a class="reference internal" href="../../03.bridge.html#bridge"><span class="std std-ref">interfaz bridge</span></a>
+virtual. Si marcamos los paquetes en el primer enganche, seremos capaces de
+reconocer el puerto de entrada en el segundo consultando la marca.</p>
+<p>Hay dos tipos de marcas:</p>
+<ul class="simple">
+<li>La <em class="dfn">marca de paquete</em> que es aquella que se establece individualmente
+para cada paquete. En realidad, las marcas no se escriben sobre el propio
+paquete, sino sobre su representación en <strong class="program">netfilter</strong>, por lo que no
+podrá ser consultada fuera del propio cortafuegos.</li>
+<li>La <em class="dfn">marca de conexión</em> que es aquella que se establece sobre la conexión
+a la que pertenece un paquete. En consecuencia, es consultable desde el resto
+de paquetes que pertenecen a la marca. Es común que se establezca en un
+enganche de tipo <em>nat</em> en el primer paquete.</li>
+</ul>
+<table border="1" class="nftables-matches docutils">
+<colgroup>
+<col width="15%" />
+<col width="21%" />
+<col width="64%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Criterio</th>
+<th class="head">Argumento</th>
+<th class="head">Descripción</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td rowspan="4">meta</td>
+<td rowspan="2">mark</td>
+<td>Comprueba la marca del paquete.</td>
+</tr>
+<tr class="row-odd"><td>meta mark 0x1</td>
+</tr>
+<tr class="row-even"><td rowspan="2">mark set</td>
+<td>Establece la marca sobre el paquete.</td>
+</tr>
+<tr class="row-odd"><td>meta mark set 0x1</td>
+</tr>
+<tr class="row-even"><td rowspan="4">ct</td>
+<td rowspan="2">mark</td>
+<td>Comprueba la marca de la comexión.</td>
+</tr>
+<tr class="row-odd"><td>ct mark 0x1</td>
+</tr>
+<tr class="row-even"><td rowspan="2">mark set</td>
+<td>Establece la marca sobre la conexión.</td>
+</tr>
+<tr class="row-odd"><td>ct mark set 0x1</td>
+</tr>
+</tbody>
+</table>
+<p>Por ejemplo, si queremos limitar el caudal de tráfico <abbr title="Security SHell">SSH</abbr>, pero sólo de los
+clientes que se conectan a nuestro servidor por <em>eth0</em>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>table netdev filter <span class="o">{</span>
+   chain INGRESS <span class="o">{</span>
+      <span class="nb">type</span> filter hook ingres device eth0 priority filter
+
+      tcp dport ssh meta mark <span class="nb">set</span> <span class="m">1</span>
+   <span class="o">}</span>
+
+   chain INPUT <span class="o">{</span>
+      <span class="nb">type</span> filter hook input priority filter
+
+      meta mark <span class="m">1</span> limit over <span class="m">512</span> kbytes/second drop
+   <span class="o">}</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="colecciones">
+<h2>8.7.3.2.4.2. Colecciones<a class="headerlink" href="#colecciones" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Incluimos bajo este epígrafe las herramientas de que dispone <strong class="program">nftables</strong>
+para agrupar elementos</p>
 <div class="section" id="conjuntos">
-<span id="nftables-sets"></span><h2>8.7.3.2.4.1. Conjuntos<a class="headerlink" href="#conjuntos" title="Enlazar permanentemente con este título">¶</a></h2>
+<span id="nftables-sets"></span><h3>8.7.3.2.4.2.1. Conjuntos<a class="headerlink" href="#conjuntos" title="Enlazar permanentemente con este título">¶</a></h3>
 <p>En <strong class="program">nftables</strong> hay dos tipos de conjuntos:</p>
 <ul>
 <li><p class="first"><strong>Anónimos</strong> que son aquellos invariables que se añaden directamente a las
@@ -199,7 +278,7 @@ fijar un tamaño máximo y un tiempo de vida del elemento en el conjunto.</p>
 <p>siempre y cuando no estén vinculados a ninguna regla.</p>
 </div>
 <div class="section" id="concatenaciones">
-<span id="nftables-concat"></span><h2>8.7.3.2.4.2. Concatenaciones<a class="headerlink" href="#concatenaciones" title="Enlazar permanentemente con este título">¶</a></h2>
+<span id="nftables-concat"></span><h3>8.7.3.2.4.2.2. Concatenaciones<a class="headerlink" href="#concatenaciones" title="Enlazar permanentemente con este título">¶</a></h3>
 <p>Las <em class="dfn">concatenaciones</em> permiten agrupar selectores (o sea, condiciones) para
 tratarlas de modo conjunto. Como operador se usa el punto («.»). Por ejemplo:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add filter FORWARD ip saddr . ip daddr <span class="o">{</span><span class="m">10</span>.0.0.4 . <span class="m">10</span>.0.0.8, <span class="m">10</span>.0.0.5 . <span class="m">10</span>.0.0.10<span class="o">}</span> counter
@@ -222,7 +301,7 @@ nftables</a>.</p>
 </div>
 </div>
 <div class="section" id="mapas">
-<span id="nftables-maps"></span><h2>8.7.3.2.4.3. Mapas<a class="headerlink" href="#mapas" title="Enlazar permanentemente con este título">¶</a></h2>
+<span id="nftables-maps"></span><h3>8.7.3.2.4.2.3. Mapas<a class="headerlink" href="#mapas" title="Enlazar permanentemente con este título">¶</a></h3>
 <p>Los <em class="dfn">mapas</em> son conjuntos de valores a los que se accede a través de una clave.
 Como en el caso de los conjuntos:</p>
 <ul class="simple">
@@ -251,7 +330,7 @@ segundo de mapa con nombre don se requiere hacer algunas definiciones previas:</
 </div>
 </div>
 <div class="section" id="diccionarios">
-<span id="nftables-vmap"></span><h2>8.7.3.2.4.4. Diccionarios<a class="headerlink" href="#diccionarios" title="Enlazar permanentemente con este título">¶</a></h2>
+<span id="nftables-vmap"></span><h3>8.7.3.2.4.2.4. Diccionarios<a class="headerlink" href="#diccionarios" title="Enlazar permanentemente con este título">¶</a></h3>
 <p>Los <em class="dfn">diccionarios</em> son mapas en que los valores son acciones terminalesi (excepto
 <em>reject</em>). Por ejemplo, esta regla salta dependiendo del tipo de tráfico a una u
 otra cadena de usuario:</p>
@@ -261,79 +340,72 @@ otra cadena de usuario:</p>
 <p>También es posible hacer diccionarios nominados.</p>
 </div>
 <div class="section" id="conjuntos-dinamicos">
-<span id="nftables-meters"></span><h2>8.7.3.2.4.5. Conjuntos dinámicos<a class="headerlink" href="#conjuntos-dinamicos" title="Enlazar permanentemente con este título">¶</a></h2>
-<div class="admonition-todo admonition" id="index-0">
-<p class="first admonition-title">Por hacer</p>
-<p class="last">Repasar este apartado para aclarar el concepto y usar también
-ejemplos con quota.</p>
+<span id="nftables-meters"></span><h3>8.7.3.2.4.2.5. Conjuntos dinámicos<a class="headerlink" href="#conjuntos-dinamicos" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Cuando en las reglas usamos <a class="reference internal" href="02.reglas.html#nftables-stateful-objects"><span class="std std-ref">objetos de inspección de estado</span></a>, en particular, <a class="reference internal" href="02.reglas.html#nftables-limit"><span class="std std-ref">caudales</span></a> y
+<a class="reference internal" href="02.reglas.html#nftables-quota"><span class="std std-ref">cuotas</span></a>, como por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add rule filter output tcp sport ssh quota over <span class="m">100</span> mbytes drop
+</pre></div>
 </div>
-<p>Los <em class="dfn">conjuntos dinámicos</em> permiten incluir elementos atendiendo al estado
-de la conexión. La diferencia con un conjunto a secas es que éstos últimos
-incluyen, por ejemplo, una dirección <abbr title="Internet Protocol">IP</abbr> a secas, mientras que los dinámicos
-incluyen una dirección <abbr title="Internet Protocol">IP</abbr> que cumple una determinada condición; y si no la
-cumple, la <abbr title="Internet Protocol">IP</abbr> no es añadida y, además, la acción fracasa. Tienen dos formas de
-expresarse:</p>
+<p>el objeto (la cuota en este caso) se actualiza y se comprueba cada vez que se
+hay tráfico de descarga que provocan nuestro clientes del servicio <abbr title="Security SHell">SSH</abbr>. Esta
+cuota es general y, cualquier cliente que descargue algo, contribuirá a
+aumentarla. En principio, si nuestra intención fuera establecer una cuota
+individual por cliente, deberíamos incluir tantas regla distintas como clientes
+tengamos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add rule filter output tcp sport ssh ip daddr <span class="m">1</span>.1.1.1 quota over <span class="m">10</span> mbytes drop
+<span class="gp">#</span> nft add rule filter output tcp sport ssh ip daddr <span class="m">1</span>.1.1.2 quota over <span class="m">10</span> mbytes drop
+<span class="gp">#</span> etc...
+</pre></div>
+</div>
+<p>esto es inviable, pero los <em>conjuntos dinámicos</em> vienen a resolvernos la
+papeleta. Un <em class="dfn">conjunto dinámico</em> es aquel conjunto que relaciona un
+elemento con un objeto de inspección de estado, de manera que al actualizar
+la presencia del objeto en el conjunto actualiza también su objeto
+correspondiente.</p>
+<p>Tienen dos formas de expresarse:</p>
 <ul class="simple">
 <li>Hasta la versión <em>0.9.0</em> (que es precisamente la que trae <em>Buster</em>) a través
 de la palabra clave <kbd class="kbd docutils literal notranslate">meter</kbd>.</li>
 <li>A partir de la <em>0.9.1</em> a través del <em>flag</em> <kbd class="kbd docutils literal notranslate">dynamic</kbd> al crear conjuntos.</li>
 </ul>
 <p>Aunque <kbd class="kbd docutils literal notranslate">meter</kbd> sigue existiendo, esta marcada como obsoleta por lo que
-podría ocurrir que en el futuro desapareciera. En consecuencia, trataremos ambas
-sintaxis. Para ilustrarlas consideremos en caso de que queramos aceptar
-peticiones <abbr title="Internet Control Message Protocol">ICMP</abbr> pero limitadas a una cada segundo por cliente como máximo.</p>
-<p class="rubric">meter</p>
-<p>Con <em>lista blanca</em>, deberíamos hacer:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add filter INPUT icmp <span class="nb">type</span> echo-request <span class="se">\</span>
-   meter pines size <span class="m">65535</span> <span class="o">{</span>ip saddr timeout 5s limit rate <span class="m">1</span>/second burst <span class="m">1</span> packets<span class="o">}</span> accept
-</pre></div>
-</div>
-<p>En este caso, se añaden al <em>meter</em> (el conjunto) «pines» todas las direcciones
-de origen cuyo ratio no sobrepase el de 1 por segundo. La sentencia resulta verdadera en ese caso y,
-en consecuencia se acepta el paquete. En cambio, si el ratio es mayor, no se cumple la regla y,
-consecuentemente por la política predeterminada, el paquete se desecha.</p>
-<p>Con <em>lista negra</em>, el equivalente será:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add filter INPUT icmp <span class="nb">type</span> echo-request <span class="se">\</span>
-   meter pines size <span class="m">1000</span> <span class="o">{</span>ip saddr timeout 5s limit rate over <span class="m">1</span>/second burst <span class="m">1</span> packets<span class="o">}</span> drop
-</pre></div>
-</div>
-<p>En que sólo se añadirán a «pines» las direccions de origen que sobrepasen la
-cuota, de lo que resultará una evaluación verdadera y se acabará desechando el
-paquete.</p>
-<p>Em ambos casos, podremos consultar el contenido de «pines» con:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft list meter filter pines
-</pre></div>
-</div>
+podría ocurrir que en el futuro desapareciera. Sea como sea, trataremos ambas</p>
 <p class="rubric">dynamic</p>
-<p>El equivalente usando el tipo <em>dinámico</em> consiste en definir primero el conjunto:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add <span class="nb">set</span> filter pines <span class="o">{</span><span class="nb">type</span> ipv4_addr<span class="p">;</span> timeout 5s<span class="p">;</span> flags dynamic<span class="p">;</span> size <span class="m">65535</span><span class="o">}</span>
+<p>La nueva sintaxis es la que mejor ilustra el concepto que acabamos de explicar,
+así que la expondremos antes. Definimos primero el conjunto:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add <span class="nb">set</span> filter sshquota <span class="s2">&quot;{type ipv4_addr; timeout 1h; flags dynamic; size 65535}&quot;</span>
 </pre></div>
 </div>
-<p>y añadir los elementos en la regla correspondiente. Con una política de <em>lista
+<p>para añadir después los elementos en la regla correspondiente. Con una política de <em>lista
 blanca</em>, la regla quedaría así:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add filter INPUT icmp <span class="nb">type</span> echo-request <span class="se">\</span>
-   add @pines <span class="o">{</span>ip saddr limit rate <span class="m">1</span>/second burst <span class="m">1</span> packets<span class="o">}</span> accept
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add filter OUTPUT tcp sport ssh add @sshquota <span class="o">{</span>ip saddr quota <span class="m">10</span> mbytes<span class="o">}</span> accept
 </pre></div>
 </div>
-<p>Para aclarar el concepto, podemos hacernos la siguiente pregunta: ¿cuál es la
-diferencia entre la sentencia anterior, y esta otra suponiendo que «pines» sea
-un conjunto normal?</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add filter INPUT icmp <span class="nb">type</span> echo-request <span class="se">\</span>
-    limit rate <span class="m">1</span>/second burst <span class="m">1</span> packets add @pines <span class="o">{</span>ip saddr<span class="o">}</span> accept
+<p>Y si fuera de <em>lista negra</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add filter OUTPUT tcp sport ssh add @sshquota <span class="o">{</span>ip saddr quota over <span class="m">10</span> mbytes<span class="o">}</span> drop
 </pre></div>
 </div>
-<p>La diferencia radica en que en este segundo caso, siempre que una máquina envíe
-una peticion <abbr title="Internet Control Message Protocol">ICMP</abbr> se comprueba el ratio de peticiones que incluirá todas las
-peticiones de todas las máquinas; y, si ese ratio global no supera el límite, se
-aceptará la petición. Por ese motivo, una máquina que individualmente no haga
-más de una petición, puede ser rechazada, si otras máquinas contribuyeron a
-alcanzar el límite. En cambio, con los conjuntos dinámicos, se analiza cada
-ratio individual.</p>
+<p class="rubric">meter</p>
+<p>La obsoleta sintaxis con <kbd class="kbd docutils literal notranslate">meter</kbd> no es excesivamente diferente, aunque no
+defina explícitamente un conjunto. Con <em>lista blanca</em>, deberíamos hacer:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add filter OUTPUT tcp sport ssh <span class="se">\</span>
+   meter sshquota size <span class="m">65535</span> <span class="o">{</span>ip saddr timeout 5s quota <span class="m">10</span> mbytes<span class="o">}</span> accept
+</pre></div>
+</div>
+<p>Con <em>lista negra</em>, el equivalente será:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add filter OUTPUT tcp sport ssh <span class="se">\</span>
+   meter sshquota size <span class="m">65535</span> <span class="o">{</span>ip saddr timeout 5s quota over <span class="m">10</span> mbytes<span class="o">}</span> drop
+</pre></div>
+</div>
+<p>Em ambos casos, podremos consultar el contenido de «sshquota» con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft list meter filter sshquota
+</pre></div>
+</div>
 <p>En conjunción con las concatenaciones los <em>conjuntos dinámicos</em> permiten la
 implementación de las funcionalidades que ofrecen los módulos <a class="reference internal" href="../01.iptables/03.ext.html#iptables-limit"><span class="std std-ref">hashlimit y
 connlimit</span></a> de <strong class="program">iptables</strong>.</p>
 <div class="section" id="connlimit">
-<span id="nftables-connlimit"></span><h3>8.7.3.2.4.5.1. connlimit<a class="headerlink" href="#connlimit" title="Enlazar permanentemente con este título">¶</a></h3>
+<span id="nftables-connlimit"></span><h4>8.7.3.2.4.2.5.1. connlimit<a class="headerlink" href="#connlimit" title="Enlazar permanentemente con este título">¶</a></h4>
 <p>Dependiendo de cuáles sean las conexiones que queremos limitar, así tendremos
 que obrar. Consideraremos una política de <em>lista blanca</em> en nuestro servidor:</p>
 <dl class="docutils">
@@ -369,7 +441,7 @@ implementación con <em>dynamic</em> es trivial.</p>
 </div>
 </div>
 <div class="section" id="hashlimit">
-<span id="nftables-hashlimit"></span><h3>8.7.3.2.4.5.2. hashlimit<a class="headerlink" href="#hashlimit" title="Enlazar permanentemente con este título">¶</a></h3>
+<span id="nftables-hashlimit"></span><h4>8.7.3.2.4.2.5.2. hashlimit<a class="headerlink" href="#hashlimit" title="Enlazar permanentemente con este título">¶</a></h4>
 <p>El módulo <em>hashlimit</em> de <strong class="program">iptables</strong> permite limitar el flujo de paquete
 según cual sea el origen o destino de las conexión. A diferencia de <em>limit</em>, que
 limita el flujo de paquetes global. Para implementar esta funcionalidad en
@@ -384,7 +456,7 @@ dinámicos y la concatenación. Por ejemplo, para limitar la descarga a través 
 </div>
 </div>
 <div class="section" id="flowtables">
-<span id="nftables-flowtables"></span><h2>8.7.3.2.4.6. flowtables<a class="headerlink" href="#flowtables" title="Enlazar permanentemente con este título">¶</a></h2>
+<span id="nftables-flowtables"></span><h3>8.7.3.2.4.2.6. flowtables<a class="headerlink" href="#flowtables" title="Enlazar permanentemente con este título">¶</a></h3>
 <p>Las <em class="dfn">flowtables</em> son un mecanismo para acelerar el paso de los paquetes
 por la máquina haciendo que fluyan directamente entre la entrada (el enganche
 <em>ingress</em>) y la interfaz de salida sin tener que atravesar todo los enganches
@@ -457,11 +529,105 @@ de <em>eth0</em>, seguiríamos pudiendo acelerar la intermediación de los paque
 </pre></div>
 </div>
 </div>
-<div class="section" id="marcas">
-<span id="nftables-marcas"></span><h2>8.7.3.2.4.7. Marcas<a class="headerlink" href="#marcas" title="Enlazar permanentemente con este título">¶</a></h2>
 </div>
 <div class="section" id="emulacion-de-recent">
-<span id="nftables-recent"></span><h2>8.7.3.2.4.8. Emulación de recent<a class="headerlink" href="#emulacion-de-recent" title="Enlazar permanentemente con este título">¶</a></h2>
+<span id="nftables-recent"></span><h2>8.7.3.2.4.3. Emulación de recent<a class="headerlink" href="#emulacion-de-recent" title="Enlazar permanentemente con este título">¶</a></h2>
+</div>
+<div class="section" id="bridges">
+<span id="nftables-bridge"></span><h2>8.7.3.2.4.4. Bridges<a class="headerlink" href="#bridges" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>El tratamiento de las <a class="reference internal" href="../../03.bridge.html#bridge"><span class="std std-ref">interfaces bridge</span></a> se hace también con
+<strong class="command">nft</strong>. Ahora bien, si se observa el <a class="reference internal" href="../index.html#netfilter-hooks"><span class="std std-ref">diagrama de flujo</span></a> (eliminando el flujo para tráfico <abbr title="Address Resolution Protocol">ARP</abbr>):</p>
+<img alt="../../../_images/ebtables1.png" src="../../../_images/ebtables1.png" />
+<p>se comprobará que el tráfico que circula entre dos puertos de un mismo <em>bridge</em>
+no se ve afectado por las reglas que se escriban para los puntos de enganche del
+resto de las familias (excepto <em>netdev</em>, claro está). Podemos ratificarlo si
+para una máquina con dos interfaces en puente definimos estar reglas:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>table ip filter <span class="o">{</span>
+   chain FORWARD <span class="o">{</span>
+      <span class="nb">type</span> filter hook forward priority filter<span class="p">;</span>
+
+      ip protocol icmp counter
+   <span class="o">}</span>
+<span class="o">}</span>
+
+table bridge filter <span class="o">{</span>
+   chain FORWARD <span class="o">{</span>
+      <span class="nb">type</span> filter hook forward priority filter<span class="p">;</span>
+
+      ip protocol icmp counter
+      iif eth0 ip protocol icmp counter
+   <span class="o">}</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+<p>Al enviar un paquete <abbr title="Internet Control Message Protocol">ICMP</abbr> desde una máquina conectada en un extremo a otra
+colocada en el otro extremo, el contador de la tabla de la familia <em>ip</em> no
+detectará ningún paquete, mientras que los contadores de la familia <em>bridge</em>,
+sí.</p>
+<p>Otro aspecto a tener en cuenta es que en las reglas que se encuentren en cadenas
+de la familia <em>bridge</em> las interfaces serán los puertos del puente, es decir, si
+se pretende establecer una condición con <kbd class="kbd docutils literal notranslate">iif</kbd> la interfaz que deberá
+proporcionarse será aquel puerto físico del puente por el que entró el paquete
+(p.e. <em>eth0</em>). Sin embargo, si ese mismo paquete, estaba destinado para la propia
+máquina que hace de puente y, en consecuencia, atraviesa enganches de la familia
+<em>ip</em> (en concreto <em>prerouting</em> e <em>înput</em>) en las cadenas asociadas a tales
+enganches, la interfaz de entrada no será el puerto físico, sino la interfaz
+virtual <em>bridge</em>. Por tanto, la condición con <kbd class="kbd docutils literal notranslate">iif</kbd> deberá hacerse con
+<em>br0</em> (o comoquiera que se llame la interfaz).</p>
+<p>Finalmente, si nuestra intención es forzar a que los paquetes sean encaminados,
+no conmutados, la estrategia con <strong class="command">nftables</strong> es alterar en el paquete la
+<abbr title="Media Access Control">MAC</abbr> de destino para que coincida con la de la interfaz <em>bridge</em>, obviamente
+antes de que <strong class="program">netfilter</strong> lleve a cabo la comprobación para dirigir el
+paquete hacia en enganche <em>forward</em> de la familia <em>bridge</em>. Así pues, si nuestra
+intención fuera encaminar siempre el tráfico <abbr title="Internet Control Message Protocol">ICMP</abbr> que entra por el puerto
+<em>eth0</em>, podríamos hacer:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>table bridge filter <span class="o">{</span>
+   chain PREROUTING <span class="o">{</span>
+      <span class="nb">type</span> filter hook prerouting priority dstnat
+
+      iif eth0 icmp <span class="nb">type</span> echo-request ether daddr <span class="nb">set</span> de:ad:be:ef:27:d4 <span class="se">\</span>
+                                      meta pkttype <span class="nb">set</span> unicast <span class="se">\</span>
+                                      meta mark <span class="nb">set</span> 0x1
+   <span class="o">}</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+<p>suponiendo que <em>de:ad:be:ef:27:d4</em> sea la <abbr title="Media Access Control">MAC</abbr> de nuestra interfaz puente.
+Hemos aprovechado, además, para marcar tales paquetes por si más adelante
+necesitamos hacer referencia a tales paquetes.</p>
+<p>Sí, además, tuviéramos intención de apropiarnos del paquete podríamos
+redirigirlo:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>table ip nat <span class="o">{</span>
+   chain PREROUTING <span class="o">{</span>
+      <span class="nb">type</span> nat hook prerouting priority dstnat
+      meta mark <span class="m">1</span> redirect
+   <span class="o">}</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">A fecha de redacción<a class="footnote-reference" href="#id2" id="id1">[1]</a>, no hay soporte aún para manipular el
+tráfico <abbr title="Address Resolution Protocol">ARP</abbr> que accede por un <a class="reference internal" href="../../03.bridge.html#bridge"><span class="std std-ref">bridge</span></a> (<kbd class="kbd docutils literal notranslate">arpreply</kbd>).
+Véase <a class="reference external" href="https://wiki.nftables.org/wiki-nftables/index.php/Supported_features_compared_to_xtables#arpreply">esta referencia</a>.</p>
+</div>
+</div>
+<div class="section" id="trafico-arp">
+<span id="nftables-arp"></span><h2>8.7.3.2.4.5. Tráfico <abbr title="Address Resolution Protocol">ARP</abbr><a class="headerlink" href="#trafico-arp" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Lo que podemos hacer con este tráfico es, básicamente, dejar de responder a
+peticiones <abbr title="Address Resolution Protocol">ARP</abbr> o evitar aceptar respuestas <abbr title="Address Resolution Protocol">ARP</abbr>.</p>
+<img alt="../../../_images/arptables.png" src="../../../_images/arptables.png" />
+<div class="admonition-todo admonition" id="index-0">
+<p class="first admonition-title">Por hacer</p>
+<p class="last">Añadir algunos ejemplos.</p>
+</div>
+<p class="rubric">Notas al pie</p>
+<table class="docutils footnote" frame="void" id="id2" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td>Febrerp de 2020</td></tr>
+</tbody>
+</table>
 </div>
 </div>
 
@@ -474,18 +640,23 @@ de <em>eth0</em>, seguiríamos pudiendo acelerar la intermediación de los paque
   <h3><a href="../../../index.html">Table of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">8.7.3.2.4. Uso avanzado</a><ul>
-<li><a class="reference internal" href="#conjuntos">8.7.3.2.4.1. Conjuntos</a></li>
-<li><a class="reference internal" href="#concatenaciones">8.7.3.2.4.2. Concatenaciones</a></li>
-<li><a class="reference internal" href="#mapas">8.7.3.2.4.3. Mapas</a></li>
-<li><a class="reference internal" href="#diccionarios">8.7.3.2.4.4. Diccionarios</a></li>
-<li><a class="reference internal" href="#conjuntos-dinamicos">8.7.3.2.4.5. Conjuntos dinámicos</a><ul>
-<li><a class="reference internal" href="#connlimit">8.7.3.2.4.5.1. connlimit</a></li>
-<li><a class="reference internal" href="#hashlimit">8.7.3.2.4.5.2. hashlimit</a></li>
+<li><a class="reference internal" href="#marcas">8.7.3.2.4.1. Marcas</a></li>
+<li><a class="reference internal" href="#colecciones">8.7.3.2.4.2. Colecciones</a><ul>
+<li><a class="reference internal" href="#conjuntos">8.7.3.2.4.2.1. Conjuntos</a></li>
+<li><a class="reference internal" href="#concatenaciones">8.7.3.2.4.2.2. Concatenaciones</a></li>
+<li><a class="reference internal" href="#mapas">8.7.3.2.4.2.3. Mapas</a></li>
+<li><a class="reference internal" href="#diccionarios">8.7.3.2.4.2.4. Diccionarios</a></li>
+<li><a class="reference internal" href="#conjuntos-dinamicos">8.7.3.2.4.2.5. Conjuntos dinámicos</a><ul>
+<li><a class="reference internal" href="#connlimit">8.7.3.2.4.2.5.1. connlimit</a></li>
+<li><a class="reference internal" href="#hashlimit">8.7.3.2.4.2.5.2. hashlimit</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#flowtables">8.7.3.2.4.6. flowtables</a></li>
-<li><a class="reference internal" href="#marcas">8.7.3.2.4.7. Marcas</a></li>
-<li><a class="reference internal" href="#emulacion-de-recent">8.7.3.2.4.8. Emulación de recent</a></li>
+<li><a class="reference internal" href="#flowtables">8.7.3.2.4.2.6. flowtables</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#emulacion-de-recent">8.7.3.2.4.3. Emulación de recent</a></li>
+<li><a class="reference internal" href="#bridges">8.7.3.2.4.4. Bridges</a></li>
+<li><a class="reference internal" href="#trafico-arp">8.7.3.2.4.5. Tráfico <abbr title="Address Resolution Protocol">ARP</abbr></a></li>
 </ul>
 </li>
 </ul>
@@ -494,8 +665,8 @@ de <em>eth0</em>, seguiríamos pudiendo acelerar la intermediación de los paque
   <p class="topless"><a href="03.conn.html"
                         title="capítulo anterior">8.7.3.2.3. Uso práctico</a></p>
   <h4>Próximo tema</h4>
-  <p class="topless"><a href="05.bridge.html"
-                        title="próximo capítulo">8.7.3.2.5. Bridges</a></p>
+  <p class="topless"><a href="../../08.qos/index.html"
+                        title="próximo capítulo">8.8. Calidad de servicio</a></p>
   <div role="note" aria-label="source link">
     <h3>Esta página</h3>
     <ul class="this-page-menu">
@@ -526,7 +697,7 @@ de <em>eth0</em>, seguiríamos pudiendo acelerar la intermediación de los paque
           <a href="../../../genindex.html" title="Índice General"
              >índice</a></li>
         <li class="right" >
-          <a href="05.bridge.html" title="8.7.3.2.5. Bridges"
+          <a href="../../08.qos/index.html" title="8.8. Calidad de servicio"
              >siguiente</a> |</li>
         <li class="right" >
           <a href="03.conn.html" title="8.7.3.2.3. Uso práctico"

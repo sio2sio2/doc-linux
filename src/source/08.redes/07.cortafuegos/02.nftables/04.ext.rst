@@ -1,5 +1,77 @@
+************
 Uso avanzado
 ************
+
+.. _nftables-marcas:
+
+Marcas
+******
+Las :dfn:`marcas` son señales que pueden establecerse sobre los paquetes a fin
+de reconocerlos más adelante en el flujo. Por ejemplo, en un enganche de la
+familia *bridge* somos capaces de reconocer cuál es la interfaz física (el
+puerto) por el que entró un paquete, mientras que un enganche de la familia
+*ip*, sólo somos capaces de reconocer la :ref:`interfaz bridge <bridge>`
+virtual. Si marcamos los paquetes en el primer enganche, seremos capaces de
+reconocer el puerto de entrada en el segundo consultando la marca.
+
+Hay dos tipos de marcas:
+
+- La :dfn:`marca de paquete` que es aquella que se establece individualmente
+  para cada paquete. En realidad, las marcas no se escriben sobre el propio
+  paquete, sino sobre su representación en :program:`netfilter`, por lo que no
+  podrá ser consultada fuera del propio cortafuegos.
+
+- La :dfn:`marca de conexión` que es aquella que se establece sobre la conexión
+  a la que pertenece un paquete. En consecuencia, es consultable desde el resto
+  de paquetes que pertenecen a la marca. Es común que se establezca en un
+  enganche de tipo *nat* en el primer paquete.
+
+.. table::
+   :class: nftables-matches
+
+   +-----------+---------------+----------------------------------------------+
+   | Criterio  | Argumento     | Descripción                                  |
+   +===========+===============+==============================================+
+   | meta      | mark          | Comprueba la marca del paquete.              |
+   |           |               +----------------------------------------------+
+   |           |               | meta mark 0x1                                |
+   |           +---------------+----------------------------------------------+
+   |           | mark set      | Establece la marca sobre el paquete.         |
+   |           |               +----------------------------------------------+
+   |           |               | meta mark set 0x1                            |
+   +-----------+---------------+----------------------------------------------+
+   | ct        | mark          | Comprueba la marca de la comexión.           |
+   |           |               +----------------------------------------------+
+   |           |               | ct mark 0x1                                  |
+   |           +---------------+----------------------------------------------+
+   |           | mark set      | Establece la marca sobre la conexión.        |
+   |           |               +----------------------------------------------+
+   |           |               | ct mark set 0x1                              |
+   +-----------+---------------+----------------------------------------------+
+
+Por ejemplo, si queremos limitar el caudal de tráfico |SSH|, pero sólo de los
+clientes que se conectan a nuestro servidor por *eth0*:
+
+.. code-block:: bash
+
+   table netdev filter {
+      chain INGRESS {
+         type filter hook ingres device eth0 priority filter
+
+         tcp dport ssh meta mark set 1
+      }
+
+      chain INPUT {
+         type filter hook input priority filter
+
+         meta mark 1 limit over 512 kbytes/second drop
+      }
+   }
+
+Colecciones
+***********
+Incluimos bajo este epígrafe las herramientas de que dispone :program:`nftables`
+para agrupar elementos
 
 .. _nftables-sets:
 
@@ -184,79 +256,70 @@ También es posible hacer diccionarios nominados.
 
 Conjuntos dinámicos
 ===================
+Cuando en las reglas usamos :ref:`objetos de inspección de estado
+<nftables-stateful-objects>`, en particular, :ref:`caudales <nftables-limit>` y
+:ref:`cuotas <nftables-quota>`, como por ejemplo::
 
-.. todo:: Repasar este apartado para aclarar el concepto y usar también
-   ejemplos con quota.
+   # nft add rule filter output tcp sport ssh quota over 100 mbytes drop
 
-Los :dfn:`conjuntos dinámicos` permiten incluir elementos atendiendo al estado
-de la conexión. La diferencia con un conjunto a secas es que éstos últimos
-incluyen, por ejemplo, una dirección |IP| a secas, mientras que los dinámicos
-incluyen una dirección |IP| que cumple una determinada condición; y si no la
-cumple, la |IP| no es añadida y, además, la acción fracasa. Tienen dos formas de
-expresarse:
+el objeto (la cuota en este caso) se actualiza y se comprueba cada vez que se
+hay tráfico de descarga que provocan nuestro clientes del servicio |SSH|. Esta
+cuota es general y, cualquier cliente que descargue algo, contribuirá a
+aumentarla. En principio, si nuestra intención fuera establecer una cuota
+individual por cliente, deberíamos incluir tantas regla distintas como clientes
+tengamos::
+
+   # nft add rule filter output tcp sport ssh ip daddr 1.1.1.1 quota over 10 mbytes drop
+   # nft add rule filter output tcp sport ssh ip daddr 1.1.1.2 quota over 10 mbytes drop
+   # etc...
+
+esto es inviable, pero los *conjuntos dinámicos* vienen a resolvernos la
+papeleta. Un :dfn:`conjunto dinámico` es aquel conjunto que relaciona un
+elemento con un objeto de inspección de estado, de manera que al actualizar
+la presencia del objeto en el conjunto actualiza también su objeto
+correspondiente.
+
+Tienen dos formas de expresarse:
 
 * Hasta la versión *0.9.0* (que es precisamente la que trae *Buster*) a través
   de la palabra clave :kbd:`meter`.
 * A partir de la *0.9.1* a través del *flag* :kbd:`dynamic` al crear conjuntos.
 
 Aunque :kbd:`meter` sigue existiendo, esta marcada como obsoleta por lo que
-podría ocurrir que en el futuro desapareciera. En consecuencia, trataremos ambas
-sintaxis. Para ilustrarlas consideremos en caso de que queramos aceptar
-peticiones |ICMP| pero limitadas a una cada segundo por cliente como máximo.
-
-.. rubric:: meter
-
-Con *lista blanca*, deberíamos hacer::
-
-   # nft add filter INPUT icmp type echo-request \
-      meter pines size 65535 {ip saddr timeout 5s limit rate 1/second burst 1 packets} accept
-
-En este caso, se añaden al *meter* (el conjunto) "pines" todas las direcciones
-de origen cuyo ratio no sobrepase el de 1 por segundo. La sentencia resulta verdadera en ese caso y,
-en consecuencia se acepta el paquete. En cambio, si el ratio es mayor, no se cumple la regla y,
-consecuentemente por la política predeterminada, el paquete se desecha.
-
-Con *lista negra*, el equivalente será::
-
-   # nft add filter INPUT icmp type echo-request \
-      meter pines size 1000 {ip saddr timeout 5s limit rate over 1/second burst 1 packets} drop
-
-En que sólo se añadirán a "pines" las direccions de origen que sobrepasen la
-cuota, de lo que resultará una evaluación verdadera y se acabará desechando el
-paquete.
-
-Em ambos casos, podremos consultar el contenido de "pines" con::
-
-   # nft list meter filter pines
+podría ocurrir que en el futuro desapareciera. Sea como sea, trataremos ambas
 
 .. rubric:: dynamic
 
-El equivalente usando el tipo *dinámico* consiste en definir primero el conjunto::
+La nueva sintaxis es la que mejor ilustra el concepto que acabamos de explicar,
+así que la expondremos antes. Definimos primero el conjunto::
 
-   # nft add set filter pines {type ipv4_addr; timeout 5s; flags dynamic; size 65535}
+   # nft add set filter sshquota "{type ipv4_addr; timeout 1h; flags dynamic; size 65535}"
 
-y añadir los elementos en la regla correspondiente. Con una política de *lista
+para añadir después los elementos en la regla correspondiente. Con una política de *lista
 blanca*, la regla quedaría así::
 
-   # nft add filter INPUT icmp type echo-request \
-      add @pines {ip saddr limit rate 1/second burst 1 packets} accept
+   # nft add filter OUTPUT tcp sport ssh add @sshquota {ip saddr quota 10 mbytes} accept
 
-Para aclarar el concepto, podemos hacernos la siguiente pregunta: ¿cuál es la
-diferencia entre la sentencia anterior, y esta otra suponiendo que "pines" sea
-un conjunto normal?
+Y si fuera de *lista negra*::
 
-::
+   # nft add filter OUTPUT tcp sport ssh add @sshquota {ip saddr quota over 10 mbytes} drop
 
-   # nft add filter INPUT icmp type echo-request \
-       limit rate 1/second burst 1 packets add @pines {ip saddr} accept
-   
-La diferencia radica en que en este segundo caso, siempre que una máquina envíe
-una peticion |ICMP| se comprueba el ratio de peticiones que incluirá todas las
-peticiones de todas las máquinas; y, si ese ratio global no supera el límite, se
-aceptará la petición. Por ese motivo, una máquina que individualmente no haga
-más de una petición, puede ser rechazada, si otras máquinas contribuyeron a
-alcanzar el límite. En cambio, con los conjuntos dinámicos, se analiza cada
-ratio individual.
+.. rubric:: meter
+
+La obsoleta sintaxis con :kbd:`meter` no es excesivamente diferente, aunque no
+defina explícitamente un conjunto. Con *lista blanca*, deberíamos hacer::
+
+   # nft add filter OUTPUT tcp sport ssh \
+      meter sshquota size 65535 {ip saddr timeout 5s quota 10 mbytes} accept
+
+Con *lista negra*, el equivalente será::
+
+   # nft add filter OUTPUT tcp sport ssh \
+      meter sshquota size 65535 {ip saddr timeout 5s quota over 10 mbytes} drop
+
+Em ambos casos, podremos consultar el contenido de "sshquota" con::
+
+   # nft list meter filter sshquota
 
 En conjunción con las concatenaciones los *conjuntos dinámicos* permiten la
 implementación de las funcionalidades que ofrecen los módulos :ref:`hashlimit y
@@ -395,16 +458,119 @@ de *eth0*, seguiríamos pudiendo acelerar la intermediación de los paquetes::
 .. https://wiki.nftables.org/wiki-nftables/index.php/Flowtable
    https://github.com/torvalds/linux/blob/master/Documentation/networking/nf_flowtable.txt
 
-.. _nftables-marcas:
-
-Marcas
-======
-
 .. _nftables-recent:
 
 Emulación de recent
-===================
+*******************
+
+.. _nftables-bridge:
+
+Bridges
+*******
+El tratamiento de las :ref:`interfaces bridge <bridge>` se hace también con
+:command:`nft`. Ahora bien, si se observa el :ref:`diagrama de flujo
+<netfilter-hooks>` (eliminando el flujo para tráfico |ARP|):
+
+.. image:: files/ebtables.png
+
+se comprobará que el tráfico que circula entre dos puertos de un mismo *bridge*
+no se ve afectado por las reglas que se escriban para los puntos de enganche del
+resto de las familias (excepto *netdev*, claro está). Podemos ratificarlo si
+para una máquina con dos interfaces en puente definimos estar reglas:
+
+.. code-block:: bash
+
+   table ip filter {
+      chain FORWARD {
+         type filter hook forward priority filter;
+         
+         ip protocol icmp counter
+      }
+   }
+
+   table bridge filter {
+      chain FORWARD {
+         type filter hook forward priority filter;
+         
+         ip protocol icmp counter
+         iif eth0 ip protocol icmp counter
+      }
+   }
+
+Al enviar un paquete |ICMP| desde una máquina conectada en un extremo a otra
+colocada en el otro extremo, el contador de la tabla de la familia *ip* no
+detectará ningún paquete, mientras que los contadores de la familia *bridge*,
+sí.
+
+Otro aspecto a tener en cuenta es que en las reglas que se encuentren en cadenas
+de la familia *bridge* las interfaces serán los puertos del puente, es decir, si
+se pretende establecer una condición con :kbd:`iif` la interfaz que deberá
+proporcionarse será aquel puerto físico del puente por el que entró el paquete
+(p.e. *eth0*). Sin embargo, si ese mismo paquete, estaba destinado para la propia
+máquina que hace de puente y, en consecuencia, atraviesa enganches de la familia
+*ip* (en concreto *prerouting* e *înput*) en las cadenas asociadas a tales
+enganches, la interfaz de entrada no será el puerto físico, sino la interfaz
+virtual *bridge*. Por tanto, la condición con :kbd:`iif` deberá hacerse con
+*br0* (o comoquiera que se llame la interfaz).
+
+Finalmente, si nuestra intención es forzar a que los paquetes sean encaminados,
+no conmutados, la estrategia con :command:`nftables` es alterar en el paquete la
+|MAC| de destino para que coincida con la de la interfaz *bridge*, obviamente
+antes de que :program:`netfilter` lleve a cabo la comprobación para dirigir el
+paquete hacia en enganche *forward* de la familia *bridge*. Así pues, si nuestra
+intención fuera encaminar siempre el tráfico |ICMP| que entra por el puerto
+*eth0*, podríamos hacer:
+
+.. code-block:: bash
+
+   table bridge filter {
+      chain PREROUTING {
+         type filter hook prerouting priority dstnat
+
+         iif eth0 icmp type echo-request ether daddr set de:ad:be:ef:27:d4 \
+                                         meta pkttype set unicast \
+                                         meta mark set 0x1
+      }
+   }
+
+suponiendo que *de:ad:be:ef:27:d4* sea la |MAC| de nuestra interfaz puente.
+Hemos aprovechado, además, para marcar tales paquetes por si más adelante
+necesitamos hacer referencia a tales paquetes. 
+
+Sí, además, tuviéramos intención de apropiarnos del paquete podríamos
+redirigirlo:
+
+.. code-block:: bash
+
+   table ip nat {
+      chain PREROUTING {
+         type nat hook prerouting priority dstnat
+         meta mark 1 redirect
+      }
+   }
+
+.. note:: A fecha de redacción\ [#]_, no hay soporte aún para manipular el
+   tráfico |ARP| que accede por un :ref:`bridge <bridge>` (:kbd:`arpreply`).
+   Véase `esta referencia
+   <https://wiki.nftables.org/wiki-nftables/index.php/Supported_features_compared_to_xtables#arpreply>`_.
+
+.. _nftables-arp:
+
+Tráfico |ARP|
+*************
+Lo que podemos hacer con este tráfico es, básicamente, dejar de responder a
+peticiones |ARP| o evitar aceptar respuestas |ARP|.
+
+.. image:: files/arptables.png
+
+.. todo:: Añadir algunos ejemplos.
+
+.. rubric:: Notas al pie
+
+.. [#] Febrerp de 2020
+
 
 .. |ICMP| replace:: :abbr:`ICMP (Internet Control Message Protocol)`
 .. |MAC| replace:: :abbr:`MAC (Media Access Control)`
 .. |NAT| replace:: :abbr:`NAT (Network Address Translation)`
+.. |ARP| replace:: :abbr:`ARP (Address Resolution Protocol)`

@@ -23,7 +23,7 @@
     
     <link rel="index" title="Índice" href="../../../genindex.html" />
     <link rel="search" title="Búsqueda" href="../../../search.html" />
-    <link rel="next" title="8.7.3.2.6. Tráfico ARP" href="06.arp.html" />
+    <link rel="next" title="8.8. Calidad de servicio" href="../../08.qos/index.html" />
     <link rel="prev" title="8.7.3.2.4. Uso avanzado" href="04.ext.html" /> 
   </head><body>
     <div class="related" role="navigation" aria-label="related navigation">
@@ -33,7 +33,7 @@
           <a href="../../../genindex.html" title="Índice General"
              accesskey="I">índice</a></li>
         <li class="right" >
-          <a href="06.arp.html" title="8.7.3.2.6. Tráfico ARP"
+          <a href="../../08.qos/index.html" title="8.8. Calidad de servicio"
              accesskey="N">siguiente</a> |</li>
         <li class="right" >
           <a href="04.ext.html" title="8.7.3.2.4. Uso avanzado"
@@ -52,6 +52,79 @@
             
   <div class="section" id="bridges">
 <span id="nftables-bridge"></span><h1>8.7.3.2.5. Bridges<a class="headerlink" href="#bridges" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>El tratamiento de las <a class="reference internal" href="../../03.bridge.html#bridge"><span class="std std-ref">interfaces bridge</span></a> se hace también con
+<strong class="command">nft</strong>. Ahora bien, si se observa el <a class="reference internal" href="../index.html#netfilter-hooks"><span class="std std-ref">diagrama de flujo</span></a> (eliminando el flujo para tráfico <abbr title="Address Resolution Protocol">ARP</abbr>):</p>
+<img alt="../../../_images/ebtables1.png" src="../../../_images/ebtables1.png" />
+<p>se comprobará que el tráfico que circula entre dos puertos de un mismo <em>bridge</em>
+no se ve afectado por las reglas que se escriban para los puntos de enganche del
+resto de las familias (excepto <em>netdev</em>, claro está). Podemos ratificarlo si
+para una máquina con dos interfaces en puente definimos estar reglas:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>table ip filter <span class="o">{</span>
+   chain FORWARD <span class="o">{</span>
+      <span class="nb">type</span> filter hook forward priority filter<span class="p">;</span>
+
+      ip protocol icmp counter
+   <span class="o">}</span>
+<span class="o">}</span>
+
+table bridge filter <span class="o">{</span>
+   chain FORWARD <span class="o">{</span>
+      <span class="nb">type</span> filter hook forward priority filter<span class="p">;</span>
+
+      ip protocol icmp counter
+      iif eth0 ip protocol icmp counter
+   <span class="o">}</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+<p>Al enviar un paquete <abbr title="Internet Control Message Protocol">ICMP</abbr> desde una máquina conectada en un extremo a otra
+colocada en el otro extremo, el contador de la tabla de la familia <em>ip</em> no
+detectará ningún paquete, mientras que los contadores de la familia <em>bridge</em>,
+sí.</p>
+<p>Otro aspecto a tener en cuenta es que en las reglas que se encuentren en cadenas
+de la familia <em>bridge</em> las interfaces serán los puertos del puente, es decir, si
+se pretende establecer una condición con <kbd class="kbd docutils literal notranslate">iif</kbd> la interfaz que deberá
+proporcionarse será aquel puerto físico del puente por el que entró el paquete
+(p.e. <em>eth0</em>). Sin embargo, si ese mismo paquete, estaba destinado para la propia
+máquina que hace de puente y, en consecuencia, atraviesa enganches de la familia
+<em>ip</em> (en concreto <em>prerouting</em> e <em>înput</em>) en las cadenas asociadas a tales
+enganches, la interfaz de entrada no será el puerto físico, sino la interfaz
+virtual <em>bridge</em>. Por tanto, la condición con <kbd class="kbd docutils literal notranslate">iif</kbd> deberá hacerse con
+<em>br0</em> (o comoquiera que se llame la interfaz).</p>
+<p>Finalmente, si nuestra intención es forzar a que los paquetes sean encaminados,
+no conmutados, la estrategia con <strong class="command">nftables</strong> es alterar en el paquete la
+<abbr title="Media Access Control">MAC</abbr> de destino para que coincida con la de la interfaz <em>bridge</em>, obviamente
+antes de que <strong class="program">netfilter</strong> lleve a cabo la comprobación para dirigir el
+paquete hacia en enganche <em>forward</em> de la familia <em>bridge</em>. Así pues, si nuestra
+intención fuera encaminar siempre el tráfico <abbr title="Internet Control Message Protocol">ICMP</abbr> que entra por el puerto
+<em>eth0</em>, podríamos hacer:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>table bridge filter <span class="o">{</span>
+   chain PREROUTING <span class="o">{</span>
+      <span class="nb">type</span> filter hook prerouting priority dstnat
+
+      iif eth0 icmp <span class="nb">type</span> echo-request ether daddr <span class="nb">set</span> de:ad:be:ef:27:d4 <span class="se">\</span>
+                                      meta pkttype <span class="nb">set</span> unicast <span class="se">\</span>
+                                      meta mark <span class="nb">set</span> 0x1
+   <span class="o">}</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+<p>suponiendo que <em>de:ad:be:ef:27:d4</em> sea la <abbr title="Media Access Control">MAC</abbr> de nuestra interfaz puente.
+Hemos aprovechado, además, para marcar tales paquetes por si más adelante
+necesitamos hacer referencia a tales paquetes.</p>
+<p>Sí, además, tuviéramos intención de apropiarnos del paquete podríamos
+redirigirlo:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>table ip nat <span class="o">{</span>
+   chain PREROUTING <span class="o">{</span>
+      <span class="nb">type</span> nat hook prerouting priority dstnat
+      meta mark <span class="m">1</span> redirect
+   <span class="o">}</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="trafico-arp">
+<span id="nftables-arp"></span><h1>8.7.3.2.6. Tráfico <abbr title="Address Resolution Protocol">ARP</abbr><a class="headerlink" href="#trafico-arp" title="Enlazar permanentemente con este título">¶</a></h1>
 </div>
 
 
@@ -60,12 +133,18 @@
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
+  <h3><a href="../../../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">8.7.3.2.5. Bridges</a></li>
+<li><a class="reference internal" href="#trafico-arp">8.7.3.2.6. Tráfico <abbr title="Address Resolution Protocol">ARP</abbr></a></li>
+</ul>
+
   <h4>Tema anterior</h4>
   <p class="topless"><a href="04.ext.html"
                         title="capítulo anterior">8.7.3.2.4. Uso avanzado</a></p>
   <h4>Próximo tema</h4>
-  <p class="topless"><a href="06.arp.html"
-                        title="próximo capítulo">8.7.3.2.6. Tráfico <abbr title="Address Resolution Protocol">ARP</abbr></a></p>
+  <p class="topless"><a href="../../08.qos/index.html"
+                        title="próximo capítulo">8.8. Calidad de servicio</a></p>
   <div role="note" aria-label="source link">
     <h3>Esta página</h3>
     <ul class="this-page-menu">
@@ -96,7 +175,7 @@
           <a href="../../../genindex.html" title="Índice General"
              >índice</a></li>
         <li class="right" >
-          <a href="06.arp.html" title="8.7.3.2.6. Tráfico ARP"
+          <a href="../../08.qos/index.html" title="8.8. Calidad de servicio"
              >siguiente</a> |</li>
         <li class="right" >
           <a href="04.ext.html" title="8.7.3.2.4. Uso avanzado"
