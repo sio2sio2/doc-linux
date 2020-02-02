@@ -194,20 +194,20 @@ por quien tenga permisos para ello:
     Hidden            2         Gráfico         Oculto.
     System            4         Consola         Es archivo de sistema.
     Directory         16         \-             Es un directorio.
-    Archive           32        Gráfico         Modifcado desde el último respaldo.
+    Archive           32        Gráfico         Modificado desde el último respaldo.
     Compressed        2048      Gráfico\ [a]_   El fichero está comprimido.
-    NotContentIndexed 8192      Gráfico         El servición de indexación no indexa el fichero.
+    NotContentIndexed 8192      Gráfico         El servicio de indexación no indexa el fichero.
     Encrypted         16384     Gráfico\ [a]_   El fichero está cifrado.
    ================== ========= ============== ================================================
 
 .. [a] En realidad el atributo no es ajustable, pero la interfaz gráfica da la posibilidad de comprimir
    o cifrar el fichero, por lo que como efecto colateral se aplicará el atributo.
 
-.. seealso:: Para información más extensa sobre cúales todos los atributos y su
-   significado consule `esta documentación de Microsoft
+.. seealso:: Para información más extensa sobre cuáles todos los atributos y su
+   significado consulte `esta documentación de Microsoft
    <https://docs.microsoft.com/en-us/dotnet/api/system.io.fileattributes?view=netframework-4.8>`_
    y para saber cómo alterarlos a través de la *PowerShell* su valor, consulte
-   `este desapecido artículo
+   `este desaparecido artículo
    <https://web.archive.org/web/20100105052819/http://www.cmschill.net/stringtheory/2009/05/02/bitwise-operators/>`_.
 
 
@@ -219,7 +219,7 @@ la seguridad del sistema. Se accede a ellas mediante el programa
 interesantes:
 
 - *Directivas de cuenta*, dentro de las cuales puede establecerse la política
-  centraseñas (longitud, caducidad, etc.)
+  contraseñas (longitud, caducidad, etc.)
 
 - *Directivas locales*, dentro de las cuales se les puede asignar a usuarios y
   grupos, permiso para llevar a cabo ciertas tareas.
@@ -243,27 +243,27 @@ Para la *gestión de procesos*, *Windows 10* proporciona el
 al pulsar :kbd:`Ctrl+Alt+Supr`, o directamente pulsado
 :kbd:`Ctrl+Shift+Esc`, o ejecutando :command:`TaskManager.exe`. La aplicación
 dispone de distintas pestañas cada una de las cuales sirve para un
-propósitos:
+propósito:
 
 .. image:: files/taskmanager.png
 
-* *Procesos* permite consultar los procesos en ejecución y cuáles son recursos
-  que consumen. Además, permite matarlos.
+* *Procesos* permite consultar los procesos en ejecución y cuáles son los
+  recursos que consumen. Además, permite matarlos.
 * *Detalles* enumera los procesos indicando cuál es el ejecutable.
 * *Servicios* permite arrancar y parar servicios. Si el proceso que deseamos
   parar es un servicio, es preferible hacerlo usando esta pestaña.
 * *Rendimiento* nos ofrece información sobre el consumo de |CPU|, memoria, etc.
-* *Inicio* lista una serie de aplicaciones que se ejecután automáticamente
+* *Inicio* lista una serie de aplicaciones que se ejecutan automáticamente
   durante el arranque del sistema. Se permite deshabilitarlas.
 
 Gestión de servicios
 ====================
 Además de poder arrancar o parar servicios a través del :program:`Administrador
 de tareas` es posible llevar a cabo una gestión más exhaustiva decidiendo qué
-servicios se habilitan o deshabilitan, de manera que se levanten o no de manera
+servicios se habilitan o deshabilitan, de manera que se levanten o no
 automáticamente al iniciar *Windows*. Esto es posible a través del gestor de
-servicios al cual puede llegarse a través del :program:`Administrador de Equipos`
-o directamente ejecutando :program:`services.msc`.
+servicios al cual puede llegarse a través del :program:`Administrador de
+Equipos` o directamente ejecutando :program:`services.msc`.
 
 Programación de tareas
 ======================
@@ -277,7 +277,7 @@ administrativas".
 Crear una *tarea básica* es relativamente sencillo (puede consultar `este enlace
 de genbeta sobre cómo programar tareas en Windows 10
 <https://www.genbeta.com/paso-a-paso/como-programar-tareas-en-windows-10>`_).
-Las lista de tareas definidas por el usuario pueden consultarse en la
+La lista de tareas definidas por el usuario pueden consultarse en la
 sección "Biblioteca del Programador de tareas", aunque, si no aparece, habrá que
 actualizar la vista con el menú contextual.
 
