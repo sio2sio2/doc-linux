@@ -1,0 +1,574 @@
+
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>7.4.3.1.3. Conexión sede-sede &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/custom.css" />
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../_static/language_data.js"></script>
+    <script type="text/javascript" src="../../../_static/translations.js"></script>
+    <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <link rel="index" title="Índice" href="../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../search.html" />
+    <link rel="next" title="7.4.3.1.4. Otros aspectos" href="04.misc.html" />
+    <link rel="prev" title="7.4.3.1.2. Conexión sede-equipo móvil" href="02.rw.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="04.misc.html" title="7.4.3.1.4. Otros aspectos"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="02.rw.html" title="7.4.3.1.2. Conexión sede-equipo móvil"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >7. Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" >7.4. Redes VPN</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="index.html" accesskey="U">7.4.3.1. OpenVPN</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="conexion-sede-sede">
+<h1>7.4.3.1.3. Conexión sede-sede<a class="headerlink" href="#conexion-sede-sede" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>El próposito en este caso es que el sistema remoto no sea un dispositivo (el
+equipo móvil) sino toda una sede remota, esto es, una <abbr title="Local Area Network">LAN</abbr>. Un buen esquema de
+lo que pretendemos es el siguiente:</p>
+<img alt="../../../_images/sede-sede_capa3.png" src="../../../_images/sede-sede_capa3.png" />
+<p>Las diferencias fundamentales con la conexión sede-equipo móvil son:</p>
+<ul class="simple">
+<li>Tdos los dispositivos de la red remota (y no sólo el cliente <abbr title="Virtual Private Network">VPN</abbr>) deben ser
+capaces de conectar con la red local.</li>
+<li>Puede desearse también que los equipos de la red local conecten con los de la
+remota, si no todos los servicios se encuentran en la sede local.</li>
+<li>Es más que probable que controlemos la red remota y, por tanto, que no
+tengamos necesidad alguna de salir a internet a través del túnel <abbr title="Virtual Private Network">VPN</abbr>.</li>
+</ul>
+<p>Para la configuración utilizaremos los siguientes principios:</p>
+<ol class="arabic simple">
+<li>Por el tunel <abbr title="Virtual Private Network">VPN</abbr> sólo circulará el tráfico destinado al otro lado (no lo
+usaremos para salir a internet).</li>
+<li>Asignaremos una <abbr title="Internet Protocol">IP</abbr> fija al cliente <abbr title="Virtual Private Network">VPN</abbr>.</li>
+<li>Autenticaremos los clientes con certificado, lo que obliga a crear una entidad
+certificadora y acreditar también con ella el certificado de servidor.</li>
+</ol>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">Las configuraciones pueden ser más sencillas si servidor, cliente o
+ambos actúan como puerta de enlace de sus respectivas redes. Para hacerlas
+más generales, no se presupondrá esto, salvo para el cliente en la
+<a class="reference internal" href="#ovpn-ss-c2"><span class="std std-ref">configuración de capa de enlace</span></a>.</p>
+</div>
+<div class="section" id="capa-de-red">
+<h2>7.4.3.1.3.1. Capa de red<a class="headerlink" href="#capa-de-red" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Para implementar esta solución crearemos estas tres redes:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="19%" />
+<col width="26%" />
+<col width="33%" />
+<col width="22%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head" colspan="2">Red</th>
+<th class="head" colspan="2">Máquina</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td rowspan="2">Local</td>
+<td rowspan="2">192.168.255.0/24</td>
+<td>Servidor <abbr title="Virtual Private Network">VPN</abbr> (eth0)</td>
+<td>192.168.255.2</td>
+</tr>
+<tr class="row-odd"><td>Router Local</td>
+<td>192.168.255.1</td>
+</tr>
+<tr class="row-even"><td rowspan="2">Túnel <abbr title="Virtual Private Network">VPN</abbr></td>
+<td rowspan="2">10.8.0.0/24</td>
+<td>Servidor <abbr title="Virtual Private Network">VPN</abbr> (tun0)</td>
+<td>10.8.0.1</td>
+</tr>
+<tr class="row-odd"><td>Cliente <abbr title="Virtual Private Network">VPN</abbr> (tun0)</td>
+<td>10.8.0.2</td>
+</tr>
+<tr class="row-even"><td rowspan="2">Remota</td>
+<td rowspan="2">192.168.1.0/24</td>
+<td>Cliente <abbr title="Virtual Private Network">VPN</abbr> (eth0)</td>
+<td>192.168.1.2</td>
+</tr>
+<tr class="row-odd"><td>Router remoto</td>
+<td>192.168.1.1</td>
+</tr>
+</tbody>
+</table>
+<p>La diferencia fundamental en la configuración es que, tanto servidor como
+cliente, deben hacer de router entre su red y la red del otro extremo. Además,
+dado que nuestra intención es que pueda haber túneles que conecten dos sedes,
+tiene cierto sentido que las <abbr title="Internet Protocol">IP</abbr>s asignadas a estos clientes que conectan
+sedes sean fijas en vez de dinámicas.</p>
+<div class="section" id="servidor">
+<span id="ss3-server"></span><h3>7.4.3.1.3.1.1. Servidor<a class="headerlink" href="#servidor" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Como configuración para el servidor, podemos usar <a class="reference download internal" download="" href="../../../_downloads/66f2f45f6f0ee3147bec46cf147a8254/s-ss_3.txt"><code class="xref download docutils literal notranslate"><span class="pre">esta</span></code></a>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>port <span class="m">1194</span>
+proto udp
+dev tun0
+
+ca certs/ca.crt
+cert certs/server.crt
+key keys/server.key
+dh keys/dh2048.pem
+
+<span class="c1"># Configuración de la red del túnel VPN</span>
+mode server
+tls-server
+topology subnet
+ifconfig <span class="m">10</span>.8.0.1 <span class="m">255</span>.255.255.0
+client-config-dir ccd-dir
+ifconfig-pool <span class="m">10</span>.8.0.10 <span class="m">10</span>.8.0.127
+ifconfig-pool-persist ipp.txt
+
+<span class="c1"># Encaminamiento</span>
+push <span class="s2">&quot;route-gateway 10.8.0.1&quot;</span>
+push <span class="s2">&quot;route 192.168.255.0 255.255.255.0 vpn_gateway&quot;</span>
+route <span class="m">192</span>.168.254.0 <span class="m">255</span>.255.255.0 <span class="m">10</span>.8.0.2
+
+keepalive <span class="m">10</span> <span class="m">120</span>
+compress lz4
+persist-key
+persist-tun
+status openvpn-status.log
+verb <span class="m">5</span>
+
+cipher AES-128-CBC
+tls-auth keys/ta.key <span class="m">0</span>
+
+user nobody
+group nogroup
+
+max-clients <span class="m">10</span>
+</pre></div>
+</div>
+<p>Teniendo presente la <a class="reference internal" href="02.rw.html#srw3-server"><span class="std std-ref">configuración para capa 3 para un road warrior</span></a>, escudriñaremos las diferencias:`</p>
+<ul>
+<li><p class="first">En este caso, la autenticación del cliente es a través certificado digital, no
+de contraseña. De hecho, el <em>CN</em> que hayamos definido al crear el certificado
+de cliente, será el nombre con el que el servidor identifique a tal cliente.
+Comno consecuencia, han desaparecido las líneas de configuración para la
+autenticación mediante contraseña.</p>
+</li>
+<li><p class="first">Deja de tener sentido también el enmascaramiento, ya que nuestra intención es
+que no solamente la red remota acceda a las máquinas de la red local, sino que
+las locales accedan también a las máquinas remotas. A menos, claro está, que
+la sede del servidor centralice todos los servicios. En ese caso, lo más
+conveniente es enmascarar como hicimos en el caso del <em>roadwarrior</em>.</p>
+</li>
+<li><p class="first">Como queremos que algunos clientes tengan <abbr title="Internet Protocol">IP</abbr> fija (los que conectan sedes) y
+no (los equipos móviles), no basta con definir la directiva <code class="code docutils literal notranslate"><span class="pre">server</span></code>,
+como se hizo en el caso anterior:</p>
+<ul>
+<li><p class="first">Se fija la <abbr title="Internet Protocol">IP</abbr> del servidor con <code class="code docutils literal notranslate"><span class="pre">ifconfig</span></code>.</p>
+</li>
+<li><p class="first">Se define un rango que no ocupa toda la red con <code class="code docutils literal notranslate"><span class="pre">ifconfig-pool</span></code>.</p>
+</li>
+<li><p class="first">Se define un subdirectorio llamado <code class="file docutils literal notranslate"><span class="pre">ccd-dir</span></code> dentro del cual se
+incluirán ficheros en que cada nombre coincide con el nombre de cada cliente
+con <abbr title="Internet Protocol">IP</abbr> fija, dentro de cada uno de los cuales se establecerán sus <abbr title="Internet Protocol">IP</abbr>s
+del siguiente modo:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/openvpn/ccd-dir/cliente1</span>
+ifconfig-push <span class="m">10</span>.8.0.2 <span class="m">255</span>.255.255.0
+</pre></div>
+</div>
+</li>
+</ul>
+</li>
+<li><p class="first">En lo relativo al encaminamiento, es necesario declarar que la puerta de
+enlace es la <abbr title="Internet Protocol">IP</abbr> del servidor <abbr title="Virtual Private Network">VPN</abbr>, decirle a los clientes cuál es la red
+local con <code class="code docutils literal notranslate"><span class="pre">push</span> <span class="pre">route</span></code> y añadir a la tabla de encaminamiento del
+servidor cómo llegar a la red remota. Si la redes remotas fueran varias,
+porque fueran varios los clientes, entonces habría que añadir varias entradas.</p>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">Si hay equipos móviles podemos optar, bien por incluir una entrada
+por cada equipo móvil, o bien hacer enmascaramiento como hicimos en el caso
+anterior.</p>
+</div>
+</li>
+</ul>
+<p>Al margen del fichero de configuración, hay otra aspecto que debemos atender:
+hemos añadido la ruta que permite conocer al servidor <abbr title="Virtual Private Network">VPN</abbr> cómo alcanzar la red
+remota. Sin embargo, si no es la puerta de enlace de la red local, el resto de
+máquinas locales no tendrán noticia de esta entrada y, en consecuencia, será
+incapaces de conectar con la red remota. Esto se puede solucionar de dos formas:</p>
+<blockquote>
+<div><ul class="simple">
+<li>Añadiendo una ruta estática a la puerta de enlace de la red local para que
+entregue los paquetes dirigidos a la red remota al servidor <abbr title="Virtual Private Network">VPN</abbr><a class="footnote-reference" href="#id6" id="id1">[1]</a>.</li>
+<li>Añadiendo la ruta estática a cada máquina de la red local lo cual puede muy
+fácilmente hacerse si todas reciben configuración dinámica mediante <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr>,
+incluyendo la <a class="reference internal" href="../../../06.infraestructura/02.dhcp/03.dnsmasq.html#dhcp-static-routes"><span class="std std-ref">opción 121</span></a>.</li>
+</ul>
+</div></blockquote>
+</div>
+<div class="section" id="cliente">
+<span id="ss3-cliente"></span><h3>7.4.3.1.3.1.2. Cliente<a class="headerlink" href="#cliente" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Para la configuración del cliente podemos usar <a class="reference download internal" download="" href="../../../_downloads/4dd36a7561d6178b7a766d963df8cd33/c-ss_3.txt"><code class="xref download docutils literal notranslate"><span class="pre">esta</span> <span class="pre">otro</span> <span class="pre">fichero</span></code></a>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/openvpn/client/example/example.conf</span>
+client
+dev-type tun
+dev tun0
+topology subnet
+
+&lt;connection&gt;
+   remote <span class="m">192</span>.168.1.14 <span class="m">1194</span> udp
+&lt;/connection&gt;
+
+resolv-retry infinite
+
+ca client/example/ca.crt
+remote-cert-tls server
+
+nobind
+persist-key
+persist-tun
+
+compress lz4
+verb <span class="m">3</span>
+
+cipher AES-128-CBC
+tls-auth client/example/ta.key <span class="m">1</span>
+
+<span class="c1"># Autenticación con certificado de cliente</span>
+cert client/example/cliente1.crt
+key client/example/cliente1.key
+</pre></div>
+</div>
+<p>cuyas diferencias con la <a class="reference internal" href="02.rw.html#srw3-client"><span class="std std-ref">configuración que requería el road warrior</span></a> se reduce a:</p>
+<ul class="simple">
+<li>Usar certificado para la autenticación.</li>
+<li>No usar el túnel como salida natural a internet. Como el servidor envía la
+ruta adecuada al cliente, no es necesario añadir ninguna directiva de
+encaminamiento.</li>
+</ul>
+<p>Sin embargo, como en el caso del servidor, sólo el cliente añade la entrada
+estática para saber llegar a la red local. Si queremos que el resto de máquinas
+también lo tendremos que hacer una operación análoga a la que hicimos en el
+servidor: modificar la tabla de encaminamiento de la puerta de enlace, o bien,
+modificar la configuración <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr>.</p>
+</div>
+</div>
+<div class="section" id="capa-de-enlace">
+<span id="ovpn-ss-c2"></span><h2>7.4.3.1.3.2. Capa de enlace<a class="headerlink" href="#capa-de-enlace" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Cuando el túnel se hace en la capa de enlace, la red remota puede participar de
+la red local, de manera que todas las máquinas, locales y remotas, se encuentren
+en la misma red lógica:</p>
+<img alt="../../../_images/sede-sede_capa2.png" src="../../../_images/sede-sede_capa2.png" />
+<p>En la sede remota hemos situado el cliente <abbr title="Virtual Private Network">VPN</abbr> como puerta de enlace de la
+red<a class="footnote-reference" href="#id7" id="id2">[2]</a>, aunque no es preceptivo. Tal disposición hace recomendable que el
+cliente tenga dos interfaces físicas de red <a class="footnote-reference" href="#id8" id="id3">[3]</a>.</p>
+<p>Como pretendemos que la configuración dinámica de los equipos la realice el
+servidor <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> situado en la sede local, la configuración es semejante a la
+desarrollada para la conexión sede-equipo móvil, aunque hay alguna diferencia en
+la sede remota que se trataran a su debido tiempo.</p>
+<p>El esquema de las interfaces de cliente y servidor es el siguiente:</p>
+<img alt="../../../_images/br_c2_ss.png" src="../../../_images/br_c2_ss.png" />
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">Como en el caso de <a class="reference internal" href="02.rw.html#srw2-server"><span class="std std-ref">la conexíón sede-equipo móvil en capa de red</span></a> de la constituición de los puentes se encargarán los <em>script</em>
+que crean el túnel.</p>
+</div>
+<div class="section" id="id4">
+<h3>7.4.3.1.3.2.1. Servidor<a class="headerlink" href="#id4" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>La configuración es una mezcla entre <a class="reference internal" href="#ss3-server"><span class="std std-ref">la anterior para road warrior</span></a>, de la que tomamos la configuración estática del cliente y su autenticación mediante
+certificado, y la configuración hecha para <a class="reference internal" href="02.rw.html#srw2-server"><span class="std std-ref">la conexíón
+sede-equipo móvil en capa de red</span></a>. de la que aprovechamos el resto
+para hacer <a class="reference download internal" download="" href="../../../_downloads/22822aa7e54c4b09b3db8a8b48c9a6e4/s-ss_2.txt"><code class="xref download docutils literal notranslate"><span class="pre">la</span> <span class="pre">siguiente</span> <span class="pre">configuración</span></code></a>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/openvpn/server.conf</span>
+port <span class="m">1194</span>
+proto udp
+dev tap0
+dev-type tap
+
+<span class="c1"># Certificados y claves</span>
+ca certs/ca.crt
+cert certs/server.crt
+key keys/server.key
+dh keys/dh2048.pem
+
+<span class="c1"># Configuración de la red del túnel VPN</span>
+server-bridge
+client-config-dir ccd-dir
+
+keepalive <span class="m">10</span> <span class="m">120</span>
+compress lz4
+persist-key
+persist-tun
+status openvpn-status.log
+verb <span class="m">3</span>
+
+cipher AES-128-CBC
+tls-auth keys/ta.key <span class="m">0</span>
+
+user nobody
+group nogroup
+
+max-clients <span class="m">10</span>
+
+script-security <span class="m">2</span>
+up <span class="s2">&quot;/etc/openvpn/bin/bridge.sh eth0 vpn&quot;</span>
+plugin /usr/lib/openvpn/openvpn-plugin-down-root.so <span class="s2">&quot;/etc/openvpn/bin/bridge.sh eth0 vpn&quot;</span>
+</pre></div>
+</div>
+<p>Dentro de <code class="file docutils literal notranslate"><span class="pre">ccd-dir</span></code> podemos incluir la ip fija que queremos conceder al
+cliente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> /etc/openvpn/ccd-dir/cliente1
+<span class="go">ifconfig-push 192.168.255.3 255.255.255.0</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">El <a class="reference download internal" download="" href="../../../_downloads/87ded814012304d092b2eae5bf198248/bridge.sh"><code class="xref download docutils literal notranslate"><span class="pre">script</span></code></a> es exactamente el mismo que
+nos resolvió la parte de servidor en la conexión con un equipo móvil.</p>
+</div>
+</div>
+<div class="section" id="id5">
+<h3>7.4.3.1.3.2.2. Cliente<a class="headerlink" href="#id5" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Las dos diferencias fundamentales respecto a la configuración para un equipo
+móvilson:</p>
+<ul class="simple">
+<li>Debemos crear un puente que incluya la intefaz <em>TAP</em> virtual y la interfaz
+física que conecte con el resto de dispositivos de la red remota, excepto el
+router que da salida al exterior.</li>
+<li>Los dispositivos de la red remota toman su configuración de red del servidor
+<abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> de la red local.</li>
+</ul>
+<p>Tal cosa puede resolverse con <a class="reference download internal" download="" href="../../../_downloads/331bfe987f424871b79e69f08c465ef8/c-ss_2.txt"><code class="xref download docutils literal notranslate"><span class="pre">la</span> <span class="pre">siguiente</span> <span class="pre">configuración</span></code></a>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/openvpn/client/example/example.conf</span>
+client
+dev-type tap
+dev tap0
+topology subnet
+
+&lt;connection&gt;
+   remote <span class="m">192</span>.168.1.14 <span class="m">1194</span> udp
+&lt;/connection&gt;
+
+resolv-retry infinite
+
+ca client/example/ca.crt
+remote-cert-tls server
+
+nobind
+persist-key
+persist-tun
+
+compress lz4
+verb <span class="m">3</span>
+
+cipher AES-128-CBC
+tls-auth client/example/ta.key <span class="m">1</span>
+
+<span class="c1"># Autenticación con certificado de cliente</span>
+cert client/example/cliente1.crt
+key client/example/cliente1.key
+
+user nobody
+group nogroup
+
+script-security <span class="m">2</span>
+up <span class="s2">&quot;/etc/openvpn/bin/bridge.sh eth0 eth1 br0&quot;</span>
+plugin /usr/lib/openvpn/openvpn-plugin-down-root.so <span class="s2">&quot;/etc/openvpn/bin/bridge.sh eth0 eth1 br0&quot;</span>
+</pre></div>
+</div>
+<p>Las particularidades más reseñables de esta configuración son:</p>
+<ol class="arabic">
+<li><p class="first">La configuración fija de la interfaz (la <abbr title="Internet Protocol">IP</abbr> se fija en el servidor).</p>
+</li>
+<li><p class="first">La autenticación del cliente con certificado.</p>
+</li>
+<li><p class="first">No se modifica el encaminamiento por defecto del cliente, por lo que seguirá
+saliendo a internet a través de su router cercano.</p>
+</li>
+<li><p class="first">El <a class="reference download internal" download="" href="../../../_downloads/87ded814012304d092b2eae5bf198248/bridge.sh"><code class="xref download docutils literal notranslate"><span class="pre">script</span> <span class="pre">bridge.sh</span></code></a> ejecutado en la creación es el
+ya ejecutado en otros casos y se encarga de:</p>
+<ul class="simple">
+<li>Exactamente lo mismo que en el servidor.</li>
+<li>Enmascarar el tráfico que salga por la interfaz <em>eth0</em>, por razón que ya
+se verá.</li>
+</ul>
+<p>En este caso, sin embargo, necesita tres parámetros: la interfaz que conecta
+con el router, la interfaz que conecta con los clientes de la red remota y
+pasa a formar parte del puente, y el nombre del propio puente.</p>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p>Si queremos que los clientes remotos usen como puerta de enlace
+el router remoto, en vez de usar el túnel y salir por el router de la red
+local, es necesaria la instalación de <strong class="command">ebtables</strong>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt-get install ebtables
+</pre></div>
+</div>
+<p>del que se vale <strong class="program">bridge.sh</strong> para lograr este fin. En principio,
+debería bastar con ello ya que la carga del módulo homónimo debería ser
+automática al ejecutar la orden dentro del <em>script</em>. Sin embargo, la carga
+parece fallar por lo que muy posiblemente haya que forzar la carga del
+módulo durante el arranque del sistema:</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="nb">echo</span> <span class="s2">&quot;ebtables&quot;</span> &gt;&gt; /etc/modules
+</pre></div>
+</div>
+</div>
+</li>
+</ol>
+<p>Esta configuración permite que circule el tráfico entre la red local y la red
+remota conectada a la interfaz <em>eth1</em> del cliente <abbr title="Virtual Private Network">VPN</abbr>, como si de una misma
+red física se tratara. Hay, sin embargo, un inconveniente:</p>
+<p>Si deseamos obtener las direcciones <abbr title="Internet Protocol">IP</abbr> para los dispositivos remotos del
+servidor <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> situado en la red remota, <strong class="program">openvpn</strong> eliminará la
+información sobre la puerta de enlace, como ya se vio al tratar <a class="reference internal" href="02.rw.html#srw2-client"><span class="std std-ref">la
+configuración del cliente en la conexión sede-equipo móvil en capa de red</span></a>. La consecuencia es que los dispositivos obtendrán una dirección
+<abbr title="Internet Protocol">IP</abbr>, pero no sabrán cómo salir de la red, porque no habrá ninguna entrada que
+defina la puerta de enlace. El modo más astuto de evitar este inconveniente es
+usar la <a class="reference internal" href="../../../06.infraestructura/02.dhcp/03.dnsmasq.html#dhcp-static-routes"><span class="std std-ref">opción DHCP 121</span></a> e incluir en ella la puerta
+predeterminada. Si el servidor <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> fuera <a class="reference internal" href="../../../06.infraestructura/02.dhcp/03.dnsmasq.html#dnsmasq"><span class="std std-ref">dnsmasq</span></a>, bastaría
+con incluir la línea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-option=121,0.0.0.0/0,192.168.255.1</span>
+</pre></div>
+</div>
+<p>Ahora bien, lo lógico es poner como puerta de enlace el router de la red local,
+ya que el servidor <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> lo usan también los clientes de la red local. Esto, no
+obstante, no es lo que queremos para los clientes de la red remota que, con esta
+configuración, saldrán a internet pasando los paquetes a través del túnel. La
+forma de evitar esto es hacer que los paquetes de los clientes remotos que
+fueran a ser conmutados en el cliente <abbr title="Virtual Private Network">VPN</abbr> pasen a ser encaminados, porque así
+éste los pasará por el túnel, si van a algún dispoitivo de la red local, y los
+mandará a su puerta de enlace (el <em>router</em> remoto) si van a internet. De esta
+manipulación se encarga <strong class="command">ebtables</strong> y su configuración la realiza el
+<a class="reference download internal" download="" href="../../../_downloads/87ded814012304d092b2eae5bf198248/bridge.sh"><code class="xref download docutils literal notranslate"><span class="pre">script</span> <span class="pre">bridge.sh</span></code></a> proporcionado.</p>
+<p class="rubric">Notas al pie</p>
+<table class="docutils footnote" frame="void" id="id6" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td><p class="first">Para que nos hagamos una idea, si añadiéramos esta ruta estática con
+<a class="reference internal" href="../../../02.conbas/09.admbasica/11.red.html#ip"><span class="std std-ref">ip</span></a>, la orden debería ser:</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> ip route add <span class="m">192</span>.168.254.0/24 via <span class="m">192</span>.168.255.2
+</pre></div>
+</div>
+</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id7" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id2">[2]</a></td><td>De hecho, podríamos incluir el cliente <abbr title="Virtual Private Network">VPN</abbr> dentro del router, si este
+nos lo permitiera, como es el caso de aquellos que ejecutan un linux
+embebido.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id8" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id3">[3]</a></td><td>Podemos, por supuesto, hacer una configuración si el cliente <abbr title="Virtual Private Network">VPN</abbr> tiene
+una sola interfaz física. Pero en este caso, todos los dispositivos de la red remota
+pertenecerían a la red del router remoto (la pintada de naranja), y además
+deberían usar al cliente <abbr title="Virtual Private Network">VPN</abbr> como puerta de enlace.</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">7.4.3.1.3. Conexión sede-sede</a><ul>
+<li><a class="reference internal" href="#capa-de-red">7.4.3.1.3.1. Capa de red</a><ul>
+<li><a class="reference internal" href="#servidor">7.4.3.1.3.1.1. Servidor</a></li>
+<li><a class="reference internal" href="#cliente">7.4.3.1.3.1.2. Cliente</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#capa-de-enlace">7.4.3.1.3.2. Capa de enlace</a><ul>
+<li><a class="reference internal" href="#id4">7.4.3.1.3.2.1. Servidor</a></li>
+<li><a class="reference internal" href="#id5">7.4.3.1.3.2.2. Cliente</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="02.rw.html"
+                        title="capítulo anterior">7.4.3.1.2. Conexión sede-equipo móvil</a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="04.misc.html"
+                        title="próximo capítulo">7.4.3.1.4. Otros aspectos</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../_sources/07.serre/04.vpn/01.openvpn/03.ss.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Ir a" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="04.misc.html" title="7.4.3.1.4. Otros aspectos"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="02.rw.html" title="7.4.3.1.2. Conexión sede-equipo móvil"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >7. Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" >7.4. Redes VPN</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="index.html" >7.4.3.1. OpenVPN</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor CC BY 4.0, 2016-2020, José Miguel Sánchez Alés.
+      Creado con <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
+    </div>
+  </body>
+</html>
