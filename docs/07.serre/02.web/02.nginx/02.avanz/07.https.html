@@ -287,19 +287,27 @@ que use <abbr title="HyperText Transfer Protocol">HTTP</abbr>sy de que no acepte
 fiable (p.e. uno autofirmado)<a class="footnote-reference" href="#id15" id="id7">[7]</a>. Para más información, consulte <a class="reference internal" href="../../../../08.redes/99.ataques/02.tecnicas/04.mitm.html#sslstrip"><span class="std std-ref">el
 epígrafe dedicado al ataque SSLstrip</span></a>.</p>
 </div>
-<div class="admonition warning">
-<p class="first admonition-title">Advertencia</p>
-<p>Cuando el servidor define varios dominios virtuales y dos o más de
-ellos usan tráfico seguro debe tenerse en cuenta que, antes de usar un
-certificado para descifrar la comunicación, el servidor web es incapaz de
-saber cuál es el nombre de <em>host</em> que usó el cliente para conectarse al
-servidor. Por tanto, la directiva <code class="docutils literal notranslate"><span class="pre">server_name</span></code> es absolutamente inútil
-para tomar decisiones sobre el cifrado. Por este motivo, <strong class="program">nginx</strong>
-siempre usa la configuración de <abbr title="Secure Socket Layer">SSL</abbr> que se encuentra en el servidor
-predeterminado e ignora cualquier otra. Por ello debemos usar siempre un
-mismo certificado virtual para todos los dominios virtuales<a class="footnote-reference" href="#id16" id="id8">[8]</a> y hacer una
-configuración de este estilo:</p>
-<div class="last highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">server</span> <span class="p">{</span>
+<p class="rubric">Múltiples dominios virtual</p>
+<p>Cuando el servidor define varios dominios virtuales y dos o más de ellos usan
+tráfico seguro debe tenerse en cuenta que, en principio, el servidor web conoce
+cuál es el nombre de máquina usado en la petición a través del comando
+<kbd class="kbd docutils literal notranslate">GET</kbd> o las cabeceras <abbr title="HyperText Transfer Protocol">HTTP</abbr>. Al ser el tráfico cifrado, el acceso
+a esta información no es accesible hasta que no se use el certificado
+correspondiente para descifrarla. Ahora bien, si cada dominio virtual seguro usa
+un certificado diferente, ¿cómo puede elegirse el adecuado si el nombre está
+cifrado? Para solucionar este problema se creó la <a class="reference internal" href="../../../../09.apendice/01.cryto/03.aplicaciones.html#sni"><span class="std std-ref">extensión SNI</span></a> al
+protocolo <abbr title="Secure Socket Layer">SSL</abbr>, que soportan la mayor parte de los navegadores modernos y, muy
+probablemente la versión de <strong class="program">nginx</strong> que se esté utilizando:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nginx -V
+</pre></div>
+</div>
+<p>En caso de que <strong class="program">nginx</strong> soporte <abbr title="Server Name Indication">SNI</abbr>, puede definirse un certificado
+diferente en cada sitio a través de <kbd class="kbd docutils literal notranslate">ssl_certificate</kbd> y
+<kbd class="kbd docutils literal notranslate">ssl_certificate_key</kbd>. Para los sitios seguros en que no se defina un
+certificado, se usará el declarado en el servidor predeterminado<a class="footnote-reference" href="#id16" id="id8">[8]</a>. Una
+configuración posible puede ser esta:</p>
+<blockquote>
+<div><div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">server</span> <span class="p">{</span>
    <span class="kn">listen</span>   <span class="mi">80</span>       <span class="s">default_server</span><span class="p">;</span>
    <span class="kn">listen</span>   <span class="mi">443</span> <span class="s">ssl</span>  <span class="s">default_server</span><span class="p">;</span>
 
@@ -318,9 +326,30 @@ configuración de este estilo:</p>
 
    <span class="c1"># Configuración para moodle</span>
 <span class="p">}</span>
+
+<span class="k">server</span>  <span class="p">{</span>
+   <span class="kn">listen</span> <span class="mi">80</span><span class="p">;</span>
+   <span class="kn">listen</span> <span class="mi">443</span> <span class="s">ssl</span><span class="p">;</span>
+
+   <span class="kn">server_name</span>  <span class="s">alt.example.net</span><span class="p">;</span>
+
+   <span class="kn">include</span> <span class="s">snippets/altcert.conf</span><span class="p">;</span>
+
+   <span class="c1"># Configuración para este sitio.</span>
+<span class="p">}</span>
 </pre></div>
 </div>
+</div></blockquote>
+<p>Con esta configuración, el sitio <em>moodle.example.net</em> usará el mismo certificado
+que el sitio predeterminado (el incluido en <code class="file docutils literal notranslate"><span class="pre">snippets/letsencrypt.conf</span></code>,
+mientras que el sitio <em>alt.example.net</em> utiliza un certificado distinto. Podemos
+cerciorarnos de que esto realmente funciona haciendo una consulte con el
+navegador y consultando los certificados, o desde la consola con
+<strong class="command">openssl</strong> al servidor:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl s_client -servername alt.example.net -connect alt.example.net:https &lt; /dev/null <span class="p">|</span> grep <span class="s1">&#39;CN =&#39;</span>
+</pre></div>
 </div>
+<p>donde <kbd class="kbd docutils literal notranslate">-servername</kbd> es el nombre de máquina que se usa para <abbr title="Server Name Indication">SNI</abbr>.</p>
 </div>
 <div class="section" id="puerto-compartido">
 <span id="nginx-haproxy"></span><h2>7.2.2.2.8.3. Puerto compartido<a class="headerlink" href="#puerto-compartido" title="Enlazar permanentemente con este título">¶</a></h2>

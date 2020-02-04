@@ -257,16 +257,26 @@ siguiente:
    fiable (p.e. uno autofirmado)\ [#]_. Para más información, consulte :ref:`el
    epígrafe dedicado al ataque SSLstrip <sslstrip>`.
 
-.. warning:: Cuando el servidor define varios dominios virtuales y dos o más de
-   ellos usan tráfico seguro debe tenerse en cuenta que, antes de usar un
-   certificado para descifrar la comunicación, el servidor web es incapaz de
-   saber cuál es el nombre de *host* que usó el cliente para conectarse al
-   servidor. Por tanto, la directiva ``server_name`` es absolutamente inútil
-   para tomar decisiones sobre el cifrado. Por este motivo, :program:`nginx`
-   siempre usa la configuración de |SSL| que se encuentra en el servidor
-   predeterminado e ignora cualquier otra. Por ello debemos usar siempre un
-   mismo certificado virtual para todos los dominios virtuales\ [#]_ y hacer una
-   configuración de este estilo:
+.. rubric:: Múltiples dominios virtual
+
+Cuando el servidor define varios dominios virtuales y dos o más de ellos usan
+tráfico seguro debe tenerse en cuenta que, en principio, el servidor web conoce
+cuál es el nombre de máquina usado en la petición a través del comando
+:kbd:`GET` o las cabeceras |HTTP|. Al ser el tráfico cifrado, el acceso
+a esta información no es accesible hasta que no se use el certificado
+correspondiente para descifrarla. Ahora bien, si cada dominio virtual seguro usa
+un certificado diferente, ¿cómo puede elegirse el adecuado si el nombre está
+cifrado? Para solucionar este problema se creó la :ref:`extensión SNI <sni>` al
+protocolo |SSL|, que soportan la mayor parte de los navegadores modernos y, muy
+probablemente la versión de :program:`nginx` que se esté utilizando::
+
+   # nginx -V
+
+En caso de que :program:`nginx` soporte |SNI|, puede definirse un certificado
+diferente en cada sitio a través de :kbd:`ssl_certificate` y
+:kbd:`ssl_certificate_key`. Para los sitios seguros en que no se defina un
+certificado, se usará el declarado en el servidor predeterminado\ [#]_. Una
+configuración posible puede ser esta:
 
    .. code-block:: nginx
 
@@ -289,6 +299,28 @@ siguiente:
 
          # Configuración para moodle
       }
+
+      server  {
+         listen 80;
+         listen 443 ssl;
+
+         server_name  alt.example.net;
+
+         include snippets/altcert.conf;
+
+         # Configuración para este sitio.
+      }
+
+Con esta configuración, el sitio *moodle.example.net* usará el mismo certificado
+que el sitio predeterminado (el incluido en :file:`snippets/letsencrypt.conf`,
+mientras que el sitio *alt.example.net* utiliza un certificado distinto. Podemos
+cerciorarnos de que esto realmente funciona haciendo una consulte con el
+navegador y consultando los certificados, o desde la consola con
+:command:`openssl` al servidor::
+
+   $ openssl s_client -servername alt.example.net -connect alt.example.net:https < /dev/null | grep 'CN ='
+
+donde :kbd:`-servername` es el nombre de máquina que se usa para |SNI|.
 
 .. _nginx+haproxy:
 
@@ -444,3 +476,4 @@ al cliente añadiendo otro bloque a la configuración:
 .. |PHP| replace:: :abbr:`PHP (PHP Hypertext Preprocessor)`
 .. |URL| replace:: :abbr:`URL (Uniform Resource Locator)`
 .. |HSTS| replace:: :abbr:`HSTS (HTTP Strict Transport Security)`
+.. |SNI| replace:: :abbr:`SNI (Server Name Indication)`

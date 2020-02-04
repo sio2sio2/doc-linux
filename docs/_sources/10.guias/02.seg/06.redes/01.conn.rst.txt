@@ -1,0 +1,150 @@
+Interconexión segura de redes
+*****************************
+Un aspecto muy importante para salvarguardar la seguridad en las redes es
+conseguir que éstas se conecten siguiendo estrategias que dificulten el acceso
+o la monitorización de intrusos. Diviremos la exposición en cuatro estrategias,
+cada una enfocada a una situación distinta.
+
+Interconexiones cableadas
+=========================
+Dentro de un red |LAN| cableada lo conveniente es que las comunicaciones
+circulen exclusivamente entre los dos extremos que pretenden comunicarse. Ello
+exige:
+
+#. Vigilar que no se interponga en algún punto de la red un dispositivo que
+   intercepte el tráfico. Una máquina con dos interfaces de red :ref:`dispuestas
+   en puente <bridge>` es capaz de llevar a cabo este propósito.
+
+#. Evitar las *topologías en bus*, en las cuales todas las comunicaciones llegan
+   a todos los nodos, de modo que basta con colocar la interfaz de red de uno de
+   los nodos en modo promiscuo para recibir todas las comunicaciones. En las
+   redes antiguas, en las que se disponían `concentradores (o hubs)
+   <https://es.wikipedia.org/wiki/Concentrador>`_ para interconectar los nodos,
+   ésta era la topología. Afortunadamente, en las redes modernas los *hubs* se
+   han sustituidos por *switches* y las topologías han pasado a ser *en
+   estrella* (o *en estrella extendida*), lo cual evita este problema.
+
+#. El uso de *switches* evita lo anterior y, si son gestionables, pueden
+   contribuir a un mejor control de la red:
+
+   - Pueden deshabilitarse los puertos que no se piensan usarse a fin de que
+     conectar un dispositivo no autorizado a uno de ellos no tenga efecto.
+
+   - Pueden definirse distintas |VLAN|\ s (`IEEE 802.1Q
+     <https://es.wikipedia.org/wiki/IEEE_802.1Q>`_), que permiten definir
+     distintas redes lógicas dentro de una misma red física. Esto asegura que
+     los dispositivos conectados a puertos de un *switch* asociados a una
+     determinada |VLAN|, no puedan comunicar con dispositivos conectados a
+     puertos del mismo *switch* asociados a otra distinta, a menos que se
+     encamine en la capa de transporte el tráfico entre ambas redes lógicos.
+     En consecuencia, el uso de |VLAN|\ s nos asegura que el dispositivo
+     conectado a una toma sólo podrá pertenecer a la red que se le asignó a la
+     toma, aunque haya varias redes lógicas compartiendo el mismo *switch*.
+
+   - Puede asociarse una |MAC| o un conjunto de |MAC|\ s a cada puerto del
+     *switch* a fin de que no puedan conectarse dispositivos distintos a los
+     predefinidos.
+
+   - Dado que falsear la dirección |MAC| es tricial, puede utilizarse un
+     :ref:`servidor RADIUS <radius>` que autentica a los dispositivos mediante
+     usuario y contraseña.
+
+.. seealso:: Para saber cómo crear y gestionar interfaces virtuales |VLAN|
+   consulte el :ref:`epígrafe dedicado a las VLAN en Linux <vlan>`.
+
+Seguridad perimetral
+====================
+La :dfn:`seguridad perimetral` de una red es el conjunto de mecanismos de
+defensa que se establecen en la zona de frontera con la red externa
+(generalmente internet) a fin de evitar intrusiones. Sus principales
+**objetivos** son:
+
+* Proporcionar un único punto de conexión con el exterior.
+* Limitar las conexiones a aquellos tráficos autorizados hacia sus respectivos
+  nodos.
+* Redirigir las peticiones externas hacia los servidores adecuados.
+* Ocultar la estructura y los servicios internos de la red.
+* Auditar el tráfico circulante.
+
+En esta red perimetral que hace de frontera se disinguen distintos
+**elementos**:
+
+:dfn:`Perímetro`
+   Se denomina así a la propia frontera fortificada de la red. Es en él donde se
+   colocan algunos de los servicios que trataremos más adelante:
+   :ref:`cortafuegos <seg-firewall>`, :ref:`proxies <seg-proxy>`, :ref:`sistemas
+   de detección de intrusos <ids>`.
+
+:dfn:`Router de frontera`
+   Es el router directamente expuesto a internet.
+
+:dfn:`DMZ`
+   La zona desmilitarizada es aquella red local del perímetro, situada entre la
+   red externa (internet) y el resto de redes locales que habitualmente aloja
+   servidores y que se caracteriza por permitir conexiones a sus servidores
+   tanto desde la red externa como la interna, pero que permite desde ella sólo
+   conexiones al exterior. En consecuencia, un intruso que lograra penetrar en
+   ella aprovechando la vulnerabilidad de algunos de sus servicios, veria
+   restringido su acceso al resto de redes locales.
+
+   .. image:: files/dmz.png
+
+:dfn:`Bastión`
+   Es un servidor especialmente diseñado para hacer frente a ataques externos
+   que dispone un servicio *proxy* accesible desde el exterior. A diferencia del
+   cortafuegos que establece una filtrado en capa 3 y 4, los bastiones son
+   pasarelas a nivel de capa de aplicación. Existen distintas arquitecturas,
+   según se disponga el bastión para proteger a la red interna:
+
+   **Screening router**
+      Es aquella en que el propio *router* de frontera hace la labor de bastión
+      y la tarea de filtrar paquetes. Por lo general, se limita a redirigir el
+      tráfico según su tipo hacia el servidor adecuado. por lo que no existe
+      ningún servicio de *proxy*.
+
+      .. image:: files/scrouter.png
+
+   **Dual-homed host** (Máquina de doble interfaz)
+      En este caso el bastión se interpone entre el *router* y la red interna,
+      pero impidiendo por completo el encaminamiento de paquetes y obligando a
+      que cualquier comunicación se lleve a cabo a través de *proxies*.
+
+      .. image:: files/dualhomed.png
+
+   **Screened host** (Máquina apantallada)
+      Es aquella en que el bastión se sitúa dentro de la red externa y el
+      *router* implementa el cortafuegos, de suerte que los clientes externos
+      sólo puede conectar con el bastión, pero no con el resto de la red.
+      El acceso de los clientes internos a internet puede hacerse:
+
+      - Directamente atravesando el *router*.
+      - Mediante *proxy* a través del bastión.
+
+      .. image:: files/scrhost.png
+
+   **Screened subnet** (Subred apantallada) o |DMZ|
+      Es aquella en que el bastión se incluye dentro de una red perimetral
+      intermedia separada de la red interna por un *router*. En esta red
+      existirán otro servidores accesibles desde el exterior a través del
+      *proxy* que proporciona el bastión, aunque es común (en detrimento de la
+      seguridad), que se elimine el bastión y el *router* externo redirija
+      directamente a los distintos servidores (este es el caso dibujado al
+      tratar más arriba la |DMZ|).
+
+      .. image:: files/bastion-dmz.png
+
+|VPN|
+=====
+Las |VPN| (:dfn:`redes privadas virtuales`) permiten la interconexión segura de
+dos redes locales remotas.
+
+.. seealso:: Siga la introducción teórica contenida :ref:`la sección sobre VPN
+   contenida en el manual <vpn>`.` 
+
+Redes inalámbricas
+==================
+
+.. |VLAN| replace:: :abbr:`VLAN (Virtual LAN)`
+.. |LAN| replace:: :abbr:`LAN (Local Area Network)`
+.. |MAC| replace:: :abbr:`MAC (Media Access Control)`
+.. |DMZ| replace:: :abbr:`DMZ (DesMilitarized Zone)`
