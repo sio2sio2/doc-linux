@@ -15,7 +15,7 @@ Cortafuegos
 
 * Cortafuegos de filtrado dinámico (:ref:`firewall stateful <fw-stateful>`):
 
-  + :program:`iptables`, desde la versión 2.4.
+  + :program:`xtables` (a.k.a :program:`iptables`), desde la versión 2.4.
   + :program:`nftables`, desde la versión 3.13.
 
 Al ser los cortafuegos piezas críticas para la seguridad del sistema operativo
@@ -42,9 +42,10 @@ es inútil por varias razones:
   sufijo *-nft* (por ejemplo, :program:`ebtables-nft` como correspondiente a
   :program:`ebtables`), que permiten escribir la orden usando exactamente la
   misma sintaxis de los programas a los que emulan.
-- Salvo módulos algo avanzados\ [#]_, la traducción será posible y el
-  administrador será capaz de seguir definiendo las reglas *de siempre* usando
-  las herramientas descritas.
+- Salvo módulos algo avanzados\ [#]_ o el objetivo :kbd:`arpreply` de
+  :program:`ebtables`, la traducción será posible y el administrador será capaz
+  de seguir definiendo las reglas *de siempre* usando las herramientas
+  descritas.
 
 Antes de comenzar la explicación de una y otra herramienta, podemos establecer
 la parte común a ambas, esto es, los fundamentos de :program:`netfilter`.
