@@ -2,13 +2,225 @@
 
 Monitorización
 **************
+Hay dos herramientas fundamentales para la monitorización de la red:
+
+* :command:`tcpdump`, sin interfaz gráfica, cuya mayor utilidad es la de
+   capturar tráfico en entornos sin escritorio y detectar la ausencia o
+   presencia de determinado tipo de tráfico.
+
+* :program:`wireshark`, con interfaz gráfica, que además de capturar tráfico es
+  muy útil para analizarlo y rastrear conexiones.
 
 .. _tcpdump:
+.. index:: tcpdump
+
+:command:`tcpdump`
+==================
+Es capaz de capturar el tráfico que pasa por una interfaz de red (en cuyo caso
+debemos ser administradores) o que se lee de un fichero en que se hubiera
+guardado el tráfico capturado previamente. El fruto de la captura puede ser
+mostrado por pantalla o almacenado en un fichero (gracias a :kbd:`-w`)::
+
+   # tcpdump -ni <interfaz> [-w <output.pcap>] [<filtro>]
+   # tcpdump -nr <input.pcap> [<filtro>]
+
+Es conveniente usar la opción :kbd:`-n` para evitar que se intenten resolver las
+direcciones |IP|. El "filtro", por su parte, determina qué trafico es capturado.
+Por ejemplo:
+
+* Para capcurar el tráfico |ICMP| que pasa por *eth0*::
+
+   # tcpdump -ni eth0 icmp
+
+* Para lo mismo, pero almacenándolo en un fichero::
+
+   # tcpdump -ni eth0 -w icmp.pcap icmp
+
+La complicación, pues, es saber expresar los filtros para obtener sólo el
+tráfico que interesa.
+
+Filtros
+-------
+Los filtros posibles se encuentran en :manpage:`pcap-filter(7)` y pueden
+yuxtaponerse, lo cual significa que todos son aplicables.
+
+**Protocolos**
+   Pueden ser protocolos de capa 3 y 4: :kbd:`ip`, :kbd:`ip6`, :kbd:`icmp`,
+   :kbd:`arp`, :kbd:`tcp`, :kbd:`udp`
+
+**Direcciones de origen/destino**
+   Cuando el origen es |IP|, puede indicarse una máquina::
+
+      dst host 192.168.1.4
+      src host 192.168.1.4
+      host 192.168.1.4
+
+   o bien una red en notación |CIDR| o expresando sólo los *bytes* de host::
+
+      dst net 192.168.1.0/24
+      src net 192.168.1
+      host 192.168.1
+
+   También pueden definirse origenes o destinos |MAC|::
+
+      ether dst AA:BB:CC:DD:EE:FF
+      ether src AA:BB:CC:DD:EE:FF
+      ether host AA:BB:CC:DD:EE:FF
+
+**Puertos de origen/destino**
+   Basta con::
+
+      dst port 80
+      src port 80
+      port 80
+
+   aunque podemos especificar si son *tcp* o *udp*::
+
+      tcp dst port 80
+
+   En caso de que queramos expresar un rango::
+
+      dst portrange 80-90
+
+**Operadores lógicos**
+   :kbd:`not` (o :kbd:`!`), :kbd:`and` (o :kbd:`&&`), :kbd:`or` (o :kbd:`||`).
+   Pueden también usarse paréntesis para alterar la precedencia::
+
+      dst port not 80
+      tcp || udp
+
+.. rubric:: Recetas
+
+#. Capturar tráfico |SSH| (ambas direcciones)::
+
+    # tcpdump -ni eth0 tcp port 22
+
+#. Ïdem, pero restringido a la comunicación con la máquina *192.168.1.100*::
+
+    # tcpdump -ni eth0 tcp port 22 host 192.168.1.100
+
+#. Tráfico generado por la orden :command:`ping`::
+
+    # tcpdump -ni eth0 "icmp[icmptype] == icmp-echoreply || icmp[icmptype] == icmp-echorequest"
+
+#. Obtener las |VLAN|\ s de los paquetes circulan por el puente *br0*::
+
+    #  tcpdump -eni br0 | grep -oP '(?<=vlan )[0-9]+' | sort -nu 
+
+   .. note:: :kbd:`-e` añade en la salida la cabecera *Ethernet*.
 
 .. _wireshark:
 
-.. todo:: Explicar el funcionamiento básico de :program:`tcpdump` y
-   :program:`wireshark`.
+:program:`wireshark`
+====================
+Como :ref:`tcpdump <tcpdump>` es capaz de capturar el tráfico de una interfaz o leer de
+fichero tráfico previamente capturado. Tiene definidos dos tipos de filtros:
+
+* :dfn:`Filtros de captura`, aplicables cuando se captura tráfico de una
+  interfaz y que son aquellos que sirven para seleccionar de entro todo el
+  tráfico circulante cuál que será clonado para ser analizado. Tienen, pues, el
+  mismo sentido que que los filtro de :ref:`tcpdump <tcpdump>` y, de hecho, se expresan
+  con el mismo formato.
+
+* :dfn:`Filtros de visualización`, que son aquellos que seleccionan cuál será de entre
+  el tráfico capturado, el mostrado en la interfaz. El expresión de estos
+  filtros es distinta que la que usa :ref:`tcpdump <tcpdump>`.
+
+Filtros de visualización
+------------------------
+
+**Protocolo**
+   Puede ser tanto de capa 3 y 4:
+   
+   | tcp
+   | udp
+   | arp
+   | icmp
+
+   como protocolo de capa de aplicación:
+
+   | ssh
+   | dhcp
+   | dns
+   | http
+   | ftp
+
+   Además :kbd:`proto.parametro` permite filtrar paquetes según un determinado
+   parámetro propio del protocolo. Por ejemplo::
+
+      http.host == www.example.com
+      tcp.ack
+
+**Dirección de origen/destino**
+   Pueden ser direcciones |IP|::
+
+      ip.src == 192.168.1.4
+      ip.dst == 192.168.1.4
+      ip.addr == 192.168.1.4
+
+   La última expresión sirve tanto para origen como para destino. Si filtramos
+   por direcciones físicas::
+
+      eth.addr == 00:11:22:33:44:55
+      eth.addr[0:3] == 00:11:22
+      eth.src == 00:11:22:33:44:55
+      eth.dst == FF:FF:FF:FF:FF:FF
+
+**Puerto de origen/destino**
+   Puede filtrarse tráfico |TCP|::
+
+      tcp.port == 80
+      tcp.srcport == 80
+      tcp.dstport == 80
+
+   o |UDP|::
+
+      udp.port == 53
+      udp.srcport == 53
+      udp.dstport == 53
+
+**Operadores lógicos**
+   Son los mismos que para :ref:`tcpdump <tcpdump>`. Por ejemplo::
+
+      ip.addr == 192.168.1.4 and tcp.port == 80
+
+   y, por supuesto, podremos alterar la precedencia usando paréntesis.
+
+**Operadores de comparación**
+   A los habituales :kbd:`==`, :kbd:`!=`, :kbd:`:`!=`, :kbd:`>=`, :kbd:`>`, :kbd:`<=` y :kbd:`<`, deben añadirse:
+
+   :kbd:`in`
+      Permite definir rangos y valores múltiple::
+
+         tcp.port in {80 443}
+         tcp.port in {110..121}
+         tcp.port in {80 443 8080..8089}
+
+   :kbd:`~` (virgulilla)
+      Permite comparar usando expresiones regulares.
+
+   :kbd:`contains`
+      La cadena contiene una subcadena.
+
+.. warning:: La expresión :kbd:`ip.addr != 192.168.1.4` muy probablemente sea un
+   filtro totalmente inútil, ya que equivale a :kbd:`ip.src != 192.168.1.4 or
+   ip.dst != 192.168.1.4`.
+
+Captura de tráfico remoto
+-------------------------
+Si se desean analizar con :program:`wireshark` paquetes de un servidor sin
+entorno gráfico, cabe la posibilidad de capturarlos con :command:`tcpdump`
+guardándolos en un archivo; y llevarse este fichero al cliente gráfico. Podemos,
+no obstante, ahorrarnos el tedio de transportar el archivo::
+
+   usuario@cliente$ ssh root@sevidor tcpdump -U -s0 -ni eth0 w - 'not port 22' | wireshark -k -i -
 
 .. todo:: Quizás es interesante explorar las posibilidades de `scapy
    <https://seguridadyredes.wordpress.com/2010/07/02/scapy-manipulacion-avanzada-e-interactiva-de-paquetes/>`_.
+
+.. |VLAN| replace:: :abbr:`VLAN (Virtual LAN)`
+.. |MAC| replace:: :abbr:`MAC (Media Access Control)`
+.. |TCP| replace:: :abbr:`TCP (Transmission Control Protocol)`
+.. |UDP| replace:: :abbr:`UDP (User Datagram Protocol )`
+.. |ICMP| replace:: :abbr:`ICMP (Internet Control Message Protocol)`
+.. |CIDR| replace:: :abbr:`CIDR (Classless Inter-Domain Routing)`
