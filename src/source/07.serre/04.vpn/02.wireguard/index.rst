@@ -10,12 +10,20 @@ oficialmente como módulo.
 
 - La configuración es bastante sencilla.
 - Tiene mucho mejor rendimiento.
+- No usa certificados, sino parejas de claves (como |SSH|).
 
 **Inconvenientes**:
 
 - Establece la |VPN| sólo en capa 3.
 - Por ahora, sólo permite la asignación estática de direcciones a los clientes.
-- La única identificación del cliente es por clave, no por contraseña.
+- No se admite identificación del cliente con usuario y contraseña.
+
+Está experimentando un rápido desarrollo y, si se desea contratar un servicio
+externo, son cada vez más `los proveerdores que lo soportan
+<https://greycoder.com/a-list-of-wireguard-supporting-vpns-in-2019/>`_. Es
+particularmente interesante, además, la lectura de este completo `artículo sobre
+el estado de Wireguard en junio de 2019
+<https://restoreprivacy.com/wireguard/>`_.
 
 .. note:: En caso de que utilicemos *Buster*, no dispondremos aún del *software*
    en el repositorio, así que tendremos que echar mano de la versión de pruebas.
