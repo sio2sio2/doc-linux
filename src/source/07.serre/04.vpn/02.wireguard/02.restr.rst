@@ -1,0 +1,190 @@
+Redes restringidas
+******************
+Cuando nuestro *guerrero de la carretera* se encuentra dentro de una red
+restringida que no controlamos nos toparemos muy probablemente con el problema
+de que seremos incapaces de acceder al puerto |UDP| en que hayamos dejado
+escuchando el servidor (el *1194* en nuestra propuesta).
+
+En estas redes restringidas, lo habitual es que sólo podemos:
+
+- Hacer consultas |DNS| (*53/UDP*).
+- Navegar (puertos *80/TCP* y *443/TCP*).
+
+Podríamos dejar escuchando el servicio en el puerto *53/UDP*, pero es común que
+en estas redes restringidas las consultas |DNS| se limiten a algún servidor
+interno, con lo cual es una solución que no será efectiva en todas las redes.
+
+La solución general es usar los puertos para tráfico web, pero nos topamos con
+el problema de que por motivos de rendimiento :program:`wireguard` sólo se ha
+implementado para |UDP|. Una solución para solucionar este inconveniente es
+tunelizador el trafico mediante `Websockets <https://v0ctor.me/websocket>`. Como
+forma parte del estándar |HTML|\ 5, no deberiamos tener problemas con el proxy
+web, aun usando |HTTP| y no |HTTP|\ s. Además, no recifrar con |SSL| aminorará
+la pérdida de rendimiento de tener que tunelizar :program:`wireguard`.
+
+:program:`wstunnel`
+===================
+Para lograr nuestro objetivo podemos usar `wstunnel
+<https://github.com/erebe/wstunnel>`_, el cual es capaz de tunelizar mediante
+*Websockets* tráfico |UDP|. No existe paquete para *Debian*, pero podemos
+descargar el ejecutable del propio repositio de *Github*. Su uso es bastante
+sencillo. Descargamos en dos máquinas el ejecutable y:
+
+* En la máquina servidor lo ejecutamos de esta forma::
+
+   # /usr/local/bin/wstunnel -v --server ws://0.0.0.0 --restrictTo 127.0.0.1:1194
+
+  lo cual supone que la aplicación escuche en el puerto *80* los datos
+  que se pretenden tunelizar. Además, sólo se aceptará tráfico que el cliente
+  indique que va dirigido al puerto *1194* de la interfaz de loopback.
+
+* En la máquina cliente, rematamos el otro extremo del túnel con::
+
+   # /usr/local/bin/wstunnel -v --udp --udpTimeoutSec -1 -L 127.0.0.1:12345:127.0.0.1:1194 ws://203.0.113.1
+
+  que conecta con el puerto 80 del servidor (hemos supuesto que *203.0.113.1* es
+  su dirección |IP|) y envía los datos que recibe por el puerto *12345/UDP*
+  de la interfaz de *loopback* al puerto *1194/UDP* de la interfaz de *loopback*
+  del servidor (esto último coincide con lo que se indicó con
+  :kbd:`--restrictTo` en el servidor).
+
+Con ello ya tendremos establecido el tunel dentro del cual circula el tráfico
+|UDP|. Si queremos probarlo, podemos hacer::
+
+   servidor$ netcat -u -l -p 1194
+
+y en el cliente::
+
+   cliente$ netcat -u localhost 12345
+
+Ambos :ref:`netcat <netcat>` deberían comunicarse a través del *websocket*.
+
+.. note:: Para que el tráfico hubiera sido cifrado (y por el puerto 443) habría
+   bastado con usar :kbd:`wss` en vez de :kbd:`ws`.
+
+Encapsulando :program:`wireguard`
+=================================
+Podemos aplicar lo expuesto bajo el epígrafe anterior al caso *sede-equipo
+móvil* en el que el equipo móvil se halla dentro de una red restringida.
+
+.. rubric:: Servidor
+
+La configuración de :program:`wireguard` es exactamente la misma pero con el
+añadido de que junto a la interfaz debemos arrancar o parar la parte de servidor
+de :program:`wstunnel` que redirige el tráfico recibido hacia el propio
+:program:`wireguard`:
+
+.. code-block:: ini
+
+   [Interface]
+   Address = 10.0.8.1/24
+   ListenPort = 1194
+   PrivateKey = kEANNMfztMtzgwFyyaWOou7+c8ZPD/lyGhmcM7oFtXA=
+   PreUp = /etc/wireguard/wstunnel.sh up %i
+   PostDown = /etc/wireguard/wstunnel.sh down %i
+
+   [Peer]
+   PublicKey = f2CH3QXHiXwFhdATcDi42DU+PUOC9Ky8BgkHBigY5H4=
+   AllowedIPs = 10.0.8.2/32
+
+La automatización de :program:`wstunnel` se logra gracias al :download:`script
+wstunnel.sh <files/wstunnel.sh>`, que debe guardarse con permisos de ejecución
+en :file:`/etc/wireguard`. El *script*, además, lee un fichero de configuración
+:file:`/etc/wireguard/wg0.wstunnel` en el que pueden definirse (con la sintaxis
+de :command:`sh`) algunas variables:
+
+.. code-block:: bash
+
+   SECURE=1                   # Para usar wss, en vez de ws.
+   LISTEN_ADDRESS=127.0.0.1   # IP de escucha de wstunnel. Por defecto, 0.0.0.0.
+   LISTEN_PORT=8080           # Por si se desea cambiar el predefinido: ws=80; wss=443
+
+Como para este caso, no cifraremos y queremos que el tunel creado por
+:program:`wstunnel` escuche en la interfaz física, **no definiremos ninguna
+variable**.
+
+.. note:: Como el :program:`wireguard` sigue escuchando en el puerto 1194 de
+   todas las interfaces, incluida la física, los clientes podrán seguir
+   conectándose, si tienen la posibilidad, sin necesidad de :program:`wstunnel`.
+
+.. rubric:: Cliente
+
+Mientras en el cliente, debemos crear un archivo :file:`/etc/wireguard/wgt0.conf`
+con el siguiente contenido:
+
+.. code-block:: ini
+
+   [Interface]
+   Address = 10.0.8.2/24
+   PrivateKey = WB4TAWIIlaOyULudlcdhqctTl/pdzO7m+6x4DhAP+0k=
+   PreUp = /etc/wireguard/wstunnel.sh up %i
+   PostUp = /etc/wireguard/wstunnel.sh route %i
+   PostDown = /etc/wireguard/wstunnel.sh down %i
+
+   [Peer]
+   PublicKey = /Pr37VgN7GVvizJw9FpCL62DSwocdNEf7lwfdDRZXj8=
+   Endpoint = 0.0.0.0:1194
+   AllowedIPs = 0.0.0.0/0
+
+que utiliza :download:`el mismo script <files/wstunnel.sh>` para crear la parte
+cliente de :program:`wstunnel`. Lo habitual, en el caso de redes restringidas,
+es que queramos usar el túnel para salir son cortapisas a internet, de ahí el
+valor de :kbd:`AllowedIPs`.
+
+Para esta parte cliente sí es necesario el fichero de configuración del tunel en
+el que puede definirse:
+
+.. code-block:: bash
+
+   SECURE=1             # Si queremos usar wss, en vez ws.
+   RHOST=203.0.113.1    # Obligatorio. Dirección del servidor.
+   WG_PORT=1194         # Puesto en el que escucha la parte servidor de wireguard.
+
+Entiéndase que :var:`RHOST` es la dirección donde escucha el otro extremo de
+:program:`wstunnel`. En consecuencia, si se usó en la configuración del servidor
+:var:`LISTEN_PORT` para alterar el puerto predeterminado y se dejó este
+escuchando en la interfaz física, es más que probable que tenga que incluir
+el puerto al definir :var:`RHOST`:
+
+.. code-block:: bash
+
+   RHOST=203.0.113.1:8080
+
+.. warning:: Si deseamos acceder al servidor mediante nombre y no mediante |IP|
+   (lo cual puede ser de mucha utilidad, si colocamos :ref:`nginx como proxy
+   inverso <wg-nginx>`), entonces deberemos añadir en :file:`/etc/hosts` la
+   resolución. para evitar consultar un |DNS| externo que no estará disponible
+   hasta no haberse completado el establecimiento del túnel::
+
+      # echo "203.0.113.1  vpn.example.net" >> /etc/hosts
+
+En cuanto a :var:`WG_PORT` coincidirá con el valor de :kbd:`ListenPort` definido
+en el servidor.
+
+Para resolver nuestro caso, dejaremos esta configuración:
+
+.. code-block:: bash
+
+   # /etc/wireguard/wgt0.wstunnel
+
+   RHOST=203.0.113.1
+   WG_PORT=1194
+
+.. _wg-nginx:
+
+Añadiendo :program:`nginx` a la ecuación
+========================================
+Poner a escuchar en la interfaz física a :program:`wstunnel` imposibilita
+a la máquina hacer también de servidor web. Si este es el caso, la solución
+consiste en disponer un *proxy* inverso que redirija el tráfico hacia el
+servidor web o hacia :program:`wstunnel` según convenga.
+
+La solución es valida tanto para tráfico cifrado como para tráfico sin cifrar.
+Ahora bien, si el tráfico es cifrado, lo conveniente es que quien cifra sea el
+proxy, no la parte servidor de :program:`wstunnel`.
+
+.. todo:: Completar
+
+.. |UDP| replace:: :abbr:`UDP (User Datagram Protocol)`
+.. |HTML| replace:: :abbr:`HTML (HyperText Markup Language)`
+.. |SSL| replace:: :abbr:`SSL (Secure Sockets Layer)`

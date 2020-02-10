@@ -1,0 +1,472 @@
+
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>7.4.3.2.1. Configuración &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/custom.css" />
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../_static/language_data.js"></script>
+    <script type="text/javascript" src="../../../_static/translations.js"></script>
+    <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <link rel="index" title="Índice" href="../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../search.html" />
+    <link rel="next" title="7.4.3.2.2. Redes restringidas" href="02.restr.html" />
+    <link rel="prev" title="7.4.3.2. Wireguard" href="index.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="02.restr.html" title="7.4.3.2.2. Redes restringidas"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="7.4.3.2. Wireguard"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >7. Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" >7.4. Redes VPN</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="index.html" accesskey="U">7.4.3.2. Wireguard</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="configuracion">
+<h1>7.4.3.2.1. Configuración<a class="headerlink" href="#configuracion" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>Debemos limitarnos a resolver la comunicación en capa 3. Podemos, eso sí,
+distinguir si nuestra intención es conectar un equipo móvil con una sede o
+intercomunicar dos sedes. La diferencia entre uno y otro caso se deben al
+tratamiento que deseamos dar en la parte del cliente. Así, en el primer caso:</p>
+<ul class="simple">
+<li>La conexión será esporádica, ya que el equipo cliente no se encontrará
+permanentemente encendido.</li>
+<li>Lo habitual es que nuestra intención se limite a permitir exclusivamente el
+acceso del equipo móvil a la sede, y no el acceso de los equipos de la sede al
+equipo móvil, o el acceso del resto de equipos que se encuentran en la red del
+equipo móvil a la sede.</li>
+<li>Podría darse el caso de que deseáramos encauzar todo el tráfico a través del
+tunel (p.e. para burlar restricciones en la red del cliente).</li>
+</ul>
+<p>En el segundo caso, en cambio:</p>
+<ul class="simple">
+<li>Al ser el cliente, a su vez, una sede, el extremo cliente será también
+permanente y, además, es bastante probable que a su vez queramos que se
+comporte como servidor de sus propios <em>guerreros de la carretera</em>.</li>
+<li>Por lo general, nuestra intención será que los equipos de ambas redes, todos,
+se puedan comunicar con los equipos de la otra sede.</li>
+<li>Lo normal es que cada sede conecte a internet a través de sus correspondientes
+puertas de enlace y que el túnel se dedique exclusivamente al tráfico que
+tiene por destino final la otra sede.</li>
+</ul>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">En realidad, la distinción entre cliente y servidor es bastante
+difusa.</p>
+</div>
+<div class="section" id="sede-equipo-movil">
+<h2>7.4.3.2.1.1. Sede-equipo móvil<a class="headerlink" href="#sede-equipo-movil" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Supongamos el siguiente punto de partida:</p>
+<img alt="../../../_images/sede-rw.png" src="../../../_images/sede-rw.png" />
+<p>con estos datos:</p>
+<table border="1" class="wireguard-red docutils">
+<colgroup>
+<col width="27%" />
+<col width="37%" />
+<col width="37%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Extremo</th>
+<th class="head" colspan="2">Características</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td rowspan="3">Servidor</td>
+<td>Interfaz (eth0)</td>
+<td>203.0.113.1</td>
+</tr>
+<tr class="row-odd"><td>Red</td>
+<td>192.168.255.0/24</td>
+</tr>
+<tr class="row-even"><td>Internet <abbr title="Virtual Private Network">VPN</abbr></td>
+<td>10.0.8.1/24</td>
+</tr>
+<tr class="row-odd"><td rowspan="3">Cliente</td>
+<td>Interfaz (eth0)</td>
+<td>192.168.254.2</td>
+</tr>
+<tr class="row-even"><td>Red</td>
+<td>192.168.254.0/24</td>
+</tr>
+<tr class="row-odd"><td>Internet <abbr title="Virtual Private Network">VPN</abbr></td>
+<td>10.0.8.2/24</td>
+</tr>
+</tbody>
+</table>
+<p>Esto es, el servidor <abbr title="Virtual Private Network">VPN</abbr> es el router que da acceso a la red
+<em>192.168.255.0/24</em> y el cliente una equipo móvil conectado a una red interna con
+acceso a internet. Ciertamente el servidor <abbr title="Virtual Private Network">VPN</abbr> no tiene que ser
+obligatoriamente el router, pero que lo sea simplifica la configuración.</p>
+<div class="section" id="interfaces-virtuales">
+<h3>7.4.3.2.1.1.1. Interfaces virtuales<a class="headerlink" href="#interfaces-virtuales" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Lo primero es configurar en cliente y servidor sus respectivas interfaces
+virtuales y ello pasa por generar las claves pública y privada de cada extremo.</p>
+<p class="rubric">Cliente</p>
+<p>Primero generamos las claves:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="nb">cd</span> /etc/wireguard
+<span class="gp">#</span> wg genkey <span class="p">|</span> tee privatekey <span class="p">|</span> wg pubkey &gt; publickey
+<span class="gp">#</span> cat privatekey
+<span class="go">WB4TAWIIlaOyULudlcdhqctTl/pdzO7m+6x4DhAP+0k=</span>
+<span class="gp">#</span> cat publickey
+<span class="go">f2CH3QXHiXwFhdATcDi42DU+PUOC9Ky8BgkHBigY5H4=</span>
+</pre></div>
+</div>
+<p>Y después creamos la configuración de la interfaz en el fichero
+<code class="file docutils literal notranslate"><span class="pre">/etc/wireguard/wg0.conf</span></code>:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[Interface]</span>
+<span class="na">Address</span> <span class="o">=</span> <span class="s">10.0.8.2/24</span>
+<span class="na">PrivateKey</span> <span class="o">=</span> <span class="s">WB4TAWIIlaOyULudlcdhqctTl/pdzO7m+6x4DhAP+0k=</span>
+</pre></div>
+</div>
+<p>Luego deberemos regresar a este fichero.</p>
+<p class="rubric">Servidor</p>
+<p>De nuevo, generamos un par de claves:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="nb">cd</span> /etc/wireguard
+<span class="gp">#</span> wg genkey <span class="p">|</span> tee privatekey <span class="p">|</span> wg pubkey &gt; publickey
+<span class="gp">#</span> cat privatekey
+<span class="go">kEANNMfztMtzgwFyyaWOou7+c8ZPD/lyGhmcM7oFtXA=</span>
+<span class="gp">#</span> cat publickey
+<span class="go">/Pr37VgN7GVvizJw9FpCL62DSwocdNEf7lwfdDRZXj8=</span>
+</pre></div>
+</div>
+<p>Y a continuación definimos la interfaz en <code class="file docutils literal notranslate"><span class="pre">/etc/wireguard/wg0.conf</span></code>:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[Interface]</span>
+<span class="na">Address</span> <span class="o">=</span> <span class="s">10.0.8.1/24</span>
+<span class="na">ListenPort</span> <span class="o">=</span> <span class="s">1194</span>
+<span class="na">PrivateKey</span> <span class="o">=</span> <span class="s">kEANNMfztMtzgwFyyaWOou7+c8ZPD/lyGhmcM7oFtXA=</span>
+<span class="c1">#PostUp = iptables -t nat -A PREROUTING -i %i -j CONNMARK --set-mark 1</span>
+<span class="c1">#PostUp = iptables -t nat -A POSTROUTING -m connmark --mark 1 -j MASQUERADE</span>
+<span class="c1">#PostDown = iptables -t nat -D PREROUTING -i %i -j CONNMARK --set-mark 1</span>
+<span class="c1">#PostDown = iptables -t nat -D POSTROUTING -m connmark --mark 1 -j MASQUERADE</span>
+</pre></div>
+</div>
+<p>Hemos definido en esta ocasión el puerto de escucha (<em>1194/UDP</em>) para que el
+cliente sepa con certeza a cuál debe conectar. En el cliente, como no se ha
+definido se escogerá uno al azar.</p>
+<p>Otro aspecto importante es el de acceso a la red interna <em>192.168.255.0/24</em>. Si
+el servidor es también la puerta de enlace de la red interna, entonces no habrá
+que hacer nada más, ya que estará ya definido para aceptar paquetes ajenos y,
+además, cualquier paquete cuyo destino sea el exterior pasará por él y el sabrá
+si tiene que enviarlo a través de la interfaz externa o a través de la interfaz
+virtual. En cambio, si no es puerta de enlace será necesario incluir las cuatro
+líneas comentadas que aseguran el enmascaramiento del tráfico saliente que
+procede del <abbr title="Virtual Private Network">VPN</abbr> y, además, deberemos aceptar paquetes ajenos establaciendo a
+<strong>1</strong> el parámetro <kbd class="kbd docutils literal notranslate">net.ipv4.ip_forward</kbd>. Para ello podemos editar
+<code class="file docutils literal notranslate"><span class="pre">/etC/sysctl.conf</span></code> y descomentar la línea:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="na">net.ipv4.ip_forward</span> <span class="o">=</span> <span class="s">1</span>
+</pre></div>
+</div>
+<p>que tendrá efecto en el próximo reinicio, pero que podemos recargar con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> sysctl -p
+</pre></div>
+</div>
+</div>
+<div class="section" id="declaracion-del-otro-extremo">
+<h3>7.4.3.2.1.1.2. Declaración del otro extremo<a class="headerlink" href="#declaracion-del-otro-extremo" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>El fichero <code class="file docutils literal notranslate"><span class="pre">/etc/wireguard/wg0.conf</span></code> no se ha completado aún porque, además
+de la interfaz, se define la configuración del otro extremo del túnel. Por cada
+extremo, debe incluirse una sección <kbd class="kbd docutils literal notranslate">[Peer]</kbd>.</p>
+<p class="rubric">Cliente</p>
+<p>Dejaremos el fichero de este modo:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[Interface]</span>
+<span class="na">Address</span> <span class="o">=</span> <span class="s">10.0.8.2/24</span>
+<span class="na">PrivateKey</span> <span class="o">=</span> <span class="s">WB4TAWIIlaOyULudlcdhqctTl/pdzO7m+6x4DhAP+0k=</span>
+
+<span class="k">[Peer]</span>
+<span class="na">PublicKey</span> <span class="o">=</span> <span class="s">/Pr37VgN7GVvizJw9FpCL62DSwocdNEf7lwfdDRZXj8=</span>
+<span class="na">Endpoint</span> <span class="o">=</span> <span class="s">203.0.113.1:1194</span>
+<span class="na">AllowedIPs</span> <span class="o">=</span> <span class="s">10.0.8.1/32, 192.168.255.0/24</span>
+<span class="c1">#AllowedIPs = 0.0.0.0/0</span>
+</pre></div>
+</div>
+<p>Donde se ha añadido un <kbd class="kbd docutils literal notranslate">[Peer]</kbd> para el servidor. Se declara su clave
+pública, la dirección de conexión a través de <kbd class="kbd docutils literal notranslate">Endpoint</kbd> y cuáles son las
+redes de destino para las que se usará el túnel (<kbd class="kbd docutils literal notranslate">AllowedIPs</kbd>). Tal y como
+está la configuración, accederemos al propio servidor y la red local del
+servidor; pero si usamos la líneas comentada alternativa, convertiremos el
+servidor <abbr title="Virtual Private Network">VPN</abbr> en la puerta predeterminada y accederemos a internet a través del
+túnel, lo cual puede resultar útil si el cliente se encuentra en una red que nos
+restringe accesos. Al levantar la interfaz, <strong class="program">wireguard</strong> se encargará de
+madoficar las reglas y tablas de encaminamiento para hacer esto posible.</p>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p>Si añadimos a <kbd class="kbd docutils literal notranslate">[Interface]</kbd> la opción:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="na">Table</span> <span class="o">=</span> <span class="s">off</span>
+</pre></div>
+</div>
+<p class="last">no se llevará a cabo modificación del encaminamiento y deberemos ser nosotros
+los que a mano alteremos el encaminamiento.</p>
+</div>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p class="last">Asegúrese de que en en las redes indicadas en <kbd class="kbd docutils literal notranslate">AllowedIPs</kbd> no
+se hay ninguna que incluya la <abbr title="Internet Protocol">IP</abbr> expresada en <kbd class="kbd docutils literal notranslate">Endpoint</kbd> o, de lo
+contrario, el túnel no funcionará.</p>
+</div>
+<p class="rubric">Servidor</p>
+<p>En el servidor el añadido será éste:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[Interface]</span>
+<span class="na">Address</span> <span class="o">=</span> <span class="s">10.0.8.1/24</span>
+<span class="na">ListenPort</span> <span class="o">=</span> <span class="s">1194</span>
+<span class="na">PrivateKey</span> <span class="o">=</span> <span class="s">kEANNMfztMtzgwFyyaWOou7+c8ZPD/lyGhmcM7oFtXA=</span>
+
+<span class="k">[Peer]</span>
+<span class="na">PublicKey</span> <span class="o">=</span> <span class="s">f2CH3QXHiXwFhdATcDi42DU+PUOC9Ky8BgkHBigY5H4=</span>
+<span class="na">AllowedIPs</span> <span class="o">=</span> <span class="s">10.0.8.2/32</span>
+</pre></div>
+</div>
+<p>Obsérvese que en el servidor el único interés será alcanzar al cliente y no su
+red, de ahí que no se añada más que la <abbr title="Internet Protocol">IP</abbr> del otro extremo del túnel. Además,
+no se define cuál es el otro extremo exactamente (<kbd class="kbd docutils literal notranslate">Endpoint</kbd>) porque no
+podemos hacerlo puesto que el puerto del cliente será aleatorio y porque no es
+necesario si es el cliente el que intenta conectar primero. Así, pues, cuando
+hagamos la primera prueba, tendremos que hacerla de cliente a servidor y no
+servidor a cliente.</p>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">Si el servidor aceptase más clientes móviles, bastaría con añadir más
+secciones <kbd class="kbd docutils literal notranslate">[Peer]</kbd>.</p>
+</div>
+</div>
+<div class="section" id="establecimiento-del-tunel">
+<h3>7.4.3.2.1.1.3. Establecimiento del túnel<a class="headerlink" href="#establecimiento-del-tunel" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Para establecer el núcleo debenmos hacer exactamente la misma acción en
+cliente y servidor: levantar la interfaz. Para ello tenemos tres alternativas:</p>
+<ul>
+<li><p class="first">Hacerlo de forma manual:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> wg-quick up wg0
+<span class="gp">#</span> wg-quick down wg0
+</pre></div>
+</div>
+</li>
+<li><p class="first">Habilitarlo como servicio de <a class="reference internal" href="../../../04.servidor/03.init/index.html#systemd"><span class="std std-ref">systemd</span></a> para que la interfaz
+se levante automáticamente durante cada inicio:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> systemctl <span class="nb">enable</span> wg-quick@wg0
+<span class="gp">#</span> systemctl start wg-quick@wg0
+</pre></div>
+</div>
+<p>aunque es probable que esto sólo nos interese en el caso del servidor.</p>
+</li>
+<li><p class="first">Editar el fichero <code class="file docutils literal notranslate"><span class="pre">/etc/network/interfaces</span></code> para poder utilizar
+<strong class="program">ifupdown</strong> en la gestión de la interfaz virtual:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">auto wg0</span>
+<span class="go">iface wg0 inet manual</span>
+<span class="go">    pre-up wg-quick up $IFACE</span>
+<span class="go">    down   wg-quick down $IFACE</span>
+</pre></div>
+</div>
+<p>aunque es probable que <kbd class="kbd docutils literal notranslate">auto</kbd> sólo queremos escribirlo en la
+configuración del cliente. De este modo, la manipulación de la interfaz puede
+llevarse a cabo exactamente igual que como con el resto de interfaces:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> ifup wg0
+<span class="gp">#</span> ifdown wg0
+</pre></div>
+</div>
+</li>
+</ul>
+<p>Establecido el túnel al configurar ambos extremos, podemos desde el cliente
+probar la configuración:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> ping -c1 <span class="m">10</span>.0.8.1
+<span class="gp">$</span> wg show
+<span class="go">interface: wg0</span>
+<span class="go">  public key: f2CH3QXHiXwFhdATcDi42DU+PUOC9Ky8BgkHBigY5H4=</span>
+<span class="go">  private key: (hidden)</span>
+<span class="go">  listening port: 43577</span>
+
+<span class="go">peer: /Pr37VgN7GVvizJw9FpCL62DSwocdNEf7lwfdDRZXj8=</span>
+<span class="go">  endpoint: 203.0.113.1:1194</span>
+<span class="go">  allowed ips: 10.0.8.1/32</span>
+<span class="go">  latest handshake: 1 hour, 3 minutes, 32 seconds ago</span>
+<span class="go">  transfer: 604 B received, 3.71 KiB sen</span>
+</pre></div>
+</div>
+<p>También podemos comprobar que para llegar a <em>192.168.255.1</em> usamos el túnel y no
+la puerta de enlace predeterminada:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> ip route get <span class="m">1</span>.1.1.1
+<span class="go">1.1.1.1 via 192.168.254.1 dev eth0 src 192.168.254.2 uid 0</span>
+<span class="go">    cache</span>
+<span class="gp">#</span> ip route get <span class="m">192</span>.168.255.1
+<span class="go">192.168.255.1 dev wg0 src 10.0.8.2 uid 0</span>
+<span class="go">    cache</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="sede-sede">
+<h2>7.4.3.2.1.2. Sede-sede<a class="headerlink" href="#sede-sede" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Este caso no es substancialmente distinto del anterior y nos lo podemos plantear
+como aquel caso en que ambos puntos se configuran simétricamente.</p>
+<img alt="../../../_images/sede-sede1.png" src="../../../_images/sede-sede1.png" />
+<p>Los datos son los siguientes:</p>
+<table border="1" class="wireguard-red docutils">
+<colgroup>
+<col width="27%" />
+<col width="37%" />
+<col width="37%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Extremo</th>
+<th class="head" colspan="2">Características</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td rowspan="3">Servidor</td>
+<td>Interfaz (eth0)</td>
+<td>203.0.113.1</td>
+</tr>
+<tr class="row-odd"><td>Red</td>
+<td>192.168.255.0/24</td>
+</tr>
+<tr class="row-even"><td>Internet <abbr title="Virtual Private Network">VPN</abbr></td>
+<td>10.0.8.1/24</td>
+</tr>
+<tr class="row-odd"><td rowspan="3">Cliente</td>
+<td>Interfaz (eth0)</td>
+<td>203.0.113.2</td>
+</tr>
+<tr class="row-even"><td>Red</td>
+<td>192.168.254.0/24</td>
+</tr>
+<tr class="row-odd"><td>Internet <abbr title="Virtual Private Network">VPN</abbr></td>
+<td>10.0.8.2/24</td>
+</tr>
+</tbody>
+</table>
+<p>Como, además, suponemos que el túnel se establece entre las puertas de enlace,
+no tenemos que preocuparnos por hacer enmascaramiento o crear entradas
+adicionales en la tabla de encaminamiento.</p>
+<p class="rubric">Cliente</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[Interface]</span>
+<span class="na">Address</span> <span class="o">=</span> <span class="s">10.0.8.2/24</span>
+<span class="na">ListenPort</span> <span class="o">=</span> <span class="s">1194</span>
+<span class="na">PrivateKey</span> <span class="o">=</span> <span class="s">WB4TAWIIlaOyULudlcdhqctTl/pdzO7m+6x4DhAP+0k=</span>
+
+<span class="k">[Peer]</span>
+<span class="na">PublicKey</span> <span class="o">=</span> <span class="s">/Pr37VgN7GVvizJw9FpCL62DSwocdNEf7lwfdDRZXj8=</span>
+<span class="na">Endpoint</span> <span class="o">=</span> <span class="s">203.0.113.1/24</span>
+<span class="na">AllowedIPs</span> <span class="o">=</span> <span class="s">10.0.8.1/32, 192.168.255.0/24</span>
+</pre></div>
+</div>
+<p>En este caso, sí fijamos el puerto de escucha, no porque el caso lo requiera,
+sino para facilitar que posibles clientes móviles puedan, a su vez, conectarse a
+la sede</p>
+<p class="rubric">Servidor</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[Interface]</span>
+<span class="na">Address</span> <span class="o">=</span> <span class="s">10.0.8.1/24</span>
+<span class="na">ListenPort</span> <span class="o">=</span> <span class="s">1194</span>
+<span class="na">PrivateKey</span> <span class="o">=</span> <span class="s">kEANNMfztMtzgwFyyaWOou7+c8ZPD/lyGhmcM7oFtXA=</span>
+
+<span class="k">[Peer]</span>
+<span class="na">PublicKey</span> <span class="o">=</span> <span class="s">f2CH3QXHiXwFhdATcDi42DU+PUOC9Ky8BgkHBigY5H4=</span>
+<span class="na">Endpoint</span> <span class="o">=</span> <span class="s">203.0.113.2/24</span>
+<span class="na">AllowedIPs</span> <span class="o">=</span> <span class="s">10.0.8.2/32, 192.168.254.0/24</span>
+</pre></div>
+</div>
+<p>La única diferencia con la configuración <em>sede-equipo móvil</em> es que ahora
+es que ahora sí intesará hacer accesible a la red del otro extremo, de ahí que
+se haya añadido a <kbd class="kbd docutils literal notranslate">AllowIPs</kbd>. Adicionalmente, hemos declarado la dirección
+del otro punto, ya que la conocemos y no cambiará.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">7.4.3.2.1. Configuración</a><ul>
+<li><a class="reference internal" href="#sede-equipo-movil">7.4.3.2.1.1. Sede-equipo móvil</a><ul>
+<li><a class="reference internal" href="#interfaces-virtuales">7.4.3.2.1.1.1. Interfaces virtuales</a></li>
+<li><a class="reference internal" href="#declaracion-del-otro-extremo">7.4.3.2.1.1.2. Declaración del otro extremo</a></li>
+<li><a class="reference internal" href="#establecimiento-del-tunel">7.4.3.2.1.1.3. Establecimiento del túnel</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#sede-sede">7.4.3.2.1.2. Sede-sede</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="index.html"
+                        title="capítulo anterior">7.4.3.2. Wireguard</a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="02.restr.html"
+                        title="próximo capítulo">7.4.3.2.2. Redes restringidas</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../_sources/07.serre/04.vpn/02.wireguard/01.conf.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Ir a" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="02.restr.html" title="7.4.3.2.2. Redes restringidas"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="7.4.3.2. Wireguard"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >7. Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" >7.4. Redes VPN</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="index.html" >7.4.3.2. Wireguard</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor CC BY 4.0, 2016-2020, José Miguel Sánchez Alés.
+      Creado con <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
+    </div>
+  </body>
+</html>

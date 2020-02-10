@@ -2,6 +2,41 @@
 
 OpenVPN
 =======
+Al abordar el estudio de las redes |VPN| debemos tener presentes los siguientes
+cuatro aspectos:
+
+**Capa de implementación del túnel**
+   El túnel puede establecerse en la *capa de enlace* con lo que ambos extremos se
+   encontrarán en la misma red; o bien puede establecerse en la *capa de red* lo
+   que determina que los segmentos local y remoto pertenezcan a redes distintas.
+
+   En el primer caso, el establecimiento en capa 2 supone que las interfaces
+   virtuales creadas sean interfaces tipo *TAP* que operan con paquetes de capa
+   2 (o sea, tramas) como *ethernet*. En el segundo caso, las interfaces creadas
+   serán de tipo *TUN*, que operan en capa 3 con paquetes |IP|,
+
+**Naturaleza del cliente**
+   Éste puede ser un *equipo móvil* (lo que en la jerga se llama *road warrior*)
+   que se conecta para participar en la red local de la sede en la que se
+   encuentra el servidor; o bien, el propósito de establecer el túnel pueda ser
+   el de comunicar dos sedes entre sí de modo que el cliente no es un cliente
+   aislado sino toda una red remota (una sede) que se desea sumar a la sede del
+   servidor.
+
+**Autenticación del cliente**
+   Puede hacerse con *certificado digital* emitido por el servidor; o bien,
+   mediante el uso de usuario y contraseña.
+
+**Tipo de certificado de servidor**
+   El certificado de servidor podemos obtenerlo a través de una entidad
+   certificadora como :ref:`Let's Encrypt <certbot>`, o bien, crear nosotros una
+   entidad certificadora y con élla acreditar el certificado del servidor.
+
+   .. note:: Esta misma entidad se encarga de acreditar también los
+       certificados de los clientes, por lo que si nuestra intención es usarlos
+       como método de autenticación para clientes, deberemos olvidarnos de usar
+       *Let's Encrypt*.
+
 En el estudio trataremos cómo establecer redes |VPN| entre una sede y un equipo
 móvil o entre dos sedes; y para ambos casos se implementará la conexión en capa
 de enlace y de red. Son, por tanto, cuatro casos posibles. Para no multiplicar

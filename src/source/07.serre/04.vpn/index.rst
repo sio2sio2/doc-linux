@@ -87,63 +87,37 @@ largo de este documento.
 
 Tipos
 -----
-Básicamente hay dos tipos de conexiones |VPN|:
+Podemos hacer varias clasificaciones atendiendo a distintos criterios:
 
-:dfn:`Acceso remoto` o conexión :dfn:`sede-cliente móvil`
-   Es la conexión que se establece entre una red y un dispotiivo remoto
-   individual. En esta conexión la red dispone de un servidor |VPN|
-   permanentemente accesible desde internet y el equipo remoto se conectará de
-   modo intermitente a menudo desde distintas localizaciones. iEn la jerga
-   habitual suele referirse el equipo remoto como *road warrior*.
+#. Según la naturaleza del cliente:
 
-   .. image:: 01.openvpn/files/roadwarrior.png
+   :dfn:`Acceso remoto` o conexión :dfn:`sede-cliente móvil`
+      Es la conexión que se establece entre una red y un dispotiivo remoto
+      individual. En esta conexión la red dispone de un servidor |VPN|
+      permanentemente accesible desde internet y el equipo remoto se conectará de
+      modo intermitente a menudo desde distintas localizaciones. iEn la jerga
+      habitual suele referirse el equipo remoto como *road warrior*.
 
-Conexión :dfn:`sede-sede`
-   Es la conexión permanente que se establece entre dos redes remotas en una de
-   las cuales un dispositivo hace el papel de servidor y en la otra, otro el de
-   cliente. Por lo general, estos dispositivos se corresponden con el router u
-   otro disposivo en la red perimetral.
+      .. image:: 01.openvpn/files/roadwarrior.png
 
-   .. image:: files/sede-sede.png
+   Conexión :dfn:`sede-sede`
+      Es la conexión permanente que se establece entre dos redes remotas en una de
+      las cuales un dispositivo hace el papel de servidor y en la otra, otro el de
+      cliente. Por lo general, estos dispositivos se corresponden con el router u
+      otro disposivo en la red perimetral.
 
-Aspectos
---------
-.. todo:: Revisar este apartado, por si está demasiado enfocado a OpenVPN
-   (Quizás haya que trasladarlo).
+      .. image:: files/sede-sede.png
 
-Hay cuatro aspectos a tener en cuenta al establecer una conexión |VPN|:
+#. Según la capa de implementación:
 
-**Capa de implementación del túnel**
-   El túnel puede establecerse en la *capa de enlace* con lo que ambos extremos se
-   encontrarán en la misma red; o bien puede establecerse en la *capa de red* lo
-   que determina que los segmentos local y remoto pertenezcan a redes distintas.
+   :dfn:`VPN en capa 2`
+      Es aquella que establece el enlace en capa 2, por lo que ambos extremos
+      del túnel se encontrarán en la mismna red lógica.
 
-   En el primer caso, el establecimiento en capa 2 supone que las interfaces
-   virtuales creadas sean interfaces tipo *TAP* que operan con paquetes de capa
-   2 (o sea, tramas) como *ethernet*. En el segundo caso, las interfaces creadas
-   serán de tipo *TUN*, que operan en capa 3 con paquetes |IP|,
-
-**Naturaleza del cliente**
-   Éste puede ser un *equipo móvil* (lo que en la jerga se llama *road warrior*)
-   que se conecta para participar en la red local de la sede en la que se
-   encuentra el servidor; o bien, el propósito de establecer el túnel pueda ser
-   el de comunicar dos sedes entre sí de modo que el cliente no es un cliente
-   aislado sino toda una red remota (una sede) que se desea sumar a la sede del
-   servidor.
-
-**Autenticación del cliente**
-   Puede hacerse con *certificado digital* emitido por el servidor; o bien,
-   mediante el uso de usuario y contraseña.
-
-**Tipo de certificado de servidor**
-   El certificado de servidor podemos obtenerlo a través de una entidad
-   certificadora como :ref:`Let's Encrypt <certbot>`, o bien, crear nosotros una
-   entidad certificadora y con élla acreditar el certificado del servidor.
-
-   .. note:: Esta misma entidad se encarga de acreditar también los
-       certificados de los clientes, por lo que si nuestra intención es usarlos
-       como método de autenticación para clientes, deberemos olvidarnos de usar
-       *Let's Encrypt*.
+   :dfn:`VPN en capa 3`
+      Es aquella que establece el enlace en capa 3, por lo que cada extremo del
+      túnel se encontrará en una red lógica distinta y el propio túnel
+      constituirá una tercera.
 
 Encaminamiento
 --------------
