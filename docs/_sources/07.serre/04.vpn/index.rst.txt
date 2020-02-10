@@ -131,11 +131,11 @@ interfaz virtual con otra |IP| de la misma red. Por tanto, es como si
 conectado con él las dos interfaces virtuales.
 
 Es obvio que los paquetes, en realidad, seguirán saliendo y llegando por las
-interfaces reales y que cada interfaz los enviará a las puertas de enlace
+interfaces reales y que cada máquina los enviará a las puertas de enlace
 respectivas. Pero toda esta realidad es absolutamente transparente para el
-usuario, de manera que si el servidor tiene |IP| virtual *10.8.0.1* y el cliente
-|IP| virtual *10.8.0.2*, para saber desde el cliente si el servidor está *ahí*
-basta con hacer::
+usuario y el tráfico encapsulado, de manera que si el servidor tiene |IP|
+virtual *10.8.0.1* y el cliente |IP| virtual *10.8.0.2*, para saber desde el
+cliente si el servidor está *ahí* basta con hacer::
 
    $ ping 10.8.0.1
 
@@ -163,9 +163,10 @@ Además de implementar nosotros mismos el servidor, existen distintos servicios
 en internet (por lo general de pago) que proporcionan servicio |VPN|, esto es,
 servidores |VPN| dispuestos a lo largo del mundo a los que podemos conectar con
 un cliente a fin de burlar algún tipo de censura u ocultar la identidad, aunque
-le proveedor del servicio sí sepa quién somos o, al menos, disponga de nuestra
-|IP| para que se pueda llegar a saber quién somos. `VPNbook
-<https://www.vpnbook.com/>`_ ofrece este servicio de forma gratuita.
+el proveedor del servicio |VPN| sí sepa quién somos o, al menos, disponga de
+nuestra |IP| para que se pueda llegar a saber quién somos. `VPNbook
+<https://www.vpnbook.com/>`_, con el que podemos usar :ref:`OpenVPN <openvpn>`,
+ofrece este servicio de forma gratuita.
 
 .. rubric:: Notas al pie
 

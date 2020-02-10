@@ -125,14 +125,19 @@ down() {
 # route...
 #
 route() {
-   local gateway routes table=$DEFAULT_PORT
+   local gateway routes rhost="${RHOST%: *}" table=$DEFAULT_PORT
    
    # ¿Ha creado rutas adicionales wg-quick?
    routes=$(ip route show table "$table" 2>/dev/null)
    [ -n "$routes" ] || return 0
 
+   # Se proporcionó el nombre y no la IP del servidor.
+   if echo "$rhost" | grep -q '[^.0-9]'; then
+      rhost=$(getent hosts "$rhost" | cut -d\  -f1)
+   fi
+
    gateway=$(ip route show | awk '/^default/ {print $3, $5}')
-   ip route add "${RHOST%:*}" via "${gateway% *}" dev "${gateway#* }" table "$table"
+   ip route add "$rhost" via "${gateway% *}" dev "${gateway#* }" table "$table"
 }
 
 

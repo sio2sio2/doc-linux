@@ -15,6 +15,7 @@ oficialmente como módulo.
 
 - Establece la |VPN| sólo en capa 3.
 - Por ahora, sólo permite la asignación estática de direcciones a los clientes.
+- La única identificación del cliente es por clave, no por contraseña.
 
 .. note:: En caso de que utilicemos *Buster*, no dispondremos aún del *software*
    en el repositorio, así que tendremos que echar mano de la versión de pruebas.
