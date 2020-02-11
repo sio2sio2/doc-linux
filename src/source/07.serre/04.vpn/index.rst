@@ -119,6 +119,34 @@ Podemos hacer varias clasificaciones atendiendo a distintos criterios:
       túnel se encontrará en una red lógica distinta y el propio túnel
       constituirá una tercera.
 
+Objetivos
+---------
+Hay tres motivaciones principales, concurrentes o no, por las que se puede
+desear el uso de una |VPN|:
+
+#. La más evidente de hacer participar a un equipo remoto o a toda una red
+   remota en la red local de una organización.
+
+#. Preservar el anonimato gracias a acceder a internet a través de una |IP|
+   distinta a la proporcionada por el |ISP|, lo cual supone que el dueño del
+   servidor |VPN| se comprometa a no facilitar la |IP| real del cliente a
+   terceros.
+   
+#. Burlar las restricciones de acceso a Internet:
+
+   - Impuestas de forma global a un país, por ejemplo, por decisión judicial.
+     Para ello basta con deslocalizar el acceso, esto es, acceder a Internet
+     a través de una |IP| de un país distinto al del |ISP| del cliente.
+
+   - Impuesto por el administrador de la red local en la que se encuentre el
+     cliente. Por ejemplo, que utiliza :ref:`sumideros DNS <seg-sinkhole>` para
+     evitar el acceso a ciertas páginas o que el cliente se sitúe en una red
+     en la que se restringen algunos tipos de tráfico al exterior (muy
+     comúnmente que sólo se permita tráfico |HTTP| y |HTTP|\ s). Este último
+     caso, obliga a crear mecanismos que permitan hacer pasar al tráfico |VPN|
+     por tráfico web. Los trataremos en el estudio práctio de :ref:`OpenVPN
+     <openvpn>` y :ref:`Wireguard <wireguard>`.
+
 Encaminamiento
 --------------
 Antes de entrar en harina, es conveniente entender qué supone establecer un
@@ -180,3 +208,4 @@ ofrece este servicio de forma gratuita.
   siguen saliendo por la puerta de enlace real.
 
 .. |SSL| replace:: :abbr:`SSL (Secure Sockets Layer)`
+.. |ISP| replace:: :abbr:`ISP (Internet Service Provider)`

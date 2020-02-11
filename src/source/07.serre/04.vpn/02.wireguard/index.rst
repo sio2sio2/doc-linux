@@ -15,8 +15,20 @@ oficialmente como módulo.
 **Inconvenientes**:
 
 - Establece la |VPN| sólo en capa 3.
-- Por ahora, sólo permite la asignación estática de direcciones a los clientes.
 - No se admite identificación del cliente con usuario y contraseña.
+- Lo que podríamos denominar *falta de anonimato*, aunque el administrador
+  del servidor no tenga intención de querer identificar al cliente. Esto es
+  debido a que, por un lado, a los clientes debe asignárseles una |IP| fija en
+  su extremo del túnel y, a que por otro, la asociación entre |IP| real
+  del cliente y su correspondiente |IP| en el túnel no se registra sin más en
+  un fichero de registro (que podría ser :file:`/dev/null` para evitar el
+  registro efectivo), sino que es permanentemente consultable a través de la
+  orden :code:`wg show`. Esta circunstancia, no obstante, movió a AzireVPN_
+  a `contratar al desarrollador de Wireguard un módulo que asegure el anonimato
+  <https://www.azirevpn.com/blog/2017-11-15/wireguard-privacy-enhancements>`_,
+  esto es, que evite que el administrador pueda llegar a averiguar la
+  correspondencia entre ambas |IP|\ s. El resultado es el módulo
+  `blind_operator_mode <https://git.zx2c4.com/blind-operator-mode/about/>`_.
 
 Está experimentando un rápido desarrollo y, si se desea contratar un servicio
 externo, son cada vez más `los proveerdores que lo soportan
@@ -61,3 +73,5 @@ Para acceder al *software*, basta con instalarlo::
   <https://kirill888.github.io/notes/wireguard-via-websocket/>`_.
 
 .. |UDP| replace:: :abbr:`UDP (User Datagram Protocol)`
+
+.. _AzireVPN: https://www.azirevpn.com
