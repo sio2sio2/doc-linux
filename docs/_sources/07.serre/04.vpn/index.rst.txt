@@ -85,28 +85,104 @@ largo de este documento.
 :dfn:`Red remota`
    Es la red a la que pertenece el cliente |VPN|.
 
+.. _vpn-objetivos:
+
+Objetivos
+---------
+Hay dos motivaciones principales, concurrentes o no, por las que se puede
+desear el uso de una |VPN|:
+
+#. La más evidente de hacer participar a un equipo remoto o a toda una red
+   remota en la red local de una organización.
+
+#. Lograr el acceso indirecto a internet a través del servidor |VPN| con el
+   fin a su vez de:
+
+   a. Preservar el anonimato gracias a acceder a internet a través de una |IP|
+      distinta a la proporcionada por el |ISP|, lo cual supone que el dueño del
+      servidor |VPN| se comprometa a no facilitar la |IP| real del cliente a
+      terceros.
+   
+   #. Burlar las restricciones de acceso a Internet:
+
+      - Impuestas de forma global a un país, por ejemplo, por decisión judicial.
+        Esto se lograría, simplemente, con que el servidor |VPN| se encontrara
+        en un país distinto al del cliente.
+
+      - Impuestas por el administrador de la red local en la que se encuentre el
+        cliente. Por ejemplo, que utiliza :ref:`sumideros DNS <seg-sinkhole>` para
+        evitar el acceso a ciertas páginas o que el cliente se sitúe en una red
+        en la que se restringen algunos tipos de tráfico al exterior (muy
+        comúnmente que sólo se permita tráfico |HTTP| y |HTTP|\ s). En este último
+        caso, el establecimiento del túnel no es trivial e implicar idear
+        mecanismos que permitan hacer pasar al tráfico |VPN| por tráfico web.
+        Los trataremos en el estudio práctio de :ref:`OpenVPN <openvpn>` y
+        :ref:`Wireguard <wireguard>`.
+
+Aunque no sean excluyentes, por lo general, una conexión |VPN| persigue o el
+primero o  el segundo objetivo.
+
 Tipos
 -----
 Podemos hacer varias clasificaciones atendiendo a distintos criterios:
 
 #. Según la naturaleza del cliente:
 
-   :dfn:`Acceso remoto` o conexión :dfn:`sede-cliente móvil`
-      Es la conexión que se establece entre una red y un dispotiivo remoto
-      individual. En esta conexión la red dispone de un servidor |VPN|
-      permanentemente accesible desde internet y el equipo remoto se conectará de
-      modo intermitente a menudo desde distintas localizaciones. iEn la jerga
-      habitual suele referirse el equipo remoto como *road warrior*.
-
-      .. image:: 01.openvpn/files/roadwarrior.png
-
    Conexión :dfn:`sede-sede`
       Es la conexión permanente que se establece entre dos redes remotas en una de
       las cuales un dispositivo hace el papel de servidor y en la otra, otro el de
-      cliente. Por lo general, estos dispositivos se corresponden con el router u
-      otro disposivo en la red perimetral.
-
+      cliente.
+     
       .. image:: files/sede-sede.png
+
+      Por lo general, el túnel se establece entre los *routers* de frontera u
+      otros disposivos de la zona perimetral, porque esto facilita los
+      encaminamientos de los equipos de ambas redes:
+
+      .. image:: files/sede-sede-router.png
+
+      En estas conexiones se pretende lograr una interconexión bidireccional,
+      esto es, que todos o varios dispositivos de una sede sean capaces de
+      alcanzar todos o varios de la sede opuesta. Se corresponde con el primer
+      objetivo referido en el :ref:`epígrafe anterior <vpn-objetivos>`.
+
+   :dfn:`Acceso remoto` o conexión :dfn:`sede-cliente móvil`
+      Es la conexión que se establece entre una red y un dispotiivo remoto
+      individual, que en la jerga suele denominarse  :dfn:`road warrior`. En
+      esta conexión la red dispone de un servidor |VPN| permanentemente
+      accesible desde internet y el equipo remoto se conectará de modo
+      intermitente a menudo desde distintas localizaciones.
+
+      Puede darse el caso que el interés del *road warrior* sea tener acceso a
+      la red corporativa de la sede (primer objetivo):
+
+      .. image:: files/roadwarrior-sede.png
+
+      Pero también que sea la de lograr acceso indirecto a internet (segundo
+      objetivos):
+
+      .. image:: files/roadwarrior-acceso.png
+
+   :dfn:`Acceso remoto compartido`
+      Es la conexión establecida entre un servidor sin red corporativa
+      asociada (o al menos irrelevante para la intención de la conexióni |VPN|) y
+      una red remota.
+     
+      .. image:: files/acceso-compartido.png
+     
+      El caso podemos asimilarlo a uno de los dos anteriores dependiendo de cómo
+      queramos verlo:
+
+      - Si como el caso de un *roadwarrior* que en realidad no se mueve y
+        comparte el túnel con la red remota a la que pertenece para que ésta
+        acceda de forma indirecta a internet.
+
+      - Si como el caso de una conexión *sede-sede* en que no hay ningún interés
+        en interconectar las dos redes privadas, sino en que una red privada
+        utilice un servidor remoto para acceso indirecto a internet.
+
+      Es pues un caso mixto y,,en consecuencia, su configuración tomará partes
+      de la configuración de uno y otro caso.
 
 #. Según la capa de implementación:
 
@@ -118,34 +194,6 @@ Podemos hacer varias clasificaciones atendiendo a distintos criterios:
       Es aquella que establece el enlace en capa 3, por lo que cada extremo del
       túnel se encontrará en una red lógica distinta y el propio túnel
       constituirá una tercera.
-
-Objetivos
----------
-Hay tres motivaciones principales, concurrentes o no, por las que se puede
-desear el uso de una |VPN|:
-
-#. La más evidente de hacer participar a un equipo remoto o a toda una red
-   remota en la red local de una organización.
-
-#. Preservar el anonimato gracias a acceder a internet a través de una |IP|
-   distinta a la proporcionada por el |ISP|, lo cual supone que el dueño del
-   servidor |VPN| se comprometa a no facilitar la |IP| real del cliente a
-   terceros.
-   
-#. Burlar las restricciones de acceso a Internet:
-
-   - Impuestas de forma global a un país, por ejemplo, por decisión judicial.
-     Para ello basta con deslocalizar el acceso, esto es, acceder a Internet
-     a través de una |IP| de un país distinto al del |ISP| del cliente.
-
-   - Impuesto por el administrador de la red local en la que se encuentre el
-     cliente. Por ejemplo, que utiliza :ref:`sumideros DNS <seg-sinkhole>` para
-     evitar el acceso a ciertas páginas o que el cliente se sitúe en una red
-     en la que se restringen algunos tipos de tráfico al exterior (muy
-     comúnmente que sólo se permita tráfico |HTTP| y |HTTP|\ s). Este último
-     caso, obliga a crear mecanismos que permitan hacer pasar al tráfico |VPN|
-     por tráfico web. Los trataremos en el estudio práctio de :ref:`OpenVPN
-     <openvpn>` y :ref:`Wireguard <wireguard>`.
 
 Encaminamiento
 --------------
