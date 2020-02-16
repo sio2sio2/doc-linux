@@ -195,6 +195,19 @@ Podemos hacer varias clasificaciones atendiendo a distintos criterios:
       túnel se encontrará en una red lógica distinta y el propio túnel
       constituirá una tercera.
 
+#. Según el propietario del servidor |VPN|:
+
+   :dfn:`Propia`
+      Es aquella |VPN| cuyo cliente y servidor pertenecen a la misma
+      organización y que, en consecuencia, es la organización la encargada de
+      administrar ambos extremos.
+
+   :dfn:`Comercial`
+      Es el servicio que, previo pago, ofrece a sus clientes una conexión |VPN|
+      a un servidor o, más comúnmente, a una variadad de servidores respartidos
+      por todo el mundo. La finalidad de este servicio suele ser la de
+      proporcionar acceso indirecto a Internet.
+
 Encaminamiento
 --------------
 Antes de entrar en harina, es conveniente entender qué supone establecer un
