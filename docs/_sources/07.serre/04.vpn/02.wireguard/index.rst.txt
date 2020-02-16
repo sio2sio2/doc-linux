@@ -41,7 +41,7 @@ el estado de Wireguard en junio de 2019
    en el repositorio, así que tendremos que echar mano de la versión de pruebas.
    Para ello, podemos añadirla como repositorio::
 
-      # cat > /etc/sources.list.d/bullseye.list
+      # cat > /etc/apt/sources.list.d/bullseye.list
       deb http://ftp.fr.debian.org/debian/ bullseye main
 
    y modificar las preferencias para seguir usando como repositorio prinicipal el
@@ -60,7 +60,7 @@ Para acceder al *software*, basta con instalarlo::
 
 .. toctree::
    :glob:
-   :maxdepth: 1
+   :maxdepth: 2
 
    [0-9]*
 

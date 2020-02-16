@@ -1,0 +1,496 @@
+#!/bin/sh
+
+DEFAULT_PORT=${WSPORT:-51820}
+MARK=${WSMARK:-$DEFAULT_PORT}
+CLASSID=0x00110011
+
+help() {
+   echo "$(basename $0) [opciones] up|down <interfaz>:
+   Crear o destruye una interfaz de wireguard para establecer una conexión
+   |VPN| encapsulada con websocket. Requiere tener wstunnel.
+
+Opciones:
+
+ -h, --help           Muestra esta misma ayuda.
+ -n, --no-tunnel      No encapsula la conexión VPN en un websocket,
+                      aunque haya ua sección [Tunnel]
+ -q. --quiet          Modo silencioso.
+ -s, --secure         Websocket seguro.
+ -S, --simulate       Informa de cuáles son las órdenes, pero no las ejecuta.
+
+Utiliza como fichero de configuración /etc/wireguard/<interfaz>.conf y permite
+añadir una sección adicional de nombre Tunnel que incluya la definición de las
+siguientes variables:
+
+ Address = IP[:PUERTO]  Dirección IP dónde escucha wstunnel. Por defecto,
+                        127.0.0.1. Si no se especifica puerto, en el
+                        servidor es 80 ó 443, dependiendo de si es seguro;
+                        y en el cliente 51820.
+ Secure  = 0|1          Si el websocket es seguro. Por defecto, 0.
+ WPath   = /ruta/       (Sólo en el cliente) Ruta a través de la cual es
+                        accesible websocket en el servidor. Sólo tiene sentido,
+                        si en el servidor escucha un proxy y no directamente
+                        wstunnel.
+"
+}
+
+
+#
+# Tratamiento de errores.
+#
+error() {
+   local EXITCODE=$1
+   shift
+
+   if [ "$EXITCODE" -eq 0 ]; then
+      echo "Atención: " $* >&2
+   else
+      echo "ERROR: " $* >&2
+      exit "$EXITCODE"
+   fi
+}
+
+
+#
+# Ejecuta una orden informando de ella
+#
+execute() {
+   local evaluate
+   [ "$1" = "-f" ] && evaluate=1 && shift
+
+   [ -z "$QUIET" ] && echo "[#]" "$@" > /dev/tty
+   if [ -z "$SIMULATE" ]; then
+      if [ -n "$evaluate" ]; then
+         eval "$@"
+      else
+         "$@"
+      fi
+   else
+      return 0
+   fi
+}
+
+
+{ # Parseo del fichero de configuración
+
+   #
+   # Obtiene secciones del fichero INI
+   #
+   # $1: Fichero INI original
+   # $*: Los nombres de las secciones a obtener
+   # stdout: Un INI con las secciones escogidas.
+   get_section() {
+      local input="$1" IFS="|"
+      shift
+
+      { echo; cat  "$input"; } | awk -v RS='\n\[' -F '\n' '$1 ~ /^('"$*"')]/ {print "[" $0}'
+   }
+
+
+   #
+   # Genera un INI compatible con "wg setconf"
+   #
+   # $1: Fichero INI original
+   clean_ini() {
+      local regex filtered="Address|Table|PreUp|PostUp|PreDown|PostDown|MTU|DNS"
+      regex='/^\s*('"$filtered"')\s*=/d'
+
+      # Cuando se tuneliza, el punto final es wstunnel, no el servidor
+      [ -n "$tunnel" ] && regex="$regex; s|\s*Endpoint\s*.*|Endpoint = $Address|"
+
+      get_section "$1" "Interface" "Peer" | sed -r "$regex"
+   }
+
+
+   #
+   # Convierte un INI en definiciones compresinsbles por sh.
+   # No trata secciones, por lo que si dos secciones tienen
+   # definida una misma variable, prevalecerá el valor de la
+   # segunda definición.
+   #
+   # stdin: Fichero INI.
+   # stdout: Definiciones para sh.
+   shellizer() {
+      sed -r 's:;.*::; /^\w+\s*=/!d; s:\s+=\s+:=:'
+   }
+
+
+   #
+   # Obtiene un valor del fichero INI
+   # $1: El fichero INI
+   # $1: El nombre de la variable
+   # $*: La(s) seccion(es). Si no se especifica se busca en todo el fichero
+   #
+   get_value() {
+      local ini="$1" varname="$2"
+      shift 2
+
+      {
+         if [ $# -gt 0 ]; then
+            get_section "$CONFFILE" "$@"
+         else
+            cat "$CONFFILE"
+         fi
+      } | awk -F '[ \t]*=[ \t]*' '$1 ~ /^[ \t]*'"$varname"'$/ {print $2}'
+   }
+}
+
+
+#
+# Lanza un proceso en segundo plano
+# $@: La línea que debe lanzarse.
+#
+lanzar_proceso() {
+   execute -f nohup "$@" ">" /dev/null "&"
+   [ -n "$SIMULATE" ] || echo "$!" > "/var/run/wstunnel.$IFACE.pid"
+}
+
+
+#
+# Determina si la máquina actúa como servidor
+# en la comunicación VPN.
+#
+is_server() {
+   # Si no hay puerta de escucha, debe ser un cliente.
+   grep -qE '^ListenPort\b' "$CONFFILE" || return 1
+
+   # Si hay más definida más de una conexión es un servidor.
+   [ $(grep -Ec '^\[Peer\]\s*$' "$CONFFILE") -gt 1 ] && return 0
+
+   # Si no tiene definido el otro extremo, es un servidor
+   ! grep -qE '^Endpoint\s*='  "$CONFFILE"
+}
+
+
+#
+# Obtiene la configuración del túnel
+#
+get_tunnelconf() {
+   local port
+
+   if [ "$tunnel" = "0" ] || ! grep -qE '^\[Tunnel\]\s*$' "$CONFFILE"; then
+      tunnel=
+      return 0
+   else
+      tunnel=1
+   fi
+
+
+   eval "$(get_section "$1" "Tunnel" | shellizer)"
+   [ "$Secure" = 0 -o "$Secure" = "off" ] && Secure=
+   Secure=${secure_c:-$Secure}
+
+   port=$(expr "$Address" : '.*:\(.\+\)')
+   Address=${Address%:$port}
+
+   if is_server; then
+      server_port=$(get_value "$CONFFILE" ListenPort Interface)
+
+      # Por defecto, el websocket en el servidor está expuesto.
+      Address=${Address:-0.0.0.0}
+   else
+      server_port=$(get_value "$CONFFILE" Endpoint Peer)
+      server_address=${server_port%:*}
+      if [ "$server_address" = "$server_port" ]; then 
+         # No se expresión el puerto del servidor.
+         server_port=$DEFAULT_PORT
+      else
+         server_port=${server_port#*:}
+      fi
+      
+      # Por defecto el websocket en el cliente,
+      # escucha comunicaciones locales
+      Address=${Address:-127.0.0.1}
+      port=${port:-$DEFAULT_PORT}
+   fi
+
+   Address="$Address${port:+:$port}"
+}
+
+
+#
+# Calcula el MTU para la interfaz wg
+#
+set_mtu() {
+   local mtu="$MTU" endpoint dev
+
+   [ -n "$mtu" ] && echo "$mtu"
+
+   set -- $(get_value "$CONFFILE" Endpoint Peer)
+   endpoint=$(get_ip ${1%:*})  # Tomamos el primero. ¿Qué pasa sin son distintos?
+
+   if [ -n "$endpoint" ]; then
+      dev=$(expr "$(ip route get "$endpoint")" : '.*dev \([^ ]\+\)')
+      [ -n "$dev" ] && mtu=$(expr "$(ip link show dev "$dev")" : ".*mtu \([0-9]\+\)")
+   fi
+
+   mtu=${mtu:-1500}
+   echo $((mtu - 80))
+}
+
+
+#
+# Obtiene el pid de wstunnel
+#
+get_pid() {
+   local pidfile="/var/run/wstunnel.$IFACE.pid"
+   [ -f "$pidfile" ] && cat "$pidfile"
+}
+
+
+#
+# Comprueba si existe la interfaz
+# $1: Nombre de la interfaz
+#
+exists() {
+   [ -d "/sys/class/net/$1" ]
+}
+
+
+#
+# Configura el cortafuegos para marcar el trafico de wstunnel
+#
+firewall() {
+   local name="wireguard" pid
+
+   case "$1" in
+      up)
+         pid="$(get_pid)"
+
+         if ! mount | grep -q '/sys/fs/cgroup'; then
+            error 0 "No puede marcarse el tráfico de wstunnel"
+            return 1
+         fi
+
+         execute mkdir -p /sys/fs/cgroup/net_cls/"$name"
+         execute -f echo "$CLASSID" ">" /sys/fs/cgroup/net_cls/"$name"/net_cls.classid
+         execute -f echo "${pid:-WSTUNNEL_PID}" ">>" /sys/fs/cgroup/net_cls/"$name"/tasks
+
+         execute nft add table wstunnel
+         execute nft add chain wstunnel output "{ type route hook output priority 50; }"
+         execute nft add rule wstunnel output meta cgroup "$CLASSID" meta mark set "$MARK"
+
+         execute sysctl -q net.ipv4.conf.all.src_valid_mark=1
+         ;;
+      down)
+         execute nft flush table wstunnel
+         execute nft delete table wstunnel
+         ;;
+   esac
+}
+
+
+#
+# Acciones que crean la conexión.
+#
+up() {
+   local proto server_port table pid
+   local wgaddress=$(get_value "$CONFFILE" Address Interface)
+
+   wg_setconf() {
+      local pipe=$(mktemp -u)
+      mkfifo "$pipe"
+      trap "rm -f $pipe" TERM EXIT INT
+
+      clean_ini "$1" > "$pipe" &
+      execute wg setconf "$IFACE" "$pipe"
+   }
+   
+   [ -n "$SIMULATE" ] || { exists "$IFACE" && error 1 "La interfaz $IFACE ya existe"; }
+
+   # Acciones anteriores a levantar la interfaz (PreUp)
+   eval "$(get_value "$CONFFILE" PreUp Interface | sed -r 's:%i:'"$IFACE"':; s:^:execute :')"
+
+   execute ip link add "$IFACE" type wireguard
+   wg_setconf "$CONFFILE"
+   execute ip -4 address add "$wgaddress" dev "$IFACE"
+   execute ip link set mtu $(set_mtu) up dev "$IFACE"
+
+   if [ "$tunnel" ]; then
+      proto="ws"
+      [ -n "$Secure" ] && proto="wss"
+
+      if is_server; then
+         lanzar_proceso wstunnel -q --server "$proto://$Address" \
+                        --restrictTo "127.0.0.1:$server_port"
+      else
+         lanzar_proceso wstunnel -q --udp --udpTimeoutSec -1 \
+                        -L "$Address:127.0.0.1:$server_port" \
+                        $proto://$server_address$WPath
+      fi
+   fi
+
+   table=$(get_value "$CONFFILE" Table Interface)
+   if [ "$table" != "0" ] && [ "$table" != "off" ]; then
+      route "$table"
+   fi
+
+   # Acciones posteriores a levantar la interfaz (PostUp)
+   eval "$(get_value "$CONFFILE" PreUp Interface | sed -r 's:%i:'"$IFACE"':; s:^:execute :')"
+}
+
+
+#
+# Acciones que destruyen la conexión.
+#
+down() {
+   local net pid table IFS=", 		
+"
+
+   if [ -z "$SIMULATE" ] && ! exists "$IFACE"; then
+      error 1 "La interfaz $IFACE no existe"
+   fi
+
+   pid=${tunnel:+$(get_pid)}
+   tunnel=$pid  # Si no hay pid, es que no hay tunel.
+
+   # Acciones anteriores a destruir la interfaz (PreDown)
+   eval "$(get_value "$CONFFILE" PreDown Interface | sed -r 's:%i:'"$IFACE"':; s:^:execute :')"
+
+   table=$(get_value "$CONFFILE" Table Interface)
+   if [ "$table" != "0" ] && [ "$table" != "off" ]; then
+      set -- $(get_value "$CONFFILE" AllowedIPs Peer)
+
+      for net in "$@"; do
+         [ "$net" = "0.0.0.0/0" ] && break
+      done
+
+      if [ "$net" = "0.0.0.0/0" ]; then
+         table=${table:-51820}
+         execute ip rule delete not fwmark "$MARK" table "$table"
+         execute ip rule delete table main suppress_prefixlength 0
+         execute ip route flush table "$table"
+
+         if [ -n "$tunnel" ]; then
+            # TODO:: ¿Hay que hacer algo con /sys/fs/cgroup/wireguard?
+            firewall down
+         fi
+      else
+         table=${table:-main}
+         for net in "$@"; do
+            execute ip route delete "$net" dev "$IFACE" table "$table"
+         done
+      fi
+   fi
+
+   if [ -n "$tunnel" ]; then
+      execute kill -TERM "${pid:-WSTUNNEL_PID}"
+      [ -z "$SIMULATE" ] && rm -f "/var/run/wstunnel.$IFACE.pid"
+   fi
+
+   execute ip link del "$IFACE" type wireguard
+
+   # Acciones posteriores a destruir la interfaz (PostDown)
+   eval "$(get_value "$CONFFILE" PostDown Interface | sed -r 's:%i:'"$IFACE"':; s:^:execute :')"
+
+}
+
+
+#
+# Obtiene la IP de un nombre de máquina
+# $1: El nombre a resolver
+#
+get_ip() {
+   if expr "$1" : '.*[A-Za-z]' > /dev/null; then
+      getent hosts "$1" | cut -d\  -f1
+   else
+      echo "$1"
+   fi
+}
+
+
+#
+# Crea el encaminamiento adecuado
+# $1: Nombre de la tabla en la que se apuntan las rutas.
+#
+route() {
+   local net gw pid server_ip table="$1" IFS=", 		
+"
+   set -- $(get_value "$CONFFILE" AllowedIPs Peer)
+   unset IFS
+
+   for net in "$@"; do
+      [ "$net" = "0.0.0.0/0" ] && break
+   done
+
+   if [ "$net" = "0.0.0.0/0" ]; then
+      if [ -n "$server_address" ]; then
+         server_ip=$(get_ip "$server_address")
+         gw=$(expr "$(ip route get "$server_ip")" : '.*via \(.\+ dev [^ ]\+\)')
+      fi
+
+      # Estrategia: 
+
+      # a) Se crea una tabla que enrute el tráfico por la interfaz wg.
+      #    salvo el dirigido al servidor VPN.
+      table=${table:-$DEFAULT_PORT}
+      execute ip route add default dev "$IFACE" table "$table"
+      [ -n "$server_ip" ] && execute ip route add "$server_ip" via $gw table "$table"
+
+      # b) La tabla la usará el tráfico que con contenga una determinada marca.
+      execute ip rule add not fwmark "$MARK" table "$table"
+
+      # c) Se añade una regla previa para que el tráfico local no use el túnel
+      execute ip rule add table main suppress_prefixlength 0
+
+      # c) Se marca el tráfico que sale de la interfaz wg
+      execute wg set "$IFACE" fwmark "$MARK"
+
+      if [ -n "$tunnel" ]; then  # Marcamos el tráfico que genera wstunnel
+         firewall up
+      fi
+   else
+      table=${table:-main}
+      for net in "$@"; do
+         execute ip route add "$net" dev "$IFACE" table "$table"
+      done
+   fi
+}
+
+
+#
+# Programa principal
+#
+{ ## Tratamientos de argumetos
+   while getopts "hnqsS" opt; do
+      case "$opt" in
+         h)
+            help
+            exit 0
+            ;;
+         s) secure_c=1 ;;
+         n) tunnel=0 ;;
+         q) QUIET=1 ;;
+         S) SIMULATE=1 ;;
+         \?)
+            error 2 "La opción -$OPTARG no existe."
+            ;;
+         :)
+            error 2 "-$OPTARG requiere argumento."
+            ;;
+      esac
+   done
+   shift $((OPTIND-1))
+
+   if [ $# -ne 2 ]; then
+      error 0 "Sintaxis incorrecta"
+      help >&2
+      exit 2
+   fi
+
+   ACTION=$1
+   IFACE=$2
+}
+
+CONFFILE=/etc/wireguard/$2.conf
+
+[ -f "$CONFFILE" ] || error 1 "No existe configuración para $2"
+
+get_tunnelconf "$CONFFILE"
+[ -z "$tunnel" ] || command -v wstunnel > /dev/null || error 1 "No se encuentra el ejecutable wstunnel"
+
+case "$ACTION" in
+   up) up ;;
+   down) down;;
+   *) error 1 "Acción '$ACTION' desconocida";;
+esac

@@ -1,0 +1,534 @@
+
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>7.4.3.2.2. Configuración avanzada &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/custom.css" />
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../_static/language_data.js"></script>
+    <script type="text/javascript" src="../../../_static/translations.js"></script>
+    <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <link rel="index" title="Índice" href="../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../search.html" />
+    <link rel="next" title="7.5. Proxies" href="../../05.proxies/index.html" />
+    <link rel="prev" title="7.4.3.2.1. Configuración" href="01.conf.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="../../05.proxies/index.html" title="7.5. Proxies"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="01.conf.html" title="7.4.3.2.1. Configuración"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >7. Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" >7.4. Redes VPN</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="index.html" accesskey="U">7.4.3.2. Wireguard</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="configuracion-avanzada">
+<h1>7.4.3.2.2. Configuración avanzada<a class="headerlink" href="#configuracion-avanzada" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>Para la mayor parte de las situaciones, <strong class="command">wg-quick</strong> resuelve todas las
+tareas relacionadas con el encaminamiento (interfaz, encaminamiento, etc.). Sin
+embargo, <strong class="command">wg-quick</strong> es un <em>script</em> de alto nivel escrito en
+<strong class="command">bash</strong> que usa la orden <strong class="command">wg</strong> como herramienta para crear y
+configurar la interfaz virtual.</p>
+<div class="section" id="configuracion-manual">
+<h2>7.4.3.2.2.1. Configuración manual<a class="headerlink" href="#configuracion-manual" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>La configuración manual del túnel supone:</p>
+<ol class="arabic simple">
+<li>Crear la interfaz y darle una dirección <abbr title="Internet Protocol">IP</abbr> con <a class="reference internal" href="../../../08.redes/index.html#ip"><span class="std std-ref">ip</span></a>.</li>
+<li>Configurarla con <strong class="command">wg setconf</strong>.</li>
+<li>Alterar las tablas de encaminamiento, de nuevo otra vez con <a class="reference internal" href="../../../08.redes/index.html#ip"><span class="std std-ref">ip</span></a>.</li>
+<li>Si la situación lo requiere, utilizar el cortafuegos.</li>
+</ol>
+<p>Por esta razón, cuando se escribe para <strong class="command">wg-quick</strong>, el fichero de
+configuración de la interfaz añade algunas variables que son ininteligibles para
+<strong class="command">wg</strong> y que el propio <em>script</em> se encarga de eliminar antes de pasárselo
+a éste último: <kbd class="kbd docutils literal notranslate">Address</kbd>, <kbd class="kbd docutils literal notranslate">MTU</kbd>, <kbd class="kbd docutils literal notranslate">DNS</kbd>, <kbd class="kbd docutils literal notranslate">Table</kbd> y las
+que refieren órdenes para ejecutar antes y después de levantar y bajar la
+interfaz: <kbd class="kbd docutils literal notranslate">PreUp</kbd>, <kbd class="kbd docutils literal notranslate">PostUp</kbd>, <kbd class="kbd docutils literal notranslate">PreDown</kbd> y <kbd class="kbd docutils literal notranslate">PostDown</kbd>.</p>
+<p>Para conocer cuáles son las órdenes atómicas que lleva a cabo
+<strong class="command">wg-quick</strong> basta con usarla:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> wg-quick up wg0
+<span class="go">[#] ip link add wg0 type wireguard</span>
+<span class="go">[#] wg setconf wg0 /dev/fd/63</span>
+<span class="go">[#] ip -4 address add 10.0.8.1/24 dev wg0</span>
+<span class="go">[#] ip link set mtu 1420 up dev wg0</span>
+<span class="go">[#] ip -4 route add 192.168.254.0/24 dev wg0</span>
+</pre></div>
+</div>
+<p>cuya salida se corresponde con la configuración:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[Interface]</span>
+<span class="na">Address</span> <span class="o">=</span> <span class="s">10.0.8.1/24</span>
+<span class="na">ListenPort</span> <span class="o">=</span> <span class="s">1194</span>
+<span class="na">PrivateKey</span> <span class="o">=</span> <span class="s">kEANNMfztMtzgwFyyaWOou7+c8ZPD/lyGhmcM7oFtXA=</span>
+
+<span class="k">[Peer]</span>
+<span class="na">PublicKey</span> <span class="o">=</span> <span class="s">f2CH3QXHiXwFhdATcDi42DU+PUOC9Ky8BgkHBigY5H4=</span>
+<span class="na">AllowedIPs</span> <span class="o">=</span> <span class="s">10.0.8.2/32, 192.168.254.0/24</span>
+</pre></div>
+</div>
+<p>Lo cual significa que si eliminamos la línea <kbd class="kbd docutils literal notranslate">Address</kbd> de la configuración
+y vamos ejecutando una tras otra las órdenes referidas por la salida,
+obtendremos el misno efecto.</p>
+<p>Entraña especial dificultad solucionar el problema del encaminamiento, cuando en
+el cliente se desea sacar todo el tráfico a través del túnel, ya que es obvio
+que el tráfico local y el tráfico dirigido al servidor deben usar la puerta de
+enlace física. La documentación oficial de <strong class="program">wireguard</strong> propone <a class="reference external" href="https://www.wireguard.com/netns/#routing-all-your-traffic">dos
+soluciones</a>, una
+basada en jugar con las tablas de encaminamiento y otra en jugar con dos
+espacios de nombres. <strong class="program">wg-quick</strong> usa el primer método. El segundo
+método, aunque bastante elegante, es complicado de implementar si se desea
+utlizar herramientas externas de configuración como <strong class="program">ifupdown</strong>.</p>
+</div>
+<div class="section" id="redes-restringidas">
+<h2>7.4.3.2.2.2. Redes restringidas<a class="headerlink" href="#redes-restringidas" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Cuando nuestro <em>guerrero de la carretera</em> se encuentra dentro de una red
+restringida que no controlamos nos topamos en algunas ocasiones con el problema
+de que somos incapaces de acceder al puerto <abbr title="User Datagram Protocol">UDP</abbr> en que hemos dejado escuchando
+el servidor (el <em>1194</em> en nuestra propuesta).</p>
+<p>En estas redes restringidas, lo habitual es que sólo podemos:</p>
+<ul class="simple">
+<li>Hacer consultas <abbr title="Domain Name Server">DNS</abbr> (<em>53/UDP</em>), aunque a veces se reduce a poder hacérselas
+a un proxy <abbr title="Domain Name Server">DNS</abbr> de la red local.</li>
+<li>Navegar por internet (puertos <em>80/TCP</em> y <em>443/TCP</em>), aunque veces fiscalizado
+por <em>proxies</em>.</li>
+</ul>
+<p>Podríamos dejar escuchando el servicio en el puerto <em>53/UDP</em>, pero será inútil
+si sólo podemos consultar un proxy <abbr title="Domain Name Server">DNS</abbr> interno.</p>
+<p>La solución general es usar los puertos para tráfico web, pero nos topamos con
+el problema de que por motivos de rendimiento <strong class="program">wireguard</strong> sólo se ha
+implementado para <abbr title="User Datagram Protocol">UDP</abbr>. Una solución para solucionar este inconveniente es
+tunelizador el trafico mediante <a class="reference external" href="https://v0ctor.me/websocket">Websockets</a>. Como
+forma parte del estándar <abbr title="HyperText Markup Language">HTML</abbr>5, no deberiamos tener problemas con el proxy
+web, aun usando <abbr title="HyperText Transfer Protocol">HTTP</abbr> y no <abbr title="HyperText Transfer Protocol">HTTP</abbr>s. Además, no recifrar con <abbr title="Secure Sockets Layer">SSL</abbr> contribuirá
+a que la pérdida de rendimiento no sea grande.</p>
+<div class="section" id="wstunnel">
+<h3>7.4.3.2.2.2.1. <strong class="program">wstunnel</strong><a class="headerlink" href="#wstunnel" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Para lograr nuestro objetivo, tal como prppugna <a class="reference external" href="https://kirill888.github.io/notes/wireguard-via-websocket">este enlace</a>, podemos usar
+<a class="reference external" href="https://github.com/erebe/wstunnel">wstunnel</a>, el cual es capaz de tunelizar mediante <em>Websockets</em> tráfico <abbr title="User Datagram Protocol">UDP</abbr>. No
+existe paquete para <em>Debian</em><a class="footnote-reference" href="#id3" id="id1">[1]</a>, pero podemos descargar el ejecutable del
+propio repositio de <a class="reference external" href="https://github.com">Github</a>. Su uso es bastante sencillo. Descargamos en dos
+máquinas el ejecutable y:</p>
+<ul>
+<li><p class="first">En la máquina servidor lo ejecutamos de esta forma:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> /usr/local/bin/wstunnel -v --server ws://0.0.0.0 --restrictTo <span class="m">127</span>.0.0.1:1194
+</pre></div>
+</div>
+<p>lo cual supone que la aplicación escuche en el puerto <em>80</em> (no seguro) los
+datos que se pretenden tunelizar. Además, sólo se aceptará tráfico que el
+cliente indique que va dirigido al puerto <em>1194</em> de la interfaz de loopback.</p>
+</li>
+<li><p class="first">En la máquina cliente, rematamos el otro extremo del túnel con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> /usr/local/bin/wstunnel -v --udp --udpTimeoutSec -1 -L <span class="m">127</span>.0.0.1:12345:127.0.0.1:1194 ws://203.0.113.1
+</pre></div>
+</div>
+<p>que conecta con el puerto 80 del servidor (hemos supuesto que <em>203.0.113.1</em> es
+su dirección <abbr title="Internet Protocol">IP</abbr>) y envía los datos que recibe por el puerto <em>12345/UDP</em>
+de la interfaz de <em>loopback</em> al puerto <em>1194/UDP</em> de la interfaz de <em>loopback</em>
+del servidor (esto último coincide con lo que se indicó con
+<kbd class="kbd docutils literal notranslate">--restrictTo</kbd> en el servidor).</p>
+</li>
+</ul>
+<p>Con ello ya tendremos establecido el tunel dentro del cual circula el tráfico
+<abbr title="User Datagram Protocol">UDP</abbr>. Si queremos probarlo, podemos hacer:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">servidor$ netcat -u -l -p 1194</span>
+</pre></div>
+</div>
+<p>y en el cliente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cliente$ netcat -u localhost 12345</span>
+</pre></div>
+</div>
+<p>Ambos <a class="reference internal" href="../../../02.conbas/99.misc/05.ordenes.html#netcat"><span class="std std-ref">netcat</span></a> deberían comunicarse a través del <em>websocket</em>.</p>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">Para que el tráfico hubiera sido cifrado (y por el puerto 443) habría
+bastado con usar <kbd class="kbd docutils literal notranslate">wss</kbd> en vez de <kbd class="kbd docutils literal notranslate">ws</kbd>.</p>
+</div>
+</div>
+<div class="section" id="encapsulando-wireguard">
+<h3>7.4.3.2.2.2.2. Encapsulando <strong class="program">wireguard</strong><a class="headerlink" href="#encapsulando-wireguard" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Para usar <strong class="program">wireguard</strong> con <strong class="program">wstunnel</strong> debemos:</p>
+<p>En el <strong>servidor</strong>:</p>
+<ul class="simple">
+<li>Hacer que <strong class="program">wstunnel</strong> escuche en el puerto 80 ó 443 de todas las
+interfaces y redirija al puerto de la interfaz de <em>loopback</em> en que escucha
+<strong class="program">wireguard</strong></li>
+<li>Hacer que <strong class="program">wireguard</strong> escuche un puerto de las interfaces} lo que
+permite a un cliente establcer directamente el túnel <abbr title="Virtual Private Network">VPN</abbr> o, si se encuentra
+en una red restringida, hacerlo a través del puerto 80 ó 443 gracias a
+<em>websocket</em>.</li>
+</ul>
+<p>En el <strong>cliente</strong> restringido (el no restringido se configura como hemos visto
+ya):</p>
+<ul class="simple">
+<li>Hacer que <strong class="program">wstunnel</strong> conecte con el puerto en el que escucha el
+<strong class="program">wstunnel</strong> del cliente y escuche en un puerto de la interfaz de
+loopback.</li>
+<li>Hacer que <strong class="program">wireguard</strong> conecte con el puerto de la interfaz de
+loopback donde se ha puesto a escuchar el <strong class="program">wstunnel</strong> local.</li>
+</ul>
+<p>Hay, sin embargo, un pequeño gran problema cuando se desea sacar todo el tráfico
+por el túnel <abbr title="Virtual Private Network">VPN</abbr> y se usa para comunicar con el servidor un nombre, en vez de
+una dirección <abbr title="Internet Protocol">IP</abbr>: para llegar a establecer el túnel necesitamos resolver el
+nombre, pero para resolver el nombre debemos haber establecido el canal, puesto
+que la petición <abbr title="Domain Name Server">DNS</abbr> intenta salir a través de él.</p>
+<p>oniendo todo junto, <a class="reference external" href="https://github.com/sio2sio2/wgws">este script llamado wgws</a> resuelve el problema del siguiente modo:</p>
+<ul>
+<li><p class="first">Necesita, obviamente, <a class="reference external" href="https://github.com/erebe/wstunnel">wstunnel</a> y que esté en algún directorio del <em>PATH</em>.</p>
+</li>
+<li><p class="first">Utiliza la misma técnica de manipulación de las tablas de encanimamiento que
+<strong class="program">wg-quick</strong>.</p>
+</li>
+<li><p class="first">Utiliza <a class="reference external" href="https://en.wikipedia.org/wiki/Cgroups">cgroups</a> para lograr marcar
+el tráfico que genera <strong class="program">wstunnel</strong>. Con la marca y la ayuda del
+cortafuegos se evita que este tráfico salga por el túnel y se resuelve el
+problema de la resolución <abbr title="Domain Name Server">DNS</abbr> del nombre del servidor.</p>
+</li>
+<li><p class="first">Requiere <a class="reference internal" href="../../../08.redes/07.cortafuegos/02.nftables/index.html#nftables"><span class="std std-ref">nftables</span></a> para generar la regla mencionada en el
+punto anterior<a class="footnote-reference" href="#id4" id="id2">[2]</a>.</p>
+</li>
+<li><p class="first">Para definir la configuración del túnel, permite añadir al una sección más al
+fichero de configuración llamada <kbd class="kbd docutils literal notranslate">[Tunnel]</kbd>, que puede incluir tres
+variables:</p>
+<table border="1" class="wgws docutils">
+<colgroup>
+<col width="16%" />
+<col width="84%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Variable</th>
+<th class="head">Descripción</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>Address</td>
+<td>Dirección y puerto donde escucha <strong class="program">wstunnel</strong>.</td>
+</tr>
+<tr class="row-odd"><td>Secure</td>
+<td>Habilita el modo seguro (<kbd class="kbd docutils literal notranslate">wss</kbd>).</td>
+</tr>
+<tr class="row-even"><td>WPath</td>
+<td>Ruta de acceso en el servidor al <em>websocket</em>. Sólo tiene
+sentido su uso en el cliente, y si en el servidor se usa
+un proxy (véase <a class="reference internal" href="#wg-nginx"><span class="std std-ref">el uso con nginx</span></a>).</td>
+</tr>
+</tbody>
+</table>
+<p>Si no se incluye la sección <kbd class="kbd docutils literal notranslate">[Tunnel]</kbd> o si, aun habiéndola, se utiliza
+la opción <kbd class="kbd docutils literal notranslate">-n</kbd>, el <em>script</em> prescindirá de <strong class="program">wstunnel</strong> y su uso
+será equivalente al de <strong class="command">wg-quick</strong>.</p>
+</li>
+</ul>
+<p>El uso es bastante sencillo. Para resolver el caso del <em>road warrior</em> ya
+analizado, la configuración es exactamente la misma, con la salvedad de añadir en
+ambos extremos la sección <kbd class="kbd docutils literal notranslate">[Tunmel]</kbd>. Así, en el <strong>servidor</strong>:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[Interface]</span>
+<span class="na">Address</span> <span class="o">=</span> <span class="s">10.8.0.1/24</span>
+<span class="na">ListenPort</span> <span class="o">=</span> <span class="s">1194</span>
+<span class="na">PrivateKey</span> <span class="o">=</span> <span class="s">kEANNMfztMtzgwFyyaWOou7+c8ZPD/lyGhmcM7oFtXA=</span>
+
+<span class="k">[Peer]</span>
+<span class="na">PublicKey</span> <span class="o">=</span> <span class="s">f2CH3QXHiXwFhdATcDi42DU+PUOC9Ky8BgkHBigY5H4=</span>
+<span class="na">AllowedIPs</span> <span class="o">=</span> <span class="s">10.8.0.2/32</span>
+
+<span class="k">[Tunnel]</span>
+<span class="c1">; No es necesaria configuración adicional</span>
+</pre></div>
+</div>
+<p>y arrancar el servidcio de este modo para dar la posibilidad de conexión directa
+(puerto <strong>1194</strong>) o a través de websocket (puerto <strong>80</strong>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> wgws up wg0
+</pre></div>
+</div>
+<p>Y en el <strong>cliente</strong>:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[Interface]</span>
+<span class="na">Address</span> <span class="o">=</span> <span class="s">10.8.0.2/24</span>
+<span class="na">PrivateKey</span> <span class="o">=</span> <span class="s">WB4TAWIIlaOyULudlcdhqctTl/pdzO7m+6x4DhAP+0k=</span>
+
+<span class="k">[Peer]</span>
+<span class="na">PublicKey</span> <span class="o">=</span> <span class="s">/Pr37VgN7GVvizJw9FpCL62DSwocdNEf7lwfdDRZXj8=</span>
+<span class="na">Endpoint</span> <span class="o">=</span> <span class="s">203.0.113.1:1194</span>
+<span class="na">AllowedIPs</span> <span class="o">=</span> <span class="s">0.0.0.0/0</span>
+
+<span class="k">[Tunnel]</span>
+<span class="c1">; No es necesaria configuración adicional</span>
+</pre></div>
+</div>
+<p>con el que podremos establecer el túnel con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> wgws -n up wg0
+</pre></div>
+</div>
+<p>si queremos conexión directa o:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> wgws up  wg0
+</pre></div>
+</div>
+<p>si queremos conexión a través de <em>websocket</em>. Si deseamos cifrar con <abbr title="Secure Sockets Layer">SSL</abbr> (lo
+cual mermará el rendimiento) debemos o añadir la opción <kbd class="kbd docutils literal notranslate">-s</kbd> en las órdenes
+de ambos extremos o añadir la opción:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="na">Secure</span> <span class="o">=</span> <span class="s">1</span>
+</pre></div>
+</div>
+<p>en la sección <kbd class="kbd docutils literal notranslate">[Tunnel]</kbd> ambos ficheros de configuración.</p>
+<p>El modo más cómodo de que un cliente móvil pueda conectarse directamente o a
+través de <em>websocket</em> según la red en la que se encuentre es crear un fichero de
+configuración <code class="file docutils literal notranslate"><span class="pre">/etc/wireguard/wg0.conf</span></code> sin configuración adicional para
+el túnel y dos enlaces simbólicos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> ln -s wg0.conf wgt0.conf
+<span class="gp">#</span> ln -s wg0.conf wgts0.conf
+</pre></div>
+</div>
+<p>y añadir en <code class="file docutils literal notranslate"><span class="pre">/etc/network/interfaces</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Conexión directa</span>
+iface wg0 inet manual
+   up   wgws -n up <span class="nv">$IFACE</span>
+   down wgws down <span class="nv">$IFACE</span>
+
+<span class="c1"># Conexión websocket</span>
+iface wgt0 inet manual
+   up   wgws up <span class="nv">$IFACE</span>
+   down wgws down <span class="nv">$IFACE</span>
+
+<span class="c1"># Conexión websocket SSL</span>
+iface wgts0 inet manual
+   up   wgws -s up <span class="nv">$IFACE</span>
+   down wgws -s down <span class="nv">$IFACE</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">El hecho de no requerir configuración adicional se debe a que
+<strong class="command">wgws</strong> decide cuál es la dirección de escucha más lógica según haga
+el papel de servidor o cliente. En el primero, <kbd class="kbd docutils literal notranslate">0.0.0.0:80</kbd> o
+<kbd class="kbd docutils literal notranslate">0.0.0.0:443</kbd> (según se use o no <abbr title="Secure Sockets Layer">SSL</abbr>) y en el segundoo,
+<kbd class="kbd docutils literal notranslate">127.0.0.1:51820</kbd>.</p>
+</div>
+</div>
+<div class="section" id="anadiendo-nginx-a-la-ecuacion">
+<span id="wg-nginx"></span><h3>7.4.3.2.2.2.3. Añadiendo <strong class="program">nginx</strong> a la ecuación<a class="headerlink" href="#anadiendo-nginx-a-la-ecuacion" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>El problema de colocar <a class="reference external" href="https://github.com/erebe/wstunnel">wstunnel</a> a escuchar en los puertos <strong>80</strong>/<strong>443</strong> es que
+inpide que la máquina puede albergar un servidor <em>web</em>, lo cual puede ser
+frecuente. En estos casos, la solución es restringir <strong class="program">wstunnel</strong> a
+escuchar en algún puerto de la interfaz de <em>loopback</em> y hacer que un <em>proxy</em>
+inverso gestione las peticiones a esos puertos y las dirija bien al servidor
+<em>web</em>, bien a <strong class="program">wstunnel</strong>. Como el propio <a class="reference internal" href="../../02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a> puede
+llevar a cabo esta labor, será lo que usemos:</p>
+<p class="rubric">Cliente</p>
+<p>La configuración es exactamente la misma, aunque es más que probable que
+deseemos usar el nombre de máquina para identificar en el servidor el tráfico
+procedente del <strong class="program">wstunnel</strong> cliente:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[Interface]</span>
+<span class="na">Address</span> <span class="o">=</span> <span class="s">10.8.0.2/24</span>
+<span class="na">PrivateKey</span> <span class="o">=</span> <span class="s">WB4TAWIIlaOyULudlcdhqctTl/pdzO7m+6x4DhAP+0k=</span>
+
+<span class="k">[Peer]</span>
+<span class="na">PublicKey</span> <span class="o">=</span> <span class="s">/Pr37VgN7GVvizJw9FpCL62DSwocdNEf7lwfdDRZXj8=</span>
+<span class="hll"><span class="na">Endpoint</span> <span class="o">=</span> <span class="s">vpn.example.net:1194</span>
+</span><span class="na">AllowedIPs</span> <span class="o">=</span> <span class="s">0.0.0.0/0</span>
+
+<span class="k">[Tunnel]</span>
+<span class="c1">; No es necesaria configuración adicional</span>
+</pre></div>
+</div>
+<p>Dependendiendo de cómo arranquemos <strong class="program">wgws</strong>, accederemos sin
+<strong class="program">wstunnel</strong> o a través de él con o sin <abbr title="Secure Sockets Layer">SSL</abbr>.</p>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p>Si por alguna razón, no usamos el nombre para identifcar el
+<em>websocket</em>, sino la ruta entonces habría que haber añadido a la
+configuración de túnel la variable <kbd class="kbd docutils literal notranslate">WPath</kbd>:</p>
+<div class="last highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[Tunnel]</span>
+<span class="na">WPath</span> <span class="o">=</span> <span class="s">/wireguard/</span>
+</pre></div>
+</div>
+</div>
+<p class="rubric">Servidor</p>
+<p>En este extremo, la novedad es que hay que colocar a <strong class="program">wstunnel</strong> en
+algún puerto libre de la interfaz de <em>loopback</em> (p.e. <strong>8080</strong>) y no utilizar
+nunca <abbr title="Secure Sockets Layer">SSL</abbr> ya que en caso de que necesitemos recifrar, puede encargarse de ello
+<strong class="program">nginx</strong>:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[Interface]</span>
+<span class="na">Address</span> <span class="o">=</span> <span class="s">10.8.0.1/24</span>
+<span class="na">ListenPort</span> <span class="o">=</span> <span class="s">1194</span>
+<span class="na">PrivateKey</span> <span class="o">=</span> <span class="s">kEANNMfztMtzgwFyyaWOou7+c8ZPD/lyGhmcM7oFtXA=</span>
+
+<span class="k">[Peer]</span>
+<span class="na">PublicKey</span> <span class="o">=</span> <span class="s">f2CH3QXHiXwFhdATcDi42DU+PUOC9Ky8BgkHBigY5H4=</span>
+<span class="na">AllowedIPs</span> <span class="o">=</span> <span class="s">10.8.0.2/32</span>
+
+<span class="k">[Tunnel]</span>
+<span class="hll"><span class="na">Address</span> <span class="o">=</span> <span class="s">127.0.0.1:8080</span>
+</span></pre></div>
+</div>
+<p>Por otro lado, para configurar <strong class="program">nginx</strong>, podemos crear un fichero con la
+configuración pertinente llamado <code class="file docutils literal notranslate"><span class="pre">snippets/websocket.conf</span></code>:</p>
+<blockquote>
+<div><div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">proxy_http_version</span> <span class="mi">1</span><span class="s">.1</span><span class="p">;</span>
+<span class="k">proxy_set_header</span> <span class="s">Upgrade</span> <span class="nv">$http_upgrade</span><span class="p">;</span>
+<span class="k">proxy_set_header</span> <span class="s">Connection</span> <span class="nv">$connection_upgrade</span><span class="p">;</span>
+
+<span class="k">proxy_set_header</span> <span class="s">X-Forwarded-Host</span> <span class="nv">$host</span><span class="p">;</span>
+<span class="k">proxy_set_header</span> <span class="s">X-Forwarded-Proto</span> <span class="nv">$x_forwarded_proto</span><span class="p">;</span>
+<span class="k">proxy_set_header</span> <span class="s">X-Forwarded-For</span> <span class="nv">$proxy_add_x_forwarded_for</span><span class="p">;</span>
+<span class="k">proxy_set_header</span> <span class="s">Host</span> <span class="nv">$http_host</span><span class="p">;</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>Y teniendo en cuenta que hemos usado <em>vpn.example.net</em> para identificar la
+conexión, definir el sitio como:</p>
+<blockquote>
+<div><div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">map</span> <span class="nv">$http_upgrade</span> <span class="nv">$connection_upgrade</span> <span class="p">{</span>
+   <span class="kn">default</span> <span class="s">upgrade</span><span class="p">;</span>
+   <span class="kn">&#39;&#39;</span> <span class="s">close</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">map</span> <span class="nv">$https</span> <span class="nv">$x_forwarded_proto</span> <span class="p">{</span>
+   <span class="kn">default</span> <span class="s">http</span><span class="p">;</span>
+   <span class="kn">on</span>      <span class="s">https</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">server</span> <span class="p">{</span>
+   <span class="kn">listen</span> <span class="mi">80</span><span class="p">;</span>
+   <span class="kn">listen</span> <span class="mi">443</span> <span class="s">ssl</span><span class="p">;</span>
+
+   <span class="kn">server_name</span> <span class="s">vpn.example.net</span><span class="p">;</span>
+
+   <span class="kn">include</span> <span class="s">snippets/snakeoil.conf</span><span class="p">;</span>
+
+   <span class="kn">location</span> <span class="s">/</span> <span class="p">{</span>
+      <span class="kn">proxy_pass</span> <span class="s">http://127.0.0.1:8080</span><span class="p">;</span>
+      <span class="kn">include</span> <span class="s">snippets/websocket.conf</span><span class="p">;</span>
+   <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>configuración con la que permitimos tanto <kbd class="kbd docutils literal notranslate">ws</kbd> como <kbd class="kbd docutils literal notranslate">wss</kbd>.</p>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p>Si la conexión se hubiera identificado con una ruta, no habría más que
+haber cambiado la localización:</p>
+<div class="last highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">location</span> <span class="s">^~</span> <span class="s">/wireguard/</span> <span class="p">{</span>
+   <span class="kn">proxy_pass</span> <span class="s">http://127.0.0.1:8080</span><span class="p">;</span>
+   <span class="kn">include</span> <span class="s">snippets/websocket.conf</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<p class="rubric">Notas al pie</p>
+<table class="docutils footnote" frame="void" id="id3" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td>Sí existe paquete para <a class="reference external" href="https://github.com/novnc/websockify">websockify</a>, pero éste sólo permite encapsular
+tráfico <abbr title="Transmission Control Protocol">TCP</abbr>.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id4" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id2">[2]</a></td><td>Aunque con <a class="reference internal" href="../../../08.redes/07.cortafuegos/01.iptables/index.html#iptables"><span class="std std-ref">iptables</span></a> podría lograrse lo mismo, pero
+el <em>script</em> no está preparado para usarlo.</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">7.4.3.2.2. Configuración avanzada</a><ul>
+<li><a class="reference internal" href="#configuracion-manual">7.4.3.2.2.1. Configuración manual</a></li>
+<li><a class="reference internal" href="#redes-restringidas">7.4.3.2.2.2. Redes restringidas</a><ul>
+<li><a class="reference internal" href="#wstunnel">7.4.3.2.2.2.1. <strong class="program">wstunnel</strong></a></li>
+<li><a class="reference internal" href="#encapsulando-wireguard">7.4.3.2.2.2.2. Encapsulando <strong class="program">wireguard</strong></a></li>
+<li><a class="reference internal" href="#anadiendo-nginx-a-la-ecuacion">7.4.3.2.2.2.3. Añadiendo <strong class="program">nginx</strong> a la ecuación</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="01.conf.html"
+                        title="capítulo anterior">7.4.3.2.1. Configuración</a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="../../05.proxies/index.html"
+                        title="próximo capítulo">7.5. Proxies</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../_sources/07.serre/04.vpn/02.wireguard/02.confalt.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Ir a" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="../../05.proxies/index.html" title="7.5. Proxies"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="01.conf.html" title="7.4.3.2.1. Configuración"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >7. Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" >7.4. Redes VPN</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="index.html" >7.4.3.2. Wireguard</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor CC BY 4.0, 2016-2020, José Miguel Sánchez Alés.
+      Creado con <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
+    </div>
+  </body>
+</html>
