@@ -1,6 +1,3 @@
-alias getopts='OPTIND=$OPTIND; getopts'
-
-
 #
 # Parche para que una opción no sea considerada
 # argumento de la opción precedente, cuando esta

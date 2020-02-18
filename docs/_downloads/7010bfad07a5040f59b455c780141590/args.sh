@@ -11,8 +11,6 @@ Opciones:
 "
 }
 
-alias getopts='OPTIND=$OPTIND; getopts'
-
 
 #
 # Parche para que una opción no sea considerada
@@ -98,7 +96,7 @@ trap '[ $? -eq 2 ] && help' EXIT
 
 while getopts ":hvf:p:-:" opt; do
    patch_lo "help verbose file:password:" opt "$@"
-   path_optarg "p password" opt
+   patch_optarg "p password" opt
    patch_dash
    case $opt in
       h|help)
