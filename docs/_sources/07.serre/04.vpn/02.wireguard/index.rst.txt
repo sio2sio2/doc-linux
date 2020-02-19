@@ -12,7 +12,7 @@ oficialmente como módulo.
 - Tiene mucho mejor rendimiento.
 - No usa certificados, sino parejas de claves (como |SSH|).
 
-**Inconvenientes**:
+**Limitaciones**:
 
 - Establece la |VPN| sólo en capa 3.
 - No se admite identificación del cliente con usuario y contraseña.

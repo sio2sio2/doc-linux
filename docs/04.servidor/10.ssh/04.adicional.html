@@ -71,7 +71,7 @@ directorio peronal del usuario. Si no se expresa ruta alguna, el fichero se
 copiará en el directorio personal. En el ejemplo, el origen es local y el
 destino remoto, por lo que la consecuencia es que <em>subimos</em> el fichero al
 servidor. Para descargar no hay más que escoger un origen remoto y un destino
-local<a class="footnote-reference" href="#id22" id="id1">[1]</a>:</p>
+local<a class="footnote-reference" href="#id20" id="id1">[1]</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> scp usuario@servidor:fichero_remoto.txt .
 </pre></div>
 </div>
@@ -154,143 +154,50 @@ redes con políticas de acceso muy restrictivas a internet, en las que
 prácticamente el único tráfico saliente permitido es el de navegación web
 (<abbr title="HyperText Transfer Protocol">HTTP</abbr> y <abbr title="HyperText Transfer Protocol">HTTP</abbr>s). En estos caso, la única solución pàra poder burlar la
 restricción es preparar nuestro servidor <abbr title="Security SHell">SSH</abbr> para que se pueda acceder
-a él a través de uno de los dos puertos anteriores (nosotros usaremos el
-<strong>443</strong><a class="footnote-reference" href="#id23" id="id2">[2]</a>). Ahora bien, dependiendo de los servicios adicionales que
-ofrezcamos en el servidor y de las restricciones de la red del cliente, la
-solución será más o menos inmediata. Las posibles situaciones son las
-siguientes:</p>
-<table border="1" class="docutils">
-<colgroup>
-<col width="18%" />
-<col width="17%" />
-<col width="65%" />
-</colgroup>
-<thead valign="bottom">
-<tr class="row-odd"><th class="head">Puerto [443]</th>
-<th class="head">Vigilancia</th>
-<th class="head">Estrategia</th>
-</tr>
-</thead>
-<tbody valign="top">
-<tr class="row-even"><td>Libre</td>
-<td>No</td>
-<td><a class="reference internal" href="#ssh-443"><span class="std std-ref">escucha en el puerto 443</span></a></td>
-</tr>
-<tr class="row-odd"><td>Ocupado</td>
-<td>No</td>
-<td><a class="reference internal" href="#sslh"><span class="std std-ref">sslh</span></a></td>
-</tr>
-<tr class="row-even"><td>Libre</td>
-<td>Sí</td>
-<td><a class="reference internal" href="#haproxy"><span class="std std-ref">haproxy</span></a></td>
-</tr>
-<tr class="row-odd"><td>Ocupado</td>
-<td>Sí</td>
-<td><a class="reference internal" href="#haproxy"><span class="std std-ref">haproxy</span></a></td>
-</tr>
-</tbody>
-</table>
-<div class="admonition note">
-<p class="first admonition-title">Nota</p>
-<p>Entiéndase que por <em>libre</em> entendemos que en nuestro servidor no usamos
-el puerto <em>443</em> para dar ningún otro servicio. Este será el caso si no ofrecemos
-servicio web seguro o si no necesitamos encauzar a través de este mismo puerto
-otros servicios como una <abbr title="Virtual Private Network">VPN</abbr>.</p>
-<p class="last">Por <em>vigilancia</em> entendemos que el tráfico de salida de la red cliente no
-solamente está restringido por un cortafuegos, sino que además hay un <em>proxy</em>
-que analice el protocolo del tráfico dirigido al puerto 443 y lo rechaza si
-éste no es <abbr title="Transport Layer Security">TLS</abbr>.</p>
+a él a través de uno de los dos puertos anteriores.</p>
+<div class="admonition seealso">
+<p class="first admonition-title">Ver también</p>
+<p class="last">Lea la  discusión sobre <a class="reference internal" href="../../07.serre/02.web/02.nginx/02.avanz/07.https.html#compartido"><span class="std std-ref">puerto compartido</span></a> presente en la sección de configuración de <a class="reference internal" href="../../07.serre/02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a>.</p>
 </div>
-<div class="section" id="puerto-libre-sin-vigilancia">
-<span id="ssh-443"></span><h3>4.5.6.3.1. Puerto libre sin vigilancia<a class="headerlink" href="#puerto-libre-sin-vigilancia" title="Enlazar permanentemente con este título">¶</a></h3>
-<p>Es la situación menos restrictiva y, por tanto, la más fácil de solucionar, ya
-que basta con hacer escuchar el servidor también en el puerto <strong>443</strong>. Para ello
-no hay más que usar repetidamente la directiva <strong>Port</strong> en <code class="file docutils literal notranslate"><span class="pre">/etc/ssh/sshd_config</span></code>:</p>
+<p>Dependiendo del grado de vigilancia en la red del cliente y de cómo hayamos
+configurado el servidor, tenemos varias soluciones:</p>
+<div class="section" id="escucha-directa">
+<span id="ssh-443"></span><h3>4.5.6.3.1. Escucha directa<a class="headerlink" href="#escucha-directa" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Sirve para la situación menos restrictiva y, por tanto, es la más fácil de
+solucionar, ya que basta con hacer escuchar el servidor también en el puerto
+<strong>443</strong>. Para ello no hay más que usar repetidamente la directiva <strong>Port</strong> en
+<code class="file docutils literal notranslate"><span class="pre">/etc/ssh/sshd_config</span></code>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Port 22</span>
 <span class="go">Port 443</span>
 </pre></div>
 </div>
+<p>Una alternayiva igualmente eficar es usar el cortafuegos para redirigir el elñ
+tráfico entrante con destino al puerto <strong>443</strong> al puerto <strong>22</strong>. Vea cómo
+<a class="reference internal" href="../../08.redes/07.cortafuegos/index.html#firewall"><span class="std std-ref">configurar el cortaguegos</span></a> para ello.</p>
 </div>
-<div class="section" id="multiplexacion">
-<span id="sslh"></span><h3>4.5.6.3.2. Multiplexación<a class="headerlink" href="#multiplexacion" title="Enlazar permanentemente con este título">¶</a></h3>
-<p>Cuando el puerto <strong>443</strong> ya lo tenemos ocupado con el servidor <em>web</em>, o bien,
-prevemos que lo tendremos ocupado, la solución anterior es inviable. La
-solución sencilla en este caso consiste en poner a escuchar el servidor web seguro
-exclusivamente en el puerto <strong>443</strong> de la interfaz de <em>loopback</em> y reservar el
-puerto de la interfaz física para el <a class="reference external" href="http://www.rutschle.net/tech/sslh/README.html">servicio SSLH</a>. Este servicio es, por decirlo
-así, un <em>multiplexor de protocolos</em> que analiza el trafico recibido en un
-determinado puerto (típicamente el <strong>443</strong>), analiza el tráfico y, en función de
-su tipo, lo redirige al puerto de la interfaz que le indiquemos. Gracias a ello,
-podemos ofrecer distintos servicios (p.e. <abbr title="HyperText Transfer Protocol">HTTP</abbr>s, <abbr title="Security SHell">SSH</abbr> y <abbr title="Virtual Private Network">VPN</abbr>) por el mismo
-puerto <strong>443</strong> de la interfaz física. La estrategia, pues, consiste en levantar
-los siguientes servicios, escuchando en los siguientes interfaces y puertos:</p>
-<table border="1" class="docutils">
-<colgroup>
-<col width="34%" />
-<col width="45%" />
-<col width="20%" />
-</colgroup>
-<thead valign="bottom">
-<tr class="row-odd"><th class="head">Servicio</th>
-<th class="head">Interfaz</th>
-<th class="head">Puerto</th>
-</tr>
-</thead>
-<tbody valign="top">
-<tr class="row-even"><td><abbr title="Security SHell">SSH</abbr></td>
-<td>0.0.0.0</td>
-<td>22/TCP</td>
-</tr>
-<tr class="row-odd"><td><em>OpenVPN</em><a class="footnote-reference" href="#id24" id="id3">[3]</a></td>
-<td>0.0.0.0</td>
-<td>1194/TCP</td>
-</tr>
-<tr class="row-even"><td><abbr title="HyperText Transfer Protocol">HTTP</abbr>s</td>
-<td>0.0.0.0</td>
-<td>80/TCP</td>
-</tr>
-<tr class="row-odd"><td><em>SSLH</em></td>
-<td>Todas excepto local</td>
-<td>443/TCP</td>
-</tr>
-</tbody>
-</table>
-<p>Para llevarlo a cabo, es necesario instalar:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt-get install sslh
-</pre></div>
-</div>
-<p>y configurar el fichero <code class="file docutils literal notranslate"><span class="pre">/etc/default/sslh</span></code> del siguiente modo:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">RUN=yes  # SSLH corre permanentemente, no a través de inetd.</span>
-
-<span class="go">[...]</span>
-
-<span class="go">DAEMON_OPTS=&quot;--user sslh --listen 172.22.0.2:443 \</span>
-<span class="go">             --ssh 127.0.0.1:22 --ssl 127.0.0.1:443 --openvpn 127.0.0.1:1194 \</span>
-<span class="go">             --pidfile /var/run/sslh/sslh.pid&quot;</span>
-</pre></div>
-</div>
-<p>esto suponiendo que tengamos una sólo interfaz física y esta tenga por <em>ip</em>
-<em>172.22.0.2</em>. Si hubiera varias, habría que colocar varias veces la opción
-<code class="docutils literal notranslate"><span class="pre">--listen</span></code> con la <em>ip</em> correspondiente.</p>
-<div class="admonition note">
-<p class="first admonition-title">Nota</p>
-<p class="last">Permitir es tráfico <abbr title="Virtual Private Network">VPN</abbr> es absolutamente accesorio. Como cuesta poco
-(una opción para <em>sslh</em>) se ha incluido en la explicación.</p>
-</div>
+<div class="section" id="puerto-compartido">
+<h3>4.5.6.3.2. Puerto compartido<a class="headerlink" href="#puerto-compartido" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Si el puerto comparte con otro servidor, será un <em>software</em> como <a class="reference internal" href="../../07.serre/02.web/02.nginx/02.avanz/07.https.html#sslh"><span class="std std-ref">sslh</span></a> o el <em>proxy</em> el que dirija el tráfico hacia el servidor <abbr title="Security SHell">SSH</abbr>. Como el
+tráfico no se enmascara para ocultarlo, no es necesaria ningún configuración
+adicional ni en el cliente ni en el servidor <abbr title="Security SHell">SSH</abbr>.</p>
 </div>
 <div class="section" id="ssh-sobre-https">
 <span id="haproxy"></span><h3>4.5.6.3.3. <abbr title="Security SHell">SSH</abbr> sobre <abbr title="HyperText Transfer Protocol">HTTP</abbr>s<a class="headerlink" href="#ssh-sobre-https" title="Enlazar permanentemente con este título">¶</a></h3>
+<div class="admonition-todo admonition" id="index-4">
+<p class="first admonition-title">Por hacer</p>
+<p class="last">Trasladar y modificar este apartado</p>
+</div>
 <p>En este último caso, un proxy intermedio analiza si el tráfico que intentamos
 dirigir hacia un puerto <strong>443</strong> sigue el protocolo <abbr title="Transport Layer Security">TLS</abbr>, como
-en teoría debería ser<a class="footnote-reference" href="#id25" id="id4">[4]</a>. Ante esto, no podemos usar ninguna de las soluciones
+en teoría debería ser<a class="footnote-reference" href="#id21" id="id2">[2]</a>. Ante esto, no podemos usar ninguna de las soluciones
 anteriores, porque en ellas el tráfico <abbr title="Security SHell">SSH</abbr> viaja desnudo y éste no usa la
 cobertura <abbr title="Transport Layer Security">TLS</abbr> que espera encontrar el <em>proxy</em>. Ahora bien, <abbr title="Transport Layer Security">TLS</abbr> es una
 envoltura que cifra todo el contenido, lo que significa que tal <em>proxy</em> es
 incapaz de saber a qué protocolo envuelve <abbr title="Transport Layer Security">TLS</abbr>. Por tanto, para el
 <em>proxy</em>  no hay diferencia entre una comunicación <abbr title="HyperText Transfer Protocol">HTTP</abbr> envuelta en <abbr title="Transport Layer Security">TLS</abbr> (o
-sea, <abbr title="HyperText Transfer Protocol">HTTP</abbr>s) o una comunicación <abbr title="Security SHell">SSH</abbr> envuelta en <abbr title="Transport Layer Security">TLS</abbr><a class="footnote-reference" href="#id26" id="id5">[5]</a><a class="footnote-reference" href="#id27" id="id6">[6]</a>.</p>
+sea, <abbr title="HyperText Transfer Protocol">HTTP</abbr>s) o una comunicación <abbr title="Security SHell">SSH</abbr> envuelta en <abbr title="Transport Layer Security">TLS</abbr><a class="footnote-reference" href="#id22" id="id3">[3]</a><a class="footnote-reference" href="#id23" id="id4">[4]</a>.</p>
 <p>Esta estrategia requiere que en el puerto <strong>443</strong> no escuche un simple
-<em>multiplexor</em>, sino un <em>proxy</em>. Para la ocasión, usaremos <a class="reference external" href="http://www.haproxy.org/">el programa haproxy</a><a class="footnote-reference" href="#id28" id="id7">[7]</a> y supondremos que todos los servidores para
+<em>multiplexor</em>, sino un <em>proxy</em>. Para la ocasión, usaremos <a class="reference external" href="http://www.haproxy.org/">el programa haproxy</a><a class="footnote-reference" href="#id24" id="id5">[5]</a> y supondremos que todos los servidores para
 los que intermedia se encuentran en la misma máquina.</p>
 <div class="section" id="servidor">
 <h4>4.5.6.3.3.1. Servidor<a class="headerlink" href="#servidor" title="Enlazar permanentemente con este título">¶</a></h4>
@@ -301,12 +208,12 @@ los que intermedia se encuentran en la misma máquina.</p>
 embargo, determina que otros servicios para los que también intermedia (como
 <abbr title="HyperText Transfer Protocol">HTTP</abbr> o <abbr title="Virtual Private Network">VPN</abbr>) deban modificar asimismo sus configuraciones en el lado
 cliente o servidor para adaptarse. Lea, al respecto, los epígrafes
-correspondientes a su <a class="reference internal" href="../../07.serre/02.web/02.nginx/02.avanz/07.https.html#nginx-haproxy"><span class="std std-ref">uso con nginx</span></a> o su <a class="reference internal" href="../../07.serre/04.vpn/01.openvpn/04.misc.html#vpn-haproxy"><span class="std std-ref">uso con
+correspondientes a su <a class="reference internal" href="../../07.serre/02.web/02.nginx/02.avanz/08.misc.html#nginx-tras-proxy"><span class="std std-ref">uso con nginx</span></a> o su <a class="reference internal" href="../../07.serre/04.vpn/01.openvpn/04.misc.html#vpn-haproxy"><span class="std std-ref">uso con
 openvpn</span></a>.</p>
 </div>
 <p><strong class="program">haproxy</strong> es, en realidad, una solución bastante general y, no permite
 sólo envolver el protocolo interno para hacerlo invisible al <em>proxy</em>, sino
-también usarlo a la manera de un <em>multiplexor</em> como <a class="reference internal" href="#sslh"><span class="std std-ref">sslh</span></a> <a class="footnote-reference" href="#id29" id="id8">[8]</a>, de
+también usarlo a la manera de un <em>multiplexor</em> como <a class="reference internal" href="../../07.serre/02.web/02.nginx/02.avanz/07.https.html#sslh"><span class="std std-ref">sslh</span></a> <a class="footnote-reference" href="#id25" id="id6">[6]</a>, de
 modo que los protocolos (<abbr title="Security SHell">SSH</abbr>, <abbr title="Virtual Private Network">VPN</abbr>) viajen sin envolver y, al llegar a
 <strong class="program">haproxy</strong> sean identificados y redirigidos al verdadero servidor.</p>
 <p>Describiremos <strong>dos soluciones</strong> distintas:</p>
@@ -339,7 +246,7 @@ comunicación con el consiguiente coste en el rendimiento.</p>
 </pre></div>
 </div>
 <p>y tener un certificado digital para el servicio, que puede ser autofirmado o
-acreditado por una autoridad certificadora (véase <a class="reference internal" href="../../07.serre/02.web/02.nginx/02.avanz/07.https.html#tls-cert"><span class="std std-ref">cómo obtener uno</span></a>)<a class="footnote-reference" href="#id30" id="id9">[9]</a>.</p>
+acreditado por una autoridad certificadora (véase <a class="reference internal" href="../../07.serre/02.web/02.nginx/02.avanz/07.https.html#tls-cert"><span class="std std-ref">cómo obtener uno</span></a>)<a class="footnote-reference" href="#id26" id="id7">[7]</a>.</p>
 <p>Sea como sea, es preciso señalar que <strong class="program">haproxy</strong> requiere que todas las
 claves públicas y la privada participantes en la autenticación estén reunidas en
 un mismo fichero.</p>
@@ -357,7 +264,7 @@ postinstalación como se sugirió en las explicaciones:</p>
 </div>
 <p>Creado el certificado adecuado, podemos hacer la configuración propiamente
 dicha, que es bastante más complicada y con muchísimas más variantes que la de
-<a class="reference internal" href="#sslh"><span class="std std-ref">sslh</span></a>.</p>
+<a class="reference internal" href="../../07.serre/02.web/02.nginx/02.avanz/07.https.html#sslh"><span class="std std-ref">sslh</span></a>.</p>
 <p class="rubric">Primera variante</p>
 <p>En ella, <strong class="program">haproxy</strong> recibe tráfico cifrado con <abbr title="Transport Layer Security">TLS</abbr>, los descifra y,
 dependiendo de su naturaleza, lo envía al servidor adecuado. Bajo estos
@@ -414,11 +321,11 @@ backend http
 supuesto que su <em>ip</em> es <em>172.22.0.2</em>); y conecta con tres servidores: uno <abbr title="Security SHell">SSH</abbr>,
 uno <abbr title="Virtual Private Network">VPN</abbr> y un web, todos en la propia máquina.</li>
 <li>Es justamente ahí donde se cifra a la salida y se descifra a la entrada
-por lo que se añade el parámetro <code class="docutils literal notranslate"><span class="pre">ssl</span></code> y se indica cuál el certificado<a class="footnote-reference" href="#id31" id="id10">[10]</a>.</li>
+por lo que se añade el parámetro <code class="docutils literal notranslate"><span class="pre">ssl</span></code> y se indica cuál el certificado<a class="footnote-reference" href="#id27" id="id8">[8]</a>.</li>
 <li>Como consecuencia de que se descifra, es posible analizar el contenido
-y distinguir entre los tres tráficos<a class="footnote-reference" href="#id32" id="id11">[11]</a>.</li>
+y distinguir entre los tres tráficos<a class="footnote-reference" href="#id28" id="id9">[9]</a>.</li>
 <li>La conexión con el servidor web se hace en modo <abbr title="HyperText Transfer Protocol">HTTP</abbr> por la razón que
-se dará más adelante. Por ello se envía la comunicación al puerto <strong>80</strong><a class="footnote-reference" href="#id33" id="id12">[12]</a>.Esto nos permite añadir los campos <code class="docutils literal notranslate"><span class="pre">X-Forwarder-For</span></code>
+se dará más adelante. Por ello se envía la comunicación al puerto <strong>80</strong><a class="footnote-reference" href="#id29" id="id10">[10]</a>.Esto nos permite añadir los campos <code class="docutils literal notranslate"><span class="pre">X-Forwarder-For</span></code>
 para indicar la <em>ip</em> del cliente y la cabecera <code class="docutils literal notranslate"><span class="pre">X-Forwarder-Proto</span></code> para
 avisar de que el protocolo que usó el cliente fue <abbr title="HyperText Transfer Protocol">HTTP</abbr>s y no <abbr title="HyperText Transfer Protocol">HTTP</abbr> que es
 el que ve el servidor. Si se tiene convenientemente configurado el servidor web,
@@ -426,7 +333,7 @@ las aplicaciones web podrán saber quién se conecta y cómo.</li>
 </ul>
 <div class="admonition warning">
 <p class="first admonition-title">Advertencia</p>
-<p class="last">A diferencia de <a class="reference internal" href="#sslh"><span class="std std-ref">sslh</span></a>, <strong class="command">haproxy</strong> es un proxy
+<p class="last">A diferencia de <a class="reference internal" href="../../07.serre/02.web/02.nginx/02.avanz/07.https.html#sslh"><span class="std std-ref">sslh</span></a>, <strong class="command">haproxy</strong> es un proxy
 y como tal establece dos conexiones distintas: una entre el cliente y él; y
 otra entre él y el servidor.  Consecuentemente, el servidor destinatario
 final es incapaz de conocer cuál es la <em>ip</em> del cliente, y entenderá que se
@@ -442,7 +349,7 @@ búsuqedas automáticas de servidores <abbr title="Security SHell">SSH</abbr> en
 <div class="admonition note">
 <p class="first admonition-title">Nota</p>
 <p class="last"><strong class="program">haproxy</strong> con la colaboración del núcleo de linux, puede
-funcionar en modo transparente, de manera que el servidor reciba la <em>ip</em> del
+funcionar en modo transparente, de manera que el servidor reciba la <abbr title="Internet Protocol">IP</abbr> del
 cliente. Sin embargo, esto exige que el servidor se encuentre en una máquina
 distinta a <strong class="program">haproxy</strong>. Por si es este nuestro caso, se deja <a class="reference internal" href="#haproxy-transparente"><span class="std std-ref">un
 epígrafe específico para su explicación</span></a>.</p>
@@ -480,7 +387,7 @@ un <abbr title="Server Name Identification">SNI</abbr> distinto para cada tipo d
 </pre></div>
 </div>
 <p class="last">Ahora bien, el tráfico sigue cifrado con <abbr title="Transport Layer Security">TLS</abbr> lo cual puede no ser un
-problema para el servidor web<a class="footnote-reference" href="#id34" id="id13">[13]</a>, pero sí para los otros servidores. Eso
+problema para el servidor web<a class="footnote-reference" href="#id30" id="id11">[11]</a>, pero sí para los otros servidores. Eso
 obligaría a que el backend (<em>ssl-ssh</em> o <em>ssl-vpn</em> en el ejemplo) no entregue
 directamente el flujo, sino que cada uno de ellos lo envíe a un puerto local
 particular en que escucha también <strong class="program">haproxy</strong> y que sea en este
@@ -492,7 +399,7 @@ particular en que escucha también <strong class="program">haproxy</strong> y qu
 <p class="rubric">UNIX</p>
 <p>El cliente <strong class="command">ssh</strong> requiere ayudarse de un <em>software</em> que con <abbr title="Transport Layer Security">TLS</abbr>
 envuelva su salida y desenvuelva su entrada, y esa labor la puede hacer
-<strong class="command">openssl</strong><a class="footnote-reference" href="#id35" id="id14">[14]</a>:</p>
+<strong class="command">openssl</strong><a class="footnote-reference" href="#id31" id="id12">[12]</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> ssh -p443 -o <span class="s2">&quot;ProxyCommand openssl s_client -quiet -connect %h:%p&quot;</span> usuario@mi.servidor.org
 </pre></div>
 </div>
@@ -580,7 +487,7 @@ Es preciso, pues, interponerse, capturar la respuesta y pasarla otra vez por
 </div>
 </div>
 </li>
-<li><p class="first">La adición de reglas de encaminamiento y reglas de <a class="reference internal" href="../../08.redes/07.cortafuegos/01.iptables/index.html#iptables"><span class="std std-ref">iptables</span></a><a class="footnote-reference" href="#id36" id="id15">[15]</a>. Como suponemos que usamos debian, podemos hacerlas perennes, manipulando
+<li><p class="first">La adición de reglas de encaminamiento y reglas de <a class="reference internal" href="../../08.redes/07.cortafuegos/01.iptables/index.html#iptables"><span class="std std-ref">iptables</span></a><a class="footnote-reference" href="#id32" id="id13">[13]</a>. Como suponemos que usamos debian, podemos hacerlas perennes, manipulando
 el fichero <code class="file docutils literal notranslate"><span class="pre">/etc/network/interfaces</span></code> y dejando así la configuración de
 la interfaz que conecta con la red en la que están los servidores:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">allow-hotplug eth1</span>
@@ -682,8 +589,8 @@ contraseña del usuario en el cliente, es decir, si en el cliente somos el
 usuario <em>pepe</em> con contraseña <em>pepesoyyo</em>, la clave de paso que debemos
 escoger al crear el certificado debe ser <em>pepesoyyo</em>.</p>
 </div>
-<span class="target" id="index-4"></span><div class="section" id="index-5">
-<span id="id16"></span><h3>4.5.6.4.1. <strong class="command">ssh-agent</strong><a class="headerlink" href="#index-5" title="Enlazar permanentemente con este título">¶</a></h3>
+<span class="target" id="index-5"></span><div class="section" id="index-6">
+<span id="id14"></span><h3>4.5.6.4.1. <strong class="command">ssh-agent</strong><a class="headerlink" href="#index-6" title="Enlazar permanentemente con este título">¶</a></h3>
 <p>Este programa permite almacenar claves de paso que luego se usarán cuando sea
 necesario para desbloquear la clave privada. Su uso manual es el siguiente:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> ssh-agent
@@ -696,7 +603,7 @@ necesario para desbloquear la clave privada. Su uso manual es el siguiente:</p>
 comunicarse con el resto de programas de <em>ssh</em>. Para que sea así,
 deben definirse como variables de ambiente las dos variables que se ven. De
 hecho, la salida es el código que lleva a cabo tal cosa, por lo que la mejor
-forma de poner en marcha el programa es así<a class="footnote-reference" href="#id37" id="id17">[16]</a>:</p>
+forma de poner en marcha el programa es así<a class="footnote-reference" href="#id33" id="id15">[14]</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> <span class="nb">eval</span> <span class="k">$(</span>ssh-agent<span class="k">)</span>
 <span class="go">Agent pid 660</span>
 </pre></div>
@@ -727,7 +634,7 @@ engorroso; así que se le puede dar una vuelta de tuerca más e instalar:</p>
 </div>
 <p>Este es un módulo que está pensado para tomar la propia contraseña de
 autenticación del usuario y usarla para arrancar <strong class="command">ssh-agent</strong> y
-desbloquear la clave privada almacenada en <code class="file docutils literal notranslate"><span class="pre">~/.ssh/</span></code><a class="footnote-reference" href="#id38" id="id18">[17]</a>. No requiere de
+desbloquear la clave privada almacenada en <code class="file docutils literal notranslate"><span class="pre">~/.ssh/</span></code><a class="footnote-reference" href="#id34" id="id16">[15]</a>. No requiere de
 configuración adicional, porque la instalación se encarga de añadirlo a <em>pam</em>
 convenientemente. Hecho esto, no tenemos más que asegurarnos de que tenemos
 creado un certificado:</p>
@@ -742,7 +649,7 @@ con la contraseña del usuario remoto).</p>
 ya que <a class="reference external" href="https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=859054">no es compatible con la versión que usa ésta de openssl</a></p>
 </div>
 <p>Como alternativa al uso de <em>pam_ssh</em>, en los clientes con entorno gráfico puede
-compprobarse<a class="footnote-reference" href="#id39" id="id19">[18]</a> que está escrito lo siguiente en
+compprobarse<a class="footnote-reference" href="#id35" id="id17">[16]</a> que está escrito lo siguiente en
 <code class="file docutils literal notranslate"><span class="pre">/etc/X11/Xsession.options</span></code>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> grep ssh /etc/X11/Xsession.options
 <span class="go">use-ssh-agent</span>
@@ -779,7 +686,7 @@ pam_ssh</span></a> si no disponemos en el sistema de él.</p>
 </div>
 <div class="section" id="gnome-keyring">
 <h3>4.5.6.4.2. <strong class="command">gnome-keyring</strong><a class="headerlink" href="#gnome-keyring" title="Enlazar permanentemente con este título">¶</a></h3>
-<div class="admonition-todo admonition" id="index-6">
+<div class="admonition-todo admonition" id="index-7">
 <p class="first admonition-title">Por hacer</p>
 <p class="last">Por investigar…</p>
 </div>
@@ -795,7 +702,7 @@ que optamos por usar <strong class="command">ssh-agent</strong> y no disponemos 
 <p>Para poder hacer esto, es necesario saber que la variable <em>SSH_ASKPASS</em> le
 indica a <strong class="command">ssh</strong> (y toda la familia de programas clientes) qué programa
 usar para obtener la contraseña. Por este motivo, si creamos el programa
-<code class="file docutils literal notranslate"><span class="pre">$XDG_RUNTIME_DIR/askpass.sh</span></code><a class="footnote-reference" href="#id40" id="id20">[19]</a>:</p>
+<code class="file docutils literal notranslate"><span class="pre">$XDG_RUNTIME_DIR/askpass.sh</span></code><a class="footnote-reference" href="#id36" id="id18">[17]</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span>!/bin/sh
 <span class="go">cat</span>
 </pre></div>
@@ -804,7 +711,7 @@ usar para obtener la contraseña. Por este motivo, si creamos el programa
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> <span class="nb">echo</span> <span class="s2">&quot;mi clave de paso&quot;</span> <span class="p">|</span> <span class="nv">SSH_ASKPASS</span><span class="o">=</span><span class="nv">$XDG_RUNTIME_DIR</span>/askpass.sh ssh-add
 </pre></div>
 </div>
-<p>Pasar la clave de paso<a class="footnote-reference" href="#id41" id="id21">[20]</a> directamente a <strong class="command">ssh</strong> es algo más
+<p>Pasar la clave de paso<a class="footnote-reference" href="#id37" id="id19">[18]</a> directamente a <strong class="command">ssh</strong> es algo más
 complicado y no resultará en una sesión interactiva (lo cual no es un problema,
 si el propio acceso pretendemos que sea interactivo):</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span>  <span class="nb">echo</span> <span class="s2">&quot;mi clave de paso&quot;</span> <span class="p">|</span> <span class="nv">SSH_ASKPASS</span><span class="o">=</span><span class="nv">$XDG_RUNTIME_DIR</span>/askpass.sh setsid ssh castillo ls /
@@ -872,7 +779,7 @@ que deseemos ejecutar el <em>script</em> separados por comas:</p>
 </div>
 </div>
 <p class="rubric">Notas al pie</p>
-<table class="docutils footnote" frame="void" id="id22" rules="none">
+<table class="docutils footnote" frame="void" id="id20" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
 <tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td><p class="first">Observe que:</p>
@@ -892,7 +799,7 @@ una. Así pues, es mejor usar la segunda forma.</p>
 </td></tr>
 </tbody>
 </table>
-<table class="docutils footnote" frame="void" id="id23" rules="none">
+<table class="docutils footnote" frame="void" id="id21" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
 <tr><td class="label"><a class="fn-backref" href="#id2">[2]</a></td><td>El acceso por el puerto <strong>443</strong> ofrece la ventaja de que, en caso de que
@@ -905,50 +812,33 @@ bastante raras. Si su filtrado también se basa en analizar el contenido, lo
 más probable es que no pasemos su filtro.</td></tr>
 </tbody>
 </table>
-<table class="docutils footnote" frame="void" id="id24" rules="none">
+<table class="docutils footnote" frame="void" id="id22" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id3">[3]</a></td><td><p class="first">Donde queramos poner a escuchar <strong class="program">openvpn</strong> depende de nuestras
-intenciones. Escoger el puerto <strong>1194</strong> responde a que ese es el puerto
-estándar para esa aplicación (de hecho, aparece referido en
-<code class="file docutils literal notranslate"><span class="pre">/etc/services</span></code>). Una buena estrategia es ponerlo a escuchar:</p>
-<blockquote class="last">
-<div><ul class="simple">
-<li>En el puerto <em>1194/UDP</em> en todas las interfaces.</li>
-<li>En el puerto <em>1194/TCP</em> de la interfaz local, cuya conexión remota se
-haŕa gracias a la intermediación de <strong class="program">haproxy</strong>.</li>
-</ul>
-</div></blockquote>
-</td></tr>
-</tbody>
-</table>
-<table class="docutils footnote" frame="void" id="id25" rules="none">
-<colgroup><col class="label" /><col /></colgroup>
-<tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id4">[4]</a></td><td>En teoría, el tráfico debe ser <abbr title="HyperText Transfer Protocol">HTTP</abbr>s, es decir, <abbr title="HyperText Transfer Protocol">HTTP</abbr> ofuscado e
+<tr><td class="label"><a class="fn-backref" href="#id3">[3]</a></td><td>En teoría, el tráfico debe ser <abbr title="HyperText Transfer Protocol">HTTP</abbr>s, es decir, <abbr title="HyperText Transfer Protocol">HTTP</abbr> ofuscado e
 irreconocible gracias a la envoltura segura que ofrece <abbr title="Transport Layer Security">TLS</abbr>.</td></tr>
 </tbody>
 </table>
-<table class="docutils footnote" frame="void" id="id26" rules="none">
+<table class="docutils footnote" frame="void" id="id23" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id5">[5]</a></td><td>De lo que se deduce que el epígrafe es inexacto: debería llamarse <em>SSH
+<tr><td class="label"><a class="fn-backref" href="#id4">[4]</a></td><td>De lo que se deduce que el epígrafe es inexacto: debería llamarse <em>SSH
 sobre TLS</em>.</td></tr>
 </tbody>
 </table>
-<table class="docutils footnote" frame="void" id="id27" rules="none">
+<table class="docutils footnote" frame="void" id="id24" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id6">[6]</a></td><td>Como el <em>proxy</em> es capaz de <em>ver</em> la capa <abbr title="Transport Layer Security">TLS</abbr>, no solamente puede
+<tr><td class="label"><a class="fn-backref" href="#id5">[5]</a></td><td>Como el <em>proxy</em> es capaz de <em>ver</em> la capa <abbr title="Transport Layer Security">TLS</abbr>, no solamente puede
 comprobar si se usa tal protocolo, sino también exigir la validez del
 certificado. En ese caso, no tendremos más remedio que generar un certificado
 válido.</td></tr>
 </tbody>
 </table>
-<table class="docutils footnote" frame="void" id="id28" rules="none">
+<table class="docutils footnote" frame="void" id="id25" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id7">[7]</a></td><td>También podría usarse el módulo <a class="reference external" href="https://httpd.apache.org/docs/2.4/mod/mod_proxy.html">mod_proxy</a> de <a class="reference external" href="http://apache.org/">apache</a> o <a class="reference external" href="http://www.squid-cache.org/">squid</a>.
+<tr><td class="label"><a class="fn-backref" href="#id6">[6]</a></td><td>También podría usarse el módulo <a class="reference external" href="https://httpd.apache.org/docs/2.4/mod/mod_proxy.html">mod_proxy</a> de <a class="reference external" href="http://apache.org/">apache</a> o <a class="reference external" href="http://www.squid-cache.org/">squid</a>.
 Desgraciadamente, no puede usarse como <em>proxy</em> <a class="reference internal" href="../../07.serre/02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a>,
 ya que éste sólo funciona como <em>proxy inverso</em>. En realidad,
 <strong class="command">nginx</strong> tiene un módulo de terceros que sí lo permite,
@@ -957,67 +847,67 @@ estado actual en que se halla la modularidad de <strong class="program">nginx</s
 engorro utilizarlo.</td></tr>
 </tbody>
 </table>
-<table class="docutils footnote" frame="void" id="id29" rules="none">
+<table class="docutils footnote" frame="void" id="id26" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id8">[8]</a></td><td>Con una importante diferencia: se altera el origen de la conexión y el
+<tr><td class="label"><a class="fn-backref" href="#id7">[7]</a></td><td>Con una importante diferencia: se altera el origen de la conexión y el
 servidor creerá que las peticiones las recibe de <strong class="program">haproxy</strong> (o sea,
 la máquina local) y del cliente original. Se discutirá más adelante.</td></tr>
 </tbody>
 </table>
-<table class="docutils footnote" frame="void" id="id30" rules="none">
+<table class="docutils footnote" frame="void" id="id27" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id9">[9]</a></td><td>Ahora bien, en la práctica deberemos usar un certificado fiable, porque
+<tr><td class="label"><a class="fn-backref" href="#id8">[8]</a></td><td>Ahora bien, en la práctica deberemos usar un certificado fiable, porque
 si el motivo de usar <strong class="program">haproxy</strong> es la existencia de un <em>proxy</em>, lo
 necesitaremos; y, si tal <em>proxy</em> no existe, es mejor usar una solución como
 <strong class="program">sslh</strong>.</td></tr>
 </tbody>
 </table>
+<table class="docutils footnote" frame="void" id="id28" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id9">[9]</a></td><td>En el <em>gancho</em> propuesto el fichero con las claves no se llama
+<em>keycert.pem</em>, sino <em>nombre_del_servidor.pem</em>. Téngalo en cuenta a la hora de
+copiar la configuración de ejemplo.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id29" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id10">[10]</a></td><td>Todo cliente debe empezar su comunicación con la cadena «<em>SSH-2.0</em>», que
+puesta en binario es el código hexadecimal escrito en la configuración.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id30" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id11">[11]</a></td><td>Para profundizar en la configuración del servidor web, cuando es el
+<em>proxy</em> de cifrar y descifrar la comunicación, vea el <a class="reference internal" href="../../07.serre/02.web/02.nginx/02.avanz/08.misc.html#nginx-tras-proxy"><span class="std std-ref">apartado
+correspondiente</span></a>.</td></tr>
+</tbody>
+</table>
 <table class="docutils footnote" frame="void" id="id31" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id10">[10]</a></td><td>En el <em>gancho</em> propuesto el fichero con las claves no se llama
-<em>keycert.pem</em>, sino <em>nombre_del_servidor.pem</em>. Téngalo en cuenta a la hora de
-copiar la configuración de ejemplo.</td></tr>
+<tr><td class="label"><a class="fn-backref" href="#id12">[12]</a></td><td>En realidad sí lo es, porque no habrá forma de conocer el origen de la
+petición, a menos que, además, se configure <strong class="program">haproxy</strong> en <a class="reference internal" href="#haproxy-transparente"><span class="std std-ref">modo
+transparente</span></a>.</td></tr>
 </tbody>
 </table>
 <table class="docutils footnote" frame="void" id="id32" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id11">[11]</a></td><td>Todo cliente debe empezar su comunicación con la cadena «<em>SSH-2.0</em>», que
-puesta en binario es el código hexadecimal escrito en la configuración.</td></tr>
-</tbody>
-</table>
-<table class="docutils footnote" frame="void" id="id33" rules="none">
-<colgroup><col class="label" /><col /></colgroup>
-<tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id12">[12]</a></td><td>Para profundizar en la configuración del servidor web, cuando es el
-<em>proxy</em> de cifrar y descifrar la comunicación, vea el <a class="reference internal" href="../../07.serre/02.web/02.nginx/02.avanz/07.https.html#nginx-haproxy"><span class="std std-ref">apartado
-correspondiente</span></a>.</td></tr>
-</tbody>
-</table>
-<table class="docutils footnote" frame="void" id="id34" rules="none">
-<colgroup><col class="label" /><col /></colgroup>
-<tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id13">[13]</a></td><td>En realidad sí lo es, porque no habrá forma de conocer el origen de la
-petición, a menos que, además, se configure <strong class="program">haproxy</strong> en <a class="reference internal" href="#haproxy-transparente"><span class="std std-ref">modo
-transparente</span></a>.</td></tr>
-</tbody>
-</table>
-<table class="docutils footnote" frame="void" id="id35" rules="none">
-<colgroup><col class="label" /><col /></colgroup>
-<tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id14">[14]</a></td><td>Obviamente, este software de <em>proxy</em> para el cliente sólo es necesario si
+<tr><td class="label"><a class="fn-backref" href="#id13">[13]</a></td><td>Obviamente, este software de <em>proxy</em> para el cliente sólo es necesario si
 necesitamos establecer el túnel <abbr title="Transport Layer Security">TLS</abbr>. Si no es el caso (segunda variante en
 redes sin proxy que fiscalece la comunicación), en el cliente no hay más que
 asegurarse de que nos conectamos al puerto <strong>443</strong>.</td></tr>
 </tbody>
 </table>
-<table class="docutils footnote" frame="void" id="id36" rules="none">
+<table class="docutils footnote" frame="void" id="id33" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id15">[15]</a></td><td><p class="first">Esta configuración requiere que el núcleo se haya compilado con el módulo
+<tr><td class="label"><a class="fn-backref" href="#id15">[14]</a></td><td><p class="first">Esta configuración requiere que el núcleo se haya compilado con el módulo
 <code class="docutils literal notranslate"><span class="pre">NETFILTER_XT_MATCH_SOCKET</span></code>, pero esto es así en las <em>debian</em> modernas:</p>
 <div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> grep -i match_socket /boot/config-<span class="sb">`</span>uname -r<span class="sb">`</span>
 <span class="go">CONFIG_NETFILTER_XT_MATCH_SOCKET=m</span>
@@ -1026,10 +916,10 @@ asegurarse de que nos conectamos al puerto <strong>443</strong>.</td></tr>
 </td></tr>
 </tbody>
 </table>
-<table class="docutils footnote" frame="void" id="id37" rules="none">
+<table class="docutils footnote" frame="void" id="id34" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id17">[16]</a></td><td><p class="first">Si antes queremos deshacernos del <strong class="command">ssh-agent</strong> ya en ejecucion
+<tr><td class="label"><a class="fn-backref" href="#id16">[15]</a></td><td><p class="first">Si antes queremos deshacernos del <strong class="command">ssh-agent</strong> ya en ejecucion
 podemos hacer lo siguiente:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> <span class="nb">export</span> <span class="nv">SSH_AUTH_SOCK</span><span class="o">=</span>/tmp/ssh-wuZYTNFc1wq1/agent.656
 <span class="gp">$</span> <span class="nb">export</span> <span class="nv">SSH_AGENT_PID</span><span class="o">=</span><span class="m">657</span>
@@ -1043,33 +933,33 @@ podemos hacer lo siguiente:</p>
 </td></tr>
 </tbody>
 </table>
-<table class="docutils footnote" frame="void" id="id38" rules="none">
+<table class="docutils footnote" frame="void" id="id35" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id18">[17]</a></td><td>Consúltese su página de manual para que la clave privada no sea una de
+<tr><td class="label"><a class="fn-backref" href="#id17">[16]</a></td><td>Consúltese su página de manual para que la clave privada no sea una de
 las predeterminadas de <strong class="command">ssh</strong> (<code class="file docutils literal notranslate"><span class="pre">~/.ssh/id_rsa</span></code>,
 <code class="file docutils literal notranslate"><span class="pre">~/.ssh/id_ecdsa</span></code>, etc.)</td></tr>
 </tbody>
 </table>
-<table class="docutils footnote" frame="void" id="id39" rules="none">
+<table class="docutils footnote" frame="void" id="id36" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id19">[18]</a></td><td>Si se usa <em>pam_ssh</em> (o el <a class="reference internal" href="#pseudopam-ssh"><span class="std std-ref">script sustitutorio después propuesto</span></a>) conviene, precisamente, cerciorarse de que esto no está
+<tr><td class="label"><a class="fn-backref" href="#id18">[17]</a></td><td>Si se usa <em>pam_ssh</em> (o el <a class="reference internal" href="#pseudopam-ssh"><span class="std std-ref">script sustitutorio después propuesto</span></a>) conviene, precisamente, cerciorarse de que esto no está
 activo comentando la opción)</td></tr>
 </tbody>
 </table>
-<table class="docutils footnote" frame="void" id="id40" rules="none">
+<table class="docutils footnote" frame="void" id="id37" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id20">[19]</a></td><td>No se usa directamente <strong class="command">cat</strong> porque <strong class="program">ssh-add</strong> y el
+<tr><td class="label"><a class="fn-backref" href="#id19">[18]</a></td><td>No se usa directamente <strong class="command">cat</strong> porque <strong class="program">ssh-add</strong> y el
 resto de programas pasan argumentos que lo malogran. El <em>script</em> desecha los
 argumentos y sólo atiende a la entrada estándar que es lo que interesa.</td></tr>
 </tbody>
 </table>
-<table class="docutils footnote" frame="void" id="id41" rules="none">
+<table class="docutils footnote" frame="void" id="id38" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
-<tr><td class="label"><a class="fn-backref" href="#id21">[20]</a></td><td>O la contraseña, no es necesario la autenticación mediante clave pública
+<tr><td class="label">[19]</td><td>O la contraseña, no es necesario la autenticación mediante clave pública
 y privada.</td></tr>
 </tbody>
 </table>
@@ -1088,8 +978,8 @@ y privada.</td></tr>
 <li><a class="reference internal" href="#transferencia-de-ficheros">4.5.6.1. Transferencia de ficheros</a></li>
 <li><a class="reference internal" href="#trampolin-de-acceso">4.5.6.2. Trampolín de acceso</a></li>
 <li><a class="reference internal" href="#redes-restringidas">4.5.6.3. Redes restringidas</a><ul>
-<li><a class="reference internal" href="#puerto-libre-sin-vigilancia">4.5.6.3.1. Puerto libre sin vigilancia</a></li>
-<li><a class="reference internal" href="#multiplexacion">4.5.6.3.2. Multiplexación</a></li>
+<li><a class="reference internal" href="#escucha-directa">4.5.6.3.1. Escucha directa</a></li>
+<li><a class="reference internal" href="#puerto-compartido">4.5.6.3.2. Puerto compartido</a></li>
 <li><a class="reference internal" href="#ssh-sobre-https">4.5.6.3.3. <abbr title="Security SHell">SSH</abbr> sobre <abbr title="HyperText Transfer Protocol">HTTP</abbr>s</a><ul>
 <li><a class="reference internal" href="#servidor">4.5.6.3.3.1. Servidor</a></li>
 <li><a class="reference internal" href="#cliente">4.5.6.3.3.2. Cliente</a></li>
@@ -1099,7 +989,7 @@ y privada.</td></tr>
 </ul>
 </li>
 <li><a class="reference internal" href="#persistencia-de-claves">4.5.6.4. Persistencia de claves</a><ul>
-<li><a class="reference internal" href="#index-5">4.5.6.4.1. <strong class="command">ssh-agent</strong></a></li>
+<li><a class="reference internal" href="#index-6">4.5.6.4.1. <strong class="command">ssh-agent</strong></a></li>
 <li><a class="reference internal" href="#gnome-keyring">4.5.6.4.2. <strong class="command">gnome-keyring</strong></a></li>
 </ul>
 </li>

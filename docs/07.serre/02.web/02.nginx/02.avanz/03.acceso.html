@@ -91,59 +91,6 @@ se lo niega al resto.</p>
 <p class="last">Cuando las reglas son largas y complicadas, es mejor recurrir al
 módulo <a class="reference external" href="http://nginx.org/en/docs/http/ngx_http_geo_module.html">ngx_http_geo_module</a></p>
 </div>
-<p id="nginx-clientip">El problema de esta restricción es que la presencia de <em>proxies</em> intermedios
-(que no actúen de manera transparente) altera la <em>ip</em> de origen de la conexión,
-ya que el servidor recibirá una conexión cuyo origen será el <em>proxy</em> más cercano
-a él. Un caso extremo es aquel en que disponemos un <em>proxy</em> en la propia máquina
-donde se encuentra el servidor <em>web</em>. En este caso, el origen de todas las
-conexiones entrantes será la propia máquina (<em>127.0.0.1</em>) con lo que en
-principio este sistema de restricción es absolutamente inútil.</p>
-<p>Para soslayar este inconveniente los <em>proxies</em> pueden ir poblando la cabecera
-<a class="reference internal" href="../../01.desc/03.cabecera.html#xforwardedfor"><span class="std std-ref">X-Forwarded-For</span></a> de manera que el servidor pueda, así,
-sustituir la <em>ip</em> original de la conexión. <strong class="program">nginx</strong> puede recalcular
-la variable <code class="docutils literal notranslate"><span class="pre">$remote_addr</span></code> a partir de la información del campo anterior, si se
-crea un fichero de configuración semejante a éste que aprovecha el módulo
-<a class="reference external" href="http://nginx.org/en/docs/http/ngx_http_realip_module.html">ngx_http_realip_module</a>:</p>
-<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/nginx/conf.d/realip.conf</span>
-<span class="k">set_real_ip_from</span> <span class="mi">127</span><span class="s">.0.0.1</span><span class="p">;</span>
-<span class="k">set_real_ip_from</span> <span class="mi">10</span><span class="s">.0.0.0/8</span><span class="p">;</span>
-<span class="k">real_ip_recursive</span> <span class="no">on</span><span class="p">;</span>
-<span class="k">real_ip_header</span> <span class="s">X-Forwarded-For</span><span class="p">;</span>
-</pre></div>
-</div>
-<p>La directiva <a class="reference external" href="http://nginx.org/en/docs/http/ngx_http_realip_module.html#real_ip_header">real_ip_header</a>
-permite indicar cuál es el nombre del campo a analizar, <a class="reference external" href="http://nginx.org/en/docs/http/ngx_http_realip_module.html#set_real_ip_from">set_real_ip_from</a>
-las redes y máquinas en que consideramos que hay <em>proxies</em> que alteran la <em>ip</em>
-original y que queremos ignorar; y <a class="reference external" href="http://nginx.org/en/docs/http/ngx_http_realip_module.html#real_ip_recursive">real_ip_recursive</a>
-provoca a <em>off</em> que consideremos la <em>ip</em> del cliente la última contenida en
-<code class="docutils literal notranslate"><span class="pre">X-Forwarded-For</span></code> (siempre que la <code class="docutils literal notranslate"><span class="pre">$remote_addr</span></code> coincida con alguna de
-las referidas en <code class="docutils literal notranslate"><span class="pre">set_real_ip_from</span></code>); y a <em>on</em>, que la <em>ip</em> del cliente sea
-la última de <code class="docutils literal notranslate"><span class="pre">X-Forwarded-For</span></code> que tampoco coincida con las referidas en
-<code class="docutils literal notranslate"><span class="pre">set_real_ip_from</span></code>.</p>
-<p>Para ilustrarlo supongamos este esquema:</p>
-<img alt="../../../../_images/proxies.png" src="../../../../_images/proxies.png" />
-<p>que genera la siguiente cabecera <code class="docutils literal notranslate"><span class="pre">X-Forwarded-For</span></code>:</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>X-Forwarded-For: 80.35.60.114 123.12.21.34 10.35.2.3
-</pre></div>
-</div>
-<p>y un <code class="docutils literal notranslate"><span class="pre">$remote_address</span></code> original que vale <em>127.0.0.1</em>, ya que el <em>proxy</em> que
-recibe la comunicación en nuestro servidor (<strong class="program">haproxy</strong>) se comunica con
-<strong class="program">nginx</strong> a través de la interfaz de <em>loopback</em>.  En este caso, y con la
-configuración anterior en <code class="file docutils literal notranslate"><span class="pre">conf.d/realip.conf</span></code>:</p>
-<ul class="simple">
-<li>Si <code class="docutils literal notranslate"><span class="pre">real_ip_recursive</span></code> está deshabilitado, <code class="docutils literal notranslate"><span class="pre">$remote_address</span></code> acabará
-valiendo <em>10.35.2.3</em>, o sea, la última <em>ip</em> de <code class="docutils literal notranslate"><span class="pre">X-Forwarded-For</span></code>.</li>
-<li>En caso contrario, <code class="docutils literal notranslate"><span class="pre">$remote_address</span></code> valdrá <em>123.12.21.34</em> ya que éste es el
-último valor de <code class="docutils literal notranslate"><span class="pre">X-Forwarded-For</span></code> que no está incluido en las directivas
-<code class="docutils literal notranslate"><span class="pre">set_real_ip_from</span></code>.</li>
-</ul>
-<div class="admonition note">
-<p class="first admonition-title">Nota</p>
-<p class="last">La existencia de proxies intermedios puede alterar también el
-protocolo original como en el caso de que <a class="reference internal" href="../../../../04.servidor/10.ssh/04.adicional.html#haproxy"><span class="std std-ref">interpongamos haproxy para
-tunelizar por el puerto 443 también el tráfico SSH</span></a>. Más adelante
-veremos cómo lidiar con este problema.</p>
-</div>
 </div>
 <div class="section" id="autenticacion">
 <span id="nginx-auth"></span><h2>7.2.2.2.4.2. Autenticación<a class="headerlink" href="#autenticacion" title="Enlazar permanentemente con este título">¶</a></h2>

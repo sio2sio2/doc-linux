@@ -320,121 +320,126 @@ navegador y consultando los certificados, o desde la consola con
 
    $ openssl s_client -servername alt.example.net -connect alt.example.net:https < /dev/null | grep 'CN ='
 
-donde :kbd:`-servername` es el nombre de máquina que se usa para |SNI|.
+.. warning:: :command:`openssl` no usa |SNI| a menos que se use la opción
+   :kbd:`-servername`, de modo que haga las pruebas incluyéndola.
 
-.. _nginx+haproxy:
+.. _80-443-compartido:
 
 Puerto compartido
 -----------------
+Los puertos **80** y **443** son puertos a los que comúnmente todas las redes,
+por muy restrictivas que sean, dejan salir ya que de lo contrario ni siquiera
+se permitiría la navegación en ellas. Por esto motivo, puede darse el caso de
+que, para asegurarnos el acceso, tengamos interés es que nuestro servicio |SSH|
+o |VPN| escuche en ellos. Cuando esto es así caben dos posibilidades en el lado
+del servidor:
 
-En ocasiones necesitamos acceso remoto al servidor desde redes restringidas. Lo
-habitual de estas redes es que, al menos, permitan el acceso al puerto **443**,
-ya que de lo contrario sus clientes no podrían navegar por la mayoría de los
-sitios web que, cada vez más, usan el protocolo seguro. Esto nos obliga a hacer
-que el servidor *web* "comparta" con servicios de acceso remoto (típicamente
-|SSH| y |VPN|) tal puerto. "Compartir" en este caso es una forma de hablar; en
-realidad, la técnica consiste en que el servidor web deje de ocupar ese puerto
-y, en su sustitución, se ponga otro servicio capaz de identificar la
-comunicación que recibe (|HTTP|, |SSH|, |VPN|) y redirigirla al servicio
-correspondiente.
+- Que no tengamos servidor web y, por tanto, los puertos estén libres.
+- Que sí tengamos servidor web y, consecuentemente, no podamos ocupar los puertos
+  con ningún otro servicio.
 
-.. note:: Bajo este epígrafe se trata exclusivamente cómo afecta esto a la
-   configuración del servicio *web*, y no cómo se configura el servicio
-   segregador. Esto último se discute en el :ref:`epígrafe dedicado a redes
-   restringidas <redes-restr>`.
+Por su parte, en el lado del cliente hay dos posibilidades también para la red
+restringida:
 
-Hay dos ténicas para lograr esto:
+- Que no haya vigilancia sobre esos puertos y, por tanto, pueda enviarse
+  tráfico no web.
+- Que los puertos sí esten vigilados por un proxy y, en consecuencia, el tráfico
+  deba ser forzosamente web. A este respecto es más común la vigilancia del
+  puerto **80** que la del puerto **443**.
 
-* Colocar un *multiplexor* como :ref:`sslh <sslh>` que discrimina el tráfico,
-  pero no altera en absoluto los paquetes.
+Un cuadro resumen con las alternativas posibles es el siguiente:
 
-* Colocar un verdadero *proxy*, como :ref:`haproxy <haproxy>`, que, además de
-  discriminar, manipula el tráfico lo cual supone, al menos, que el servidor
-  *web* vea como |IP| de origen la del servicio segregador (típicamente la
-  *127.0.0.1* si :program:`haproxy` y :program:`nginx` están en la misma
-  máquina)
+========= ========== ============================================================
+ Puerto   Vigilancia  Solución
+========= ========== ============================================================
+ Libre     No         Poner a escuchar directamente el servicio.
+ Ocupado   No         Usar un multiplexar como :ref:`sslh <sslh>`.
+ Libre     Sí         Enmascarar el tráfico.
+ Ocupado   Sí         Enmascarar el tráfico y discriminar tráfico a continuación.
+========= ========== ============================================================
 
-En el primer caso, al no haberse obrado ninguna manipulación, el cambio se
-limita a dejar libre el puerto **443** de la interfaz física por lo que bastará
-con hacer:
+Por supuesto, que el puerto esté ocupado depende de nuestro servidor, pero que
+la red remota esté sometida a vigilancia depende de cuál sea la red desde la que
+se conecta el cliente: en ocasiones no habrá restricción alguna y en otra la
+rstricción y vigilancia puede ser máxima. Hay, además, otra circunstancia a
+tener en cuenta y es el coste para la conexión de la solución. Es obvio que
+escuchar directamente es la solución más ventajosa desde el punto de vista del
+rendimiento, mientras que tener que enmascarar el tráfico y, además, deber
+discriminar tráfico por compartir el puerto la más costosa. 
 
-.. code-block:: nginx
+Las posibles soluciones para puerto compartido, ajustadas a la necesidad, son:
 
-   listen localhost:443 ssl;
+- :ref:`sslh <sslh>`, que identifica tráfico y lo deriva al servidor apropiado.
+  Es inútil si la comunicaciones al puerto son vigiladas.
+- Enmascarar el tráfico haciéndolo pasar como una aplicación que usa `Websocket
+  <https://v0ctor.me/websocket>`_.. Como *Websocket* forma parte del estándar
+  HTML5, la comunicación debería ser aceptada incluso en presencia de un *proxy*.
+  Aún con ello, si se usa una comunicación sin cifrar, en teoría, se podría
+  analizar cuál es el tráfico de la aplicación que usa *websocket* y rechazarlo.
+- Enmascarar el tráfico cifrándolo con |SSL| y enviándolo al puerto **443**.
+  Esto lo haría indistiguible del tráfico |HTTP|\ s por cualquier proxy y, *en
+  consecuencia*, irrestringible. La contrapartida es que se añade un cifrado
+  sonre un protocolo ya cifrado (|SSH| o |VPN|) lo que disminuye enormemente el
+  rendimiento. Es obvio que la solución de tunelizar con *Websocket* también
+  puede llevarse a cabo sobre |HTTP|\ s, pero no añade más que un poco de
+  pérdida de rendimiento. Ahora bien, si se implementó la solución de
+  *Websocket* para |HTTP|, puede ser interesante, ya que la configuración
+  adicional sería mínima.
 
-En cambio, en el segudo caso los cambios son más profundos e incluyen
-que la tarea de cifrado y descrifado se haga en :program:`haproxy`. Esto provoca
-que:
+Este epígrafe está dedicado a la implementación en la parte del servidor, ya que
+es la que afecta a :program:`nginx`.
 
-#. Como lo que llega al servidor es siempre tráfico |HTTP| en claro, deja de tener
-   sentido que el servidor escuche en otro puerto distinto al **80**.
-#. Es necesario, no obstante, que el servidor sea capaz de saber si la conexión
-   se hizo directamente al puerto **80** (y, por tanto, el tráfico siempre fue no
-   seguro) o si se hizo a través de :program:`haproxy` y originariamente era
-   segura. Para ello :program:`haproxy` puede añadir la cabecera
-   *X-Forwarded-Proto*.
-#. También es necesario que el servidor web sea capaz de reconocer cuál es el
-   cliente original de la petición lo que obligará a añadir o modificar la
-   cabecera *X-Forwarded-For*.
-#. Debe configurarse el servidor de modo que las dos circunstancias anteriores
-   no obliguen a las aplicaciones web a tener en cuenta si hubo o no *proxy*, esto
-   es a revisar esas dos cabeceras. Por ejemplo, las aplicaciones escritas en
-   |PHP| consultan la dirección remota a través de ``$_SERVER["ADDRESS"]`` y si
-   está activo el protocolo seguro a través de ``$_SERVER["HTTPS"]``. Por tanto,
-   configurar bien el servidor para que ejecute aplicaciones |PHP| implica que
-   ambos parámetros que pasa el servidor *web* al intérprete tengan los valores
-   adecuados.
+.. _sslh:
 
-La solución al problema de la dirección :ref:`ya se trató al discutir sobre el
-control de accesos <nginx-clientip>`. Para darle solución al segundo problema
-podemos definir la variable *$_https*:
+Multiplexación
+""""""""""""""
+Para aquellos casos en que no haya vigilancia sobre el puerto **443**, pero éste
+esté ocupado en el servidor por :program:`ngnix`, la solución consiste en poner
+a escuchar el servidor web seguro exclusivamente en el puerto **443** de la
+interfaz de *loopback* y reservar el puerto de la interfaz física para el
+`servicio SSLH <http://www.rutschle.net/tech/sslh/README.html>`_. Este servicio
+es, por decirlo así, un *multiplexor de protocolos* que analiza el trafico
+recibido en un determinado puerto (típicamente el **443**), analiza el tráfico
+y, en función de su tipo, lo redirige al puerto de la interfaz que le
+indiquemos. Gracias a ello, podemos ofrecer distintos servicios (p.e. |HTTP|\ s,
+|SSH| y |VPN|) por el mismo puerto **443** de la interfaz física. La estrategia,
+pues, consiste en levantar los siguientes servicios, escuchando en los
+siguientes interfaces y puertos:
 
-.. code-block:: nginx
+=============== ==================== =========
+Servicio        Interfaz             Puerto
+=============== ==================== =========
+|SSH|           0.0.0.0                22/TCP
+*OpenVPN*\ [#]_ 0.0.0.0              1194/TCP
+|HTTP|\ s       0.0.0.0                80/TCP
+*SSLH*          Todas excepto local   443/TCP
+=============== ==================== =========
 
-   # /etc/nginx/conf.d/https.conf
-   map $http_x_forwarded_proto $_https {
-      default  $https;
-      https    on;
-   }
+Para llevarlo a cabo, es necesario instalar::
 
-que permite conocer la naturaleza original del tráfico en sustitución de la
-variable *$https* que usamos cuando no hay proxy. De este modo, podemos hacer la
-siguiente configuración:
+   # apt-get install sslh
 
-.. code-block:: nginx
+y configurar el fichero :file:`/etc/default/sslh` del siguiente modo::
 
-   server {
-      listen   80;
+   RUN=yes  # SSLH corre permanentemente, no a través de inetd.
 
-      server_name _;
+   [...]
 
-      root /srv/www;
-      try_files $uri $uri/ =404;
+   DAEMON_OPTS="--user sslh --listen 172.22.0.2:443 \
+                --ssh 127.0.0.1:22 --ssl 127.0.0.1:443 --openvpn 127.0.0.1:1194 \
+                --pidfile /var/run/sslh/sslh.pid"
 
-      # Necesario si queremos redirigir el tráfico seguro a no seguro
-      if ($_https != "on") {
-         return 301 https://$host$uri$is_args$args;
-      }
+esto suponiendo que tengamos una sólo interfaz física y esta tenga por |IP|
+*172.22.0.2*. Si hubiera varias, habría que colocar varias veces la opción
+``--listen`` con la *ip* correspondiente.
 
-      # Cabecera HSTS (fuerza que el certificado sea válido)
-      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-   }
+.. _nginx-websocket:
 
-Es decir, una configuración exactamente igual que la *no* segura, puesto que al
-servidor llega tráfico ya no seguro. El último bloque ``if`` puede interesarnos
-si queremos que el tráfico originariamente no seguro pase a seguro.
+Websocket
+"""""""""
 
-Además, si el sitio es dinámico y usa |PHP|, entonces deberemos hacérselo saber
-al cliente añadiendo otro bloque a la configuración:
-
-.. code-block:: nginx
-   :emphasize-lines: 3
-
-   location ~ \.php$ {
-      include snippets/fastcgi-php.conf;
-      fastcgi_param  HTTPS  $_https if_not_empty;
-      fastcgi_pass php;
-   }
+|SSL|
+"""""
 
 .. rubric:: Notas al pie
 
@@ -469,6 +474,15 @@ al cliente añadiendo otro bloque a la configuración:
 
 .. [#] Lo cual no es ningún problema, puesto que un certificado digital se puede
    asociar a varios nombres.
+
+.. [#] Donde queramos poner a escuchar :program:`openvpn` depende de nuestras
+   intenciones. Escoger el puerto **1194** responde a que ese es el puerto
+   estándar para esa aplicación (de hecho, aparece referido en
+   :file:`/etc/services`). Una buena estrategia es ponerlo a escuchar:
+
+   + En el puerto *1194/UDP* en todas las interfaces.
+   + En el puerto *1194/TCP* de la interfaz local, cuya conexión remota se
+     haŕa gracias a la intermediación de :program:`haproxy`.
 
 .. |SSL| replace:: :abbr:`SSL (Secure Socket Layer)`
 .. |TLS| replace:: :abbr:`TLS (Transport Layer Security)`

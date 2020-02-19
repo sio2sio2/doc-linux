@@ -1,0 +1,227 @@
+Otros aspectos
+**************
+
+.. _nginx-map:
+
+Definición mediante mapeo
+=========================
+Si requerimos definir una variable dependiendo del valor de otra, disponemos de
+la directiva `map
+<http://nginx.org/en/docs/http/ngx_http_map_module.html#map>`_:
+
+.. code-block:: nginx
+
+   map $host $dominio {
+      hostnames;
+
+      default              "desconocido";
+      *.example.net        "example";
+      *.dominio.org        "dominio";
+      ~[^.]+\.otro\.[^.]+  "otro";
+   }
+
+En este caso, se define la variable ``$dominio`` a partir de los valores de la
+variable ``$host``. Se comprueba si el valor de esta última concuerda con
+alguna entrada de la izquierda y, si es así, se asigna el valor de la columna
+derecha correspondiente. Si no hay concordancia, se usa la entrada *default*.
+Además, se puede incluir la palabra :kbd:`hostnames` para expresar que lo
+contenido son nombres de máquina y que se entienda la notación con asterisco.
+Si la lista es larga, puede usarse ``include``:
+
+.. code-block:: nginx
+
+   map $host $dominio {
+      hostnames;
+
+      include dominios.txt;
+   }
+
+y en el fichero :file:`/etc/nginx/dominios.txt` escribir la lista de dos
+columnas.
+
+Dado que el módulo `ngx_http_referer
+<http://nginx.org/en/docs/http/ngx_http_referer_module.html>`_ no está incluido
+en el ejecutable que viene en el paquete *nginx-light* y el paquete no es
+instalable de forma separada, podríamos emular medianamente el comportamiento de
+``$invalid_referer`` del siguiente modo:
+
+.. code-block:: nginx
+
+   map $http_referer $invalid_referer {
+      default                 1;
+
+      # Dominios  para los que se permite se considera válido el referer.
+      "~www.example.net"      0;
+      "~example.net"          0;
+   }
+
+.. _nginx-comp:
+
+Compresión
+==========
+Es muy reomendable, para ahorrar ancho de banda configurar el servidor para que
+comprima aquellos ficheros cuyp ratio de compresión es alto. La configuración
+predeterminada sólo comprime los documentos |HTML|, así que creamos un fichero
+de :download:`configuración adicional <files/gzip.conf>` como
+:file:`/etc/nginx/conf.d/gzip.conf`:
+
+.. literalinclude:: files/gzip.conf
+   :language: nginx
+
+.. _nginx-debug:
+
+Depuración
+==========
+Es obvio que depurar el funcionamiento del servidor pasa por mirar los ficheros
+de registro. Sin embargo, si realizamos en la configuración :ref:`reescrituras
+internas <ngx-rewrite>`, podremos comprobar que estas no dejan rastro en los
+*logs*, ya que su registro está deshabilitado. Para habilitarlo podemos añadir
+fichero :file:`/etc/nginx/conf.d/rewrite.conf`::
+
+   # cat > /etc/nginx/conf.d/rewrite.conf
+   rewrite_log on;
+
+pero esto no es suficiente, ya que se registran en el registro de errores con
+nivel *notice*, mientras que el nivel predeterminado es *error*.
+Consecuentemente, habrá que retocar la directiva ``error_log`` que corresponda
+para cambiar el nivel. Por ejemplo::
+
+   error_log  /var/log/nginx/error.log notice;
+
+.. _nginx-tras-proxy:
+
+Servicio tras *proxy*
+=====================
+Cuando un :ref:`proxy web inverso <proxy-web-inverso>` intermedia entre nuestros
+clientes y nuestro :program:`nginx` se producen algunas distorsiones en la
+comunicación:
+
+a. El *proxy* captura la petición del cliente y la reproduce hacia el servidor lo
+   que supone que éste que la comunicación que recibe el servidor no proceda del
+   cliente original, sino del servidor
+
+#. Si el *proxy* se encuentra en la red local del servidor web y no hay
+   problemas de seguridad en la comunicación entre ambos, el extremo de cifrado,
+   si lo hay, se traslada al *proxy* y el servidor establece una conexión no
+   segura. Sin embargo, es conveniente que el servidor sea capaz de saber que la
+   comunicación originariamente era segura.
+
+Tenga presente que tratar estas cabeceras en el servidor, no es sólo necesario
+para el correcto funcionakiento del servidor, sino también para el correcto
+funcionamiento de las aplicaciones que éste ejecute.  Por ejemplo, las
+aplicaciones escritas en |PHP| consultan la dirección remota a través de
+``$_SERVER["ADDRESS"]`` y si está activo el protocolo seguro a través de
+``$_SERVER["HTTPS"]``. Por tanto, configurar bien el servidor para que ejecute
+aplicaciones |PHP| implica que ambos parámetros que pasa el servidor *web* al
+intérprete tengan los valores adecuados.
+
+.. _nginx-clientip:
+
+Cliente original
+----------------
+Un *proxy* intermedio que no que no actúe de forma transparente, hará creer al
+servidor web que todas las peticiones las recibe de él. En consecuencia,
+cualquier decisión que queramos tomar en función de quién sea quien nos haga la
+petición (p.e. si la petición es de un cliente local o uno remoto), será
+imposible.
+
+Para soslayar este inconveniente los *proxies* pueblan la cabecera
+:ref:`X-Forwarded-For <xforwardedfor>`, de manera que el servidor pueda
+recalcular la dirección qye identifica al cliente original y definir la variable
+:kbd:`$remote_addr`, en vez de usar la |IP| de la conexióni (que será la del
+*proxy*). Para que :program:`nginx` sea capaz de aprovechar la información de
+esta cabecera  puede crearse un fichero con contenido semejante a éste que
+aprovecha el módulo `ngx_http_realip_module
+<http://nginx.org/en/docs/http/ngx_http_realip_module.html>`_::
+
+   # /etc/nginx/conf.d/realip.conf
+   set_real_ip_from 127.0.0.1;
+   set_real_ip_from 10.0.0.0/8;
+   real_ip_recursive on;
+   real_ip_header X-Forwarded-For;
+
+La directiva `real_ip_header
+<http://nginx.org/en/docs/http/ngx_http_realip_module.html#real_ip_header>`_
+permite indicar cuál es el nombre del campo a analizar, `set_real_ip_from
+<http://nginx.org/en/docs/http/ngx_http_realip_module.html#set_real_ip_from>`_
+las redes y máquinas en que consideramos que hay *proxies* que alteran la *ip*
+original y que queremos ignorar; y `real_ip_recursive
+<http://nginx.org/en/docs/http/ngx_http_realip_module.html#real_ip_recursive>`_
+provoca a *off* que consideremos la *ip* del cliente la última contenida en
+``X-Forwarded-For`` (siempre que la ``$remote_addr`` coincida con alguna de
+las referidas en ``set_real_ip_from``); y a *on*, que la *ip* del cliente sea
+la última de ``X-Forwarded-For`` que tampoco coincida con las referidas en
+``set_real_ip_from``.
+
+Para ilustrarlo supongamos este esquema:
+
+.. image:: files/proxies.png
+
+que genera la siguiente cabecera ``X-Forwarded-For``:
+
+.. code-block:: none
+
+   X-Forwarded-For: 80.35.60.114 123.12.21.34 10.35.2.3
+
+y un ``$remote_address`` original que vale *127.0.0.1*, ya que el *proxy* que
+recibe la comunicación en nuestro servidor (:program:`haproxy`) se comunica con
+:program:`nginx` a través de la interfaz de *loopback*.  En este caso, y con la
+configuración anterior en :file:`conf.d/realip.conf`:
+
+* Si ``real_ip_recursive`` está deshabilitado, ``$remote_address`` acabará
+  valiendo *10.35.2.3*, o sea, la última *ip* de ``X-Forwarded-For``.
+* En caso contrario, ``$remote_address`` valdrá *123.12.21.34* ya que éste es el
+  último valor de ``X-Forwarded-For`` que no está incluido en las directivas
+  ``set_real_ip_from``.
+
+Protocolo original
+------------------
+Para que el *proxy* declare el protocolo (|HTTP|\ s) con el que recibió la
+petición se suele usar otra cabecera, *X-Forwarded-Proto*, con valor *https* si
+el protocolo original era |HTTP|\ s. Para tenerlo en cuenta en nuestro servidor
+podemos incluir esta configuración:
+
+.. code-block:: nginx
+
+   # /etc/nginx/conf.d/https.conf
+   map $http_x_forwarded_proto $_https {
+      default  $https;
+      https    on;
+   }
+
+que permite conocer la naturalza original del protocolo usando la variable de
+usuario :kbd:`$_https` en vez de la original :kbd:`$https`. Ahora, basta con
+usar :kbd:`$_https` allí donde usábamos antes :kbd:`$https`:
+
+.. code-block:: nginx
+
+   server {
+      listen   80;
+
+      server_name _;
+
+      root /srv/www;
+      try_files $uri $uri/ =404;
+
+      # Necesario si queremos redirigir el tráfico seguro a no seguro
+      if ($_https != "on") {
+         return 301 https://$host$uri$is_args$args;
+      }
+
+   }
+
+
+Además, si el sitio es dinámico y usa |PHP|, debemos hacérselo al intérprete
+añadiendo otro bloque a la configuración:
+
+.. code-block:: nginx
+   :emphasize-lines: 3
+
+   location ~ \.php$ {
+      include snippets/fastcgi-php.conf;
+      fastcgi_param  HTTPS  $_https if_not_empty;
+      fastcgi_pass php;
+   }
+
+.. |HTML| replace:: :abbr:`HTML (HyperText Markup Language)`
+.. |PHP| replace:: :abbr:`PHP (PHP Hypertext Preprocessor)`

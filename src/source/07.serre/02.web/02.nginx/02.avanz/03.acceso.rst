@@ -50,68 +50,6 @@ se lo niega al resto.
    módulo `ngx_http_geo_module
    <http://nginx.org/en/docs/http/ngx_http_geo_module.html>`_
 
-.. _nginx-clientip:
-
-El problema de esta restricción es que la presencia de *proxies* intermedios
-(que no actúen de manera transparente) altera la *ip* de origen de la conexión,
-ya que el servidor recibirá una conexión cuyo origen será el *proxy* más cercano
-a él. Un caso extremo es aquel en que disponemos un *proxy* en la propia máquina
-donde se encuentra el servidor *web*. En este caso, el origen de todas las
-conexiones entrantes será la propia máquina (*127.0.0.1*) con lo que en
-principio este sistema de restricción es absolutamente inútil.
-
-Para soslayar este inconveniente los *proxies* pueden ir poblando la cabecera
-:ref:`X-Forwarded-For <xforwardedfor>` de manera que el servidor pueda, así,
-sustituir la *ip* original de la conexión. :program:`nginx` puede recalcular
-la variable ``$remote_addr`` a partir de la información del campo anterior, si se
-crea un fichero de configuración semejante a éste que aprovecha el módulo
-`ngx_http_realip_module <http://nginx.org/en/docs/http/ngx_http_realip_module.html>`_::
-
-   # /etc/nginx/conf.d/realip.conf
-   set_real_ip_from 127.0.0.1;
-   set_real_ip_from 10.0.0.0/8;
-   real_ip_recursive on;
-   real_ip_header X-Forwarded-For;
-
-La directiva `real_ip_header
-<http://nginx.org/en/docs/http/ngx_http_realip_module.html#real_ip_header>`_
-permite indicar cuál es el nombre del campo a analizar, `set_real_ip_from
-<http://nginx.org/en/docs/http/ngx_http_realip_module.html#set_real_ip_from>`_
-las redes y máquinas en que consideramos que hay *proxies* que alteran la *ip*
-original y que queremos ignorar; y `real_ip_recursive
-<http://nginx.org/en/docs/http/ngx_http_realip_module.html#real_ip_recursive>`_
-provoca a *off* que consideremos la *ip* del cliente la última contenida en
-``X-Forwarded-For`` (siempre que la ``$remote_addr`` coincida con alguna de
-las referidas en ``set_real_ip_from``); y a *on*, que la *ip* del cliente sea
-la última de ``X-Forwarded-For`` que tampoco coincida con las referidas en
-``set_real_ip_from``.
-
-Para ilustrarlo supongamos este esquema:
-
-.. image:: files/proxies.png
-
-que genera la siguiente cabecera ``X-Forwarded-For``:
-
-.. code-block:: none
-
-   X-Forwarded-For: 80.35.60.114 123.12.21.34 10.35.2.3
-
-y un ``$remote_address`` original que vale *127.0.0.1*, ya que el *proxy* que
-recibe la comunicación en nuestro servidor (:program:`haproxy`) se comunica con
-:program:`nginx` a través de la interfaz de *loopback*.  En este caso, y con la
-configuración anterior en :file:`conf.d/realip.conf`:
-
-* Si ``real_ip_recursive`` está deshabilitado, ``$remote_address`` acabará
-  valiendo *10.35.2.3*, o sea, la última *ip* de ``X-Forwarded-For``.
-* En caso contrario, ``$remote_address`` valdrá *123.12.21.34* ya que éste es el
-  último valor de ``X-Forwarded-For`` que no está incluido en las directivas
-  ``set_real_ip_from``.
-
-.. note:: La existencia de proxies intermedios puede alterar también el
-   protocolo original como en el caso de que :ref:`interpongamos haproxy para
-   tunelizar por el puerto 443 también el tráfico SSH <haproxy>`. Más adelante
-   veremos cómo lidiar con este problema.
-
 .. _nginx-auth:
 
 Autenticación

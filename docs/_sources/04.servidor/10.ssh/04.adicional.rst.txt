@@ -111,101 +111,49 @@ internet, bien porque, aunque lo sean, tengamos restringido su acceso.
 
 Redes restringidas
 ==================
-
 Lo explicado bajo el epígrafe anterior, presupone que, desde la red local,
 disponemos de acceso a un servidor |SSH|. Sin embargo, es común encontrarse con
 redes con políticas de acceso muy restrictivas a internet, en las que
 prácticamente el único tráfico saliente permitido es el de navegación web
 (|HTTP| y |HTTP|\ s). En estos caso, la única solución pàra poder burlar la
 restricción es preparar nuestro servidor |SSH| para que se pueda acceder
-a él a través de uno de los dos puertos anteriores (nosotros usaremos el
-**443**\ [#]_). Ahora bien, dependiendo de los servicios adicionales que
-ofrezcamos en el servidor y de las restricciones de la red del cliente, la
-solución será más o menos inmediata. Las posibles situaciones son las
-siguientes:
+a él a través de uno de los dos puertos anteriores.
 
-============ =========== =========================================
-Puerto [443]  Vigilancia  Estrategia
-============ =========== =========================================
-Libre	          No       :ref:`escucha en el puerto 443 <ssh-443>`
-Ocupado         No       :ref:`sslh <sslh>`
-Libre           Sí       :ref:`haproxy <Haproxy>`
-Ocupado         Sí       :ref:`haproxy <Haproxy>`
-============ =========== =========================================
+.. seealso:: Lea la  discusión sobre :ref:`puerto compartido
+   <80-443-compartido>` presente en la sección de configuración de :ref:`n-ginx`.
 
-.. note:: Entiéndase que por *libre* entendemos que en nuestro servidor no usamos
-   el puerto *443* para dar ningún otro servicio. Este será el caso si no ofrecemos
-   servicio web seguro o si no necesitamos encauzar a través de este mismo puerto
-   otros servicios como una |VPN|.
-
-   Por *vigilancia* entendemos que el tráfico de salida de la red cliente no
-   solamente está restringido por un cortafuegos, sino que además hay un *proxy*
-   que analice el protocolo del tráfico dirigido al puerto 443 y lo rechaza si
-   éste no es |TLS|.
+Dependiendo del grado de vigilancia en la red del cliente y de cómo hayamos
+configurado el servidor, tenemos varias soluciones:
 
 .. _ssh-443:
 
-Puerto libre sin vigilancia
----------------------------
-Es la situación menos restrictiva y, por tanto, la más fácil de solucionar, ya
-que basta con hacer escuchar el servidor también en el puerto **443**. Para ello
-no hay más que usar repetidamente la directiva **Port** en :file:`/etc/ssh/sshd_config`::
+Escucha directa
+---------------
+Sirve para la situación menos restrictiva y, por tanto, es la más fácil de
+solucionar, ya que basta con hacer escuchar el servidor también en el puerto
+**443**. Para ello no hay más que usar repetidamente la directiva **Port** en
+:file:`/etc/ssh/sshd_config`::
 
    Port 22
    Port 443
 
-.. _sslh:
+Una alternayiva igualmente eficar es usar el cortafuegos para redirigir el elñ
+tráfico entrante con destino al puerto **443** al puerto **22**. Vea cómo
+:ref:`configurar el cortaguegos <firewall>` para ello.
 
-Multiplexación
---------------
-Cuando el puerto **443** ya lo tenemos ocupado con el servidor *web*, o bien,
-prevemos que lo tendremos ocupado, la solución anterior es inviable. La
-solución sencilla en este caso consiste en poner a escuchar el servidor web seguro
-exclusivamente en el puerto **443** de la interfaz de *loopback* y reservar el
-puerto de la interfaz física para el `servicio SSLH
-<http://www.rutschle.net/tech/sslh/README.html>`_. Este servicio es, por decirlo
-así, un *multiplexor de protocolos* que analiza el trafico recibido en un
-determinado puerto (típicamente el **443**), analiza el tráfico y, en función de
-su tipo, lo redirige al puerto de la interfaz que le indiquemos. Gracias a ello,
-podemos ofrecer distintos servicios (p.e. |HTTP|\ s, |SSH| y |VPN|) por el mismo
-puerto **443** de la interfaz física. La estrategia, pues, consiste en levantar
-los siguientes servicios, escuchando en los siguientes interfaces y puertos:
-
-=============== ==================== =========
-Servicio        Interfaz             Puerto
-=============== ==================== =========
-|SSH|           0.0.0.0                22/TCP
-*OpenVPN*\ [#]_ 0.0.0.0              1194/TCP
-|HTTP|\ s       0.0.0.0                80/TCP
-*SSLH*          Todas excepto local   443/TCP
-=============== ==================== =========
-
-
-Para llevarlo a cabo, es necesario instalar::
-
-   # apt-get install sslh
-
-y configurar el fichero :file:`/etc/default/sslh` del siguiente modo::
-
-   RUN=yes  # SSLH corre permanentemente, no a través de inetd.
-
-   [...]
-
-   DAEMON_OPTS="--user sslh --listen 172.22.0.2:443 \
-                --ssh 127.0.0.1:22 --ssl 127.0.0.1:443 --openvpn 127.0.0.1:1194 \
-                --pidfile /var/run/sslh/sslh.pid"
-
-esto suponiendo que tengamos una sólo interfaz física y esta tenga por *ip*
-*172.22.0.2*. Si hubiera varias, habría que colocar varias veces la opción
-``--listen`` con la *ip* correspondiente.
-
-.. note:: Permitir es tráfico |VPN| es absolutamente accesorio. Como cuesta poco
-   (una opción para *sslh*) se ha incluido en la explicación.
+Puerto compartido
+-----------------
+Si el puerto comparte con otro servidor, será un *software* como :ref:`sslh
+<sslh>` o el *proxy* el que dirija el tráfico hacia el servidor |SSH|. Como el
+tráfico no se enmascara para ocultarlo, no es necesaria ningún configuración
+adicional ni en el cliente ni en el servidor |SSH|.
 
 .. _haproxy:
 
 |SSH| sobre |HTTP|\ s
 ---------------------
+.. todo:: Trasladar y modificar este apartado 
+
 En este último caso, un proxy intermedio analiza si el tráfico que intentamos
 dirigir hacia un puerto **443** sigue el protocolo |TLS|, como
 en teoría debería ser\ [#]_. Ante esto, no podemos usar ninguna de las soluciones
@@ -228,7 +176,7 @@ Servidor
    embargo, determina que otros servicios para los que también intermedia (como
    |HTTP| o |VPN|) deban modificar asimismo sus configuraciones en el lado
    cliente o servidor para adaptarse. Lea, al respecto, los epígrafes
-   correspondientes a su :ref:`uso con nginx <nginx+haproxy>` o su :ref:`uso con
+   correspondientes a su :ref:`uso con nginx <nginx-tras-proxy>` o su :ref:`uso con
    openvpn <vpn+haproxy>`.
 
 :program:`haproxy` es, en realidad, una solución bastante general y, no permite
@@ -330,7 +278,7 @@ Las claves de esta configuración son las siguientes:
    búsuqedas automáticas de servidores |SSH| en la red.
 
 .. note:: :program:`haproxy` con la colaboración del núcleo de linux, puede
-   funcionar en modo transparente, de manera que el servidor reciba la *ip* del
+   funcionar en modo transparente, de manera que el servidor reciba la |IP| del
    cliente. Sin embargo, esto exige que el servidor se encuentre en una máquina
    distinta a :program:`haproxy`. Por si es este nuestro caso, se deja :ref:`un
    epígrafe específico para su explicación <haproxy-transparente>`.
@@ -772,15 +720,6 @@ claves |SSH|.
    bastante raras. Si su filtrado también se basa en analizar el contenido, lo
    más probable es que no pasemos su filtro.
 
-.. [#] Donde queramos poner a escuchar :program:`openvpn` depende de nuestras
-   intenciones. Escoger el puerto **1194** responde a que ese es el puerto
-   estándar para esa aplicación (de hecho, aparece referido en
-   :file:`/etc/services`). Una buena estrategia es ponerlo a escuchar:
-
-      + En el puerto *1194/UDP* en todas las interfaces.
-      + En el puerto *1194/TCP* de la interfaz local, cuya conexión remota se
-        haŕa gracias a la intermediación de :program:`haproxy`.
-
 .. [#] En teoría, el tráfico debe ser |HTTP|\ s, es decir, |HTTP| ofuscado e
    irreconocible gracias a la envoltura segura que ofrece |TLS|.
 
@@ -821,7 +760,7 @@ claves |SSH|.
 
 .. [#] Para profundizar en la configuración del servidor web, cuando es el
    *proxy* de cifrar y descifrar la comunicación, vea el :ref:`apartado
-   correspondiente <nginx+haproxy>`.
+   correspondiente <nginx-tras-proxy>`.
 
 .. [#] En realidad sí lo es, porque no habrá forma de conocer el origen de la
    petición, a menos que, además, se configure :program:`haproxy` en :ref:`modo
