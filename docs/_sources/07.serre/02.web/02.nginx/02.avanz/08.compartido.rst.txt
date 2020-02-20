@@ -1,0 +1,130 @@
+.. _80-443-compartido:
+
+Puerto compartido
+-----------------
+Los puertos **80** y **443** son puertos a los que comúnmente todas las redes,
+por muy restrictivas que sean, dejan salir ya que de lo contrario ni siquiera
+se permitiría la navegación en ellas. Por esto motivo, puede darse el caso de
+que, para asegurarnos el acceso, tengamos interés es que nuestro servicio |SSH|
+o |VPN| escuche en ellos. Cuando esto es así caben dos posibilidades en el lado
+del servidor:
+
+- Que no tengamos servidor web y, por tanto, los puertos estén libres.
+- Que sí tengamos servidor web y, consecuentemente, no podamos ocupar los puertos
+  con ningún otro servicio.
+
+Por su parte, en el lado del cliente hay dos posibilidades también para la red
+restringida:
+
+- Que no haya vigilancia sobre esos puertos y, por tanto, pueda enviarse
+  tráfico no web.
+- Que los puertos sí esten vigilados por un proxy y, en consecuencia, el tráfico
+  deba ser forzosamente web. A este respecto es más común la vigilancia del
+  puerto **80** que la del puerto **443**.
+
+Un cuadro resumen con las alternativas posibles es el siguiente:
+
+========= ========== ============================================================
+ Puerto   Vigilancia  Solución
+========= ========== ============================================================
+ Libre     No         Poner a escuchar directamente el servicio.
+ Ocupado   No         Usar un multiplexar como :ref:`sslh <sslh>`.
+ Libre     Sí         Enmascarar el tráfico.
+ Ocupado   Sí         Enmascarar el tráfico y discriminar tráfico a continuación.
+========= ========== ============================================================
+
+Por supuesto, que el puerto esté ocupado depende de nuestro servidor, pero que
+la red remota esté sometida a vigilancia depende de cuál sea la red desde la que
+se conecta el cliente: en ocasiones no habrá restricción alguna y en otra la
+rstricción y vigilancia puede ser máxima. Hay, además, otra circunstancia a
+tener en cuenta y es el coste para la conexión de la solución. Es obvio que
+escuchar directamente es la solución más ventajosa desde el punto de vista del
+rendimiento, mientras que tener que enmascarar el tráfico y, además, deber
+discriminar tráfico por compartir el puerto la más costosa. 
+
+Las posibles soluciones para puerto compartido, ajustadas a la necesidad, son:
+
+- :ref:`sslh <sslh>`, que identifica tráfico y lo deriva al servidor apropiado.
+  Es inútil si la comunicaciones al puerto son vigiladas.
+- Enmascarar el tráfico haciéndolo pasar como una aplicación que usa `Websocket
+  <https://v0ctor.me/websocket>`_.. Como *Websocket* forma parte del estándar
+  HTML5, la comunicación debería ser aceptada incluso en presencia de un *proxy*.
+  Aún con ello, si se usa una comunicación sin cifrar, en teoría, se podría
+  analizar cuál es el tráfico de la aplicación que usa *websocket* y rechazarlo.
+- Enmascarar el tráfico cifrándolo con |SSL| y enviándolo al puerto **443**.
+  Esto lo haría indistiguible del tráfico |HTTP|\ s por cualquier proxy y, *en
+  consecuencia*, irrestringible. La contrapartida es que se añade un cifrado
+  sonre un protocolo ya cifrado (|SSH| o |VPN|) lo que disminuye enormemente el
+  rendimiento. Es obvio que la solución de tunelizar con *Websocket* también
+  puede llevarse a cabo sobre |HTTP|\ s, pero no añade más que un poco de
+  pérdida de rendimiento. Ahora bien, si se implementó la solución de
+  *Websocket* para |HTTP|, puede ser interesante, ya que la configuración
+  adicional sería mínima.
+
+Este epígrafe está dedicado a la implementación en la parte del servidor, ya que
+es la que afecta a :program:`nginx`.
+
+.. _sslh:
+
+Multiplexación
+""""""""""""""
+Para aquellos casos en que no haya vigilancia sobre el puerto **443**, pero éste
+esté ocupado en el servidor por :program:`ngnix`, la solución consiste en poner
+a escuchar el servidor web seguro exclusivamente en el puerto **443** de la
+interfaz de *loopback* y reservar el puerto de la interfaz física para el
+`servicio SSLH <http://www.rutschle.net/tech/sslh/README.html>`_. Este servicio
+es, por decirlo así, un *multiplexor de protocolos* que analiza el trafico
+recibido en un determinado puerto (típicamente el **443**), analiza el tráfico
+y, en función de su tipo, lo redirige al puerto de la interfaz que le
+indiquemos. Gracias a ello, podemos ofrecer distintos servicios (p.e. |HTTP|\ s,
+|SSH| y |VPN|) por el mismo puerto **443** de la interfaz física. La estrategia,
+pues, consiste en levantar los siguientes servicios, escuchando en los
+siguientes interfaces y puertos:
+
+=============== ==================== =========
+Servicio        Interfaz             Puerto
+=============== ==================== =========
+|SSH|           0.0.0.0                22/TCP
+*OpenVPN*\ [#]_ 0.0.0.0              1194/TCP
+|HTTP|\ s       0.0.0.0                80/TCP
+*SSLH*          Todas excepto local   443/TCP
+=============== ==================== =========
+
+Para llevarlo a cabo, es necesario instalar::
+
+   # apt-get install sslh
+
+y configurar el fichero :file:`/etc/default/sslh` del siguiente modo::
+
+   RUN=yes  # SSLH corre permanentemente, no a través de inetd.
+
+   [...]
+
+   DAEMON_OPTS="--user sslh --listen 172.22.0.2:443 \
+                --ssh 127.0.0.1:22 --ssl 127.0.0.1:443 --openvpn 127.0.0.1:1194 \
+                --pidfile /var/run/sslh/sslh.pid"
+
+esto suponiendo que tengamos una sólo interfaz física y esta tenga por |IP|
+*172.22.0.2*. Si hubiera varias, habría que colocar varias veces la opción
+``--listen`` con la *ip* correspondiente.
+
+.. _nginx-websocket:
+
+Websocket
+"""""""""
+
+|SSL|
+"""""
+
+.. rubric:: Notas al pie
+
+.. [#] Donde queramos poner a escuchar :program:`openvpn` depende de nuestras
+   intenciones. Escoger el puerto **1194** responde a que ese es el puerto
+   estándar para esa aplicación (de hecho, aparece referido en
+   :file:`/etc/services`). Una buena estrategia es ponerlo a escuchar:
+
+   + En el puerto *1194/UDP* en todas las interfaces.
+   + En el puerto *1194/TCP* de la interfaz local, cuya conexión remota se
+     haŕa gracias a la intermediación de :program:`haproxy`.
+
+.. |SSL| replace:: :abbr:`SSL (Secure Socket Layer)`
