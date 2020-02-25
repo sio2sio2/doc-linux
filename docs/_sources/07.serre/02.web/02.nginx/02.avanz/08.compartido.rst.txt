@@ -1,7 +1,27 @@
 .. _80-443-compartido:
 
 Puerto compartido
------------------
+*****************
+.. todo:: Este apartado debe ser más general y trasladarse a :ref:`proxies
+   inversos <proxy-inverso>` y hacer aquí una pequeña explicación y dar el
+   enlace:
+
+   - `Multiplexar directamente con nginx <https://superuser.com/a/1343424>`_.
+   - Incluir :ref:`haproxy <haproxy>`.
+   - Referir :ref:`stunnel <stunnel>` en el apartado de |SSL|, tanto
+     en el cliente como en el servidor.
+   - Proxy transparente:
+
+     * `stunnel transparente
+       <https://blog.inf.re/stunnel-transparent-proxy-to-localhost.html>`_.
+     * :program:`haproxy` transparente.
+     * `nginx transparente
+       <https://www.nginx.com/blog/ip-transparency-direct-server-return-nginx-plus-transparent-proxy/>`_.
+
+     Es probable que con la técnica usada para :program:`stunnel` se puedan hacer
+     :program:`haproxy` y :program:`nginx` transparentes aunque el servidor
+     final esté en la misma máquina.
+
 Los puertos **80** y **443** son puertos a los que comúnmente todas las redes,
 por muy restrictivas que sean, dejan salir ya que de lo contrario ni siquiera
 se permitiría la navegación en ellas. Por esto motivo, puede darse el caso de
@@ -28,7 +48,7 @@ Un cuadro resumen con las alternativas posibles es el siguiente:
  Puerto   Vigilancia  Solución
 ========= ========== ============================================================
  Libre     No         Poner a escuchar directamente el servicio.
- Ocupado   No         Usar un multiplexar como :ref:`sslh <sslh>`.
+ Ocupado   No         Usar un multiplexor como :ref:`sslh <sslh>`.
  Libre     Sí         Enmascarar el tráfico.
  Ocupado   Sí         Enmascarar el tráfico y discriminar tráfico a continuación.
 ========= ========== ============================================================
@@ -44,8 +64,11 @@ discriminar tráfico por compartir el puerto la más costosa.
 
 Las posibles soluciones para puerto compartido, ajustadas a la necesidad, son:
 
-- :ref:`sslh <sslh>`, que identifica tráfico y lo deriva al servidor apropiado.
-  Es inútil si la comunicaciones al puerto son vigiladas.
+- :ref:`Multiplexar los tráficos <multiplexor>`, esto es, colocar en el puerto
+  **443** un servicio que identifique de qué tipo es cada tráfico y lo redirija
+  al servicio final adecuado. Como cada tráfico circula sin modificaciones, la
+  solución es inútil si un *proxy* comprueba si el tráfico de salida hacia el
+  puerto **443** es tráfico |SSL|.
 - Enmascarar el tráfico haciéndolo pasar como una aplicación que usa `Websocket
   <https://v0ctor.me/websocket>`_.. Como *Websocket* forma parte del estándar
   HTML5, la comunicación debería ser aceptada incluso en presencia de un *proxy*.
@@ -61,70 +84,228 @@ Las posibles soluciones para puerto compartido, ajustadas a la necesidad, son:
   *Websocket* para |HTTP|, puede ser interesante, ya que la configuración
   adicional sería mínima.
 
-Este epígrafe está dedicado a la implementación en la parte del servidor, ya que
-es la que afecta a :program:`nginx`.
-
-.. _sslh:
-
-Multiplexación
-""""""""""""""
-Para aquellos casos en que no haya vigilancia sobre el puerto **443**, pero éste
-esté ocupado en el servidor por :program:`ngnix`, la solución consiste en poner
-a escuchar el servidor web seguro exclusivamente en el puerto **443** de la
-interfaz de *loopback* y reservar el puerto de la interfaz física para el
-`servicio SSLH <http://www.rutschle.net/tech/sslh/README.html>`_. Este servicio
-es, por decirlo así, un *multiplexor de protocolos* que analiza el trafico
-recibido en un determinado puerto (típicamente el **443**), analiza el tráfico
-y, en función de su tipo, lo redirige al puerto de la interfaz que le
-indiquemos. Gracias a ello, podemos ofrecer distintos servicios (p.e. |HTTP|\ s,
-|SSH| y |VPN|) por el mismo puerto **443** de la interfaz física. La estrategia,
-pues, consiste en levantar los siguientes servicios, escuchando en los
-siguientes interfaces y puertos:
-
-=============== ==================== =========
-Servicio        Interfaz             Puerto
-=============== ==================== =========
-|SSH|           0.0.0.0                22/TCP
-*OpenVPN*\ [#]_ 0.0.0.0              1194/TCP
-|HTTP|\ s       0.0.0.0                80/TCP
-*SSLH*          Todas excepto local   443/TCP
-=============== ==================== =========
-
-Para llevarlo a cabo, es necesario instalar::
-
-   # apt-get install sslh
-
-y configurar el fichero :file:`/etc/default/sslh` del siguiente modo::
-
-   RUN=yes  # SSLH corre permanentemente, no a través de inetd.
-
-   [...]
-
-   DAEMON_OPTS="--user sslh --listen 172.22.0.2:443 \
-                --ssh 127.0.0.1:22 --ssl 127.0.0.1:443 --openvpn 127.0.0.1:1194 \
-                --pidfile /var/run/sslh/sslh.pid"
-
-esto suponiendo que tengamos una sólo interfaz física y esta tenga por |IP|
-*172.22.0.2*. Si hubiera varias, habría que colocar varias veces la opción
-``--listen`` con la *ip* correspondiente.
-
 .. _nginx-websocket:
 
 Websocket
-"""""""""
+=========
+Para la segunda estrategia necesitamos un programa, como `el proxy wstunnel`_, que
+permita al servicio que deseamos utilizar (|SSH|, |VPN| o cualquier otro) el
+paso por el *Websocket*.  Este programa actuará tanto en la parte cliente como
+en la servidor, de manera que el cliente (pongamos que |SSH|) conecta con él y no con el servidor.
+él conecta con su correspondiente parte servidor y, finalmente, esta parte servidor
+le entrega el tráfico al servidor |SSH|:
+
+.. image:: files/websocket.png
+
+En el gráfico situamos en la parte delantera del cliente y el servidor los
+servicios expuestos (porque escuchan en la interfaz física) y en la trasera los
+no expuestos (porque escuchan en la interfaz de *loopback*). Obsérvese que como
+el servidor |SSH| sigue expuesto, en las redes remotas en que no hay
+restricciones seguirá pudiéndose acceder a él directamente.
+
+Ahora bien, si requerimos compartir el puerto del servidor con un servicio web
+normal, entonces deberemos colocar un *proxy* inverso que redirija el tráfico
+hacia el *backend* apropiado:
+
+.. image:: files/websocket-compartido.png
+
+En este caso, nuestro *proxy* es el propio :program:`nginx`, por lo que las
+peticiones *web* podrá gestionarlas él mismo.
+
+.. _wstunnel:
+
+:program:`wstunnel`
+-------------------
+No tiene paquete en *Debian*, así que debemos instalarlo a mano. El propio
+respositorio de Github_ facilita una versión compilada para *64bits*, así que la
+instalación puede limitarse a descargar el fichero precompilado y colocarlo en
+algún lugar adecuado en el *PATH* (típicamente :file:`/usr/local/bin`). Su uso es
+bastante sencillo: debemos instalarlo tanto en la máquina servidor como en la
+máquina cliente (véanse lo esquemas superiores).
+
+**Servidor**
+   En la máquina servidor, que es lo que realmente nos interesa a efectos de
+   este epígrafe, debe escuchar según nos interese. Por ejemplo, así::
+
+      # wstunnel -v --server ws://0.0.0.0
+
+   lo cual supone que la aplicación escuche sin cifrado en el puerto **80**
+   (*ws*) de todas las interfaces los datos tunelizados. Podríamos modificar la
+   escucha cambiando el protocolo por *wss* que cifrará y escuchará por el
+   **443**. Si nos interesara, podríamos alterar los puertos prefijados también
+   (p.e. :kbd:`ws://0.0.0.0:8080`). A qué aplicación se redirijan los datos
+   dependerá de lo que se especifique en el cliente. La línea anterior supone
+   exponer :program:`wstunnel` (tal como representa la primera figura) y como no
+   se ha establecido ninguna restricción sobre el destino del tráfico, esto
+   podría propiciar que cualquier máquina utilizara ilegítimamente nuestro
+   túnel. Así pues, cuando se expone el túnel lo más prudente es restringir el
+   destino::
+
+      # wstunnel -v --server ws://0.0.0.0 -r 127.0.0.1:22
+
+   que sólo aceptará tráfico de clientes que indiquen que el tráfico debe
+   mandarse al servicio |SSH| local a la parte servidor, o sea, a un servidor
+   |SSH| que está conectado en la misma máquina.
+
+   Para resolver la situación en la que queremos compartir el puerto y exponemos
+   el *proxy* (o sea, :program:`nginx`) y no :program:`wstunnel` basta con que
+   hagamos que éste último escuche en algún puerto libre de una interfaz de *loopback*::
+
+      # wstunnel -v --server ws://127.0.0.1:8080
+
+   en que podemos hacer exactamente la misma puntualización a la restricción
+   sobre el destino.
+
+**Cliente**
+   En la máquina cliente establecemos el otro extremo del túnel de este modo::
+
+      # wstunnel -v -L 12345:127.0.0.1:22 ws://203.0.113.1
+
+   donde hemos supuesto que la máquina servidor tiene la |IP| *203.0.113.1*.  En
+   este extremo del túnel indicamos a :program:`wstunnel` que el tráfico que
+   escuche por el puerto **12345** de la interfaz de *loopback* debe ser
+   dirigido en el servidor al puerto **22** de la interfaz de *loopback* (del
+   servidor claro está). Esto supone que si queremos usar el túnel, el cliente
+   |SSH| deberá conectar al puerto **12345* de *lo*. Ha de hacerse notar que
+   el que no se cifra y conectamos al puerto **80**, es coherente con el modo en
+   que arrancamos :program:`wstunnel` en el servidor.
+
+   Es importante señalar también que al no haber especificado en el cliente, el
+   puerto **12345** en el cliente y el puerto **22** en el servidor son |TCP|.
+   Sin embargo, :program:`wstunnel` tiene capacidad para tunelizar protocolos
+   |UDP| con tan solo indicarlo al arrancar el cliente (en el lado del servidor
+   todo sigue igual)::
+
+      # wstunnel -v --udp --udpTimeoutSec -1 -L 12345:127.0.0.1:1194 ws://203.0.113.1
+
+   En este caso el cliente escucha en el puerto *12345/UDP* y en el servidor los
+   datos acaban dirigidos al puerto *1194/UDP*.
+
+   Por último, cuando en el servidor colocamos un *proxy* que recibe distinto
+   tráfico y debe identificar cuál es el dirigido al *websocket* podremos usar
+   un nombre específico de máquina::
+
+      # wstunnel -v -L 12345:127.0.0.1:22 ws://ssh.example.net
+
+   o incluso una ruta::
+
+      # wstunnel -v -L 12345:127.0.0.1:22 ws://www.example.net/ssh
+
+**Ejemplo de uso**
+   Para ilustrar el uso de :program:`wstunnel`, podemos hacer lo siguiente en el
+   **servidor**::
+
+      # wstunnel -v --server ws://0.0.0.0 -r 127.0.0.1:11111
+
+   y poner a escuchar el simple :ref:`netcat <netcat>`::
+
+      # netcat -l -p 11111
+
+   En el **cliente**, establecemos el otro extremo del túnel así::
+
+      # wstunnel -v -L 22222:127.0.0.1:11111 ws://203.0.113.1
+
+   y utilizamos :ref:`netcat <netcat>` para conversar con el del servidor::
+
+      # netcat localhost 22222
+
+   .. note:: En este caso concreto en el cliente podemos simplificar ejecutando::
+
+         # wstunnel -v -L stdio:127.0.0.1:11111 ws://203.0.113.1
+
+   que hace que el :program:`wstunnel` del cliente no converse con el puerto
+   **22222**, sino con la entrada y salida estándar, por lo que pondemos
+   ahorranos la ejecución de :ref:`netcat <netcat>` en el cliente.
+
+.. _nginx-wstunnel:
+
+:program:`nginx`
+----------------
+Cuando queremos compartir el puerto (**80** o **443**) entre distintas
+aplicaciones, incluido el propio servidor *web* es necesario trasladar
+:program:`wstunnel` a la interfaz de *loopback*::
+
+   # wstunnel -v --server ws://127.0.0.1:8080
+
+y poner en la interfaz física a :program:`nginx` con una configuración en la que
+podemos definir el fichero :file:`snippets/websocket.conf`:
+
+.. code-block:: nginx
+
+   proxy_http_version 1.1;
+   proxy_set_header Upgrade $http_upgrade;
+   proxy_set_header Connection $connection_upgrade;
+
+   proxy_set_header X-Forwarded-Host $host;
+   proxy_set_header X-Forwarded-Proto $x_forwarded_proto;
+   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+   proxy_set_header Host $http_host;
+
+y una configuración de sitio:
+
+.. code-block:: nginx
+
+   map $http_upgrade $connection_upgrade {
+      default upgrade;
+      '' close;
+   }
+
+   map $https $x_forwarded_proto {
+      default http;
+      on      https;
+   }
+
+   server {
+      listen 80;
+      listen 443 ssl;
+
+      server_name ws.example.net;
+
+      include snippets/snakeoil.conf;
+
+      location / {
+         proxy_pass http://127.0.0.1:8080;
+         include snippets/websocket.conf;
+      }
+   }
+
+En la configuración aceptamos tanto conexiones cifradas (para lo cual en el
+cliente deberíamos usar el protocolo *wss*) como conexiones sin cifrar. En ambos
+casos, la parte servidor de :program:`wstunnel` escucharía usando el protocolo
+*ws*, ya que el extremo del cifrado es el *proxy*.
+
+En la configuración propuesta se identifica el tráfico del túnel por ir dirigido
+al nombre *ws.example.net* y, como no hemos restringido el destino, podremos con
+el mismo túnel dar servicio a varios servidores (|SSH|, |VPN|. etc.).
+
+.. todo:: Comprobar si con el cortafuegos podemos restringir los destinos
+   posibles y mirar una forma de `hacer wstunnel un servicio de systemd
+   <https://tlbdk.github.io/websocket/ssh/tunnel/2016/04/14/setting-up-websocket-ssh-tunnel.html>`_.
+
+.. note:: Si la conexión se hubiera identificado con una ruta, no habría más que
+   haber cambiado la localización:
+
+   .. code-block:: nginx
+
+      location ^~ /wireguard/ {
+         proxy_pass http://127.0.0.1:8080;
+         include snippets/websocket.conf;
+      }
+
+.. wstunnel --server ws://0.0.0.0:8080 -r 127.0.0.1:22
+.. ssh -o ProxyCommand="wstunnel -L stdio:127.0.0.1:22 ws://%h:%p"  -p 8080 usuario@192.168.0.14
+
+.. _nginx-tunnel-ssl:
 
 |SSL|
-"""""
-
-.. rubric:: Notas al pie
-
-.. [#] Donde queramos poner a escuchar :program:`openvpn` depende de nuestras
-   intenciones. Escoger el puerto **1194** responde a que ese es el puerto
-   estándar para esa aplicación (de hecho, aparece referido en
-   :file:`/etc/services`). Una buena estrategia es ponerlo a escuchar:
-
-   + En el puerto *1194/UDP* en todas las interfaces.
-   + En el puerto *1194/TCP* de la interfaz local, cuya conexión remota se
-     haŕa gracias a la intermediación de :program:`haproxy`.
+=====
+La última técnica es cifrar el tráfico con |SSL| en el cliente y enviarlo al
+puerto **443** del servidor. Esto hace este tráfico indistinguible de |HTTP|\ s
+y, en consecuencia, burlará cualquier restricción.
 
 .. |SSL| replace:: :abbr:`SSL (Secure Socket Layer)`
+.. |UDP| replace:: :abbr:`UDP (User Datagram Protocol)`
+.. |TCP| replace:: :abbr:`UDP (Transmission Control Protocol)`
+
+.. _el proxy wstunnel: https://github.com/erebe/wstunnel
+.. _Github: https://github.com

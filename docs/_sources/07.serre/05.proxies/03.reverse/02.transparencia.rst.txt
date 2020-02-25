@@ -1,0 +1,180 @@
+.. _proxy-transparente:
+
+*************
+Transparencia
+*************
+En ocasiones, por ejemplo cuando se han habilitido mecanismos para restringir el
+acceso según el origen o se desea limitar el número de accesos, es imprescindible
+para los servidores conocer cuál es el cliente que lleva a cabo la petición. Sin
+embargo, un *proxy* inverso provoca que la peticion original del cliente se
+capture y se replique dirigiéndola al servidor y que, por tanto, sea en realidad
+el *proxy* el que está llevando a cabo la petición. En consecuencia, el servidor
+final sólo recibirá peticiones originadas por una única máquina (el *proxy*) y
+será incapaz de tomar decisiones en base al origen de la petición.
+
+Para paliar este problema existen dos soluciones:
+
+- Que el protocolo de capa de aplicación articule un mecanismo para informar al
+  servidor final de que la petición se hacen a través de un *proxy* y de cuál
+  es el cliente en realidad. Tal es el caso en |HTTP| de la cabecera
+  :ref:`X-Forwarder-For <xforwardedfor>`, gracias a la cual el servidor *web*
+  será capaz de saber cuál es en realidad el cliente, aunque la |IP| de origen
+  de los paquetes sea la del *proxy*, El tratamiento de esta cabecera en
+  :ref:`nginx <n-ginx>`, se lleva a cabo en :ref:`su epígrafe correspondiente
+  <nginx-tras-proxy>`.
+
+- La que nos ocupa que es hacer el *proxy* realmente **transparente**, esto es,
+  que en los paquetes de la petición que replica la |IP| de origen sea la del
+  cliente y no la suya.
+
+.. _proxy-transparente-req:
+
+Requisitos
+**********
+Para hacer un transparente un *proxy* es necesario:
+
++ Una configuración extra de la máquina en la que se ejecuta de forma
+  transparente el *proxy*.
+
++ Que las respuestas del servidor, que obviamente tendrán como destino el
+  cliente, puedan ser interceptadas por el *proxy* para que sea él quien las
+  despache hacia el cliente original. Así pues, el servidor final no puede estar
+  dispuesto en cualquier lugar, sino en uno cuyo camino de regreso pase por el
+  proxy.
+
+.. todo:: Imagen explicativa.
+
+.. _proxy-transparente-sol-gen:
+
+Solución general
+****************
+Desde la versión 2.2 del núcleo, *Linux* es capaz de comportarse como un *proxy*
+transparente, para lo cual se requiere:
+
+#. Que la aplicación *proxy* esté **preparada para ello** y utilice un *socket*
+   transparente. Este requisito debe cumplirlo la aplicación, por lo que como
+   administradores sólo podemos comprobar si es apta o no. Ahora bien, poder
+   crear un *socket* transparente se le exige a la aplicación la capacidad (véase
+   :manpage:`capabilities(7)`) ``CAP_NET_ADMIN``. Esto puede lograrse:
+
+   - Ejecutando la aplicación como *root*.
+   - Conceder la capacidad al ejecutable (p.e. `vea cómo hacerlo
+     <https://github.com/yrutschle/sslh/blob/master/doc/config.md>`_).
+
+   Cómo se configure la aplicación para que pueda actuar transparentemente es
+   particular de cada una: el siguiente epígrafe estará dedicado a la
+   configuración de algunas.
+
+#. Como el *proxy* debe interceptar también el tráfico de vuelta procedente del
+   servidor final, **debe encontrarse en el camino de regreso**, ya que al no
+   cambiar el *proxy* la |IP| del cliente original, el servidor final intentará
+   devolver la respuesta al cliente.
+
+   Para cumplir con este requisito debemos escoger el lugar donde situar el
+   *proxy*.
+
+#. Finalmente, al pasar los paquetes de respuesta por el *proxy* éste debe
+   procesarlos, aunque la |IP| de destino sea la del cliente. Para ello debe
+   **manipularse el encaminamiento**. Este es el único requisito que sí podemos
+   configurar de forma general y al que dedicaremos el resto del epígrafe.
+
+   Para que los paquetes de respuesta dirigidos al cliente pasen por la aplicación
+   de *proxy* debe lograrse que éstos se encaminen a través de la interfaz de
+   *loopback*. Para ello:
+
+   a. Se indica al núcleo que haga posible el encaminamiento a través de la
+      interfaz de *loopback*\ [#]_::
+
+         # sysctl -w net.ipv4.conf.default.route_localnet=1
+         # sysctl -w net.ipv4.conf.all.route_localnet=1
+
+   #. Se alteran las reglas de encaminamiento para que el tráfico marcado (con, por
+      ejemplo, *0xff*) vaya a la interfaz de *loopback*::
+
+         # ip rule add fwmark 0xff lookup 100
+         # ip route add local 0.0.0.0/0 dev lo table 100
+
+   #. Hacemos que el tráfico que debe volver a pasar por el *proxy* esté marcado
+      con la marca anterior (la *0xff*), para lo cual podemos utilizar el
+      cortafuegos. Cómo deba utilizarse el cortafuegos depende de si donde se
+      encuentre el servidor final:
+
+      a. Cuando está ien la misma máquina que el *proxy*\ [#]_, podemos usar la
+         estrategia de que el éste redirija los paquetes a una dirección local
+         particular (p.e. la *127.1.1.1*, en la que por supusto debe responder tal
+         servidor).  De esta forma, lograremos marcar sólo los paquetes dirigidos
+         al servidor que proceden del *proxy*::
+
+            # iptables -t raw -A PREROUTING ! -i lo -d 127.0.0.0/8 -j DROP
+            # iptables -t mangle -A POSTROUTING ! -o lo -s 127.0.0.0/8 -j DROP
+
+            # iptables -t nat -A OUTPUT -d 127.1.1.1 -j CONNMARK --set-mark 0xff
+            # iptables -t mangle -A OUTPUT -m connmark --mark 0xff -j CONNMARK --restore-mark
+
+      #. Cuando está en una máquina distinta, la estretegia es marcar en el *proxy*
+         los paquetes entrantes (que son los de vuelta) cuyo destino es un proxy
+         transparente::
+
+            # iptables -t mangle -A PREROUTING -m socket --transparent -j MARK --set-mark 0xff
+
+         .. warning:: Por alguna razón en mi sistema, :program:`nftables` es
+            incapaz de traducir la sentencia anterior, pero existe equivalente::
+
+               # nft add table mangle
+               # nft add chain mangle PREROUTING "{ type filter hook prerouting priority -150; }"
+               # nft add rule mangle PREROUTING socket transparent 1 meta mark set 0xff
+
+.. https://github.com/ahupowerdns/tproxydoc/blob/master/tproxy.md
+.. https://github.com/yrutschle/sslh/blob/master/doc/config.md
+.. https://www.kernel.org/doc/Documentation/networking/tproxy.txt
+
+
+Soluciones particulares
+***********************
+La intención es aplicar la solución antes descrita para que actúen como
+*proxies* transparentes aplicaciones utilizados en este manual: :ref:`stunnel
+<stunnel>`, :ref:`sslh <sslh>`, :ref:`haproxy <haproxy>` y :ref:`nginx
+<n-ginx>`. Ahora bien, para comprobar si, efectivamente, el *proxy* actúa de
+modo transparente, es necesario que el servidor final nos muestre cuál es la
+|IP| del cliente. Un modo muy sencillo es usar como servidor final
+:program:`nginx` con esta configuración:
+
+.. code-block:: nginx
+
+   server {
+      listen 80;  // Puerto y dirección de escucha pueden cambiar según el caso.
+       
+      location / {
+         return 200 "Saludos desde '$hostname'. Te conectas desde $remote_addr:$remote_port.\n";
+      }
+   }
+
+y que desde el cliente se haga la consulta\ [#]_::
+
+   # wget --no-check-certificate -qO- https://destino
+   Saludos desde 'servidor'. Te conectas desde 192.168.0.20:43123.
+
+donde el destino será el proxy (probablemente) y el protocolo dependerá de qué
+papel juegue el *proxy*. Si el proxy inverso es explícito veremos la |IP| del *proxy*,
+pero si es transparente --como pretendemos--, aparecerá la |IP| del propio cliente.
+
+.. toctree::
+   :glob:
+   :maxdepth: 1
+
+   02.transparencia/[0-9]*
+
+.. rubric:: Notas al pie
+
+.. [#] Si queremos hacer permanente el cambio, podemos incluir la definición de
+   los parámentros en :file:`/etC/sysctl.conf` como ya se ha hecho en otros
+   epígrafes de este manual.
+
+.. [#] Si *stunnel* no se ejecuta como administrador, sino con su propio usuario,
+   entonces podemos identificar el tráfico, no por el destino, sino por el usuario
+   que lo ejecuta::
+
+      # iptables -t nat -A OUTPUT -m owner --uid-owner stunnel -j CONNMARK --set-mark 0xff
+
+.. [#] Se añade :kbd:`--no-check-certificate` para evitar problemas si en
+   nuestras pruebas usamos certificados autofirmados.

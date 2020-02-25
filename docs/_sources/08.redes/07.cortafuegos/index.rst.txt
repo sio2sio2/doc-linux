@@ -323,7 +323,27 @@ sintaxis y en la mayor indefinición inicial de :program:`nftables`.
    la aceptación del parche.
 
 .. [#] Es indispensable leer las `aclaraciones de Croac
-   <https://www.craoc.fr/articles/nftables/#route-chaine-type>`_.
+   <https://www.craoc.fr/articles/nftables/#route-chaine-type>`_. Además pruebe
+   a ejecutar::
+
+      # iptables -t mangle -A OUTPUT -p tcp --dport smtp -j MARK --set-mark 1
+
+   que es la regla típica que marca tráfico (en este caso |SMTP|) para que
+   pueda ser encaminado luego de forma especial mediante :manpage:`ip-rule(8)`.
+   Si comprueba cómo quedan las reglas:
+
+   .. code-block:: console
+      :emphasize-lines: 4
+
+      # nft list chain mangle OUTPUT
+      table ip mangle {
+         chain OUTPUT {
+            type route hook output priority -150; policy accept;
+            ct mark 0x1 counter packets 0 bytes 0 meta mark set ct mark
+         }
+      }
+
+   verá que la tabla es de tipo "route", no de tipo "filter".
 
 .. [#] Este diagrama no coincide exactamente con `el que proporciona Jan
    Engelhardt en la Wikipedia

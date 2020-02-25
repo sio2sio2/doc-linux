@@ -1,0 +1,312 @@
+
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>7.5.2.3.2. Transparencia &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" href="../../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/custom.css" />
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../_static/language_data.js"></script>
+    <script type="text/javascript" src="../../../_static/translations.js"></script>
+    <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <link rel="index" title="Índice" href="../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../search.html" />
+    <link rel="next" title="7.5.2.3.2.3.1. stunnel" href="02.transparencia/01.stunnel.html" />
+    <link rel="prev" title="7.5.2.3.1. Multiplexores" href="01.multi.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="02.transparencia/01.stunnel.html" title="7.5.2.3.2.3.1. stunnel"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="01.multi.html" title="7.5.2.3.1. Multiplexores"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >7. Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" >7.5. Proxies</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../03.reverse.html" accesskey="U">7.5.2.3. Proxies inversos</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="transparencia">
+<span id="proxy-transparente"></span><h1>7.5.2.3.2. Transparencia<a class="headerlink" href="#transparencia" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>En ocasiones, por ejemplo cuando se han habilitido mecanismos para restringir el
+acceso según el origen o se desea limitar el número de accesos, es imprescindible
+para los servidores conocer cuál es el cliente que lleva a cabo la petición. Sin
+embargo, un <em>proxy</em> inverso provoca que la peticion original del cliente se
+capture y se replique dirigiéndola al servidor y que, por tanto, sea en realidad
+el <em>proxy</em> el que está llevando a cabo la petición. En consecuencia, el servidor
+final sólo recibirá peticiones originadas por una única máquina (el <em>proxy</em>) y
+será incapaz de tomar decisiones en base al origen de la petición.</p>
+<p>Para paliar este problema existen dos soluciones:</p>
+<ul class="simple">
+<li>Que el protocolo de capa de aplicación articule un mecanismo para informar al
+servidor final de que la petición se hacen a través de un <em>proxy</em> y de cuál
+es el cliente en realidad. Tal es el caso en <abbr title="HyperText Transfer Protocol">HTTP</abbr> de la cabecera
+<a class="reference internal" href="../../02.web/01.desc/03.cabecera.html#xforwardedfor"><span class="std std-ref">X-Forwarder-For</span></a>, gracias a la cual el servidor <em>web</em>
+será capaz de saber cuál es en realidad el cliente, aunque la <abbr title="Internet Protocol">IP</abbr> de origen
+de los paquetes sea la del <em>proxy</em>, El tratamiento de esta cabecera en
+<a class="reference internal" href="../../02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a>, se lleva a cabo en <a class="reference internal" href="../../02.web/02.nginx/02.avanz/08.misc.html#nginx-tras-proxy"><span class="std std-ref">su epígrafe correspondiente</span></a>.</li>
+<li>La que nos ocupa que es hacer el <em>proxy</em> realmente <strong>transparente</strong>, esto es,
+que en los paquetes de la petición que replica la <abbr title="Internet Protocol">IP</abbr> de origen sea la del
+cliente y no la suya.</li>
+</ul>
+<div class="section" id="requisitos">
+<span id="proxy-transparente-req"></span><h2>7.5.2.3.2.1. Requisitos<a class="headerlink" href="#requisitos" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Para hacer un transparente un <em>proxy</em> es necesario:</p>
+<ul class="simple">
+<li>Una configuración extra de la máquina en la que se ejecuta de forma
+transparente el <em>proxy</em>.</li>
+<li>Que las respuestas del servidor, que obviamente tendrán como destino el
+cliente, puedan ser interceptadas por el <em>proxy</em> para que sea él quien las
+despache hacia el cliente original. Así pues, el servidor final no puede estar
+dispuesto en cualquier lugar, sino en uno cuyo camino de regreso pase por el
+proxy.</li>
+</ul>
+<div class="admonition-todo admonition" id="index-0">
+<p class="first admonition-title">Por hacer</p>
+<p class="last">Imagen explicativa.</p>
+</div>
+</div>
+<div class="section" id="solucion-general">
+<span id="proxy-transparente-sol-gen"></span><h2>7.5.2.3.2.2. Solución general<a class="headerlink" href="#solucion-general" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Desde la versión 2.2 del núcleo, <em>Linux</em> es capaz de comportarse como un <em>proxy</em>
+transparente, para lo cual se requiere:</p>
+<ol class="arabic">
+<li><p class="first">Que la aplicación <em>proxy</em> esté <strong>preparada para ello</strong> y utilice un <em>socket</em>
+transparente. Este requisito debe cumplirlo la aplicación, por lo que como
+administradores sólo podemos comprobar si es apta o no. Ahora bien, poder
+crear un <em>socket</em> transparente se le exige a la aplicación la capacidad (véase
+<em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/capabilities(7)">capabilities(7)</a></em>) <code class="docutils literal notranslate"><span class="pre">CAP_NET_ADMIN</span></code>. Esto puede lograrse:</p>
+<ul class="simple">
+<li>Ejecutando la aplicación como <em>root</em>.</li>
+<li>Conceder la capacidad al ejecutable (p.e. <a class="reference external" href="https://github.com/yrutschle/sslh/blob/master/doc/config.md">vea cómo hacerlo</a>).</li>
+</ul>
+<p>Cómo se configure la aplicación para que pueda actuar transparentemente es
+particular de cada una: el siguiente epígrafe estará dedicado a la
+configuración de algunas.</p>
+</li>
+<li><p class="first">Como el <em>proxy</em> debe interceptar también el tráfico de vuelta procedente del
+servidor final, <strong>debe encontrarse en el camino de regreso</strong>, ya que al no
+cambiar el <em>proxy</em> la <abbr title="Internet Protocol">IP</abbr> del cliente original, el servidor final intentará
+devolver la respuesta al cliente.</p>
+<p>Para cumplir con este requisito debemos escoger el lugar donde situar el
+<em>proxy</em>.</p>
+</li>
+<li><p class="first">Finalmente, al pasar los paquetes de respuesta por el <em>proxy</em> éste debe
+procesarlos, aunque la <abbr title="Internet Protocol">IP</abbr> de destino sea la del cliente. Para ello debe
+<strong>manipularse el encaminamiento</strong>. Este es el único requisito que sí podemos
+configurar de forma general y al que dedicaremos el resto del epígrafe.</p>
+<p>Para que los paquetes de respuesta dirigidos al cliente pasen por la aplicación
+de <em>proxy</em> debe lograrse que éstos se encaminen a través de la interfaz de
+<em>loopback</em>. Para ello:</p>
+<ol class="loweralpha">
+<li><p class="first">Se indica al núcleo que haga posible el encaminamiento a través de la
+interfaz de <em>loopback</em><a class="footnote-reference" href="#id4" id="id1">[1]</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> sysctl -w net.ipv4.conf.default.route_localnet<span class="o">=</span><span class="m">1</span>
+<span class="gp">#</span> sysctl -w net.ipv4.conf.all.route_localnet<span class="o">=</span><span class="m">1</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">Se alteran las reglas de encaminamiento para que el tráfico marcado (con, por
+ejemplo, <em>0xff</em>) vaya a la interfaz de <em>loopback</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> ip rule add fwmark 0xff lookup <span class="m">100</span>
+<span class="gp">#</span> ip route add <span class="nb">local</span> <span class="m">0</span>.0.0.0/0 dev lo table <span class="m">100</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">Hacemos que el tráfico que debe volver a pasar por el <em>proxy</em> esté marcado
+con la marca anterior (la <em>0xff</em>), para lo cual podemos utilizar el
+cortafuegos. Cómo deba utilizarse el cortafuegos depende de si donde se
+encuentre el servidor final:</p>
+<ol class="loweralpha">
+<li><p class="first">Cuando está ien la misma máquina que el <em>proxy</em><a class="footnote-reference" href="#id5" id="id2">[2]</a>, podemos usar la
+estrategia de que el éste redirija los paquetes a una dirección local
+particular (p.e. la <em>127.1.1.1</em>, en la que por supusto debe responder tal
+servidor).  De esta forma, lograremos marcar sólo los paquetes dirigidos
+al servidor que proceden del <em>proxy</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> iptables -t raw -A PREROUTING ! -i lo -d <span class="m">127</span>.0.0.0/8 -j DROP
+<span class="gp">#</span> iptables -t mangle -A POSTROUTING ! -o lo -s <span class="m">127</span>.0.0.0/8 -j DROP
+
+<span class="gp">#</span> iptables -t nat -A OUTPUT -d <span class="m">127</span>.1.1.1 -j CONNMARK --set-mark 0xff
+<span class="gp">#</span> iptables -t mangle -A OUTPUT -m connmark --mark 0xff -j CONNMARK --restore-mark
+</pre></div>
+</div>
+</li>
+<li><p class="first">Cuando está en una máquina distinta, la estretegia es marcar en el <em>proxy</em>
+los paquetes entrantes (que son los de vuelta) cuyo destino es un proxy
+transparente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> iptables -t mangle -A PREROUTING -m socket --transparent -j MARK --set-mark 0xff
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p>Por alguna razón en mi sistema, <strong class="program">nftables</strong> es
+incapaz de traducir la sentencia anterior, pero existe equivalente:</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add table mangle
+<span class="gp">#</span> nft add chain mangle PREROUTING <span class="s2">&quot;{ type filter hook prerouting priority -150; }&quot;</span>
+<span class="gp">#</span> nft add rule mangle PREROUTING socket transparent <span class="m">1</span> meta mark <span class="nb">set</span> 0xff
+</pre></div>
+</div>
+</div>
+</li>
+</ol>
+</li>
+</ol>
+</li>
+</ol>
+</div>
+<div class="section" id="soluciones-particulares">
+<h2>7.5.2.3.2.3. Soluciones particulares<a class="headerlink" href="#soluciones-particulares" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>La intención es aplicar la solución antes descrita para que actúen como
+<em>proxies</em> transparentes aplicaciones utilizados en este manual: <a class="reference internal" href="../../../09.apendice/01.cryto/03.aplicaciones.html#stunnel"><span class="std std-ref">stunnel</span></a>, <a class="reference internal" href="01.multi.html#sslh"><span class="std std-ref">sslh</span></a>, <a class="reference internal" href="../../../04.servidor/10.ssh/04.adicional.html#haproxy"><span class="std std-ref">haproxy</span></a> y <a class="reference internal" href="../../02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a>. Ahora bien, para comprobar si, efectivamente, el <em>proxy</em> actúa de
+modo transparente, es necesario que el servidor final nos muestre cuál es la
+<abbr title="Internet Protocol">IP</abbr> del cliente. Un modo muy sencillo es usar como servidor final
+<strong class="program">nginx</strong> con esta configuración:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">server</span> <span class="p">{</span>
+   <span class="kn">listen</span> <span class="mi">80</span><span class="p">;</span>  <span class="kn">//</span> <span class="s">Puerto</span> <span class="s">y</span> <span class="s">dirección</span> <span class="s">de</span> <span class="s">escucha</span> <span class="s">pueden</span> <span class="s">cambiar</span> <span class="s">según</span> <span class="s">el</span> <span class="s">caso.</span>
+
+   <span class="s">location</span> <span class="s">/</span> <span class="p">{</span>
+      <span class="kn">return</span> <span class="mi">200</span> <span class="s">&quot;Saludos</span> <span class="s">desde</span> <span class="s">&#39;</span><span class="nv">$hostname&#39;.</span> <span class="s">Te</span> <span class="s">conectas</span> <span class="s">desde</span> <span class="nv">$remote_addr:$remote_port.\n&quot;</span><span class="p">;</span>
+   <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>y que desde el cliente se haga la consulta<a class="footnote-reference" href="#id6" id="id3">[3]</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> wget --no-check-certificate -qO- https://destino
+<span class="go">Saludos desde &#39;servidor&#39;. Te conectas desde 192.168.0.20:43123.</span>
+</pre></div>
+</div>
+<p>donde el destino será el proxy (probablemente) y el protocolo dependerá de qué
+papel juegue el <em>proxy</em>. Si el proxy inverso es explícito veremos la <abbr title="Internet Protocol">IP</abbr> del <em>proxy</em>,
+pero si es transparente –como pretendemos–, aparecerá la <abbr title="Internet Protocol">IP</abbr> del propio cliente.</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="02.transparencia/01.stunnel.html">7.5.2.3.2.3.1. stunnel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="02.transparencia/02.sslh.html">7.5.2.3.2.3.2. SSLH</a></li>
+<li class="toctree-l1"><a class="reference internal" href="02.transparencia/03.nginx.html">7.5.2.3.2.3.3. nginx</a></li>
+<li class="toctree-l1"><a class="reference internal" href="02.transparencia/04.haproxy.html">7.5.2.3.2.3.4. haproxy</a></li>
+</ul>
+</div>
+<p class="rubric">Notas al pie</p>
+<table class="docutils footnote" frame="void" id="id4" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td>Si queremos hacer permanente el cambio, podemos incluir la definición de
+los parámentros en <code class="file docutils literal notranslate"><span class="pre">/etC/sysctl.conf</span></code> como ya se ha hecho en otros
+epígrafes de este manual.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id5" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id2">[2]</a></td><td><p class="first">Si <em>stunnel</em> no se ejecuta como administrador, sino con su propio usuario,
+entonces podemos identificar el tráfico, no por el destino, sino por el usuario
+que lo ejecuta:</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> iptables -t nat -A OUTPUT -m owner --uid-owner stunnel -j CONNMARK --set-mark 0xff
+</pre></div>
+</div>
+</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id6" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id3">[3]</a></td><td>Se añade <kbd class="kbd docutils literal notranslate">--no-check-certificate</kbd> para evitar problemas si en
+nuestras pruebas usamos certificados autofirmados.</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">7.5.2.3.2. Transparencia</a><ul>
+<li><a class="reference internal" href="#requisitos">7.5.2.3.2.1. Requisitos</a></li>
+<li><a class="reference internal" href="#solucion-general">7.5.2.3.2.2. Solución general</a></li>
+<li><a class="reference internal" href="#soluciones-particulares">7.5.2.3.2.3. Soluciones particulares</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="01.multi.html"
+                        title="capítulo anterior">7.5.2.3.1. Multiplexores</a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="02.transparencia/01.stunnel.html"
+                        title="próximo capítulo">7.5.2.3.2.3.1. stunnel</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../_sources/07.serre/05.proxies/03.reverse/02.transparencia.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Ir a" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="02.transparencia/01.stunnel.html" title="7.5.2.3.2.3.1. stunnel"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="01.multi.html" title="7.5.2.3.1. Multiplexores"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >7. Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" >7.5. Proxies</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../03.reverse.html" >7.5.2.3. Proxies inversos</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor CC BY 4.0, 2016-2020, José Miguel Sánchez Alés.
+      Creado con <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
+    </div>
+  </body>
+</html>

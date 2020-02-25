@@ -19,7 +19,7 @@ html:
 
 pkg:
 	@echo -n "Creando paquete de copia en el directorio padre... "
-	@tar -acf "${PKGDIR}/linux.tar.gz" "${SOURCEDIR}"
+	@tar -acf "${PKGDIR}/linuxnomicon.tar.gz" "${SOURCEDIR}"
 	@echo "Hecho."
 
 # Catch-all target: route all unknown targets to Sphinx using the new
