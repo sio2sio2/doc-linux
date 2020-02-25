@@ -13,7 +13,7 @@ Citaremos dos clasificaciones:
 
 - Atendiendo a quién sea el sujeto de su intermediación:
 
-  :dfn:`Proxy de cliente` (generalmente *proxy* a secas)
+  :dfn:`Proxy directo` (generalmente *proxy* a secas)
      Es aquel que captura las peticiones de los clientes concretos de una red
      hacia todos los servidores (generalmente en internet y de un tipo específico).
 
@@ -42,7 +42,7 @@ Citaremos dos clasificaciones:
   *proxy* puede ser explícito o transparente  para el cliente, para el servidor
   o para ambos. Por lo general:
   
-  * Cuando se trata de un *proxy de cliente*, un *proxy* se entiende
+  * Cuando se trata de un *proxy directo*, un *proxy* se entiende
     **transparente**, cuando los clientes no notan su presencia, esto es, cuando
     creen comunicarse directamente con los servidores a los intentan acceder. De
     hecho, que un *proxy* sea **explícito** implica configurar los propios
@@ -58,7 +58,7 @@ Citaremos dos clasificaciones:
 *Proxies* frecuentes
 --------------------
 :dfn:`Proxy DNS`,
-  que es aquel *proxy de cliente* que se encarga de obtener de un servidor |DNS|
+  que es aquel *proxy directo* que se encarga de obtener de un servidor |DNS|
   las resoluciones de nombres solicitadas por sus clientes y cachearlas a fin de
   acelerar las solicitudes posterioes. :ref:`dnsmasq <dnsmasq-dns>` es un
   ejemplo de *proxy* de este tipo.
@@ -72,10 +72,10 @@ Citaremos dos clasificaciones:
 
 :dfn:`Proxy web`
    Es aquel *proxy* especializado en la intermediación de peticiones |HTTP| y
-   |HTTP|\ s. Dependiendo de si actúa como *proxy de cliente* o *proxy inverso*,
+   |HTTP|\ s. Dependiendo de si actúa como *proxy directo* o *proxy inverso*,
    cumple distintas funciones:
 
-   * Como *proxy de cliente* puede:
+   * Como *proxy directo* puede:
 
      - Establecer permisos u horarios de acceso, cuotas o anchos de banda según
        los usuarios que se definan.
