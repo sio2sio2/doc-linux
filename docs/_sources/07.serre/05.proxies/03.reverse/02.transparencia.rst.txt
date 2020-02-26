@@ -157,11 +157,83 @@ donde el destino será el proxy (probablemente) y el protocolo dependerá de qu�
 papel juegue el *proxy*. Si el proxy inverso es explícito veremos la |IP| del *proxy*,
 pero si es transparente --como pretendemos--, aparecerá la |IP| del propio cliente.
 
-.. toctree::
-   :glob:
-   :maxdepth: 1
+.. _stunnel-transparente:
 
-   02.transparencia/[0-9]*
+stunnel
+=======
+:ref:`stunnel <stunnel>` permite encapsular con |SSL| cualquier tipo de tráfico;
+y, si queremos que el servidor final conozca la dirección del cliente original y
+no la |IP| de la parte servidor de :program:`stunnel` debemos hacer que éste se
+comporte de forma transparente. 
+
+Podemos poner en práctica la :ref:`solución general
+<proxy-transparente-sol-gen>`, a la cual sólo le falta desarrollar la primera
+parte, esto es, la relativa a la propia aplicación *proxy*. Es configuración
+(partido del :ref:`ejemplo ilustrativo en que se expuso qué es stunnel <stunnel>`),
+puede ser esta, si el servidor final se encuentra en la misma máquina:
+
+.. code-block:: ini
+   :emphasize-lines: 2, 5
+
+   ; La IP de la interfaz física del servidor es 192.168.0.14
+
+   [netcat-ssl]
+   transparent = source
+   cert = /etc/stunnel/stunnel.pem
+   accept = 192.168.0.14:443
+   connect = 127.1.1.1:80
+
+donde las novedades son la particular dirección local del servidor final
+(coherente con la que se cita en la :ref:`solución general para proxy
+transparente <proxy-transparente-sol-gen>`), y la línea en que indicamos a
+:program:`stunnel` que mantenga la |IP| original del cliente.
+
+En caso de que el servidor final estuviera en una máquina distinta, la última
+línea deberíamos cambiarla por algo así:
+
+.. code-block:: ini
+
+   ; El servicio final se encuentra en otra máquina (192.168.255.10)
+   connect = 192.168.255.100:80
+
+.. warning:: Tenga presente que, además de toda la configuración de cortafuegos
+   y reglas de encaminamiento, debemos asegurarnos de que :program:`stunnel`
+   tiene capacidad para crear el *socket* transparente y que la vuelta de los
+   paquetes pasará por la máquina con :program:`stunnel`.
+
+.. _sslh-transparente:
+
+SSLH
+====
+A la :ref:`solución general <proxy-transparente-sol-gen>`, basta añadirle la
+configuración particular del :program:`sslh`, que podría ser la siguiente en
+:file:`/etc/default/sslh`:
+
+.. code-block:: bash 
+
+   RUN=yes  # SSLH corre permanentemente, no a través de inetd.
+
+   [...]
+
+   DAEMON_OPTS="--transparent --user sslh --listen 172.22.0.2:443 \
+                --ssh 127.1.1.1:22 --ssl 127.1.1.1:443 --openvpn 127.1.1.1:1194 \
+                --pidfile /var/run/sslh/sslh.pid"
+
+donde se indica que se quiere hacer transparente el servicio, y se redirige el
+tráfico a una interfaz local particular. 
+
+.. note:: En este caso, no se tiene que ejecutar como administrador porque
+   *Debian* compilar el programa con la opción ``USELIBCAP=1``.
+
+.. _nginx-transparente:
+
+nginx
+=====
+
+.. _haproxy-transparent:
+
+haproxy
+=======
 
 .. rubric:: Notas al pie
 
@@ -177,3 +249,5 @@ pero si es transparente --como pretendemos--, aparecerá la |IP| del propio clie
 
 .. [#] Se añade :kbd:`--no-check-certificate` para evitar problemas si en
    nuestras pruebas usamos certificados autofirmados.
+
+.. |SSL| replace:: :abbr:`SSL (Secure Socket Layer)`

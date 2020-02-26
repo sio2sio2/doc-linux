@@ -23,7 +23,7 @@
     
     <link rel="index" title="Índice" href="../../../genindex.html" />
     <link rel="search" title="Búsqueda" href="../../../search.html" />
-    <link rel="next" title="7.5.2.3.2.3.1. stunnel" href="02.transparencia/01.stunnel.html" />
+    <link rel="next" title="7.5.2.3.3. Web" href="03.web.html" />
     <link rel="prev" title="7.5.2.3.1. Multiplexores" href="01.multi.html" /> 
   </head><body>
     <div class="related" role="navigation" aria-label="related navigation">
@@ -33,7 +33,7 @@
           <a href="../../../genindex.html" title="Índice General"
              accesskey="I">índice</a></li>
         <li class="right" >
-          <a href="02.transparencia/01.stunnel.html" title="7.5.2.3.2.3.1. stunnel"
+          <a href="03.web.html" title="7.5.2.3.3. Web"
              accesskey="N">siguiente</a> |</li>
         <li class="right" >
           <a href="01.multi.html" title="7.5.2.3.1. Multiplexores"
@@ -202,14 +202,70 @@ modo transparente, es necesario que el servidor final nos muestre cuál es la
 <p>donde el destino será el proxy (probablemente) y el protocolo dependerá de qué
 papel juegue el <em>proxy</em>. Si el proxy inverso es explícito veremos la <abbr title="Internet Protocol">IP</abbr> del <em>proxy</em>,
 pero si es transparente –como pretendemos–, aparecerá la <abbr title="Internet Protocol">IP</abbr> del propio cliente.</p>
-<div class="toctree-wrapper compound">
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="02.transparencia/01.stunnel.html">7.5.2.3.2.3.1. stunnel</a></li>
-<li class="toctree-l1"><a class="reference internal" href="02.transparencia/02.sslh.html">7.5.2.3.2.3.2. SSLH</a></li>
-<li class="toctree-l1"><a class="reference internal" href="02.transparencia/03.nginx.html">7.5.2.3.2.3.3. nginx</a></li>
-<li class="toctree-l1"><a class="reference internal" href="02.transparencia/04.haproxy.html">7.5.2.3.2.3.4. haproxy</a></li>
-</ul>
+<div class="section" id="stunnel">
+<span id="stunnel-transparente"></span><h3>7.5.2.3.2.3.1. stunnel<a class="headerlink" href="#stunnel" title="Enlazar permanentemente con este título">¶</a></h3>
+<p><a class="reference internal" href="../../../09.apendice/01.cryto/03.aplicaciones.html#stunnel"><span class="std std-ref">stunnel</span></a> permite encapsular con <abbr title="Secure Socket Layer">SSL</abbr> cualquier tipo de tráfico;
+y, si queremos que el servidor final conozca la dirección del cliente original y
+no la <abbr title="Internet Protocol">IP</abbr> de la parte servidor de <strong class="program">stunnel</strong> debemos hacer que éste se
+comporte de forma transparente.</p>
+<p>Podemos poner en práctica la <a class="reference internal" href="#proxy-transparente-sol-gen"><span class="std std-ref">solución general</span></a>, a la cual sólo le falta desarrollar la primera
+parte, esto es, la relativa a la propia aplicación <em>proxy</em>. Es configuración
+(partido del <a class="reference internal" href="../../../09.apendice/01.cryto/03.aplicaciones.html#stunnel"><span class="std std-ref">ejemplo ilustrativo en que se expuso qué es stunnel</span></a>),
+puede ser esta, si el servidor final se encuentra en la misma máquina:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="c1">; La IP de la interfaz física del servidor es 192.168.0.14</span>
+<span class="hll">
+</span><span class="k">[netcat-ssl]</span>
+<span class="na">transparent</span> <span class="o">=</span> <span class="s">source</span>
+<span class="hll"><span class="na">cert</span> <span class="o">=</span> <span class="s">/etc/stunnel/stunnel.pem</span>
+</span><span class="na">accept</span> <span class="o">=</span> <span class="s">192.168.0.14:443</span>
+<span class="na">connect</span> <span class="o">=</span> <span class="s">127.1.1.1:80</span>
+</pre></div>
 </div>
+<p>donde las novedades son la particular dirección local del servidor final
+(coherente con la que se cita en la <a class="reference internal" href="#proxy-transparente-sol-gen"><span class="std std-ref">solución general para proxy
+transparente</span></a>), y la línea en que indicamos a
+<strong class="program">stunnel</strong> que mantenga la <abbr title="Internet Protocol">IP</abbr> original del cliente.</p>
+<p>En caso de que el servidor final estuviera en una máquina distinta, la última
+línea deberíamos cambiarla por algo así:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="c1">; El servicio final se encuentra en otra máquina (192.168.255.10)</span>
+<span class="na">connect</span> <span class="o">=</span> <span class="s">192.168.255.100:80</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p class="last">Tenga presente que, además de toda la configuración de cortafuegos
+y reglas de encaminamiento, debemos asegurarnos de que <strong class="program">stunnel</strong>
+tiene capacidad para crear el <em>socket</em> transparente y que la vuelta de los
+paquetes pasará por la máquina con <strong class="program">stunnel</strong>.</p>
+</div>
+</div>
+<div class="section" id="sslh">
+<span id="sslh-transparente"></span><h3>7.5.2.3.2.3.2. SSLH<a class="headerlink" href="#sslh" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>A la <a class="reference internal" href="#proxy-transparente-sol-gen"><span class="std std-ref">solución general</span></a>, basta añadirle la
+configuración particular del <strong class="program">sslh</strong>, que podría ser la siguiente en
+<code class="file docutils literal notranslate"><span class="pre">/etc/default/sslh</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">RUN</span><span class="o">=</span>yes  <span class="c1"># SSLH corre permanentemente, no a través de inetd.</span>
+
+<span class="o">[</span>...<span class="o">]</span>
+
+<span class="nv">DAEMON_OPTS</span><span class="o">=</span><span class="s2">&quot;--transparent --user sslh --listen 172.22.0.2:443 \</span>
+<span class="s2">             --ssh 127.1.1.1:22 --ssl 127.1.1.1:443 --openvpn 127.1.1.1:1194 \</span>
+<span class="s2">             --pidfile /var/run/sslh/sslh.pid&quot;</span>
+</pre></div>
+</div>
+<p>donde se indica que se quiere hacer transparente el servicio, y se redirige el
+tráfico a una interfaz local particular.</p>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">En este caso, no se tiene que ejecutar como administrador porque
+<em>Debian</em> compilar el programa con la opción <code class="docutils literal notranslate"><span class="pre">USELIBCAP=1</span></code>.</p>
+</div>
+</div>
+<div class="section" id="nginx">
+<span id="nginx-transparente"></span><h3>7.5.2.3.2.3.3. nginx<a class="headerlink" href="#nginx" title="Enlazar permanentemente con este título">¶</a></h3>
+</div>
+<div class="section" id="haproxy">
+<span id="haproxy-transparent"></span><h3>7.5.2.3.2.3.4. haproxy<a class="headerlink" href="#haproxy" title="Enlazar permanentemente con este título">¶</a></h3>
 <p class="rubric">Notas al pie</p>
 <table class="docutils footnote" frame="void" id="id4" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
@@ -240,6 +296,7 @@ nuestras pruebas usamos certificados autofirmados.</td></tr>
 </table>
 </div>
 </div>
+</div>
 
 
           </div>
@@ -252,7 +309,13 @@ nuestras pruebas usamos certificados autofirmados.</td></tr>
 <li><a class="reference internal" href="#">7.5.2.3.2. Transparencia</a><ul>
 <li><a class="reference internal" href="#requisitos">7.5.2.3.2.1. Requisitos</a></li>
 <li><a class="reference internal" href="#solucion-general">7.5.2.3.2.2. Solución general</a></li>
-<li><a class="reference internal" href="#soluciones-particulares">7.5.2.3.2.3. Soluciones particulares</a></li>
+<li><a class="reference internal" href="#soluciones-particulares">7.5.2.3.2.3. Soluciones particulares</a><ul>
+<li><a class="reference internal" href="#stunnel">7.5.2.3.2.3.1. stunnel</a></li>
+<li><a class="reference internal" href="#sslh">7.5.2.3.2.3.2. SSLH</a></li>
+<li><a class="reference internal" href="#nginx">7.5.2.3.2.3.3. nginx</a></li>
+<li><a class="reference internal" href="#haproxy">7.5.2.3.2.3.4. haproxy</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -261,8 +324,8 @@ nuestras pruebas usamos certificados autofirmados.</td></tr>
   <p class="topless"><a href="01.multi.html"
                         title="capítulo anterior">7.5.2.3.1. Multiplexores</a></p>
   <h4>Próximo tema</h4>
-  <p class="topless"><a href="02.transparencia/01.stunnel.html"
-                        title="próximo capítulo">7.5.2.3.2.3.1. stunnel</a></p>
+  <p class="topless"><a href="03.web.html"
+                        title="próximo capítulo">7.5.2.3.3. Web</a></p>
   <div role="note" aria-label="source link">
     <h3>Esta página</h3>
     <ul class="this-page-menu">
@@ -293,7 +356,7 @@ nuestras pruebas usamos certificados autofirmados.</td></tr>
           <a href="../../../genindex.html" title="Índice General"
              >índice</a></li>
         <li class="right" >
-          <a href="02.transparencia/01.stunnel.html" title="7.5.2.3.2.3.1. stunnel"
+          <a href="03.web.html" title="7.5.2.3.3. Web"
              >siguiente</a> |</li>
         <li class="right" >
           <a href="01.multi.html" title="7.5.2.3.1. Multiplexores"
