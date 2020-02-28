@@ -11,7 +11,8 @@ Tipos
 -----
 Citaremos dos clasificaciones:
 
-- Atendiendo a quién sea el sujeto de su intermediación:
+- Atendiendo al lado de la comunicación (cliente o servidor) para el que
+  intermedie:
 
   :dfn:`Proxy directo` (generalmente *proxy* a secas)
      Es aquel que captura las peticiones de los clientes concretos de una red
@@ -53,7 +54,7 @@ Citaremos dos clasificaciones:
     clientes, esto es, los paquetes entrantes tienen por |IP| de origen la del
     cliente y no la del *proxy*.
 
-  .. todo:: Hacer algunos esquemas para ilustrar esto.
+  .. image:: files/proxytransparente.png
 
 *Proxies* frecuentes
 --------------------
