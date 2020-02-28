@@ -1,3 +1,5 @@
+.. _cli:
+
 ¿Cómo es el entorno de texto?
 =============================
 

@@ -1,3 +1,5 @@
+.. _linux-info:
+
 Acceso a la información
 =======================
 

@@ -1,4 +1,4 @@
-Ejercicios sobre manipulación de ficheros
+Ejercicios sobre manipulación de archivos
 -----------------------------------------
 
 .. note:: Especifique convenientemente si usa el administrador o no.

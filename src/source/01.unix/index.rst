@@ -1,3 +1,5 @@
+.. _qué-es:
+
 ¿Qué es linux?
 ==============
 En puridad, deberíamos empezar por el principio, esto es, por *UNIX*
