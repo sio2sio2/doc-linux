@@ -109,6 +109,34 @@ Citaremos dos clasificaciones:
        cacheo debe ser muy cuidadoso ya que se corre el riesgo de entregar
        información obsoletas.
 
+.. _dpi:
+
+:dfn:`Proxy DPI`
+   Es aquel *proxy* directo que se encarga de inspeccionar a fondo los paquetes
+   que pasan por él con el fin de encontrar algún incumplimiento en la política
+   predefinida, habilitar una :ref:`calidad de servicio <QoS>` o por mera
+   intención estadística. Reciben el nombre |DPI| (inspección profunda de
+   paquetes, en castellano), precisamente por esa causa, donde *profunda* o *a
+   fondp* implica el análisis de de metainformación de capa 7 o incluso el
+   contenido. En cierta medida, un proxy *web* directo es una herramienta de
+   este tipo, aunque centrada exclusivamente en el protoclo |HTTP|.
+
+   Por ejemplo, si la política de una organización es que hacia el puerto **443**
+   sólo puede establecerse comunicaciones web cifradas seguras, la herramienta
+   |DPI| se encargará de:
+
+   - Desechar cualquier tráfico que no sea |TLS|.
+   - Rechazar cualquier conexión en la que el certificado no sea válido
+     (caducado, autofirmado, etc.).
+
+:dfn:`Proxy SOCKS`
+   Es un servicio cliente-servidor que canaliza una conexión |TCP| o |UDP|\ [#]_
+   realizada en la parte cliente hasta la parte servidor, a fin de que ésta
+   realice la conexión, reciba la respuesta y la entregue a la parte cliente.
+   :ref:`OpenSSH <ssh>` actúa como *proxy* SOCKS al realizar :ref:`túneles
+   dinámicos <ssh-socks>`. En ese mismo epígrafe se propuso :command:`tsocks`
+   como cliente.
+
 .. rubric:: Contenidos
 
 .. toctree::
@@ -117,8 +145,15 @@ Citaremos dos clasificaciones:
 
    [0-9]*
 
+.. rubric:: Notas al pie
+
+.. [#] |UDP| sólo a partir de la versión 5 del protocolo.
+
 .. |ARP| replace:: :abbr:`ARP (Address Resolution Protocol)`
 .. |MAC| replace:: :abbr:`MAC (Media Access Control)`
 .. |SNI| replace:: :abbr:`SNI (Server Name Indication)`
 .. |DoS| replace:: :abbr:`DoS (Deny of Service)`
 .. |TLS| replace:: :abbr:`TLS (Transport Layer Security)`
+.. |UDP| replace:: :abbr:`UDP (User Datagram Protocol)`
+.. |TCP| replace:: :abbr:`TCP (Transmission Control Protocol)`
+.. |DPI| replace:: :abbr:`DPI (Deep Packet Inspection)`

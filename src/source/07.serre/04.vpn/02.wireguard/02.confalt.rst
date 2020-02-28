@@ -63,242 +63,205 @@ utlizar herramientas externas de configuración como :program:`ifupdown`.
 Redes restringidas
 ******************
 Cuando nuestro *guerrero de la carretera* se encuentra dentro de una red
-restringida que no controlamos nos topamos en algunas ocasiones con el problema
+restringida que no controlamos, nos topamos en ocasiones con el problema
 de que somos incapaces de acceder al puerto |UDP| en que hemos dejado escuchando
 el servidor (el *1194* en nuestra propuesta).
 
-En estas redes restringidas, lo habitual es que sólo podemos:
+En estas redes restringidas, lo habitual es que sólo podamos:
 
 - Hacer consultas |DNS| (*53/UDP*), aunque a veces se reduce a poder hacérselas
   a un proxy |DNS| de la red local.
-- Navegar por internet (puertos *80/TCP* y *443/TCP*), aunque veces fiscalizado
-  por *proxies*.
+- Navegar por internet (puertos *80/TCP* y *443/TCP*), aunque a veces
+  fiscalizado por *proxies*.
 
-Podríamos dejar escuchando el servicio en el puerto *53/UDP*, pero será inútil
-si sólo podemos consultar un proxy |DNS| interno.
+Podríamos dejar escuchando el servicio en el puerto *53/UDP*, pero es bastante
+común que en estas redes restringidas, la consulta de nombres esté restrinjida
+a un proxy |DNS| interno.
 
 La solución general es usar los puertos para tráfico web, pero nos topamos con
 el problema de que por motivos de rendimiento :program:`wireguard` sólo se ha
 implementado para |UDP|. Una solución para solucionar este inconveniente es
 tunelizador el trafico mediante `Websockets <https://v0ctor.me/websocket>`_. Como
 forma parte del estándar |HTML|\ 5, no deberiamos tener problemas con el proxy
-web, aun usando |HTTP| y no |HTTP|\ s. Además, no recifrar con |SSL| contribuirá
-a que la pérdida de rendimiento no sea grande.
+web, aun usando |HTTP| y no |HTTP|\ s. Si es posible usar |HTTP|, tendremos la
+ventaja de no tener que recifrar con |SSL|, lo que redundará en un mejor
+rendimiento.
 
-:program:`wstunnel`
-===================
-Para lograr nuestro objetivo, tal como prppugna `este enlace
-<https://kirill888.github.io/notes/wireguard-via-websocket>`_, podemos usar
-wstunnel_, el cual es capaz de tunelizar mediante *Websockets* tráfico |UDP|. No
-existe paquete para *Debian*\ [#]_, pero podemos descargar el ejecutable del
-propio repositio de Github_. Su uso es bastante sencillo. Descargamos en dos
-máquinas el ejecutable y:
+Para encapsular :program:`wireguard` podemos utilizar :ref:`wstunnel
+<wstunnel>`, como sugiere `este artículo
+<https://kirill888.github.io/notes/wireguard-via-websocket>`.
 
-* En la máquina servidor lo ejecutamos de esta forma::
+Encapsulación
+=============
+Para usar :program:`wireguard` con :ref:`wstunnel <wstunnel>` podemos obrar del
+siguiente modo.
 
-   # /usr/local/bin/wstunnel -v --server ws://0.0.0.0 --restrictTo 127.0.0.1:1194
+**Servidor**
+   En lo referente a los servicios:
 
-  lo cual supone que la aplicación escuche en el puerto *80* (no seguro) los
-  datos que se pretenden tunelizar. Además, sólo se aceptará tráfico que el
-  cliente indique que va dirigido al puerto *1194* de la interfaz de loopback.
+   * Hacemos que :program:`wireguard` escuche en un puerto de todas las interfaces,
+     lo cual permitirá establecer el túnel |VPN| directamente sin la intermediación
+     de :ref:`wstunnel <wstunnel>`.
 
-* En la máquina cliente, rematamos el otro extremo del túnel con::
+   * Hacemos que :ref:`wstunnel <wstunnel>` escuche en el puerto **80** ó **443**
+     de todas las interfaces y comunique con al puerto de la interfaz de *loopback*
+     en que escucha :program:`wireguard`. Esto nos permitirá la conexión desde
+     redes restringidas gracias a la intermediación de :ref:`wstunnel <wstunnel>`.
 
-   # /usr/local/bin/wstunnel -v --udp --udpTimeoutSec -1 -L 127.0.0.1:12345:127.0.0.1:1194 ws://203.0.113.1
+   Hay, sin embargo, un pequeño gran problema cuando se desea sacar todo el tráfico
+   por el túnel |VPN| y se usa para comunicar con el servidor un nombre, en vez de
+   una dirección |IP|: para llegar a establecer el túnel necesitamos resolver el
+   nombre, pero para resolver el nombre debemos haber establecido el canal, puesto
+   que la petición |DNS| intenta salir a través de él. Esto puede resolverse bien
+   utilizando un proxy |DNS| como :ref:`dnsmasq` (que es lo que propugna el
+   artículo antes referido), bien segurándonos que el tráfico que genera
+   :ref:`wstunnel <wstunnel>` nunca usa el propio túnel.
 
-  que conecta con el puerto 80 del servidor (hemos supuesto que *203.0.113.1* es
-  su dirección |IP|) y envía los datos que recibe por el puerto *12345/UDP*
-  de la interfaz de *loopback* al puerto *1194/UDP* de la interfaz de *loopback*
-  del servidor (esto último coincide con lo que se indicó con
-  :kbd:`--restrictTo` en el servidor).
+   La resolución automatizade de este problema se encuentra en  `este script
+   llamado wgws <https://github.com/sio2sio2/wgws>`_:
 
-Con ello ya tendremos establecido el tunel dentro del cual circula el tráfico
-|UDP|. Si queremos probarlo, podemos hacer::
+   * Necesita, obviamente, :ref:`wstunnel <wstunnel>` en algún directorio del
+     *PATH*.
+   * Utiliza la misma técnica de manipulación de las tablas de encanimamiento que
+     :program:`wg-quick`.
+   * El propio :program:`wstunnel` marca el tráfico para el encaminamiento evite
+     que salga por el tunel.
+   * Para definir la configuración del túnel, permite añadir una sección más al
+     fichero de configuración llamada :kbd:`[Tunnel]`, que puede incluir tres
+     variables:
+   * Usa el cortafuegos para permitir que haya tráfico excepcional que no use el
+     túnel.
 
-   servidor$ netcat -u -l -p 1194
+     .. table::
+        :class: wgws
 
-y en el cliente::
+        +-----------+-----------------------------------------------------------+
+        | Variable  | Descripción                                               |
+        +===========+===========================================================+
+        | Address   | Dirección y puerto donde escucha :program:`wstunnel`.     |
+        +-----------+-----------------------------------------------------------+
+        | Secure    | Habilita el modo seguro (:kbd:`wss`).                     |
+        +-----------+-----------------------------------------------------------+
+        | WPath     | Ruta de acceso en el servidor al *websocket*. Sólo tiene  |
+        |           | sentido su uso en el cliente, y si en el servidor se usa  |
+        |           | un proxy (véase :ref:`el uso con nginx <wg-nginx>`).      |
+        +-----------+-----------------------------------------------------------+
 
-   cliente$ netcat -u localhost 12345
+     Si no se incluye la sección :kbd:`[Tunnel]` o si, aun habiéndola, se utiliza
+     la opción :kbd:`-n`, el *script* prescindirá de :program:`wstunnel` y su uso
+     será equivalente al de :command:`wg-quick`.
 
-Ambos :ref:`netcat <netcat>` deberían comunicarse a través del *websocket*.
+   El uso es bastante sencillo. Para resolver el caso del *road warrior* ya
+   analizado, la configuración es exactamente la misma, con la salvedad de añadir en
+   ambos extremos la sección :kbd:`[Tunmel]`. Así, en el **servidor**:
 
-.. note:: Para que el tráfico hubiera sido cifrado (y por el puerto 443) habría
-   bastado con usar :kbd:`wss` en vez de :kbd:`ws`.
+   .. code-block:: ini
 
-Encapsulando :program:`wireguard`
-=================================
-Para usar :program:`wireguard` con :program:`wstunnel` debemos:
+      [Interface]
+      Address = 10.8.0.1/24
+      ListenPort = 1194
+      PrivateKey = kEANNMfztMtzgwFyyaWOou7+c8ZPD/lyGhmcM7oFtXA=
 
-En el **servidor**:
+      [Peer]
+      PublicKey = f2CH3QXHiXwFhdATcDi42DU+PUOC9Ky8BgkHBigY5H4=
+      AllowedIPs = 10.8.0.2/32
 
-* Hacer que :program:`wstunnel` escuche en el puerto 80 ó 443 de todas las
-  interfaces y redirija al puerto de la interfaz de *loopback* en que escucha
-  :program:`wireguard`
-* Hacer que :program:`wireguard` escuche un puerto de las interfaces} lo que
-  permite a un cliente establcer directamente el túnel |VPN| o, si se encuentra
-  en una red restringida, hacerlo a través del puerto 80 ó 443 gracias a
-  *websocket*.
+      [Tunnel]
+      ; No es necesaria configuración adicional
 
-En el **cliente** restringido (el no restringido se configura como hemos visto
-ya):
+   y arrancar el servidcio de este modo para dar la posibilidad de conexión directa
+   (puerto **1194**) o a través de websocket (puerto **80**)::
 
-* Hacer que :program:`wstunnel` conecte con el puerto en el que escucha el
-  :program:`wstunnel` del cliente y escuche en un puerto de la interfaz de
-  loopback.
-* Hacer que :program:`wireguard` conecte con el puerto de la interfaz de
-  loopback donde se ha puesto a escuchar el :program:`wstunnel` local.
+      # wgws up wg0
 
-Hay, sin embargo, un pequeño gran problema cuando se desea sacar todo el tráfico
-por el túnel |VPN| y se usa para comunicar con el servidor un nombre, en vez de
-una dirección |IP|: para llegar a establecer el túnel necesitamos resolver el
-nombre, pero para resolver el nombre debemos haber establecido el canal, puesto
-que la petición |DNS| intenta salir a través de él.
+**Cliente**:
+   La configuración es la misma que para :command:`wg-quick` con la salvedad de
+   que debemos añadir la sección :kbd:`[Tunnel]`:
 
-oniendo todo junto, `este script llamado wgws
-<https://github.com/sio2sio2/wgws>`_ resuelve el problema del siguiente modo:
+   .. code-block:: ini
 
-* Necesita, obviamente, wstunnel_ y que esté en algún directorio del *PATH*.
-* Utiliza la misma técnica de manipulación de las tablas de encanimamiento que
-  :program:`wg-quick`.
-* Utiliza `cgroups <https://en.wikipedia.org/wiki/Cgroups>`_ para lograr marcar
-  el tráfico que genera :program:`wstunnel`. Con la marca y la ayuda del
-  cortafuegos se evita que este tráfico salga por el túnel y se resuelve el
-  problema de la resolución |DNS| del nombre del servidor.
-* Requiere :ref:`nftables <nftables>` para generar la regla mencionada en el
-  punto anterior\ [#]_.
-* Para definir la configuración del túnel, permite añadir al una sección más al
-  fichero de configuración llamada :kbd:`[Tunnel]`, que puede incluir tres
-  variables:
+      [Interface]
+      Address = 10.8.0.2/24
+      PrivateKey = WB4TAWIIlaOyULudlcdhqctTl/pdzO7m+6x4DhAP+0k=
 
-  .. table::
-     :class: wgws
+      [Peer]
+      PublicKey = /Pr37VgN7GVvizJw9FpCL62DSwocdNEf7lwfdDRZXj8=
+      Endpoint = 203.0.113.1:1194
+      AllowedIPs = 0.0.0.0/0
 
-     +-----------+-----------------------------------------------------------+
-     | Variable  | Descripción                                               |
-     +===========+===========================================================+
-     | Address   | Dirección y puerto donde escucha :program:`wstunnel`.     |
-     +-----------+-----------------------------------------------------------+
-     | Secure    | Habilita el modo seguro (:kbd:`wss`).                     |
-     +-----------+-----------------------------------------------------------+
-     | WPath     | Ruta de acceso en el servidor al *websocket*. Sólo tiene  |
-     |           | sentido su uso en el cliente, y si en el servidor se usa  |
-     |           | un proxy (véase :ref:`el uso con nginx <wg-nginx>`).      |
-     +-----------+-----------------------------------------------------------+
+      [Tunnel]
+      ; No es necesaria configuración adicional
 
-  Si no se incluye la sección :kbd:`[Tunnel]` o si, aun habiéndola, se utiliza
-  la opción :kbd:`-n`, el *script* prescindirá de :program:`wstunnel` y su uso
-  será equivalente al de :command:`wg-quick`.
+   Con esto ya podremos establecer el túnel, si queremos conexión directa::
 
-El uso es bastante sencillo. Para resolver el caso del *road warrior* ya
-analizado, la configuración es exactamente la misma, con la salvedad de añadir en
-ambos extremos la sección :kbd:`[Tunmel]`. Así, en el **servidor**:
+      # wgws -n up wg0
 
-.. code-block:: ini
+   o, si queremos conexión a través del Websockets_:::
 
-   [Interface]
-   Address = 10.8.0.1/24
-   ListenPort = 1194
-   PrivateKey = kEANNMfztMtzgwFyyaWOou7+c8ZPD/lyGhmcM7oFtXA=
+      # wgws up  wg0
 
-   [Peer]
-   PublicKey = f2CH3QXHiXwFhdATcDi42DU+PUOC9Ky8BgkHBigY5H4=
-   AllowedIPs = 10.8.0.2/32
+   Si deseamos cifrar con |SSL| (lo cual mermará el rendimiento) debemos o
+   añadir la opción :kbd:`-s` en las órdenes de ambos extremos o añadir la
+   opción:
 
-   [Tunnel]
-   ; No es necesaria configuración adicional
+   .. code-block:: ini
 
-y arrancar el servidcio de este modo para dar la posibilidad de conexión directa
-(puerto **1194**) o a través de websocket (puerto **80**)::
+      Secure = 1
 
-   # wgws up wg0
+   en la sección :kbd:`[Tunnel]` de ambos ficheros de configuración\ [#]_.
 
-Y en el **cliente**:
+   El modo más cómodo de que un cliente móvil pueda conectarse directamente o a
+   través de *websocket* según la red en la que se encuentre es crear un fichero de
+   configuración :file:`/etc/wireguard/wg0.conf` sin configuración adicional para
+   el túnel y dos enlaces simbólicos::
 
-.. code-block:: ini
+      # ln -s wg0.conf wgt0.conf
+      # ln -s wg0.conf wgts0.conf
 
-   [Interface]
-   Address = 10.8.0.2/24
-   PrivateKey = WB4TAWIIlaOyULudlcdhqctTl/pdzO7m+6x4DhAP+0k=
+   y añadir en :file:`/etc/network/interfaces`:
 
-   [Peer]
-   PublicKey = /Pr37VgN7GVvizJw9FpCL62DSwocdNEf7lwfdDRZXj8=
-   Endpoint = 203.0.113.1:1194
-   AllowedIPs = 0.0.0.0/0
+   .. code-block:: bash
 
-   [Tunnel]
-   ; No es necesaria configuración adicional
+      # Conexión directa
+      iface wg0 inet manual
+         up   wgws -n up $IFACE
+         down wgws down $IFACE
 
-con el que podremos establecer el túnel con::
+      # Conexión websocket
+      iface wgt0 inet manual
+         up   wgws up $IFACE
+         down wgws down $IFACE
 
-   # wgws -n up wg0
+      # Conexión websocket SSL
+      iface wgts0 inet manual
+         up   wgws -s up $IFACE
+         down wgws down $IFACE
 
-si queremos conexión directa o::
+   .. note:: El hecho de no requerir configuración adicional se debe a que
+      :command:`wgws` decide cuál es la dirección de escucha más lógica según haga
+      el papel de servidor o cliente. En el primero, :kbd:`0.0.0.0:80` o
+      :kbd:`0.0.0.0:443` (según se use o no |SSL|) y en el segundoo,
+      :kbd:`127.0.0.1:51820`.
 
-   # wgws up  wg0
+   También es posible evitar que cierto tráfico salga por el túnel |VPN| poniéndole
+   una marca. Por ejemplo, para evitar que el tráfico web usara el túnel, bastaría
+   añadir a la configuración:
 
-si queremos conexión a través de *websocket*. Si deseamos cifrar con |SSL| (lo
-cual mermará el rendimiento) debemos o añadir la opción :kbd:`-s` en las órdenes
-de ambos extremos o añadir la opción:
+   .. code-block:: ini
 
-.. code-block:: ini
-
-   Secure = 1
-
-en la sección :kbd:`[Tunnel]` ambos ficheros de configuración.
-
-El modo más cómodo de que un cliente móvil pueda conectarse directamente o a
-través de *websocket* según la red en la que se encuentre es crear un fichero de
-configuración :file:`/etc/wireguard/wg0.conf` sin configuración adicional para
-el túnel y dos enlaces simbólicos::
-
-   # ln -s wg0.conf wgt0.conf
-   # ln -s wg0.conf wgts0.conf
-
-y añadir en :file:`/etc/network/interfaces`:
-
-.. code-block:: bash
-
-   # Conexión directa
-   iface wg0 inet manual
-      up   wgws -n up $IFACE
-      down wgws down $IFACE
-
-   # Conexión websocket
-   iface wgt0 inet manual
-      up   wgws up $IFACE
-      down wgws down $IFACE
-
-   # Conexión websocket SSL
-   iface wgts0 inet manual
-      up   wgws -s up $IFACE
-      down wgws -s down $IFACE
-
-.. note:: El hecho de no requerir configuración adicional se debe a que
-   :command:`wgws` decide cuál es la dirección de escucha más lógica según haga
-   el papel de servidor o cliente. En el primero, :kbd:`0.0.0.0:80` o
-   :kbd:`0.0.0.0:443` (según se use o no |SSL|) y en el segundoo,
-   :kbd:`127.0.0.1:51820`.
-
-También es posible evitar que cierto tráfico salga por el túnel |VPN| poniéndole
-una marca. Por ejemplo, para evitar que el tráfico web usara el túnel bastaría
-añadir a la configuración:
-
-.. code-block:: ini
-
-   PostUp = nft add rule wireguard output tcp dport { http, https } meta mark set 51820
+      PostUp = nft add rule wireguard output tcp dport { http, https } meta mark set 51820
 
 .. _wg-nginx:
 
 Añadiendo :program:`nginx` a la ecuación
 ========================================
-El problema de colocar wstunnel_ a escuchar en los puertos **80**/**443** es que
-inpide que la máquina puede albergar un servidor *web*, lo cual puede ser
-frecuente. En estos casos, la solución es restringir :program:`wstunnel` a
-escuchar en algún puerto de la interfaz de *loopback* y hacer que un *proxy*
-inverso gestione las peticiones a esos puertos y las dirija bien al servidor
-*web*, bien a :program:`wstunnel`. Como el propio :ref:`nginx <n-ginx>` puede
-llevar a cabo esta labor, será lo que usemos:
+El problema de colocar :ref:`wstunnel <wstunnel>` a escuchar en los puertos
+**80**/**443** es que inpide que la máquina puede albergar un servidor *web*, lo
+cual puede ser frecuente. En estos casos, la solución es restringir
+:program:`wstunnel` a escuchar en algún puerto de la interfaz de *loopback* y
+hacer que un *proxy* inverso gestione las peticiones a esos puertos y las dirija
+bien al servidor *web*, bien a :program:`wstunnel`. Como el propio :ref:`nginx
+<n-ginx>` puede llevar a cabo esta labor, será lo que usemos:
 
 .. rubric:: Cliente
 
@@ -412,17 +375,11 @@ configuración con la que permitimos tanto :kbd:`ws` como :kbd:`wss`.
 
 .. rubric:: Notas al pie
 
-.. [#] Sí existe paquete para `websockify
-   <https://github.com/novnc/websockify>`_, pero éste sólo permite encapsular
-   tráfico |TCP|.
-
-.. [#] Aunque con :ref:`iptables <iptables>` podría lograrse lo mismo, pero
-   el *script* no está preparado para usarlo.
+.. [#] Añadir la opción en el fichero de configuración, nos impedirá la conexión
+   no cifrada, ya que no hay ningún argumento de línea de comandos que lo revoque.
 
 .. |UDP| replace:: :abbr:`UDP (User Datagram Protocol)`
 .. |TCP| replace:: :abbr:`TCP (Transmission Control Protocol)`
 .. |HTML| replace:: :abbr:`HTML (HyperText Markup Language)`
 .. |SSL| replace:: :abbr:`SSL (Secure Sockets Layer)`
 
-.. _Github: https://github.com
-.. _wstunnel: https://github.com/erebe/wstunnel

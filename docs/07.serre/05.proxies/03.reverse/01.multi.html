@@ -57,24 +57,30 @@ naturaleza y dirigirlo cada cual a su servicio correspondiente:</p>
 <img alt="../../../_images/multiplexor.png" src="../../../_images/multiplexor.png" />
 <p>Su función es la de permitir que un mismo puerto pueda ser compartido por varios
 servicios distintos, comúnmente en previsión de que los clientes se encuentren
-en redes que les restrinjan el acceso a determinados puertos. Lo habitual es que
-el <em>multiplexor</em> se coloque en el puerto <strong>443</strong>, ya que es el puerto para
-<abbr title="HyperText Transfer Protocol">HTTP</abbr>s y el tráfico web seguro suele permitirse en todas las redes.</p>
+en redes que, mediante el uso de una <a class="reference external" href="https://es.wikipedia.org/wiki/Inspecci%C3%B3n_profunda_de_paquete">herramienta DPI</a>, les
+restrinjan el acceso a determinados puertos. Lo habitual es que el <em>multiplexor</em>
+se coloque en el puerto <strong>443</strong>, ya que es el puerto para <abbr title="HyperText Transfer Protocol">HTTP</abbr>s y el tráfico
+web seguro suele permitirse en todas las redes.</p>
 <p>En el esquema se han representado los servidores finales cada uno en su máquina
 y, a su vez, en distinta máquina de la que corre el <em>multiplexor</em>, pero es
 psoble también que <em>multiplexor</em> y servicios finales corran todos en el mismo
 equipo.</p>
-<p>Estudiaremos tres multiplexores:</p>
+<p>Nos detendremos en analizar cinco estrategias de multiplexación:</p>
 <ul class="simple">
-<li><strong class="program">sslh</strong>, que permite multiplexar tráfico <abbr title="Security SHell">SSH</abbr>, <abbr title="Secure Socket Layer">SSL</abbr> y Open<abbr title="Virtual Private Network">VPN</abbr>
+<li><a class="reference internal" href="#sslh"><span class="std std-ref">sslh</span></a>, que permite multiplexar tráfico <abbr title="Security SHell">SSH</abbr>, <abbr title="Secure Socket Layer">SSL</abbr> y Open<abbr title="Virtual Private Network">VPN</abbr>
 entre otros.</li>
-<li><a class="reference internal" href="../../02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a>, que puede usarse para otras funciones, pero que para
-esta tarea puede distinguir entre tráfico <abbr title="Secure Socket Layer">SSL</abbr> y tráfico no <abbr title="Secure Socket Layer">SSL</abbr>.</li>
-<li><a class="reference internal" href="../../../04.servidor/10.ssh/04.adicional.html#haproxy"><span class="std std-ref">haproxy</span></a>, que puede usarse para otras funciones, pero puede servirnos
-para multiplexar <abbr title="Security SHell">SSH</abbr>, <abbr title="Secure Socket Layer">SSL</abbr> y Open<abbr title="Virtual Private Network">VPN</abbr>.</li>
+<li><a class="reference internal" href="#wstunnel"><span class="std std-ref">wstunnel</span></a>, que nos permite canalizar cualesquiera aplicaciones a
+través de <a class="reference external" href="https://v0ctor.me/websocket">Websockets</a>, lo cual es, por tanto, una manera de conseguir
+multiplexación.</li>
+<li><a class="reference internal" href="#haproxy"><span class="std std-ref">haproxy</span></a>, que entre otras cosas, es capaz de multiplexar al
+menos <abbr title="Security SHell">SSH</abbr>, <abbr title="Secure Socket Layer">SSL</abbr> y Open<abbr title="Virtual Private Network">VPN</abbr>.</li>
+<li><a class="reference internal" href="../../02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a>, que es capaz de distinguir entre tráfico <abbr title="Secure Socket Layer">SSL</abbr> y tráfico no <abbr title="Secure Socket Layer">SSL</abbr>
+y, por tanto, puede hacer una labor de multiplexación. Se trata en el
+<a class="reference internal" href="../../02.web/02.nginx/02.avanz/08.multiplex.html#nginx-multiplexacion"><span class="std std-ref">epígrafe sobre nginx dedicado a la multiplexación</span></a>.</li>
+<li><em class="dfn">Multiplexión SSL</em> que es una técnica que consiste en encapsular
+cualquier tráfico <abbr title="Transmission Control Protocol">TCP</abbr> con <abbr title="Secure Socket Layer">SSL</abbr> y distinguir el tipo por el <a class="reference internal" href="../../../09.apendice/01.cryto/03.aplicaciones.html#sni"><span class="std std-ref">SNI</span></a>. Trataremos su implementación con <a class="reference internal" href="#haproxy"><span class="std std-ref">haproxy</span></a> y al
+analizar la <a class="reference internal" href="../../02.web/02.nginx/02.avanz/08.multiplex.html#nginx-multiplexacion"><span class="std std-ref">multiplexación con nginx</span></a>.</li>
 </ul>
-<p>Los tres discriminan tráfico <abbr title="Transmission Control Protocol">TCP</abbr> por lo que Open<abbr title="Virtual Private Network">VPN</abbr> debería escuchar en un
-puerto <abbr title="Transmission Control Protocol">TCP</abbr>, no <abbr title="User Datagram Protocol">UDP</abbr>.</p>
 <div class="section" id="sslh">
 <span id="id1"></span><h2>7.5.2.3.1.1. SSLH<a class="headerlink" href="#sslh" title="Enlazar permanentemente con este título">¶</a></h2>
 <p>El <a class="reference external" href="http://www.rutschle.net/tech/sslh/README.html">servicio SSLH</a> se
@@ -117,7 +123,7 @@ propuesta podría ser esta:</p>
 <td>0.0.0.0</td>
 <td>22/TCP</td>
 </tr>
-<tr class="row-odd"><td><em>OpenVPN</em><a class="footnote-reference" href="#id3" id="id2">[1]</a></td>
+<tr class="row-odd"><td><em>OpenVPN</em><a class="footnote-reference" href="#id10" id="id2">[1]</a></td>
 <td>127.0.0.1</td>
 <td>1194/TCP</td>
 </tr>
@@ -143,17 +149,335 @@ error no afecta a todas las conexiones. A través de <code class="docutils liter
 utilizarse uno y otro ejecutable.</p>
 </div>
 </div>
-<div class="section" id="nginx">
-<span id="nginx-multi"></span><h2>7.5.2.3.1.2. nginx<a class="headerlink" href="#nginx" title="Enlazar permanentemente con este título">¶</a></h2>
-</div>
 <div class="section" id="haproxy">
-<span id="haproxy-multi"></span><h2>7.5.2.3.1.3. haproxy<a class="headerlink" href="#haproxy" title="Enlazar permanentemente con este título">¶</a></h2>
+<span id="id3"></span><h2>7.5.2.3.1.2. <strong class="program">haproxy</strong><a class="headerlink" href="#haproxy" title="Enlazar permanentemente con este título">¶</a></h2>
+<p><strong class="program">haproxy</strong> es, en realidad, un <em>proxy</em> bastante más completo de lo que
+expondremos aquí, por cuanto sólo expondremos como hacer que multiplexe tráficos
+de distinto tipo.</p>
+<p>Desrrollaremos <strong>dos soluciones</strong> distintas:</p>
+<ol class="arabic">
+<li><p class="first">Una en la que todos los protocolos <abbr title="HyperText Transfer Protocol">HTTP</abbr>. <abbr title="Security SHell">SSH</abbr> y <abbr title="Virtual Private Network">VPN</abbr> van encapsulados con
+<abbr title="Transport Layer Security">TLS</abbr> y es el propio <strong class="program">haproxy</strong> el que los desencapsula, los reconoce
+y los envía al servidor correspondiente.</p>
+</li>
+<li><p class="first">Otra en que junto a tráfico <abbr title="Transport Layer Security">TLS</abbr>, se permite que <abbr title="Security SHell">SSH</abbr> y <abbr title="Virtual Private Network">VPN</abbr> circulen sin
+encapsular, de manera que al llegar el tráfico a <strong class="program">haproxy</strong>, este lo manda
+a sus respectivos servidores. Hasta aquí, <strong class="program">haproxy</strong> se comporta
+exactamente igual que <a class="reference internal" href="#sslh"><span class="std std-ref">sslh</span></a>. Sin embargo, el tráfico <abbr title="Transport Layer Security">TLS</abbr> no lo
+envía al servidor <em>web</em>, sino que lo desencapsula, como en el caso anterior,
+para comprobar si es <abbr title="HyperText Transfer Protocol">HTTP</abbr>, <abbr title="Security SHell">SSH</abbr> y <abbr title="Virtual Private Network">VPN</abbr> y, reconocidos, se reenvían al servidor
+correspondiente.</p>
+<p>En este segundo caso, la configuración permite enviar encapsulado o no el
+tráfico <abbr title="Security SHell">SSH</abbr> y <abbr title="Virtual Private Network">VPN</abbr> según el grado de restricción de la red remota. Tenga
+en cuenta que encapsular este tráfico, que ya es tráfico seguro, sólo tiene
+por finalidad engañar a los proxies intermedios pero a costa de reducir el
+rendimiento de la conexión, ya que la capsula <abbr title="Transport Layer Security">TLS</abbr> supone procesamiento y
+metainformación extra.</p>
+</li>
+</ol>
+<p>Antes de entrar a configurar, es necesario instalar:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt-get install haproxy
+</pre></div>
+</div>
+<p>y tener un certificado digital para el servicio, que puede ser autofirmado o
+acreditado por una autoridad certificadora (véase <a class="reference internal" href="../../02.web/02.nginx/02.avanz/07.https.html#tls-cert"><span class="std std-ref">cómo obtener uno</span></a>)<a class="footnote-reference" href="#id11" id="id4">[2]</a>.</p>
+<p>Sea como sea, es preciso señalar que <strong class="program">haproxy</strong> requiere que todas las
+claves públicas y la privada participantes en la autenticación estén reunidas en
+un mismo fichero.</p>
+<p>En el caso de un <em>certificado autofirmado</em>, muy probablemente tendremos que
+hacer algo así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cat /etc/ssl/<span class="o">{</span>private/ssl-cert-snakeoil.key,certs/ssl-cert-snakeoil.pem<span class="o">}</span> &gt; /etc/haproxy/keycert.pem
+<span class="gp">#</span> chmod <span class="m">600</span> /etc/haproxy/keycert.pem
+</pre></div>
+</div>
+<p>y en el caso de haber usado <em>letsencrypt</em>, si no hemos creado un <em>gancho</em> de
+postinstalación como se sugirió en las explicaciones:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cat /etc/letsencrypt/live/mi.servidor.org/<span class="o">{</span>fullchain,privkey<span class="o">}</span>.pem &gt; /etc/haproxy/keycert.pem
+<span class="gp">#</span> chmod <span class="m">600</span> /etc/haproxy/keycert.pem
+</pre></div>
+</div>
+<p>Creado el certificado adecuado, podemos hacer la configuración propiamente
+dicha, que es bastante más complicada y con muchísimas más variantes que la de
+<a class="reference internal" href="#sslh"><span class="std std-ref">sslh</span></a>.</p>
+<p class="rubric">Primera variante</p>
+<p>En ella, <strong class="program">haproxy</strong> recibe tráfico cifrado con <abbr title="Transport Layer Security">TLS</abbr>, lo descifra y,
+dependiendo de su naturaleza, lo envía al servidor adecuado. Bajo estos
+presupuestos la configuración en <code class="file docutils literal notranslate"><span class="pre">/etc/haproxy/haproxy.cfg</span></code> queda así:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>global
+   # directivas que trae ya el fichero
+
+   tune.ssl.default-dh-param 2048
+
+
+default
+   # directivas que trae ya el fichero
+
+
+frontend ssl
+   bind *:443 ssl crt /etc/haproxy/keycert.pem
+   mode tcp
+   option tcplog
+
+   tcp-request inspect-delay 5s
+   tcp-request content accept  if  { req.ssl_hello_type 1 }
+
+   acl ssh_request     payload(0,7) -m bin 5353482d322e30  
+
+   use_backend http     if HTTP
+   use_backend ssh      if ssh_request
+   use_backend vpn      if !{ req.ssl_hello_type 1 } !{ req.len 0 }
+
+
+backend ssh
+   mode tcp
+   timeout server 2h
+   server ssh 127.0.0.1:22
+
+
+backend vpn
+   mode tcp
+   timeout server 2h
+   server openvpn 127.0.0.1:1194
+   
+
+backend http
+   mode http
+   option forwardfor
+   reqadd X-Forwarded-Proto:\ https
+   server nginx 127.0.0.1:80
+</pre></div>
+</div>
+<p>Las claves de esta configuración son las siguientes:</p>
+<ul class="simple">
+<li>Las cláusulas <em>frontend</em> definen las conexiones con el cliente y las cláusulas
+<em>backend</em> las conexiones con los servidores, de lo que se deduce que
+<strong class="program">haproxy</strong> escucha en el puerto <strong>443</strong> de la interfaz real (se ha
+supuesto que su <em>ip</em> es <em>172.22.0.2</em>); y conecta con tres servidores: uno <abbr title="Security SHell">SSH</abbr>,
+uno <abbr title="Virtual Private Network">VPN</abbr> y un web, todos en la propia máquina.</li>
+<li>Es justamente ahí donde se cifra a la salida y se descifra a la entrada
+por lo que se añade el parámetro <code class="docutils literal notranslate"><span class="pre">ssl</span></code> y se indica cuál el certificado<a class="footnote-reference" href="#id12" id="id5">[3]</a>.</li>
+<li>Como consecuencia de que se descifra, es posible analizar el contenido
+y distinguir entre los tres tráficos<a class="footnote-reference" href="#id13" id="id6">[4]</a>.</li>
+<li>La conexión con el servidor se hace en modo <abbr title="HyperText Transfer Protocol">HTTP</abbr> al puerto <strong>80</strong><a class="footnote-reference" href="#id14" id="id7">[5]</a>.
+Esto nos permite añadir los campos <code class="docutils literal notranslate"><span class="pre">X-Forwarder-For</span></code>
+para indicar la <abbr title="Internet Protocol">IP</abbr> del cliente original y la cabecera <code class="docutils literal notranslate"><span class="pre">X-Forwarder-Proto</span></code>
+para avisar de que el protocolo que usó el cliente fue <abbr title="HyperText Transfer Protocol">HTTP</abbr>s y no <abbr title="HyperText Transfer Protocol">HTTP</abbr>
+que es el que ve el servidor. Si se tiene convenientemente configurado el
+servidor web, las aplicaciones web podrán saber quién se conecta y cómo.</li>
+</ul>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last"><strong class="program">haproxy</strong>. en este caso, no actúa como <em>proxy</em> transparente,
+por lo que todos los servidores finales entenderán que reciben las peticiones
+de la propia máquina. Si el origen de las peticiones para <abbr title="Virtual Private Network">VPN</abbr> y <abbr title="Security SHell">SSH</abbr> nos fuera fundamental
+(en el servicio web se han resuleto vía cabeceras <abbr title="HyperText Transfer Protocol">HTTP</abbr>), podemos ponerlo
+a funcionar en <a class="reference internal" href="02.transparencia.html#haproxy-transparent"><span class="std std-ref">modo transparente</span></a>.</p>
+</div>
+<p class="rubric" id="haproxy-2v">Segunda variante</p>
+<p>Añade a la primera, la posibilidad de también conectarse al puerto <strong>443</strong> sin
+necesidad de establecer el túnel <abbr title="Transport Layer Security">TLS</abbr>. Puede descargar el código de
+<a class="reference download internal" download="" href="../../../_downloads/ed326395f55140bd49934276dc7d2094/haproxy_2.cfg"><code class="xref download docutils literal notranslate"><span class="pre">este</span> <span class="pre">enlace</span></code></a>.</p>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p>Por el modo en que se ha realizado esta configuración del servidor (y
+tambiém la anterior), éste no necesita conocer de antemano de qué naturaleza
+es el tráfico escondido dentro de <abbr title="Transport Layer Security">TLS</abbr>, ya que antes de discriminar tal
+tráfico desencapsula. Como encapsulado, el tráfico está cifrado y es
+imposible conocer cuál es (esta es, precisamente, la base de que podamos
+burlar cualquier <em>proxy</em>), el protocolo <abbr title="Transport Layer Security">TLS</abbr> habilita una manera de que en
+la propia envoltura se indique el nombre del servidor: la extensión <abbr title="Server Name Indication">SNI</abbr>.</p>
+<p>Una manera de distinguir el tipo de tráfico es hacer que el cliente incluya
+un <abbr title="Server Name Indication">SNI</abbr> distinto para cada tipo de tráfico y reconocer éste leyendo el
+<abbr title="Server Name Indication">SNI</abbr>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">frontend main</span>
+<span class="go">   bind 172.22.0.2:443  # No descriframos en absoluto.</span>
+<span class="go">   mode tcp</span>
+<span class="go">   option tcplog</span>
+
+<span class="go">   tcp-request inspect-delay 5s</span>
+<span class="go">   tcp-request content accept if { req_ssl_hello_type 1 }</span>
+
+<span class="go">   acl   ssh_request   req_ssl_sni -i ssh.mi.servidor.org</span>
+<span class="go">   acl   vpn_request   req_ssl_sni -i vpn.mi.servidor.org</span>
+
+<span class="go">   use_backend ssl-ssh   if ssh_request</span>
+<span class="go">   use_backend ssl-vpn   if vpn_request</span>
+<span class="go">   default_backend       http</span>
+</pre></div>
+</div>
+<p class="last">Ahora bien, el tráfico sigue cifrado con <abbr title="Transport Layer Security">TLS</abbr> lo cual puede no ser un
+problema para el servidor web<a class="footnote-reference" href="#id15" id="id8">[6]</a>, pero sí para los otros servidores. Eso
+obligaría a que el backend (<em>ssl-ssh</em> o <em>ssl-vpn</em> en el ejemplo) no entregue
+directamente el flujo, sino que cada uno de ellos lo envíe a un puerto local
+particular en que escucha también <strong class="program">haproxy</strong> y que sea en este
+<em>frontend</em> donde <strong class="program">haproxy</strong> aplique el certificado para descifrar.</p>
+</div>
+</div>
+<div class="section" id="wstunnel">
+<span id="id9"></span><h2>7.5.2.3.1.3. wstunnel<a class="headerlink" href="#wstunnel" title="Enlazar permanentemente con este título">¶</a></h2>
+<p><strong class="program">wstunnel</strong> no es exactamente un multiplexador, sino un <em>proxy</em> que nos
+permite tunelizar a través de <a class="reference external" href="https://v0ctor.me/websocket">Websockets</a> cualquier servicio (p.e.
+<a class="reference internal" href="../../04.vpn/02.wireguard/index.html#wireguard"><span class="std std-ref">wireguard</span></a>). Este programa actuará tanto en la parte cliente
+como en la servidor, de manera que el cliente (pongamos que <abbr title="Security SHell">SSH</abbr>) conecta con
+su parte servidor y esta parte servidor la que entrega el tráfico al servidor
+<abbr title="Security SHell">SSH</abbr>.</p>
+<img alt="../../../_images/websocket.png" src="../../../_images/websocket.png" />
+<p>En el gráfico situamos en la parte delantera del cliente y el servidor los
+servicios expuestos (porque escuchan en la interfaz física) y en la trasera los
+no expuestos (porque escuchan en la interfaz de <em>loopback</em>). Obsérvese que como
+el servidor <abbr title="Security SHell">SSH</abbr> sigue expuesto, en las redes remotas en que no hay
+restricciones seguirá pudiéndose acceder a él directamente.</p>
+<p>La aplicación nos permite multiplexar por dos razones:</p>
+<ul>
+<li><p class="first">Porque un misma parte servidor puede tunelizar tráfico de distinto tipo.</p>
+</li>
+<li><p class="first">Porque al ser una tecnología web, podemos colocar a la escucha un un <em>proxy</em>
+web inverso y que éste tenga como uno de sus <em>backends</em> la parte servidor de
+<strong class="program">wstunnel</strong>:</p>
+<img alt="../../../_images/websocket-compartido.png" src="../../../_images/websocket-compartido.png" />
+</li>
+</ul>
+<p>No existe paquete para <em>Debian</em>, pero podemos descargar el ejecutable de <cite>su
+repositio de Github &lt;https://github.com/erebe/wstunnel&gt;</cite>. Su uso es bastante
+sencillo. Debemos descargar en las dos máquinas el ejecutable y colocarlo en un
+lugar adecuado (p.e. <code class="file docutils literal notranslate"><span class="pre">/usr/local/bin</span></code>).</p>
+<dl class="docutils">
+<dt><strong>Servidor</strong></dt>
+<dd><p class="first">En la máquina servidor, que es lo que realmente nos interesa a efectos de
+este epígrafe, debe escuchar según nos interese. Por ejemplo, así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> wstunnel -v --server ws://0.0.0.0
+</pre></div>
+</div>
+<p>lo cual supone que la aplicación escuche sin cifrado en el puerto <strong>80</strong>
+(<em>ws</em>) de todas las interfaces los datos tunelizados. Podríamos modificar la
+escucha cambiando el protocolo por <em>wss</em> que cifrará y escuchará por el
+<strong>443</strong>. Si nos interesara, podríamos alterar los puertos prefijados también
+(p.e. <kbd class="kbd docutils literal notranslate">ws://0.0.0.0:8080</kbd>). A qué aplicación se redirijan los datos
+dependerá de lo que se especifique en el cliente. La línea anterior supone
+exponer <strong class="program">wstunnel</strong> (tal como representa la primera figura) y como no
+se ha establecido ninguna restricción sobre el destino del tráfico, esto
+podría propiciar que cualquier máquina utilizara ilegítimamente nuestro
+túnel. Así pues, cuando se expone el túnel lo más prudente es restringir el
+destino:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> wstunnel -v --server ws://0.0.0.0 -r <span class="m">127</span>.0.0.1:22
+</pre></div>
+</div>
+<p>que sólo aceptará tráfico de clientes que indiquen que el tráfico debe
+mandarse al servicio <abbr title="Security SHell">SSH</abbr> local a la parte servidor, o sea, a un servidor
+<abbr title="Security SHell">SSH</abbr> que está conectado en la misma máquina.</p>
+<p>Para resolver la situación en la que queremos compartir el puerto y exponemos
+el <em>proxy</em> (o sea, <strong class="program">nginx</strong>) y no <strong class="program">wstunnel</strong> basta con que
+hagamos que éste último escuche en algún puerto libre de una interfaz de <em>loopback</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> wstunnel -v --server ws://127.0.0.1:8080
+</pre></div>
+</div>
+<p class="last">en que podemos hacer exactamente la misma puntualización a la restricción
+sobre el destino.</p>
+</dd>
+<dt><strong>Cliente</strong></dt>
+<dd><p class="first">En la máquina cliente establecemos el otro extremo del túnel de este modo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> wstunnel -v -L <span class="m">12345</span>:127.0.0.1:22 ws://203.0.113.1
+</pre></div>
+</div>
+<p>donde hemos supuesto que la máquina servidor tiene la <abbr title="Internet Protocol">IP</abbr> <em>203.0.113.1</em>.  En
+este extremo del túnel indicamos a <strong class="program">wstunnel</strong> que el tráfico que
+escuche por el puerto <strong>12345</strong> de la interfaz de <em>loopback</em> debe ser
+dirigido en el servidor al puerto <strong>22</strong> de la interfaz de <em>loopback</em> (del
+servidor claro está). Esto supone que si queremos usar el túnel, el cliente
+<abbr title="Security SHell">SSH</abbr> deberá conectar al puerto <strong>12345</strong> de <em>lo</em>. Ha de hacerse notar que
+el que no se cifra y conectamos al puerto <strong>80</strong>, es coherente con el modo en
+que arrancamos <strong class="program">wstunnel</strong> en el servidor.</p>
+<p>Es importante señalar también que al no haber especificado en el cliente, el
+puerto <strong>12345</strong> en el cliente y el puerto <strong>22</strong> en el servidor son <abbr title="Transmission Control Protocol">TCP</abbr>.
+Sin embargo, <strong class="program">wstunnel</strong> tiene capacidad para tunelizar protocolos
+<abbr title="User Datagram Protocol">UDP</abbr> con tan solo indicarlo al arrancar el cliente (en el lado del servidor
+todo sigue igual):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> wstunnel -v --udp --udpTimeoutSec -1 -L <span class="m">12345</span>:127.0.0.1:1194 ws://203.0.113.1
+</pre></div>
+</div>
+<p>En este caso el cliente escucha en el puerto <em>12345/UDP</em> y en el servidor los
+datos acaban dirigidos al puerto <em>1194/UDP</em>.</p>
+<p>Por último, cuando en el servidor colocamos un <em>proxy</em> que recibe distinto
+tráfico y debe identificar cuál es el dirigido al <em>websocket</em> podremos usar
+un nombre específico de máquina:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> wstunnel -v -L <span class="m">12345</span>:127.0.0.1:22 ws://ssh.example.net
+</pre></div>
+</div>
+<p>o incluso una ruta:</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> wstunnel -v -L <span class="m">12345</span>:127.0.0.1:22 ws://www.example.net/ssh
+</pre></div>
+</div>
+</dd>
+<dt><strong>Ejemplo de uso</strong></dt>
+<dd><p class="first">Para ilustrar el uso de <strong class="program">wstunnel</strong>, podemos hacer lo siguiente en el
+<strong>servidor</strong>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> wstunnel -v --server ws://0.0.0.0 -r <span class="m">127</span>.0.0.1:11111
+</pre></div>
+</div>
+<p>y poner a escuchar el simple <a class="reference internal" href="../../../02.conbas/99.misc/05.ordenes.html#netcat"><span class="std std-ref">netcat</span></a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> netcat -l -p <span class="m">11111</span>
+</pre></div>
+</div>
+<p>En el <strong>cliente</strong>, establecemos el otro extremo del túnel así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> wstunnel -v -L <span class="m">22222</span>:127.0.0.1:11111 ws://203.0.113.1
+</pre></div>
+</div>
+<p>y utilizamos <a class="reference internal" href="../../../02.conbas/99.misc/05.ordenes.html#netcat"><span class="std std-ref">netcat</span></a> para conversar con el del servidor:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> netcat localhost <span class="m">22222</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p>En este caso concreto en el cliente podemos simplificar ejecutando:</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> wstunnel -v -L stdio:127.0.0.1:11111 ws://203.0.113.1
+</pre></div>
+</div>
+</div>
+<p class="last">que hace que el <strong class="program">wstunnel</strong> del cliente no converse con el puerto
+<strong>22222</strong>, sino con la entrada y salida estándar, por lo que pondemos
+ahorranos la ejecución de <a class="reference internal" href="../../../02.conbas/99.misc/05.ordenes.html#netcat"><span class="std std-ref">netcat</span></a> en el cliente.</p>
+</dd>
+</dl>
+<dl class="docutils" id="wstunnel-systemd">
+<dt><strong>Servicio</strong></dt>
+<dd><p class="first">Para la parte de servidor, es espcialmente aconsejable convertir
+<strong class="program">wstunnel</strong> en un servicio de <a class="reference internal" href="../../../04.servidor/03.init/index.html#systemd"><span class="std std-ref">systemd</span></a> creando el
+siguiente servicio en <code class="file docutils literal notranslate"><span class="pre">/etc/systemd/system/wstunnel.service</span></code>:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[Service]</span>
+<span class="na">EnvironmentFile</span><span class="o">=</span><span class="s">-/etc/default/wstunnel</span>
+<span class="na">ExecStart</span><span class="o">=</span><span class="s">/usr/bin/wstunnel $OPTIONS</span>
+<span class="na">Restart</span><span class="o">=</span><span class="s">always</span>
+<span class="na">StandardOutput</span><span class="o">=</span><span class="s">syslog</span>
+<span class="na">StandardError</span><span class="o">=</span><span class="s">syslog</span>
+<span class="na">SyslogIdentifier</span><span class="o">=</span><span class="s">wstunnel</span>
+<span class="na">User</span><span class="o">=</span><span class="s">nobody</span>
+<span class="na">Group</span><span class="o">=</span><span class="s">nogroup</span>
+
+<span class="k">[Install]</span>
+<span class="na">WantedBy</span><span class="o">=</span><span class="s">multi-user.target</span>
+</pre></div>
+</div>
+<p>que requiere un fichero <code class="file docutils literal notranslate"><span class="pre">/etc/default/wstunnel</span></code> para definir las
+opciones de arranque:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1">#OPTIONS=&quot;--server ws://127.0.0.1:8080&quot;</span>
+<span class="nv">OPTIONS</span><span class="o">=</span><span class="s2">&quot;--server ws://0.0.0.0:8080&quot;</span>
+</pre></div>
+</div>
+<p>Por último, habrá que habilitarlo para arranques futuros:</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> systemctl daemon-reload
+<span class="gp">#</span> systemctl <span class="nb">enable</span> wstunnel
+<span class="gp">#</span> systemctl start wstunnel
+</pre></div>
+</div>
+</dd>
+</dl>
 <p class="rubric">Notas al pie</p>
-<table class="docutils footnote" frame="void" id="id3" rules="none">
+<table class="docutils footnote" frame="void" id="id10" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
 <tbody valign="top">
 <tr><td class="label"><a class="fn-backref" href="#id2">[1]</a></td><td><p class="first">Donde queramos poner a escuchar <strong class="program">openvpn</strong> depende de nuestras
-intenciones. Escoger el puerto <strong>1194</strong> responde a que ese es el puerto
+intenciones, pero deberá ser <abbr title="Transmission Control Protocol">TCP</abbr> porque así lo podrá encapsular
+<strong class="program">sslh</strong>. Escoger el puerto <strong>1194</strong> responde a que ese es el puerto
 estándar para esa aplicación (de hecho, aparece referido en
 <code class="file docutils literal notranslate"><span class="pre">/etc/services</span></code>). Una buena estrategia es ponerlo a escuchar:</p>
 <ul class="last simple">
@@ -162,6 +486,46 @@ estándar para esa aplicación (de hecho, aparece referido en
 gracias al multiplexor.</li>
 </ul>
 </td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id11" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id4">[2]</a></td><td>Ahora bien, en la práctica deberemos usar un certificado fiable, porque
+si el motivo de usar <strong class="program">haproxy</strong> es la existencia de un <em>proxy</em>, lo
+necesitaremos; y, si tal <em>proxy</em> no existe, es mejor usar una solución como
+<strong class="program">sslh</strong>.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id12" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id5">[3]</a></td><td>En el <em>gancho</em> propuesto el fichero con las claves no se llama
+<em>keycert.pem</em>, sino <em>nombre_del_servidor.pem</em>. Téngalo en cuenta a la hora de
+copiar la configuración de ejemplo.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id13" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id6">[4]</a></td><td>Todo cliente debe empezar su comunicación con la cadena «<em>SSH-2.0</em>», que
+puesta en binario es el código hexadecimal escrito en la configuración.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id14" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id7">[5]</a></td><td>Para profundizar en la configuración del servidor web, cuando es el
+<em>proxy</em> de cifrar y descifrar la comunicación, vea el <a class="reference internal" href="../../02.web/02.nginx/02.avanz/09.misc.html#nginx-tras-proxy"><span class="std std-ref">apartado
+correspondiente</span></a>.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id15" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id8">[6]</a></td><td>En realidad sí lo es, porque no habrá forma de conocer el origen de la
+petición, a menos que, además, se configure <strong class="program">haproxy</strong> en <a class="reference internal" href="02.transparencia.html#haproxy-transparent"><span class="std std-ref">modo
+transparente</span></a>.</td></tr>
 </tbody>
 </table>
 </div>
@@ -177,8 +541,8 @@ gracias al multiplexor.</li>
   <ul>
 <li><a class="reference internal" href="#">7.5.2.3.1. Multiplexores</a><ul>
 <li><a class="reference internal" href="#sslh">7.5.2.3.1.1. SSLH</a></li>
-<li><a class="reference internal" href="#nginx">7.5.2.3.1.2. nginx</a></li>
-<li><a class="reference internal" href="#haproxy">7.5.2.3.1.3. haproxy</a></li>
+<li><a class="reference internal" href="#haproxy">7.5.2.3.1.2. <strong class="program">haproxy</strong></a></li>
+<li><a class="reference internal" href="#wstunnel">7.5.2.3.1.3. wstunnel</a></li>
 </ul>
 </li>
 </ul>

@@ -118,381 +118,6 @@ internet, bien porque, aunque lo sean, tengamos restringido su acceso.
 
    .. todo:: Y, sin embargo.., no funciona. 
 
-.. _redes-restr:
-
-Redes restringidas
-==================
-Lo explicado bajo el epígrafe anterior, presupone que, desde la red local,
-disponemos de acceso a un servidor |SSH|. Sin embargo, es común encontrarse con
-redes con políticas de acceso muy restrictivas a internet, en las que
-prácticamente el único tráfico saliente permitido es el de navegación web
-(|HTTP| y |HTTP|\ s). En estos caso, la única solución pàra poder burlar la
-restricción es preparar nuestro servidor |SSH| para que se pueda acceder
-a él a través de uno de los dos puertos anteriores.
-
-.. seealso:: Lea la  discusión sobre :ref:`puerto compartido
-   <80-443-compartido>` presente en la sección de configuración de :ref:`n-ginx`.
-
-Dependiendo del grado de vigilancia en la red del cliente y de cómo hayamos
-configurado el servidor, tenemos varias soluciones:
-
-.. _ssh-443:
-
-Escucha directa
----------------
-Sirve para la situación menos restrictiva y, por tanto, es la más fácil de
-solucionar, ya que basta con hacer escuchar el servidor también en el puerto
-**443**. Para ello no hay más que usar repetidamente la directiva **Port** en
-:file:`/etc/ssh/sshd_config`::
-
-   Port 22
-   Port 443
-
-Una alternayiva igualmente eficar es usar el cortafuegos para redirigir el elñ
-tráfico entrante con destino al puerto **443** al puerto **22**. Vea cómo
-:ref:`configurar el cortaguegos <firewall>` para ello.
-
-Puerto compartido
------------------
-Si el puerto comparte con otro servidor, será un *software* como :ref:`sslh
-<sslh>` o el *proxy* el que dirija el tráfico hacia el servidor |SSH|. Como el
-tráfico no se enmascara para ocultarlo, no es necesaria ningún configuración
-adicional ni en el cliente ni en el servidor |SSH|.
-
-.. _haproxy:
-
-|SSH| sobre |HTTP|\ s
----------------------
-.. todo:: Trasladar y modificar este apartado 
-
-En este último caso, un proxy intermedio analiza si el tráfico que intentamos
-dirigir hacia un puerto **443** sigue el protocolo |TLS|, como
-en teoría debería ser\ [#]_. Ante esto, no podemos usar ninguna de las soluciones
-anteriores, porque en ellas el tráfico |SSH| viaja desnudo y éste no usa la
-cobertura |TLS| que espera encontrar el *proxy*. Ahora bien, |TLS| es una
-envoltura que cifra todo el contenido, lo que significa que tal *proxy* es
-incapaz de saber a qué protocolo envuelve |TLS|. Por tanto, para el
-*proxy*  no hay diferencia entre una comunicación |HTTP| envuelta en |TLS| (o
-sea, |HTTP|\ s) o una comunicación |SSH| envuelta en |TLS|\ [#]_\ [#]_.
-
-Esta estrategia requiere que en el puerto **443** no escuche un simple
-*multiplexor*, sino un *proxy*. Para la ocasión, usaremos `el programa haproxy
-<http://www.haproxy.org/>`_\ [#]_ y supondremos que todos los servidores para
-los que intermedia se encuentran en la misma máquina.
-
-Servidor
-""""""""
-.. warning:: El presente epígrafe describe cómo configurar *exclusivamente*
-   :program:`haproxy` y :program:`ssh` (servidor y cliente). Su uso, sin
-   embargo, determina que otros servicios para los que también intermedia (como
-   |HTTP| o |VPN|) deban modificar asimismo sus configuraciones en el lado
-   cliente o servidor para adaptarse. Lea, al respecto, los epígrafes
-   correspondientes a su :ref:`uso con nginx <nginx-tras-proxy>` o su :ref:`uso con
-   openvpn <vpn+haproxy>`.
-
-:program:`haproxy` es, en realidad, una solución bastante general y, no permite
-sólo envolver el protocolo interno para hacerlo invisible al *proxy*, sino
-también usarlo a la manera de un *multiplexor* como :ref:`sslh <sslh>` [#]_, de
-modo que los protocolos (|SSH|, |VPN|) viajen sin envolver y, al llegar a
-:program:`haproxy` sean identificados y redirigidos al verdadero servidor.
-
-Describiremos **dos soluciones** distintas:
-
-#. Una en la que todos los protocolos |HTTP|. |SSH| y |VPN| van encapsulados con
-   |TLS| y es el propio :program:`haproxy` el que los desencapsula, los reconoce
-   y los envía al servidor correspondiente.
-
-#. Otra en que junto a tráfico |TLS|, se permite que |SSH| y |VPN| circulen sin
-   encapsular, de manera que al llegar el tráfico a :program:`haproxy` se manda
-   a sus respectivos servidores. El tráfico |TLS|, por su parte, se desemcapsula
-   como en el caso anterior para comprobar si es |HTTP|, |SSH| y |VPN| y,
-   reconocidos, se reenvían al servidor correspondiente.
-
-   En este segundo caso, la configuración permite enviar encapsulado o no el
-   tráfico |SSH| y |VPN| según el grado de restricción de la red remota. Tenga
-   en cuenta que encapsular este tráfico, que ya es tráfico seguro, sólo tiene
-   por finalidad engañar a los proxies intermedios pero a costa de reducir el
-   rendimiento de la conexión (ya que la cobertura |TLS| ocupa espacio) y,
-   además, consume recursos del procesador al tener que cifrar y descifrar una
-   capa extra.
-
-.. note:: Obsérvese que todo esto exige incorporar capaz intermedias a la
-   comunicación con el consiguiente coste en el rendimiento.
-
-Antes de entrar a configurar, es necesario instalar::
-
-   # apt-get install haproxy
-
-y tener un certificado digital para el servicio, que puede ser autofirmado o
-acreditado por una autoridad certificadora (véase :ref:`cómo obtener uno
-<tls-cert>`)\ [#]_.
-
-Sea como sea, es preciso señalar que :program:`haproxy` requiere que todas las
-claves públicas y la privada participantes en la autenticación estén reunidas en
-un mismo fichero.
-
-En el caso de un *certificado autofirmado*, muy probablemente tendremos que
-hacer algo así::
-
-   # cat /etc/ssl/{private/ssl-cert-snakeoil.key,certs/ssl-cert-snakeoil.pem} > /etc/haproxy/keycert.pem
-   # chmod 600 /etc/haproxy/keycert.pem
-
-y en el caso de haber usado *letsencrypt*, si no hemos creado un *gancho* de
-postinstalación como se sugirió en las explicaciones::
-
-   # cat /etc/letsencrypt/live/mi.servidor.org/{fullchain,privkey}.pem > /etc/haproxy/keycert.pem
-   # chmod 600 /etc/haproxy/keycert.pem
-
-Creado el certificado adecuado, podemos hacer la configuración propiamente
-dicha, que es bastante más complicada y con muchísimas más variantes que la de
-:ref:`sslh <sslh>`.
-
-.. rubric:: Primera variante
-
-En ella, :program:`haproxy` recibe tráfico cifrado con |TLS|, los descifra y,
-dependiendo de su naturaleza, lo envía al servidor adecuado. Bajo estos
-presupuestos la configuración en :file:`/etc/haproxy/haproxy.cfg` queda así:
-
-.. literalinclude:: files/haproxy_1.cfg
-   :language: none
-   
-Las claves de esta configuración son las siguientes:
-
-* Las cláusulas *frontend* definen las conexiones con el cliente y las cláusulas
-  *backend* las conexiones con los servidores, de lo que se deduce que
-  :program:`haproxy` escucha en el puerto **443** de la interfaz real (se ha
-  supuesto que su *ip* es *172.22.0.2*); y conecta con tres servidores: uno |SSH|,
-  uno |VPN| y un web, todos en la propia máquina.
-* Es justamente ahí donde se cifra a la salida y se descifra a la entrada
-  por lo que se añade el parámetro ``ssl`` y se indica cuál el certificado\ [#]_.
-* Como consecuencia de que se descifra, es posible analizar el contenido
-  y distinguir entre los tres tráficos\ [#]_.
-* La conexión con el servidor web se hace en modo |HTTP| por la razón que
-  se dará más adelante. Por ello se envía la comunicación al puerto **80**\
-  [#]_.Esto nos permite añadir los campos ``X-Forwarder-For``
-  para indicar la *ip* del cliente y la cabecera ``X-Forwarder-Proto`` para
-  avisar de que el protocolo que usó el cliente fue |HTTP|\ s y no |HTTP| que es
-  el que ve el servidor. Si se tiene convenientemente configurado el servidor web,
-  las aplicaciones web podrán saber quién se conecta y cómo.
-
-.. warning:: A diferencia de :ref:`sslh <sslh>`, :command:`haproxy` es un proxy
-   y como tal establece dos conexiones distintas: una entre el cliente y él; y
-   otra entre él y el servidor.  Consecuentemente, el servidor destinatario
-   final es incapaz de conocer cuál es la *ip* del cliente, y entenderá que se
-   comunica siempre con la propia máquina local (o sea, *127.0.0.1*), ya que
-   :program:`haproxy` está situado en la misma máquina. Esto, por ejemplo,
-   nos impediría  :ref:`protegernos contra ataques de fuera bruta <fail2ban>`,
-   cuando los ataques se dirigen al puerto **443**, en vez de al **22**. En el
-   caso concreto de esta variante, no tiene excesiva importancia, ya que la
-   conexión sólo es posible si se establece además un tunel |SSH|, lo cual es
-   bastante improbable que intenten hacer estos atacantes chinos que hacen
-   búsuqedas automáticas de servidores |SSH| en la red.
-
-.. note:: :program:`haproxy` con la colaboración del núcleo de linux, puede
-   funcionar en modo transparente, de manera que el servidor reciba la |IP| del
-   cliente. Sin embargo, esto exige que el servidor se encuentre en una máquina
-   distinta a :program:`haproxy`. Por si es este nuestro caso, se deja :ref:`un
-   epígrafe específico para su explicación <haproxy-transparente>`.
-
-.. _haproxy-2v:
-
-.. rubric:: Segunda variante
-
-Añade a la primera, la posibilidad de también conectarse al puerto **443** sin
-necesidad de establecer el túnel |TLS|. Puede descargar el código de
-:download:`este enlace <files/haproxy_2.cfg>`.
-
-.. note:: Por el modo en que se ha realizado esta configuración del servidor (y
-   tambiém la anterior), éste no necesita conocer de antemano de qué naturaleza
-   es el tráfico escondido dentro de |TLS|, ya que antes de discriminar tal
-   tráfico desencapsula. Como encapsulado, el tráfico está cifrado y es
-   imposible conocer cuál es (esta es, precisamente, la base de que podamos
-   burlar cualquier *proxy*), el protocolo |TLS| habilita una manera de que en
-   la propia envoltura se indique el nombre del servidor: la extensión |SNI|.
-
-   Una manera de distinguir el tipo de tráfico es hacer que el cliente incluya
-   un |SNI| distinto para cada tipo de tráfico y reconocer éste leyendo el
-   |SNI|::
-
-      frontend main
-         bind 172.22.0.2:443  # No descriframos en absoluto.
-         mode tcp
-         option tcplog
-
-         tcp-request inspect-delay 5s
-         tcp-request content accept if { req_ssl_hello_type 1 }
-
-         acl   ssh_request   req_ssl_sni -i ssh.mi.servidor.org
-         acl   vpn_request   req_ssl_sni -i vpn.mi.servidor.org
-         
-         use_backend ssl-ssh   if ssh_request
-         use_backend ssl-vpn   if vpn_request
-         default_backend       http
-
-   Ahora bien, el tráfico sigue cifrado con |TLS| lo cual puede no ser un
-   problema para el servidor web\ [#]_, pero sí para los otros servidores. Eso
-   obligaría a que el backend (*ssl-ssh* o *ssl-vpn* en el ejemplo) no entregue
-   directamente el flujo, sino que cada uno de ellos lo envíe a un puerto local
-   particular en que escucha también :program:`haproxy` y que sea en este
-   *frontend* donde :program:`haproxy` aplique el certificado para descifrar.
-
-.. _haproxy-cliente:
-
-Cliente
-"""""""
-.. rubric:: UNIX
-
-El cliente :command:`ssh` requiere ayudarse de un *software* que con |TLS|
-envuelva su salida y desenvuelva su entrada, y esa labor la puede hacer
-:command:`openssl`\ [#]_::
-
-   $ ssh -p443 -o "ProxyCommand openssl s_client -quiet -connect %h:%p" usuario@mi.servidor.org
-
-lo cual es un poco engorroso, así que es mejor dejarlo ya escrito en el fichero
-de configuración del cliente::
-
-   Hostname *servidor
-      Host           mi.servidor.org
-      Username       usuario
-      Port           443
-
-   Hostname ssl*
-      ProxyCommand   openssl s_client -quiet -connect %h:%p
-
-.. note:: Obsérvese que, de este modo, cuando no necesitemos encapsular el tráfico
-   podremos hacer::
-
-      $ ssh servidor
-
-   y cuando queramos encapsularlo::
-
-      $ ssh ssl-servidor
-
-.. note:: Si quiséramos enviar un |SNI| podríamos añadir a :command:`openssl` la
-   opción ``-servername``::
-
-      ProxyCommand   openssl s_client -quiet -connect %h:%p -servername ssh.%h
-   
-.. rubric:: Windows
-
-Con :program:`putty` es posible hacer su equivalente, pero como careceremos de
-:program:`openssl`, es necesario primero instalarlo. El modo más sencillo es
-instalar la versión *light* que ofrece `esta página
-<https://slproweb.com/products/Win32OpenSSL.html>`_, que no requerirá más que
-vayamos aceptando los distintos pasos de instalación. Al término, tendremos un
-ejecutable funcional en el directorio :file:`C:\OpenSSL-Win32\bin\\`.
-
-Instalado, basta configurar :program:`putty` de este modo:
-
-.. image:: files/SSHoverSSL1.png
-
-.. image:: files/SSHoverSSL2.png
-
-esto es, configurar la sesión para conectarnos al puerto **443** del servidor
-que en esta ocasión hemos llamado *example.net*. A continuación debemos escoger
-``Connection>Proxy``, escoger un *proxy* de tipo *local* y usar
-:program:`openssl` para establecer el túnel del mismo modo en que lo usábamos
-con *ProxyCommand*::
-
-   C:\OpenSSL-Win32\bin\openssl.exe s_client -connect %host:%port -quiet
-
-.. _haproxy-transparente:
-
-Modo transparente
-"""""""""""""""""
-Es posible hacer que :program:`haproxy` actúe como *proxy* absolutamente
-transparente, pero ello exige algo más que reconfigurarlo. Para empezar, hay dos
-condiciones:
-
-#. El servidor destino de las conexiones (|SSH|, web, etc.) debe estar en una
-   máquina distinta de la que corre :program:`haproxy`.
-#. La máquina con :program:`haproxy` debe encontrarse en la ruta de salida de
-   los servidores hacia los clientes. Esta exigencia se debe a que al actuar
-   nuestro *proxy* de forma transparente, envía a los servidores como *ip* de
-   origen de la comunicación la *ip* del cliente original. Por ello, la
-   respuesta del servidor tendrá por destino la *ip* del cliente y, si el *proxy*
-   no se interpone, llegará al cliente sin haber pasado otra vez por el proxy.
-   Es preciso, pues, interponerse, capturar la respuesta y pasarla otra vez por
-   :program:`haproxy`.
-
-Para ilustrarlo consideraremos el siguiente esquema:
-
-.. image:: files/haproxy-trans.png
-
-que cumple con lo que decimos. La configuración exige:
-
-* La modificación de un par de parámetros del núcleo (en
-  :file:`/etc/sysctl/sysctl.conf`)::
-
-      net.ipv4.ip_forward = 1
-      net.ipv4.ip_nonlocal_bind = 1
-
-  .. note:: Si se quiere habilitarlos inmediatamente, se puede ejecutar::
-
-      # sysctl -p
-
-* La adición de reglas de encaminamiento y reglas de :ref:`iptables <iptables>`\ 
-  [#]_. Como suponemos que usamos debian, podemos hacerlas perennes, manipulando
-  el fichero :file:`/etc/network/interfaces` y dejando así la configuración de
-  la interfaz que conecta con la red en la que están los servidores::
-
-   allow-hotplug eth1
-   iface eth1 inet static
-      address 192.168.255.1/24
-      # Creamos la reglas
-      up   iptables -t mangle -A PREROUTING -i $IFACE -p tcp -m socket --transparent -j MARK --set-mark 111
-      up   ip rule add fwmark 111 lookup 100
-      up   ip route add local 0.0.0.0/0 dev lo table 100
-      # Y las destruimos
-      down iptables -t mangle -D PREROUTING -i $IFACE -p tcp -m socket --transparent -j MARK --set-mark 111
-      down ip rule del fwmark 111 lookup 100
-      down ip route del local 0.0.0.0/0 dev lo table 100
-
-  .. note:: Nótese que por razones de encaminamiento es bastante probable que
-     necesitemos hacer enmascaramiento en la máquina router-proxy, así que la
-     interfaz externa puede estar configurada así::
-
-      allow-hotplug eth0
-      iface eth0 inet static
-         address 172.22.0.2/16
-         gateway 172.22.0.1
-         up   iptables -t nat -A POSTROUTING -o $IFACE -j MASQUERADE
-         down iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE
-
-* La modificación (mínima) de la configuración de :program:`haproxy` que
-  implica:
-
-  * Comentar en la sección *global* los líneas que impiden que
-    :program:`haproxy` se ejecute con premisos de administrador::
-
-      #user haproxy
-      #group haproxy
-
-  * Añadir a todos los servidores con los que se quiere actuar como proxy
-    transparente una directiva más para que se envíen los paquetes utilizando
-    la *ip* del cliente como origen::
-
-      backend ssh
-         mode tcp
-         source 0.0.0.0 usesrc clientip
-         server ssh 192.168.255.2:22
-
-.. note:: En el supuesto de que clientes y servidores estén en la misma red, no
-   tiene efecto colocar como puerta de enlace de los servidores el *proxy* para
-   obligar a que la respuesta pase por él, De todos modos, aún puede hacer que
-   la comunicación pase por él, manipulando el encaminamiento de los servidores.
-   Suponiendo que la red sea la *192.168.255.0/24*, y la *ip* del *proxy* la
-   *192.168.255.10*, podríamos configurar la interfaz de cada servidor, así::
-
-      allow-hotplug eth0
-      iface eth0 inet static
-         address 192.168.255.100/24   # La IP que deba tener el servidor.
-         gateway 192.168.255.1
-         up   ip route add 192.168.255.0/24 via 192.168.255.10 metric 1 dev eth0
-         up   ip route del 192.168.255.0/24 dev eth0
-         down ip route del 192.168.255.0/24 viua 192.168.255.10 metric 1 dev eth0
-         down ip route add 192.168.255.0/24 dev eth0
-
 .. _ssh-agent:
 
 Persistencia de claves
@@ -705,6 +330,127 @@ claves |SSH|.
 
       optional pam_exec.so expose_authtok quiet /usr/local/bin/pam_ssh.sh start_if=login,sshd,slim
 
+.. _redes-restr:
+
+Redes restringidas
+==================
+Entendemos como :dfn:`red restringida` aquella desde la que el cliente no puede
+acceder normalmente al servidor |SSH|, esto es, acceder conectándose al puerto
+**22**. Dependiendo del grado de vigilancia y los puertos ya ocupados en el
+servidor tenemos varias alternativas:
+
+a. Que el servicio escuche por otro puerto, para lo cual basta con modificar la
+   configuración del servidor y añadir varias directivas :kbd:`Port`::
+
+      Port 22
+      Port 443
+ 
+   Alternativamente, puede usarse el cortafuegos para redirigir el
+   tráfico entrante hacia el puerto **443** al puerto **22**. Vea cómo
+   :ref:`configurar el cortafuegos <firewall>` para ello.
+
+#. Si el puerto **443** está ya ocupado en el servidor, usar un multiplexor como
+   :ref:`sslh <sslh>`.
+
+#. Tunelizar la conexión con Websockets_, bien usando el puerto **80**, bien
+   usando el puerto **443**.
+
+#. Encapsular con |SSL|.
+
+Las dos primeras alternitivas suponen que el tráfico |SSH| circule tal cual,
+por lo que en la parte cliente no exigen otra cosa que cambiar el puerto de
+destino::
+
+   # ssh -p443 usuario@servidor
+
+En cambio, las dos últimas suponen una encapsulación y, a parte de cambios en la
+parte del servidor, también exigen que los clientes se ejecuten de una
+determinada forma.
+
+Websockets
+----------
+Exige utilizar una aplicación que facilite la tunelización como :ref:`wstunnel
+<wstunnel>` y configurar la parte de servidor con :ref:`nginx <n-ginx>` según lo
+expuesto en el :ref:`epígrafe correspondiente <nginx-websockets>`. En cualquier
+caso, la configuración del servidor |SSH| no necesita cambios.
+
+En la parte cliente basta con utilizar como *proxy* para llevar a cabo la
+conexión. Así, si se usa la conexión con el puerto **80**::
+
+   # ssh -o ProxyCommand="wstunnel -L stdio:127.0.0.1:22 ws://%h" usuario@servidor
+
+y para la conexión al puerto **443**::
+
+   # ssh -o ProxyCommand="wstunnel -L stdio:127.0.0.1:22 wss://%h" usuario@servidor
+
+.. note:: Puede ayudarse del fichero de configuración para no tener que escribir
+   constatemente esta línea tan engorrosa. Échele un vistazo al epígrafe
+   siguiente.
+
+|SSH| sobre |HTTP|\ s
+---------------------
+En este caso, la estrategia es encapsular todo lo que vaya dirigido al puerto
+**443** con |TLS|, que es en teoría el tráfico que debe circular hacia ese
+destino\ [#]_\ [#]_. Lo más apropiado para multiplexar los distintos tráficos en
+el servidor es instalar y configurar :ref:`haproxy <haproxy>`. La configuración
+del servidor de |SSH| no requiere ningún cambio.
+
+Para poder acceder a través del túnel |SSL| necesitamos en la parte cliente
+que un *proxy* se encargue del encapsulamiento. Lo más cómo es usar
+:command:`openssl`\ [#]_::
+
+   $ ssh -p443 -o "ProxyCommand openssl s_client -quiet -connect %h:%p" usuario@servidor
+
+lo cual es un poco engorroso, así que es mejor dejarlo ya escrito en el fichero
+de configuración del cliente::
+
+   Hostname *servidor
+      Host           mi.servidor.org
+      Username       usuario
+      Port           443
+
+   Hostname ssl-*
+      ProxyCommand   openssl s_client -quiet -connect %h:%p
+
+   Hostname ws-*
+      ProxyCommand wstunnel -L stdio:127.0.0.1:22 ws://%h
+
+   Hostname wss-*
+      ProxyCommand wstunnel -L stdio:127.0.0.1:22 wss://%h
+
+que hará las conexiones tan sencillas como::
+
+   $ ssh servidor
+   $ ssh ssl-servidor
+   $ ssh ws-servidor
+   $ ssh wss-servidor
+
+.. note:: Si quiséramos enviar un |SNI| podríamos añadir a :command:`openssl` la
+   opción ``-servername``::
+
+      ProxyCommand   openssl s_client -quiet -connect %h:%p -servername ssh.%h
+   
+Con :program:`putty` es posible hacer su equivalente, pero como careceremos de
+:program:`openssl`, es necesario primero instalarlo. El modo más sencillo es
+instalar la versión *light* que ofrece `esta página
+<https://slproweb.com/products/Win32OpenSSL.html>`_, que no requerirá más que
+vayamos aceptando los distintos pasos de instalación. Al término, tendremos un
+ejecutable funcional en el directorio :file:`C:\OpenSSL-Win32\bin\\`.
+
+Instalado, basta configurar :program:`putty` de este modo:
+
+.. image:: files/SSHoverSSL1.png
+
+.. image:: files/SSHoverSSL2.png
+
+esto es, configurar la sesión para conectarnos al puerto **443** del servidor
+que en esta ocasión hemos llamado *example.net*. A continuación debemos escoger
+``Connection>Proxy``, escoger un *proxy* de tipo *local* y usar
+:program:`openssl` para establecer el túnel del mismo modo en que lo usábamos
+con *ProxyCommand*::
+
+   C:\OpenSSL-Win32\bin\openssl.exe s_client -connect %host:%port -quiet
+
 .. rubric:: Notas al pie
 
 .. [#] Observe que::
@@ -721,72 +467,6 @@ claves |SSH|.
    mientras que en la segunda se produce en el servidor. Como consecuencia, en
    el primer caso habrá dos autenticaciones, mientras que en el segundo sólo
    una. Así pues, es mejor usar la segunda forma.
-
-.. [#] El acceso por el puerto **443** ofrece la ventaja de que, en caso de que
-   un *proxy* vigile el tráfico, no podrá más que comprobar que existe protocolo
-   |TLS| y hacer algunas comprobaciones sobre éste (por ejemplo, la autenticidad
-   del certificado del servidor), ya que el contenido encapsulado está cifrado
-   y, consecuentemente, es totalmente opaco. Por contra, un *proxy* que vigile el
-   puerto **80** puede acceder al contenido y ver que esas supuestas páginas son
-   bastante raras. Si su filtrado también se basa en analizar el contenido, lo
-   más probable es que no pasemos su filtro.
-
-.. [#] En teoría, el tráfico debe ser |HTTP|\ s, es decir, |HTTP| ofuscado e
-   irreconocible gracias a la envoltura segura que ofrece |TLS|.
-
-.. [#] De lo que se deduce que el epígrafe es inexacto: debería llamarse *SSH
-   sobre TLS*.
-
-.. [#] Como el *proxy* es capaz de *ver* la capa |TLS|, no solamente puede
-   comprobar si se usa tal protocolo, sino también exigir la validez del
-   certificado. En ese caso, no tendremos más remedio que generar un certificado
-   válido.
-
-.. [#] También podría usarse el módulo `mod_proxy
-   <https://httpd.apache.org/docs/2.4/mod/mod_proxy.html>`_ de `apache
-   <http://apache.org/>`_ o `squid <http://www.squid-cache.org/>`_.
-   Desgraciadamente, no puede usarse como *proxy* :ref:`nginx <n-ginx>`,
-   ya que éste sólo funciona como *proxy inverso*. En realidad,
-   :command:`nginx` tiene un módulo de terceros que sí lo permite,
-   `ngx_http_proxy_connect
-   <https://github.com/chobits/ngx_http_proxy_connect_module>`_, pero en el
-   estado actual en que se halla la modularidad de :program:`nginx` es un
-   engorro utilizarlo.
-
-.. [#] Con una importante diferencia: se altera el origen de la conexión y el
-   servidor creerá que las peticiones las recibe de :program:`haproxy` (o sea,
-   la máquina local) y del cliente original. Se discutirá más adelante.
-
-.. [#] Ahora bien, en la práctica deberemos usar un certificado fiable, porque
-   si el motivo de usar :program:`haproxy` es la existencia de un *proxy*, lo
-   necesitaremos; y, si tal *proxy* no existe, es mejor usar una solución como
-   :program:`sslh`.
-
-.. [#] En el *gancho* propuesto el fichero con las claves no se llama
-   *keycert.pem*, sino *nombre_del_servidor.pem*. Téngalo en cuenta a la hora de
-   copiar la configuración de ejemplo.
-
-.. [#] Todo cliente debe empezar su comunicación con la cadena "*SSH-2.0*", que
-   puesta en binario es el código hexadecimal escrito en la configuración.
-
-.. [#] Para profundizar en la configuración del servidor web, cuando es el
-   *proxy* de cifrar y descifrar la comunicación, vea el :ref:`apartado
-   correspondiente <nginx-tras-proxy>`.
-
-.. [#] En realidad sí lo es, porque no habrá forma de conocer el origen de la
-   petición, a menos que, además, se configure :program:`haproxy` en :ref:`modo
-   transparente <haproxy-transparente>`.
-
-.. [#] Obviamente, este software de *proxy* para el cliente sólo es necesario si
-   necesitamos establecer el túnel |TLS|. Si no es el caso (segunda variante en
-   redes sin proxy que fiscalece la comunicación), en el cliente no hay más que
-   asegurarse de que nos conectamos al puerto **443**.
-
-.. [#] Esta configuración requiere que el núcleo se haya compilado con el módulo
-   ``NETFILTER_XT_MATCH_SOCKET``, pero esto es así en las *debian* modernas::
-
-      # grep -i match_socket /boot/config-`uname -r`
-      CONFIG_NETFILTER_XT_MATCH_SOCKET=m
 
 .. [#] Si antes queremos deshacernos del :command:`ssh-agent` ya en ejecucion
    podemos hacer lo siguiente::
@@ -814,5 +494,19 @@ claves |SSH|.
 .. [#] O la contraseña, no es necesario la autenticación mediante clave pública
    y privada.
 
+.. [#] En teoría, el tráfico debe ser |HTTP|\ s, es decir, |HTTP| ofuscado e
+   irreconocible gracias a la envoltura segura que ofrece |TLS|.
+
+.. [#] De lo que se deduce que el epígrafe es inexacto: debería llamarse *SSH
+   sobre TLS*.
+
+.. [#] Obviamente, este software de *proxy* para el cliente sólo es necesario si
+   necesitamos establecer el túnel |TLS|. Si no es el caso (segunda variante en
+   redes sin proxy que fiscalece la comunicación), en el cliente no hay más que
+   asegurarse de que nos conectamos al puerto **443**.
+
 .. |TLS| replace:: :abbr:`TLS (Transport Layer Security)`
+.. |SSL| replace:: :abbr:`SSL (Secure Socket Layer)`
 .. |SNI| replace:: :abbr:`SNI (Server Name Identification)`
+
+.. _Websockets: https://v0ctor.me/websocket

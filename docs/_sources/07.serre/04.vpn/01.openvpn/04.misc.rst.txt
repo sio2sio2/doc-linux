@@ -1,38 +1,45 @@
-Otros aspectos
-**************
-
-.. _vpn+haproxy:
+.. _openvpn+restr:
 
 Redes restringidas
-==================
+******************
+En este caso, una :dfn:`red restringida` será toda red que no permita al *road
+warrior* conectar directamente al puerto del servidor en el que escucha Open\
+|VPN|.
 
-.. todo:: Repasar este apartado, porque puede usarse *Websockets* con idéntico
-   fin.
+Tenemos varias alternativas para evitar las restricciones, cuya efectividad
+dependerá del grado de vigilancia al que esté sometida la red:
 
-Como en el caso de otros servicios como :ref:`ssh <ssh>`, es posible que
-deseemos establecer una conexión |VPN| desde redes cuyo acceso al exterior esté
-restringido. Obviamente, este inconveniente será más habitual en conexiones al
-servidor de un *road warrior*.
+#. Si no hay restricciones sobre el puerto *53/UDP* y no hemos levantado un
+   servidor |DNS|, podemos poner a escuchar el servicio en este puerto también
+   (o usar el cortafuegos para redirigir el tráfico a este puerto hacia el
+   puerto de escucha).
 
-La estrategia es conectarse a través del puerto *443/TCP* y la discusión sobre
-ello ya está :ref:`desarrollada al hablar sobre ssh <redes-restr>`. En ella se
-establecen dos soluciones, usar :ref:`sslh <sslh>` o :ref:`haproxy
-<haproxy>`, dependiendo de cuál sea la fiscalización, y en ambas se presupuso
-que el servidor |VPN| escuchaba en el puerto *1194/TCP*
+#. Escuchar también en el puerto *443/TCP* (se requiere otra instancia
+   distinta), lo cual es probable que implique entrar en conflicto con el
+   servicio *web* y, en consecuencia, tener que usar un multiplexor como
+   :ref:`sslh <sslh>` o :ref:`haproxy <haproxy>`.
 
-Las configuraciones necesarias para :program:`sslh` y :program:`haproxy` ya
-están explicadas en los apartados referidos, pero toca aquí indicar cómo
-configurar el servicio |VPN|. Para ello presupondremos que nuestra intención es
-conectar un equipo móvil estableciendo el túnel en capa de red.
+#. Tunelizar con :ref:`wstunnel` y :ref:`nginx <n-ginx>` via :ref:`Websockets
+   <nginx-websockets>`, bien por el puerto *80/TCP* bien por el *443/TCP*.
+
+#. Tunelizar con |TLS| y usar el puerto *443/TCP* en donde escucha :ref:`haproxy
+   <haproxy>`.
+
+.. seealso:: Échele un vistazo a la introduciión al :ref:`epígrafe sobre
+   multiplexación con nginx <nginx-multiplexacion>`, donde se discute el
+   rendimiento de estas soluciones.
 
 Servidor
---------
-En el servidor podemos optar por hacer que el servidor escuche por el puerto
-*1194/UDP* y también por el *1194/TCP*, esto es, levantamos dos instancias de
-:program:`openvpn` con la misma configuración y en la que sólo cambian las
-directivas que indican el puerto y protocolo de escucha. Para ello podemos crear
-un fichero :file:`/etc/openvpn/common` con las directivas comunes (la mayoria) y
-dos ficheros, :file:`free.conf`::
+========
+En el caso particular de |VPN| es bastante más eficiente usar el procolo |UDP|
+que el |TCP|, pero sólo la primera solución (que será inútil en muchos casos)
+y la cuarta (que de todos modos tiene que hacer una conversión a |TCP|),
+funcionan con |UDP|. En el resto de soluciones será necesario crear una segunda
+instancia de Open\ |VPN| que escuche en el puerto *1194/TCP*. Como la
+configuración es exactamente la misma y sólo cambian las directivas que indican
+el puerto y el protocolo de escucha, lo más inteligente es crear un fichero
+:file:`/etc/openvpn/common` con las directivas comunes (la mayoria) y dos
+ficheros, :file:`free.conf`::
 
    port 1194
    proto udp
@@ -45,7 +52,7 @@ dos ficheros, :file:`free.conf`::
 
 y :file:`ies.conf`\ [#]_::
 
-   local 127.0.0.1
+   local 127.1.1.1
    port 1194
    proto tcp
    dev tun1
@@ -55,10 +62,14 @@ y :file:`ies.conf`\ [#]_::
 
    config common
 
+En cuanto a la configuración del proxy *multiplexor*, basta con seguir las
+instrucciones para :ref:`sslh <sslh>`, :ref:`haproxy <haproxy>` o :ref:`nginx
+<nginx-multiplexacion>`.
+
 Cliente
--------
-Ensayaremos una configuración análaga a :ref:`la ya aconsejada <srw3-client>`,
-aunque ahora podemos incluir tres nodos *connection*::
+=======
+Proponemos una configuración análaga a :ref:`la ya aconsejada <srw3-client>`,
+aunque ahora podemos incluir varios nodos *connection*. Por ejemplo::
 
    <connection>
       remote www.example.net 1194 udp
@@ -82,97 +93,49 @@ servidor bien porque usemos :program:`sslh` bien porque usamos
 :program:`haproxy` utlizando la :ref:`segunda variante <haproxy-2v>` con la que
 permitimos conectar sin crear un túnel |TLS|.
 
-Ahora bien, si requerimos un encapsulamiento |TLS| para burlar la fiscalización
-de un *proxy*, entonces no podemos conectar directamente, sino que tenemos que
-usar algún *software* intermediario. Uno apropiado es `stunnel
-<https://www.stunnel.org/>`_.
+La tercera conexión pretende implementar aquellas soluciones en las que tenemos
+que tunelizar la conexión (*Websockets* o túnel |TLS|) para burlar un
+:ref:`proxy DPI <dpi>`. Aparentemente conecta con el servidor remoto
+*www.example.net* pero esto es sólo una argucia para que Open\  |VPN| modifique
+correctamente el encaminamiento. Lo analizaremos después.
 
-En nuestro caso, sólo necesitamos usarlo en el cliente, ya que en el servidor es
-:program:`haproxy` el que se encarga de eliminar el encapsulamiento. Así pues::
+Para la tunelización podemos usar:
 
-   # apt-get install stunnel 
+:ref:`stunnel <stunnel>`
+   si pretendemos encapsular con |TLS|. Esta configuración:
 
-La configuración de este servicio consiste en incluir dentro de
-:file:`/etc/stunnel` distintas configuraciones. En nuestro caso, una adecuada
-es::
+   .. code-block:: ini
 
-   # /etc/stunnel/tunnel.conf
-   [wrapper]
-   client = yes
-   accept = localhost:12345
-   connect = www.example.net:443
+      [vpn-ssl]
+      client = yes
+      accept = localhost:12345
+      connect = www.example.net:443
 
-que permite que nuestro cliente |VPN| se conecte al puerto *12345/TCP* para que
-se encapsulen sus datos y, este tráfico ya encapsulado, se envíe al puerto
-*443/TCP* del servidor en que debe escuchar :program:`haproxy`.
+   permite que nuestro cliente |VPN| se conecte al puerto *12345/TCP* para que
+   se encapsulen sus datos y, este tráfico ya encapsulado, se envíe al puerto
+   *443/TCP* del servidor en que debe escuchar :program:`haproxy`.
 
-El problema de ello es que al cliente |VPN|, en principio, habría que decirle
-que debe conectarse a *localhost*, no al servidor real\ [#]_, y eso provocaría
-que escribera mal las entradas en la tabla de encaminamiento si nuestra
-intención es hacer del servidor |VPN| la puerta de enlace predeterminada. Para
-solucionar este caso, una buena manera de levantar la interfaz es esta::
+:ref:`wstunnel <wstunnel>`
+   si pretendemos usar :ref:`Websockets <nginx-websockets>`::
 
-   iface tun0 inet manual
-      openvpn client
-      up   stunnel /etc/stunnel/tunnel.conf
-      down kill $(cat /var/run/stunnel4.pid)
-      up   iptables -t nat -A OUTPUT -d www.example.net -p tcp --dport 12345 -j REDIRECT
-      down iptables -t nat -D OUTPUT -d www.example.net -p tcp --dport 12345 -j REDIRECT
+      # wstunnel -u --udpTimeoutSec=-1 -L 12345:127.1.1.1:1194 ws://www.example.net
+
+Por último, debemos resolver el escollo de que en la configuración hemos dejado
+dicho que el cliente |VPN| conecta directamente con el servidor, cuando debe
+hacerlo en realidad con la propia máquina\ [#]_. La solución es usar el
+cortafuegos::
+
+   # iptables -t nat -A OUTPUT -d www.example.net -p tcp --dport 12345 -j REDIRECT
 
 es decir, hacemos que el tráfico que pretendía conectar con el puerto
-*12345/TCP* del servidor |VPN| acabe en el propio cliente en donde escucha
-:program:`stunnel` que se encarga del resto. Esto permite escribir la conexión
-tal y como la hemos sugerido al comienzo del epígrafe, lo cual *engañará* al
-propio cliente haciéndole creer que conecta directamente con el servidor. En
-consecuencia escribirá correctamente las entradas de encaminamiento.
+*12345/TCP* del servidor |VPN| acabe en el propio cliente en donde escuchan
+:program:`stunnel` o :program:`wstunnel`, que se encargan del resto.
 
 .. note:: Obviamente, si no incluimos la directiva *redirect-gateway*, porque no
    es nuestra intención hacer que el cliente salga a internet a través del túnel
-   VPN, no es necesaria esta argucia, por lo que podremos ahorranos la la
+   VPN, no es necesaria esta argucia, por lo que podremos ahorranos la
    redirección con :command:`iptables` y deberemos decir en el nodo ``connection``
    correspondiente que conectamos a *localhost*.
-
-.. note:: Nótese que también aprovechamos la activación y desactivación de la
-   interfaz para arrancar y parar :program:`stunnel`.
-
-Liberando redes restringidas
-============================
-Este apartado es una vuelta de tuerca al anterior, en el que nos hemos limitado
-a que un cliente individual burle las restringiones impuestas por la conexión
-a internet de la red remota. Nuestra intención ahora es lograr que, de forma
-transparente, todos los dispositivos de la red remota (o al menos una subred
-dentro de ella) conecten a internet sin restricciones.
-
-A grandes rasgos, la estrategia para lograrlo es la siguiente:
-
-#. Disponemos un servidor |VPN| *a prueba de redes restringidas* en un |VPS|
-   contratado con ancho de banda ilimitado,
-
-#. Instalamos un cliente |VPN| en el router de la red remota. Como hemos
-   estudiado :program:`openvpn`, habremos instalado este servidor en el |VPS| y
-   necesitaremos tambien instalar este mismo en el cliente, lo cual restringe
-   nuestra elección del router. Alternativas posibles oon:
-
-   - Una máquina con dos interfaces de red.
-   - Un router neutro que permita la instalación de `openwrt
-     <https://openwrt.org/>`_ u otro linux empotrado capaz de configurar a
-     voluntad un cliente :program:`openvpn`.
-   - Un router `mikrotik <https://wiki.mikrotik.com/wiki/Main_Page>`_.
-
-#. Al hacer lo anterior el *router* tendrá dos posibles salidas a intenet:
-
-   - La salida a través de su puerta de enlace, capada de modo que posiblemente
-     los únicos protocolos permitidos sean |HTTP|, |HTTP|\ s y |DNS|.
-
-   - La salida sin restricciones a través del tunel |VPN|.
-
-   configuramos en él un *encaminamiento basado en políticas* (véase
-   :ref:`policy-based routing <pbr>`) para que los clientes que acceden a
-   internet a través del router salgan a internet usando la puerta de enlace
-   cuando el tráfico es |HTTP|, |HTTP|\ s o |DNS|, y el túnel en cualquier otro
-   caso. 
-
-.. todo:: Continuar escribiendo...
 
 .. rubric:: Notas al pie
 
@@ -192,3 +155,7 @@ A grandes rasgos, la estrategia para lograrlo es la siguiente:
 
 .. |TLS| replace:: :abbr:`TLS (Transport Layer Security)`
 .. |VPS| replace:: :abbr:`VPS (Virtual Private Server)`
+.. |TCP| replace:: :abbr:`TCP (Transmission Control Protocol)`
+.. |UDP| replace:: :abbr:`UDP (User Datagram Protocol)`
+
+.. _Websockets: https://v0ctor.me/websocket

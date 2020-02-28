@@ -68,7 +68,7 @@ es el cliente en realidad. Tal es el caso en <abbr title="HyperText Transfer Pro
 <a class="reference internal" href="../../02.web/01.desc/03.cabecera.html#xforwardedfor"><span class="std std-ref">X-Forwarder-For</span></a>, gracias a la cual el servidor <em>web</em>
 será capaz de saber cuál es en realidad el cliente, aunque la <abbr title="Internet Protocol">IP</abbr> de origen
 de los paquetes sea la del <em>proxy</em>, El tratamiento de esta cabecera en
-<a class="reference internal" href="../../02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a>, se lleva a cabo en <a class="reference internal" href="../../02.web/02.nginx/02.avanz/08.misc.html#nginx-tras-proxy"><span class="std std-ref">su epígrafe correspondiente</span></a>.</li>
+<a class="reference internal" href="../../02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a>, se lleva a cabo en <a class="reference internal" href="../../02.web/02.nginx/02.avanz/09.misc.html#nginx-tras-proxy"><span class="std std-ref">su epígrafe correspondiente</span></a>.</li>
 <li>La que nos ocupa que es hacer el <em>proxy</em> realmente <strong>transparente</strong>, esto es,
 que en los paquetes de la petición que replica la <abbr title="Internet Protocol">IP</abbr> de origen sea la del
 cliente y no la suya.</li>
@@ -155,7 +155,7 @@ al servidor que proceden del <em>proxy</em>:</p>
 </pre></div>
 </div>
 </li>
-<li><p class="first">Cuando está en una máquina distinta, la estretegia es marcar en el <em>proxy</em>
+<li><p class="first">Cuando está en una máquina distinta, la estrategia es marcar en el <em>proxy</em>
 los paquetes entrantes (que son los de vuelta) cuyo destino es un proxy
 transparente:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> iptables -t mangle -A PREROUTING -m socket --transparent -j MARK --set-mark 0xff
@@ -181,7 +181,7 @@ incapaz de traducir la sentencia anterior, pero existe equivalente:</p>
 <div class="section" id="soluciones-particulares">
 <h2>7.5.2.3.2.3. Soluciones particulares<a class="headerlink" href="#soluciones-particulares" title="Enlazar permanentemente con este título">¶</a></h2>
 <p>La intención es aplicar la solución antes descrita para que actúen como
-<em>proxies</em> transparentes aplicaciones utilizados en este manual: <a class="reference internal" href="../../../09.apendice/01.cryto/03.aplicaciones.html#stunnel"><span class="std std-ref">stunnel</span></a>, <a class="reference internal" href="01.multi.html#sslh"><span class="std std-ref">sslh</span></a>, <a class="reference internal" href="../../../04.servidor/10.ssh/04.adicional.html#haproxy"><span class="std std-ref">haproxy</span></a> y <a class="reference internal" href="../../02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a>. Ahora bien, para comprobar si, efectivamente, el <em>proxy</em> actúa de
+<em>proxies</em> transparentes aplicaciones utilizados en este manual: <a class="reference internal" href="../../../09.apendice/01.cryto/03.aplicaciones.html#stunnel"><span class="std std-ref">stunnel</span></a>, <a class="reference internal" href="01.multi.html#sslh"><span class="std std-ref">sslh</span></a>, <a class="reference internal" href="01.multi.html#haproxy"><span class="std std-ref">haproxy</span></a> y <a class="reference internal" href="../../02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a>. Ahora bien, para comprobar si, efectivamente, el <em>proxy</em> actúa de
 modo transparente, es necesario que el servidor final nos muestre cuál es la
 <abbr title="Internet Protocol">IP</abbr> del cliente. Un modo muy sencillo es usar como servidor final
 <strong class="program">nginx</strong> con esta configuración:</p>
@@ -263,9 +263,93 @@ tráfico a una interfaz local particular.</p>
 </div>
 <div class="section" id="nginx">
 <span id="nginx-transparente"></span><h3>7.5.2.3.2.3.3. nginx<a class="headerlink" href="#nginx" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>La configuración para hacer que <strong class="program">nginx</strong> se comporte como proxy
+<em>transparente</em> pasa por ejecutarlo como administrador:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="c1"># Esto es nginx.conf</span>
+
+<span class="k">user</span> <span class="s">root</span>
+
+<span class="s">[...]</span>
+
+<span class="s">stream</span> <span class="p">{</span>
+   <span class="kn">server</span> <span class="p">{</span>
+      <span class="kn">listen</span> <span class="mi">80</span><span class="p">;</span>
+
+      <span class="kn">proxy_bind</span> <span class="nv">$remote_addr</span> <span class="s">transparent</span><span class="p">;</span>
+      <span class="kn">proxy_pass</span> <span class="mi">127</span><span class="s">.1.1.1</span><span class="p">;</span>
+   <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>que supone que el servidor final está en la propia máquina. Esta configuración
+de proxy <abbr title="Transmission Control Protocol">TCP</abbr>, a menos que fuera con <abbr title="Secure Socket Layer">SSL</abbr> y se usara <abbr title="Server Name Indication">SNI</abbr> para discriminar
+los tráficos, resulta un poco inútil. La transparencia también puede practicarse
+en un <em>proxy</em> <abbr title="HyperText Transfer Protocol">HTTP</abbr>:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">upstream</span> <span class="s">backend</span> <span class="p">{</span>
+   <span class="kn">server</span> <span class="mi">192</span><span class="s">.168.0.100</span><span class="p">;</span>
+   <span class="kn">server</span> <span class="mi">192</span><span class="s">.168.0.200</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">server</span> <span class="p">{</span>
+   <span class="kn">listen</span> <span class="mi">80</span><span class="p">;</span>
+
+   <span class="kn">location</span> <span class="s">/</span> <span class="p">{</span>
+      <span class="kn">proxy_bind</span> <span class="nv">$remote_addr</span> <span class="s">transparent</span><span class="p">;</span>
+      <span class="kn">proxy_pass</span> <span class="s">http://</span><span class="nv">$backend$uri</span><span class="p">;</span>
+   <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<div class="admonition seealso">
+<p class="first admonition-title">Ver también</p>
+<p class="last">Échele un ojo a una <cite>entrada sobre el asunto
+&lt;https://www.nginx.com/blog/ip-transparency-direct-server-return-nginx-plus-transparent-proxy/&gt;</cite>
+en el blog oficial.</p>
+</div>
 </div>
 <div class="section" id="haproxy">
 <span id="haproxy-transparent"></span><h3>7.5.2.3.2.3.4. haproxy<a class="headerlink" href="#haproxy" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>A la <a class="reference internal" href="#proxy-transparente-sol-gen"><span class="std std-ref">solución general</span></a>, basta añadirle estos
+pequeños cambios en la configuración:</p>
+<ul>
+<li><p class="first">Comentar en la sección <em>global</em> los líneas que impiden que
+<strong class="program">haproxy</strong> se ejecute con permisos de administrador:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1">#user haproxy</span>
+<span class="c1">#group haproxy</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">Añadir a todos los servidores con los que se quiere actuar como proxy
+transparente una directiva más para que se envíen los paquetes utilizando
+la <abbr title="Internet Protocol">IP</abbr> del cliente como origen. Por ejemplo:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>backend ssh
+   mode tcp
+<span class="hll">   <span class="nb">source</span> <span class="m">0</span>.0.0.0 usesrc clientip
+</span>   server ssh <span class="m">127</span>.1.1.1:22
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">Si los servidores están en la misma máquina recuerde hacer
+referencia a ellos usando una <abbr title="Internet Protocol">IP</abbr> local no habitual como la <em>127.1.1.1</em>
+sugerida en la solución general.</p>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p>En el caso del servidor web, como se conserva la <abbr title="Internet Protocol">IP</abbr> del cliente,
+no es necesario alterar la cabecera <cite>X-Forwarded-For</cite>, pero sí la referente
+al protocolo, que cambia de <abbr title="HyperText Transfer Protocol">HTTP</abbr>s a <abbr title="HyperText Transfer Protocol">HTTP</abbr>:</p>
+<div class="last highlight-bash notranslate"><div class="highlight"><pre><span></span>backend http
+   mode http
+<span class="hll">   <span class="c1">#option forwardfor</span>
+</span><span class="hll">   <span class="nb">source</span> <span class="m">0</span>.0.0.0 usesrc clientip
+</span>   reqadd X-Forwarded-Proto:<span class="se">\ </span>https
+   server nginx <span class="m">127</span>.1.1.1:80
+</pre></div>
+</div>
+</div>
+</li>
+</ul>
 <p class="rubric">Notas al pie</p>
 <table class="docutils footnote" frame="void" id="id4" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
@@ -292,6 +376,18 @@ que lo ejecuta:</p>
 <tbody valign="top">
 <tr><td class="label"><a class="fn-backref" href="#id3">[3]</a></td><td>Se añade <kbd class="kbd docutils literal notranslate">--no-check-certificate</kbd> para evitar problemas si en
 nuestras pruebas usamos certificados autofirmados.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id7" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label">[4]</td><td><p class="first">Esta configuración requiere que el núcleo se haya compilado con el módulo
+<code class="docutils literal notranslate"><span class="pre">NETFILTER_XT_MATCH_SOCKET</span></code>, pero esto es así en las <em>debian</em> modernas:</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> grep -i match_socket /boot/config-<span class="sb">`</span>uname -r<span class="sb">`</span>
+<span class="go">CONFIG_NETFILTER_XT_MATCH_SOCKET=m</span>
+</pre></div>
+</div>
+</td></tr>
 </tbody>
 </table>
 </div>

@@ -111,7 +111,7 @@ transparente, para lo cual se requiere:
             # iptables -t nat -A OUTPUT -d 127.1.1.1 -j CONNMARK --set-mark 0xff
             # iptables -t mangle -A OUTPUT -m connmark --mark 0xff -j CONNMARK --restore-mark
 
-      #. Cuando está en una máquina distinta, la estretegia es marcar en el *proxy*
+      #. Cuando está en una máquina distinta, la estrategia es marcar en el *proxy*
          los paquetes entrantes (que son los de vuelta) cuyo destino es un proxy
          transparente::
 
@@ -229,11 +229,96 @@ tráfico a una interfaz local particular.
 
 nginx
 =====
+La configuración para hacer que :program:`nginx` se comporte como proxy
+*transparente* pasa por ejecutarlo como administrador:
+
+.. code-block:: nginx
+
+   # Esto es nginx.conf
+
+   user root
+
+   [...]
+
+   stream {
+      server {
+         listen 80;
+
+         proxy_bind $remote_addr transparent;
+         proxy_pass 127.1.1.1;
+      }
+   }
+
+que supone que el servidor final está en la propia máquina. Esta configuración
+de proxy |TCP|, a menos que fuera con |SSL| y se usara |SNI| para discriminar
+los tráficos, resulta un poco inútil. La transparencia también puede practicarse
+en un *proxy* |HTTP|:
+
+.. code-block:: nginx
+
+   upstream backend {
+      server 192.168.0.100;
+      server 192.168.0.200;
+   }
+
+   server {
+      listen 80;
+
+      location / {
+         proxy_bind $remote_addr transparent;
+         proxy_pass http://$backend$uri;
+      }
+   }
+
+.. seealso:: Échele un ojo a una `entrada sobre el asunto
+   <https://www.nginx.com/blog/ip-transparency-direct-server-return-nginx-plus-transparent-proxy/>`
+   en el blog oficial.
 
 .. _haproxy-transparent:
 
 haproxy
 =======
+A la :ref:`solución general <proxy-transparente-sol-gen>`, basta añadirle estos
+pequeños cambios en la configuración:
+
+* Comentar en la sección *global* los líneas que impiden que
+  :program:`haproxy` se ejecute con permisos de administrador:
+
+  .. code-block:: bash
+
+     #user haproxy
+     #group haproxy
+
+* Añadir a todos los servidores con los que se quiere actuar como proxy
+  transparente una directiva más para que se envíen los paquetes utilizando
+  la |IP| del cliente como origen. Por ejemplo:
+
+  .. code-block:: bash
+     :emphasize-lines: 3
+
+     backend ssh
+        mode tcp
+        source 0.0.0.0 usesrc clientip
+        server ssh 127.1.1.1:22
+
+  .. note:: Si los servidores están en la misma máquina recuerde hacer
+     referencia a ellos usando una |IP| local no habitual como la *127.1.1.1*
+     sugerida en la solución general.
+
+  .. note:: En el caso del servidor web, como se conserva la |IP| del cliente,
+     no es necesario alterar la cabecera `X-Forwarded-For`, pero sí la referente
+     al protocolo, que cambia de |HTTP|\ s a |HTTP|:
+
+     .. code-block:: bash
+        :emphasize-lines: 3, 4
+
+        backend http
+           mode http
+           #option forwardfor
+           source 0.0.0.0 usesrc clientip
+           reqadd X-Forwarded-Proto:\ https
+           server nginx 127.1.1.1:80
+
 
 .. rubric:: Notas al pie
 
@@ -250,4 +335,12 @@ haproxy
 .. [#] Se añade :kbd:`--no-check-certificate` para evitar problemas si en
    nuestras pruebas usamos certificados autofirmados.
 
+.. [#] Esta configuración requiere que el núcleo se haya compilado con el módulo
+   ``NETFILTER_XT_MATCH_SOCKET``, pero esto es así en las *debian* modernas::
+
+      # grep -i match_socket /boot/config-`uname -r`
+      CONFIG_NETFILTER_XT_MATCH_SOCKET=m
+
 .. |SSL| replace:: :abbr:`SSL (Secure Socket Layer)`
+.. |SNI| replace:: :abbr:`SNI (Server Name Indication)`
+.. |TCP| replace:: :abbr:`TCP (Transmission Control Protocol)`

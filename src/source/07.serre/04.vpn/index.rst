@@ -255,7 +255,8 @@ un cliente a fin de burlar algún tipo de censura u ocultar la identidad, aunque
 el proveedor del servicio |VPN| sí sepa quién somos o, al menos, disponga de
 nuestra |IP| para que se pueda llegar a saber quién somos. `VPNbook
 <https://www.vpnbook.com/>`_, con el que podemos usar :ref:`OpenVPN <openvpn>`,
-ofrece este servicio de forma gratuita.
+ofrece este servicio de forma gratuita; también `ZPN <https://zpn.im/>`, aunque
+limitado a una transferencia de 10GB al mes.
 
 .. rubric:: Notas al pie
 

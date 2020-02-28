@@ -9,26 +9,33 @@ naturaleza y dirigirlo cada cual a su servicio correspondiente:
 
 Su función es la de permitir que un mismo puerto pueda ser compartido por varios
 servicios distintos, comúnmente en previsión de que los clientes se encuentren
-en redes que les restrinjan el acceso a determinados puertos. Lo habitual es que
-el *multiplexor* se coloque en el puerto **443**, ya que es el puerto para
-|HTTP|\ s y el tráfico web seguro suele permitirse en todas las redes.
+en redes que, mediante el uso de una `herramienta DPI
+<https://es.wikipedia.org/wiki/Inspecci%C3%B3n_profunda_de_paquete>`_, les
+restrinjan el acceso a determinados puertos. Lo habitual es que el *multiplexor*
+se coloque en el puerto **443**, ya que es el puerto para |HTTP|\ s y el tráfico
+web seguro suele permitirse en todas las redes.
 
 En el esquema se han representado los servidores finales cada uno en su máquina
 y, a su vez, en distinta máquina de la que corre el *multiplexor*, pero es
 psoble también que *multiplexor* y servicios finales corran todos en el mismo
 equipo.
 
-Estudiaremos tres multiplexores:
+Nos detendremos en analizar cinco estrategias de multiplexación:
 
-* :program:`sslh`, que permite multiplexar tráfico |SSH|, |SSL| y Open\ |VPN|
+* :ref:`sslh <sslh>`, que permite multiplexar tráfico |SSH|, |SSL| y Open\ |VPN|
   entre otros.
-* :ref:`nginx <n-ginx>`, que puede usarse para otras funciones, pero que para
-  esta tarea puede distinguir entre tráfico |SSL| y tráfico no |SSL|.
-* :ref:`haproxy <haproxy>`, que puede usarse para otras funciones, pero puede servirnos
-  para multiplexar |SSH|, |SSL| y Open\ |VPN|.
-
-Los tres discriminan tráfico |TCP| por lo que Open\ |VPN| debería escuchar en un
-puerto |TCP|, no |UDP|.
+* :ref:`wstunnel <wstunnel>`, que nos permite canalizar cualesquiera aplicaciones a
+  través de Websockets_, lo cual es, por tanto, una manera de conseguir
+  multiplexación.
+* :ref:`haproxy <haproxy>`, que entre otras cosas, es capaz de multiplexar al
+  menos |SSH|, |SSL| y Open\ |VPN|.
+* :ref:`nginx <n-ginx>`, que es capaz de distinguir entre tráfico |SSL| y tráfico no |SSL|
+  y, por tanto, puede hacer una labor de multiplexación. Se trata en el
+  :ref:`epígrafe sobre nginx dedicado a la multiplexación <nginx-multiplexacion>`.
+* :dfn:`Multiplexión SSL` que es una técnica que consiste en encapsular
+  cualquier tráfico |TCP| con |SSL| y distinguir el tipo por el :ref:`SNI
+  <sni>`. Trataremos su implementación con :ref:`haproxy <haproxy>` y al
+  analizar la :ref:`multiplexación con nginx <nginx-multiplexacion>`.
 
 .. _sslh:
 
@@ -79,20 +86,306 @@ Si existen varias interfaces físicas entonces puede repetirse la opción
    error no afecta a todas las conexiones. A través de ``DAEMON`` puede
    utilizarse uno y otro ejecutable.
 
-.. _nginx-multi:
+.. _haproxy:
 
-nginx
-=====
+:program:`haproxy`
+==================
+:program:`haproxy` es, en realidad, un *proxy* bastante más completo de lo que
+expondremos aquí, por cuanto sólo expondremos como hacer que multiplexe tráficos
+de distinto tipo.
 
-.. _haproxy-multi:
+Desrrollaremos **dos soluciones** distintas:
 
-haproxy
-=======
+#. Una en la que todos los protocolos |HTTP|. |SSH| y |VPN| van encapsulados con
+   |TLS| y es el propio :program:`haproxy` el que los desencapsula, los reconoce
+   y los envía al servidor correspondiente.
+
+#. Otra en que junto a tráfico |TLS|, se permite que |SSH| y |VPN| circulen sin
+   encapsular, de manera que al llegar el tráfico a :program:`haproxy`, este lo manda
+   a sus respectivos servidores. Hasta aquí, :program:`haproxy` se comporta
+   exactamente igual que :ref:`sslh <sslh>`. Sin embargo, el tráfico |TLS| no lo
+   envía al servidor *web*, sino que lo desencapsula, como en el caso anterior,
+   para comprobar si es |HTTP|, |SSH| y |VPN| y, reconocidos, se reenvían al servidor
+   correspondiente.
+
+   En este segundo caso, la configuración permite enviar encapsulado o no el
+   tráfico |SSH| y |VPN| según el grado de restricción de la red remota. Tenga
+   en cuenta que encapsular este tráfico, que ya es tráfico seguro, sólo tiene
+   por finalidad engañar a los proxies intermedios pero a costa de reducir el
+   rendimiento de la conexión, ya que la capsula |TLS| supone procesamiento y
+   metainformación extra.
+
+Antes de entrar a configurar, es necesario instalar::
+
+   # apt-get install haproxy
+
+y tener un certificado digital para el servicio, que puede ser autofirmado o
+acreditado por una autoridad certificadora (véase :ref:`cómo obtener uno
+<tls-cert>`)\ [#]_.
+
+Sea como sea, es preciso señalar que :program:`haproxy` requiere que todas las
+claves públicas y la privada participantes en la autenticación estén reunidas en
+un mismo fichero.
+
+En el caso de un *certificado autofirmado*, muy probablemente tendremos que
+hacer algo así::
+
+   # cat /etc/ssl/{private/ssl-cert-snakeoil.key,certs/ssl-cert-snakeoil.pem} > /etc/haproxy/keycert.pem
+   # chmod 600 /etc/haproxy/keycert.pem
+
+y en el caso de haber usado *letsencrypt*, si no hemos creado un *gancho* de
+postinstalación como se sugirió en las explicaciones::
+
+   # cat /etc/letsencrypt/live/mi.servidor.org/{fullchain,privkey}.pem > /etc/haproxy/keycert.pem
+   # chmod 600 /etc/haproxy/keycert.pem
+
+Creado el certificado adecuado, podemos hacer la configuración propiamente
+dicha, que es bastante más complicada y con muchísimas más variantes que la de
+:ref:`sslh <sslh>`.
+
+.. rubric:: Primera variante
+
+En ella, :program:`haproxy` recibe tráfico cifrado con |TLS|, lo descifra y,
+dependiendo de su naturaleza, lo envía al servidor adecuado. Bajo estos
+presupuestos la configuración en :file:`/etc/haproxy/haproxy.cfg` queda así:
+
+.. literalinclude:: files/haproxy_1.cfg
+   :language: none
+   
+Las claves de esta configuración son las siguientes:
+
+* Las cláusulas *frontend* definen las conexiones con el cliente y las cláusulas
+  *backend* las conexiones con los servidores, de lo que se deduce que
+  :program:`haproxy` escucha en el puerto **443** de la interfaz real (se ha
+  supuesto que su *ip* es *172.22.0.2*); y conecta con tres servidores: uno |SSH|,
+  uno |VPN| y un web, todos en la propia máquina.
+* Es justamente ahí donde se cifra a la salida y se descifra a la entrada
+  por lo que se añade el parámetro ``ssl`` y se indica cuál el certificado\ [#]_.
+* Como consecuencia de que se descifra, es posible analizar el contenido
+  y distinguir entre los tres tráficos\ [#]_.
+* La conexión con el servidor se hace en modo |HTTP| al puerto **80**\ [#]_.
+  Esto nos permite añadir los campos ``X-Forwarder-For``
+  para indicar la |IP| del cliente original y la cabecera ``X-Forwarder-Proto``
+  para avisar de que el protocolo que usó el cliente fue |HTTP|\ s y no |HTTP|
+  que es el que ve el servidor. Si se tiene convenientemente configurado el
+  servidor web, las aplicaciones web podrán saber quién se conecta y cómo.
+
+.. note:: :program:`haproxy`. en este caso, no actúa como *proxy* transparente,
+   por lo que todos los servidores finales entenderán que reciben las peticiones
+   de la propia máquina. Si el origen de las peticiones para |VPN| y |SSH| nos fuera fundamental
+   (en el servicio web se han resuleto vía cabeceras |HTTP|), podemos ponerlo
+   a funcionar en :ref:`modo transparente <haproxy-transparent>`.
+
+.. _haproxy-2v:
+
+.. rubric:: Segunda variante
+
+Añade a la primera, la posibilidad de también conectarse al puerto **443** sin
+necesidad de establecer el túnel |TLS|. Puede descargar el código de
+:download:`este enlace <files/haproxy_2.cfg>`.
+
+.. note:: Por el modo en que se ha realizado esta configuración del servidor (y
+   tambiém la anterior), éste no necesita conocer de antemano de qué naturaleza
+   es el tráfico escondido dentro de |TLS|, ya que antes de discriminar tal
+   tráfico desencapsula. Como encapsulado, el tráfico está cifrado y es
+   imposible conocer cuál es (esta es, precisamente, la base de que podamos
+   burlar cualquier *proxy*), el protocolo |TLS| habilita una manera de que en
+   la propia envoltura se indique el nombre del servidor: la extensión |SNI|.
+
+   Una manera de distinguir el tipo de tráfico es hacer que el cliente incluya
+   un |SNI| distinto para cada tipo de tráfico y reconocer éste leyendo el
+   |SNI|::
+
+      frontend main
+         bind 172.22.0.2:443  # No descriframos en absoluto.
+         mode tcp
+         option tcplog
+
+         tcp-request inspect-delay 5s
+         tcp-request content accept if { req_ssl_hello_type 1 }
+
+         acl   ssh_request   req_ssl_sni -i ssh.mi.servidor.org
+         acl   vpn_request   req_ssl_sni -i vpn.mi.servidor.org
+         
+         use_backend ssl-ssh   if ssh_request
+         use_backend ssl-vpn   if vpn_request
+         default_backend       http
+
+   Ahora bien, el tráfico sigue cifrado con |TLS| lo cual puede no ser un
+   problema para el servidor web\ [#]_, pero sí para los otros servidores. Eso
+   obligaría a que el backend (*ssl-ssh* o *ssl-vpn* en el ejemplo) no entregue
+   directamente el flujo, sino que cada uno de ellos lo envíe a un puerto local
+   particular en que escucha también :program:`haproxy` y que sea en este
+   *frontend* donde :program:`haproxy` aplique el certificado para descifrar.
+
+.. _wstunnel:
+
+wstunnel
+========
+:program:`wstunnel` no es exactamente un multiplexador, sino un *proxy* que nos
+permite tunelizar a través de Websockets_ cualquier servicio (p.e.
+:ref:`wireguard <wireguard>`). Este programa actuará tanto en la parte cliente
+como en la servidor, de manera que el cliente (pongamos que |SSH|) conecta con
+su parte servidor y esta parte servidor la que entrega el tráfico al servidor
+|SSH|.
+
+.. image:: files/websocket.png
+
+En el gráfico situamos en la parte delantera del cliente y el servidor los
+servicios expuestos (porque escuchan en la interfaz física) y en la trasera los
+no expuestos (porque escuchan en la interfaz de *loopback*). Obsérvese que como
+el servidor |SSH| sigue expuesto, en las redes remotas en que no hay
+restricciones seguirá pudiéndose acceder a él directamente.
+
+La aplicación nos permite multiplexar por dos razones:
+
+- Porque un misma parte servidor puede tunelizar tráfico de distinto tipo.
+- Porque al ser una tecnología web, podemos colocar a la escucha un un *proxy*
+  web inverso y que éste tenga como uno de sus *backends* la parte servidor de
+  :program:`wstunnel`:
+
+  .. image:: files/websocket-compartido.png
+
+No existe paquete para *Debian*, pero podemos descargar el ejecutable de `su
+repositio de Github <https://github.com/erebe/wstunnel>`. Su uso es bastante
+sencillo. Debemos descargar en las dos máquinas el ejecutable y colocarlo en un
+lugar adecuado (p.e. :file:`/usr/local/bin`).
+
+**Servidor**
+   En la máquina servidor, que es lo que realmente nos interesa a efectos de
+   este epígrafe, debe escuchar según nos interese. Por ejemplo, así::
+
+      # wstunnel -v --server ws://0.0.0.0
+
+   lo cual supone que la aplicación escuche sin cifrado en el puerto **80**
+   (*ws*) de todas las interfaces los datos tunelizados. Podríamos modificar la
+   escucha cambiando el protocolo por *wss* que cifrará y escuchará por el
+   **443**. Si nos interesara, podríamos alterar los puertos prefijados también
+   (p.e. :kbd:`ws://0.0.0.0:8080`). A qué aplicación se redirijan los datos
+   dependerá de lo que se especifique en el cliente. La línea anterior supone
+   exponer :program:`wstunnel` (tal como representa la primera figura) y como no
+   se ha establecido ninguna restricción sobre el destino del tráfico, esto
+   podría propiciar que cualquier máquina utilizara ilegítimamente nuestro
+   túnel. Así pues, cuando se expone el túnel lo más prudente es restringir el
+   destino::
+
+      # wstunnel -v --server ws://0.0.0.0 -r 127.0.0.1:22
+
+   que sólo aceptará tráfico de clientes que indiquen que el tráfico debe
+   mandarse al servicio |SSH| local a la parte servidor, o sea, a un servidor
+   |SSH| que está conectado en la misma máquina.
+
+   Para resolver la situación en la que queremos compartir el puerto y exponemos
+   el *proxy* (o sea, :program:`nginx`) y no :program:`wstunnel` basta con que
+   hagamos que éste último escuche en algún puerto libre de una interfaz de *loopback*::
+
+      # wstunnel -v --server ws://127.0.0.1:8080
+
+   en que podemos hacer exactamente la misma puntualización a la restricción
+   sobre el destino.
+
+**Cliente**
+   En la máquina cliente establecemos el otro extremo del túnel de este modo::
+
+      # wstunnel -v -L 12345:127.0.0.1:22 ws://203.0.113.1
+
+   donde hemos supuesto que la máquina servidor tiene la |IP| *203.0.113.1*.  En
+   este extremo del túnel indicamos a :program:`wstunnel` que el tráfico que
+   escuche por el puerto **12345** de la interfaz de *loopback* debe ser
+   dirigido en el servidor al puerto **22** de la interfaz de *loopback* (del
+   servidor claro está). Esto supone que si queremos usar el túnel, el cliente
+   |SSH| deberá conectar al puerto **12345** de *lo*. Ha de hacerse notar que
+   el que no se cifra y conectamos al puerto **80**, es coherente con el modo en
+   que arrancamos :program:`wstunnel` en el servidor.
+
+   Es importante señalar también que al no haber especificado en el cliente, el
+   puerto **12345** en el cliente y el puerto **22** en el servidor son |TCP|.
+   Sin embargo, :program:`wstunnel` tiene capacidad para tunelizar protocolos
+   |UDP| con tan solo indicarlo al arrancar el cliente (en el lado del servidor
+   todo sigue igual)::
+
+      # wstunnel -v --udp --udpTimeoutSec -1 -L 12345:127.0.0.1:1194 ws://203.0.113.1
+
+   En este caso el cliente escucha en el puerto *12345/UDP* y en el servidor los
+   datos acaban dirigidos al puerto *1194/UDP*.
+
+   Por último, cuando en el servidor colocamos un *proxy* que recibe distinto
+   tráfico y debe identificar cuál es el dirigido al *websocket* podremos usar
+   un nombre específico de máquina::
+
+      # wstunnel -v -L 12345:127.0.0.1:22 ws://ssh.example.net
+
+   o incluso una ruta::
+
+      # wstunnel -v -L 12345:127.0.0.1:22 ws://www.example.net/ssh
+
+**Ejemplo de uso**
+   Para ilustrar el uso de :program:`wstunnel`, podemos hacer lo siguiente en el
+   **servidor**::
+
+      # wstunnel -v --server ws://0.0.0.0 -r 127.0.0.1:11111
+
+   y poner a escuchar el simple :ref:`netcat <netcat>`::
+
+      # netcat -l -p 11111
+
+   En el **cliente**, establecemos el otro extremo del túnel así::
+
+      # wstunnel -v -L 22222:127.0.0.1:11111 ws://203.0.113.1
+
+   y utilizamos :ref:`netcat <netcat>` para conversar con el del servidor::
+
+      # netcat localhost 22222
+
+   .. note:: En este caso concreto en el cliente podemos simplificar ejecutando::
+
+         # wstunnel -v -L stdio:127.0.0.1:11111 ws://203.0.113.1
+
+   que hace que el :program:`wstunnel` del cliente no converse con el puerto
+   **22222**, sino con la entrada y salida estándar, por lo que pondemos
+   ahorranos la ejecución de :ref:`netcat <netcat>` en el cliente.
+
+.. _wstunnel-systemd:
+
+**Servicio**
+   Para la parte de servidor, es espcialmente aconsejable convertir
+   :program:`wstunnel` en un servicio de :ref:`systemd <systemd>` creando el
+   siguiente servicio en :file:`/etc/systemd/system/wstunnel.service`:
+
+   .. code-block:: ini
+
+      [Service]
+      EnvironmentFile=-/etc/default/wstunnel
+      ExecStart=/usr/bin/wstunnel $OPTIONS
+      Restart=always
+      StandardOutput=syslog
+      StandardError=syslog
+      SyslogIdentifier=wstunnel
+      User=nobody
+      Group=nogroup
+
+      [Install]
+      WantedBy=multi-user.target
+
+   que requiere un fichero :file:`/etc/default/wstunnel` para definir las
+   opciones de arranque:
+
+   .. code-block:: bash
+
+      #OPTIONS="--server ws://127.0.0.1:8080"
+      OPTIONS="--server ws://0.0.0.0:8080"
+
+   Por último, habrá que habilitarlo para arranques futuros::
+
+   # systemctl daemon-reload
+   # systemctl enable wstunnel
+   # systemctl start wstunnel
 
 .. rubric:: Notas al pie
 
 .. [#] Donde queramos poner a escuchar :program:`openvpn` depende de nuestras
-   intenciones. Escoger el puerto **1194** responde a que ese es el puerto
+   intenciones, pero deberá ser |TCP| porque así lo podrá encapsular
+   :program:`sslh`. Escoger el puerto **1194** responde a que ese es el puerto
    estándar para esa aplicación (de hecho, aparece referido en
    :file:`/etc/services`). Una buena estrategia es ponerlo a escuchar:
 
@@ -100,7 +393,32 @@ haproxy
    + En el puerto *1194/TCP* de la interfaz local, cuyo acceso será posible
      gracias al multiplexor.
 
+.. [#] Ahora bien, en la práctica deberemos usar un certificado fiable, porque
+   si el motivo de usar :program:`haproxy` es la existencia de un *proxy*, lo
+   necesitaremos; y, si tal *proxy* no existe, es mejor usar una solución como
+   :program:`sslh`.
+
+.. [#] En el *gancho* propuesto el fichero con las claves no se llama
+   *keycert.pem*, sino *nombre_del_servidor.pem*. Téngalo en cuenta a la hora de
+   copiar la configuración de ejemplo.
+
+.. [#] Todo cliente debe empezar su comunicación con la cadena "*SSH-2.0*", que
+   puesta en binario es el código hexadecimal escrito en la configuración.
+
+.. [#] Para profundizar en la configuración del servidor web, cuando es el
+   *proxy* de cifrar y descifrar la comunicación, vea el :ref:`apartado
+   correspondiente <nginx-tras-proxy>`.
+
+.. [#] En realidad sí lo es, porque no habrá forma de conocer el origen de la
+   petición, a menos que, además, se configure :program:`haproxy` en :ref:`modo
+   transparente <haproxy-transparent>`.
+
 
 .. |SSL| replace:: :abbr:`SSL (Secure Socket Layer)`
+.. |TLS| replace:: :abbr:`TLS (Transport Layer Security)`
 .. |TCP| replace:: :abbr:`TCP (Transmission Control Protocol)`
 .. |UDP| replace:: :abbr:`UDP (User Datagram Protocol)`
+.. |SNI| replace:: :abbr:`SNI (Server Name Indication)`
+
+.. _Websockets: https://v0ctor.me/websocket
+
