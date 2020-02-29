@@ -43,6 +43,15 @@ asociados a este apartado son:
 
 * :ref:`ej-softw`
 
+Interfaz de red
+===============
+Para interfaz de texto puede usarse el epígrafe de :ref:`configuración mínima de
+la red <redminima>`. Ahora bien, sería conveniente cómo configurarla en entornos
+gráficos que utilizan otros mecanismos de configuración (p.e `network-manager
+<https://es.wikipedia.org/wiki/NetworkManager>`_). Esto último puede hacerse a
+través de los ejercicios:
+
+* :ref:`ej-redmin`
 
 .. |BIOS| replace:: :abbr:`BIOS (Basic I/O System)`
 .. |UEFI| replace:: :abbr:`UEFI (Unified Extensible Firmware Interface)`
