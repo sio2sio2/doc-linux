@@ -75,7 +75,7 @@ del `proyecto GNU <https://es.wikipedia.org/wiki/Proyecto_GNU>`_, que aun
 habiendo desarrollado desde 1983 muchas de las aplicaciones del *UNIX* original
 aún carecía en 1991 de un núcleo operativo.
 
-Aunque el creador original de *Linux* fue Torvald, prontó adoptó un desarrollo
+Aunque el creador original de *Linux* fue Torvald, pronto adoptó un desarrollo
 colaborativo a través de internet\ [#]_ y en la actualidad es desarrollado por
 voluntarios y empleados de grandes empresas con interés en el desarrollo del
 sistema como `IBM <https://es.wikipedia.org/wiki/IBM>`_, `Google

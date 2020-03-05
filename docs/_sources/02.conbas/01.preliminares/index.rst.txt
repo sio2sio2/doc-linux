@@ -95,7 +95,7 @@ que proporciona el utilísimo :ref:`tmux <tmux>` (también puede ser `screen
 Ya se ha indicado que el ordenador espera una *orden* por nuestra parte. Pero
 ¿qué implica en este caso el hecho de *dar una orden*? Básicamente, indicar qué
 programa queremos usar. Si pensamos en una interfaz gráfica de ventanas, el
-ordenador también espera: espera que desplazemos el ratón hasta pulsar sobre el
+ordenador también espera: espera que desplacemos el ratón hasta pulsar sobre el
 icono que representa el programa que deseamos ejecutar. En esencia, es lo mismo:
 en un caso se invoca el programa a través de su icono y, en otro caso, a través
 de su nombre. Por ejemplo::
@@ -110,7 +110,7 @@ devuelve la respuesta a través de la pantalla: *root*, en este caso, porque
 recuérdese que hemos acordado que un *prompt* constituido por una almohadilla
 simbolizará que actuamos como administrador.
 
-Este programa (:command:`whoami`) es enormente simple y basta con dar únicamente
+Este programa (:command:`whoami`) es enormemente simple y basta con dar únicamente
 su nombre para que se ejecute y nos devuelva una respuesta. Sin embargo, no
 siempre es así de sencillo. Otro algo más complicado es:
 
@@ -141,10 +141,10 @@ siempre es así de sencillo. Otro algo más complicado es:
 
 O dicho de otra modo, ¿cómo ejecutar un programa? Cuando se pretende usar un
 programa comúnmente se puede (o tiene que) decir algo más que el solo nombre.
-Igual pasa en la conversación cotidiana en que puede decirse *«Múevete»*, pero
+Igual pasa en la conversación cotidiana en que puede decirse *«Muévete»*, pero
 también ser más preciso y decir *«Muévete rápido»*. Incluso en ocasiones es
 indispensable añadir algo. Por ejemplo, si ordenamos con un *«Cuélga»*, nuestro
-interlocutor nos preguntará *«¿Qué es lo que quires que cuelgue?»*. Porque
+interlocutor nos preguntará *«¿Qué es lo que quieres que cuelgue?»*. Porque
 efectivamente, no sabrá si quiere que colguemos la ropa o colguemos un cuadro en
 el salón.
 
@@ -162,7 +162,7 @@ particular, pero gran parte de ellos sigue el estándar `POSIX
 programa :command:`ls` que nos informa de cuál es el contenido de un
 determinado directorio.
 
-En princpio, la forma más sencilla de usar :command:`ls` es sin ningún
+En principio, la forma más sencilla de usar :command:`ls` es sin ningún
 argumento::
 
    $ ls
@@ -298,7 +298,7 @@ encuentran los ejecutables, devolverá su ruta::
    Para búsquedas más exhaustivas de programas y ficheros que no son programas
    puede recurrirse a :ref:`whereis <whereis>` o :ref:`find <find>`.
 
-La preguna del millón es, ¿cómo sé si una orden es externa o interna? Una
+La pregunta del millón es, ¿cómo sé si una orden es externa o interna? Una
 posible solución es usar :command:`which`: si la orden es externa, entonces la
 orden nos devolverá la ruta (como ha ocurrido con :command:`cp`) y si es
 interna, no devolverá nada, porque no existe ningún programa ejecutable::
