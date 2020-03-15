@@ -4,7 +4,7 @@ Ejercicios sobre gestión de software
 #. Actualizar el sistema:
 
    a. Sin más.
-   #. Eliminando los paquetes que se vuelven innecesarios.
+   #. Eliminando también los paquetes que se vuelven innecesarios.
 
 #. Instalar las herramientas para soportar |NTFS|.
 
@@ -20,7 +20,8 @@ Ejercicios sobre gestión de software
 #. Consultar para qué sirve el paquete **vlan**.
 
 #. Buscar algún paquete que nos permita jugar al `Pacman
-   <https://es.wikipedia.org/wiki/Pac-Man>`_.
+   <https://es.wikipedia.org/wiki/Pac-Man>`_ (pero para consola de texto, porque
+   no tenemos entorno gráfico)
 
 #. Desinstalar el juego anterior.
 
