@@ -8,7 +8,15 @@ red, y profundizar en ello requeriría un tratamiento muchísimo más amplio del
 que aquí se mostrará\ [#]_. Bajo este epígrafe nos limitaremos a indicar cómo
 hacer una configuración simple de las interfaces, tanto con herramientas
 comunes a todas las distribuciones de *linux* como con las herramientas que
-provee *debian*.
+provee *Debian*.
+
+Tenga presente que el método de configuración que ofrece *Debian*
+(:ref:`ifupdown <ifupdown>`) y el uso de las :ref:`herramientas generales
+<net-univ>` es alternativo y **no debe mezclarse**: o configuramos con uno o con
+el otro. Por ese motivo, si una interfaz está activa porque se usó la
+herramienta :ref:`ifup <ifup>` de *Debian*, sólo debemos manipularña usando las
+herramientas generales, si previamente la desactivamos usando :ref:`ifdown
+<ifdown>`.
 
 .. warning:: El epígrafe está referido a interfaces de cable, que son las
    habituales en servidores. Las interfaces inalámbricas son más engorrosas ya
@@ -20,9 +28,12 @@ provee *debian*.
    se exponen en :ref:`el epígrafe referente a otros modos de configuración
    <otros-conf-red>`.
 
+.. note:: `Ubuntu <https://ubuntu.com/>`_, aunque basada en *Debian*, usa
+   como herramienta de configuración de red, desde su versión 18, `netplan
+   <https://netplan.io/>` y no :ref:`ifupdown <ifupdown>`.
+
 Interfaces presentes
 --------------------
-
 Antes de poner a configurar interfaces es indispensable saber qué interfaces hay
 presentes en nuestro sistema. Para que el sistema registre una interfaz es
 necesario que tal interfaz exista, pero también que haya un driver apropiado que
@@ -46,38 +57,24 @@ También es posible obtener las interfaces a través del comando :ref:`ip <ip>`:
 
    # ip link show
 
+.. _ifupdown:
+
 Configuración en debian
 -----------------------
+*Debian* gestiona sus interfaces preferentemente a través de los *scripts* que
+proporciona el paquete **ifupdown**, los cuales consultan el contenido del
+fichero :file:`/etc/network/interfaces`\ [#]_. Por tanto, configurar las
+interfaces de red mediante este método supone fundamentalmente:
 
-La configuración de red en debian se basa fundamentalmente en el contenido del
-fichero :file:`/etc/network/interfaces`\ [#]_, el fichero
-:file:`/etc/resolv.conf` y en tres herramientas:
+- Saber cómo expresar la configuración de las interfaces dentro de
+  :file:`/etc/netwoek/interfaces`.
+- Utiliazar las herramientas de activación (:ref:`ifup <ifup>`)
+  y desactivación (:ref:`ifdown <ifdown>`).
+- Saber cómo definir los servidores |DNS| para la resolución de nombres.
 
-.. _ifquery:
-.. index:: ifquery
+.. rubric:: Herramientas
 
-:command:`ifquery`
-   Permite hacer consultas sobre las interfaces gestionadas. Lo más habitual
-   es preguntar por cuál es la configuración de una interfaz::
-
-      $ ifquery eth0
-      address: 192.168.4.20/24
-      gateway: 192.168.4.253
-      up: iptables -t nat -A POSTROUTING -o $IFACE -j MASQUERADE
-      down: iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE
-
-   .. warning:: Esta es la configuración que se hizo para la interfaz
-      eth0 en :file:`/etc/network/interfaces` y no la configuración que
-      realmente tiene la interfaz.
-
-   También puede usarse::
-
-      $ ifquery --state
-      lo=lo
-      eth0=eth0
-
-   que nos devolverá la interfaces activas a través de :command:`ifup`.
-
+Las fundamentables son:
 
 .. _ifup:
 .. index:: ifup
@@ -109,14 +106,42 @@ fichero :file:`/etc/network/interfaces`\ [#]_, el fichero
    cuando :command:`ifdown` intente desactivarla, se encuentre con que la
    interfaz no tiene configuración.
 
+.. _ifquery:
+.. index:: ifquery
+
+:command:`ifquery`
+   Permite hacer consultas sobre las interfaces gestionadas. Lo más habitual
+   es preguntar por cuál es la configuración de una interfaz::
+
+      $ ifquery eth0
+      address: 192.168.4.20/24
+      gateway: 192.168.4.253
+      up: iptables -t nat -A POSTROUTING -o $IFACE -j MASQUERADE
+      down: iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE
+
+   .. warning:: La orden nos devuelve la configuración que se encuentra en
+      :file:`/etc/network/interfaces`, no la que realmente tenga la interfaz,
+      que pueden diferir, si se deshabilito la interfaz con :ref:`ifdown
+      <ifdown>` y se volvió a configurar de modo diferente con las
+      :ref:`herramientas generales <net-univ>`.
+
+   También puede usarse::
+
+      $ ifquery --state
+      lo=lo
+      eth0=eth0
+
+   que nos devolverá la interfaces activas a través de :command:`ifup`.
+
+.. rubric:: Fichero de confiuración
+
 En realidad, el meollo de la configuración está en la escritura de
 :file:`/etc/network/interfaces`. Mostremos un fichero con la interfaz de
 *loopback*, una interfaz *eth0* configurada de forma dinámica y una interfaz
 *eth1* cpmfigurada de forma estática:
 
 .. literalinclude:: docs/interfaces
-   :language: none
-   :linenos:
+   :language: bash
 
 La configuración es bastante elocuente. La segunda interfaz, al tener una
 configuración estática, necesita algunos datos (*ip* y máscara, y puerta de
@@ -126,38 +151,63 @@ Service)`\ [#]_, porque estos no se expresan en este fichero, sino en
 
 Sí es pertinente aclarar por qué algunas interfaces van acompañadas de la
 palabra :kbd:`auto` y otras de la palabra :kbd:`allow-hotplug`. Incluso podría
-haber otras en que no se hubiera incluido tal línea. Ésta determina qué ocurrirá
-durante el arranque: si no existe, la interfaz no se activará y tendrá que
-activarse durante el uso del sistema explícitamente. En cambio, tanto
-:kbd:`auto` como :kbd:`allow-hotplug`, las activan automáticamente. La
-diferencia es que la primera la activará siempre, mientras que la segunda sólo
-intentará la activación, si la interfaz realmente existe.
+haber otras sin ninguna de esas dos líneas. En este último caso, la interfaz
+no se activará durante el arranque y tendrá que ser el usuario quien manualmente
+lo haga mediante :ref:`ifup <ifup>`. En cambio, una de esas dos dos líneas,
+activa automáticamente en el arranque la interfaz, pero con un matiz diferente:
+:kbd:`allow-hotplug` activa la interfaz si se detecta que esta existe y, si no
+existe, no ocurrirá nada, mientras que :kbd:`auto` intentará activar la interfaz
+siempre y, si no existe, provocará un error visible. La regla general es que
+:kbd:`allow-hotplug` se usa con interfaces físicas,  mientras que :kbd:`auto` se
+usa con interfaces virtuales que no existen previamente, sino que se crear al
+ser activadas y que, por tanto, no pueden existir con anterioridad.
 
 Es posible añadir también en la configuración de cada interfaz líneas que
 comiencen con :kbd:`pre-up`, :kbd:`up`, :kbd:`down` y :kbd:`post-down`. Estas
 líneas permiten ejecutar comandos arbitrarios justamente antes de activar la
 interfaz, tras haberlo hecho, justamente antes de desactivarla o después de
 haberlo hecho. Es bastante común el caso en que queremos añadir alguna regla en
-el cortafuegos al levantar la interfaz y borrarla al desactivarla::
+el :ref:`cortafuegos <firewall>` al levantar la interfaz y borrarla al
+desactivarla::
 
    allow-hotplug eth0
    iface eth0 inet dhcp
       pre-up    iptables -A POSTROUTING -o $IFACE -j MASQUERADE
       post-down iptables -D POSTROUTING -o $IFACE -j MASQUERADE
 
+.. warning:: Si pretende cambiar la configuración de una interfaz, es muy
+   importante que antes de editar el fichero, la desactive con :ref:`ifdown
+   <ifdown>`.  Esto es debido a que para desactivar una interfaz, este *script*
+   no atiende a cómo se configuró la interfaz, sino a cual es la configuración
+   escrita en el fichero en el momento de ejecutar :ref:`ifdown <ifdown>`. Por
+   eso, si al activarse la interfaz, la configuración era estática, los
+   *scripta* usarán internamente la orden :ref:`ip <ip>`. Si antes de
+   desactivaer la interfaz, modifica el fichero y vuelve la configuración
+   dinámica, al hacer :ref:`ifdown <ifdown>`. el *script* no desactivará la
+   interfaz con :ref:`ip <ip>`, sino que intentará usar internamente
+   :ref:`dhclient <dhclient>` y, obviamente, fallará.
+
+
+.. rubric:: DNS
+
 Queda, por último, tratar la configuración de los servidores :abbr:`DNS (Domain
 Name Service)` en el fichero :file:`/etc/resolv.conf`. Si la configuración es
 dinámica, el propio cliente *dhcp* se encarga de escribir este fichero y no hay
 que hacer ninguna configuración. En cambio, si la configuración es estática, sí
-habrá que escribirlo o al menos cerciorarse que es válido. Se dejará la
-explicación de su contenido para el epígrafe siguiente.
+habrá que escribirlo o al menos cerciorarse que es válido. Se explicará
+su contenido :ref:`dentro del epígrafe siguiente <bas-resolv.conf>`.
+
+.. _net-univ:
 
 Configuración universal
 -----------------------
-.. warning:: Antes de comenzar, debemos cerciorarnos de que la interfaz no está
-   configurada a través de :command:`ifup`.
+.. warning:: Recuerde que, para utilizar estas herramientas, debe cerciorarse
+   primero de que la interfaz no se activó mediante :ref:`ifup <ifup>`
+   y, si lo está, utilice :ref:`ifdown <ifdown>` antes de empezar.
 
-La configuración más sencilla es la utomática, ya que el cliente de *dhcp* se
+.. rubric:: Configuración automática
+
+La configuración más sencilla es la automática, ya que el cliente de *dhcp* se
 encargará de todo. El cliente habitual es
 
 .. _dhclient:
@@ -181,19 +231,20 @@ encargará de todo. El cliente habitual es
    interfaz con la opción ``-x``, pero en este caso no se informa al servidor de
    que deseamos dejar de usar la *ip* con lo que el servidor no la liberará.
 
+.. rubric:: Configuración manual
+
 Si la configuración es manual, debemos realizar tres labores:
 
-#. Configurar los servidores :abbr:`DHCP (Dynamic Host Configuration
-   Protocol)`.
 #. Configurar los parámetros de red de la interfaz.
 #. Añadir una entrada a la tabla de encaminamiento para indicar cuál es la
    puerta de enlace.
+#. Configurar los servidores |DNS|
 
-Así que supongamos que queremos fijar una *ip* :kbd:`192.168.1.10/24`, la puerta
-de enlace es :kbd:`192.168.1.1` y los servidores *dns* :kbd:`8.8.8.8` y
-:kbd:`8.8.4.4`.
+Así que supongamos que queremos fijar una dirección  |IP|
+:kbd:`192.168.1.10/24`, la puerta de enlace es :kbd:`192.168.1.1` y los
+servidores |DNS| :kbd:`1.1.1.1` y :kbd:`1.0.0.1`.
 
-Para las dos primeras tareas, el comando apropiado es\ [#]_:
+Para las dos primeras tareas, el comando apropiado es:
 
 .. _ip:
 .. index:: ip
@@ -237,13 +288,22 @@ Para las dos primeras tareas, el comando apropiado es\ [#]_:
       $ ip route show
       [... Listado aquí ...]
 
-.. _resolv-conf:
+.. warning:: En tutoriales antiguos de *Linux* podrá ver que estas órdenes se
+   hacen con :manpage:`ifconfig` y :manpage:`route`. Estas herramientas, sin
+   embargo, hace tiempo que se marcaron como obsoletas y, de hecho, ya no están
+   disponibles en *Debian* desde hace años. a menos que se instale expresamente
+   el paquete **net-tools**.
 
-Por último, es necesario definir los servidores *dns* para lo cual basta editar
-el fichero :file:`/etc/resolv.conf` e incluir las siguientes líneas::
+.. _bas-resolv.conf:
 
-   nameserver 8.8.8.8
-   nameserver 8.8.4.4
+.. rubric:: DNS
+
+En una configuración estática, es necesario definir los servidores |DNS|, para
+lo cual basta editar el fichero :file:`/etc/resolv.conf` e incluir las
+siguientes líneas::
+
+   nameserver 1.0.0.1
+   nameserver 1.1.1.1
 
 .. _otros-conf-red:
 
@@ -277,6 +337,3 @@ través del fichero :file:`/etc/network/interfaces`.
    <https://www.freedesktop.org/wiki/Software/systemd/PredictableNetworkInterfaceNames/>`_.
 
 .. [#] Si se instala el paquete *resolvconf*, si pueden incluirse.
-
-.. [#] Tradicionalmente, los comandos para configurar la red han sido
-   :command:`ifconfig` y :command:`route`, pero su uso ya se ha desaconsejado.
