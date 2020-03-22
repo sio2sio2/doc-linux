@@ -22,17 +22,20 @@ Desarrollado en el :ref:`epígrafe sobre entorno de texto <cli>`.
 
 Sistema de archivos
 ===================
-Desarrollado en todos los epígrafes que componen :ref:`acceso a la información
-<linux-info>`. Sin embargo, es conveniente no dar en tanta profundidad
-:ref:`find <find>`. Para esta orden basta con limitarse al uso::
+Desarrollado en los epígrafes que componen:
+
+* :ref:`filesystem`
+* :ref:`fic-dir`
+
+aunque es conveniente no dar en tanta profundidad :ref:`find <find>`. Para esta
+orden basta con limitarse al uso::
 
    # find /ruta [-type f|l|d] -iname "nombre-con-comodines"
 
-Dentro de este apartado deben hacerse dos relaciones de ejercicios:
+Dentro de este apartado hay dos relaciones de ejercicios pertinentes:
 
 * :ref:`ej-rutas`
 * :ref:`ej-fic`
-* :ref:`ej-dev`
 
 Instalación y gestión de programas
 ==================================

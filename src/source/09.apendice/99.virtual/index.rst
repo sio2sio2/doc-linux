@@ -113,6 +113,8 @@ Antes de empezar, no obstante, hay que introducir cuatro conceptos:
    intensivo de memoria, y para el resto se usa virtualización completa del
    *hardware*.
 
+.. _contenedores:
+
 **Contenedores**
    La virtualización por sistema operativo la llevan a cabo aquellos sistemas
    operativos capaces de crear varios espacios de usuario completamente aislados
