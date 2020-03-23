@@ -10,6 +10,13 @@ ejercicios:
 
 * :ref:`ej-usu`
 
+Permisos
+========
+Se tratara el :ref:`sistema de permisos POSIX <ugo>` para el cual existe la
+relación de ejercicios:
+
+* :ref:`ej-perm`
+
 Gestión de dispositivos
 =======================
 Su contenido es el incluido en el :ref:`epígrafe sobre dispositivos
