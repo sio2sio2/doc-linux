@@ -163,16 +163,16 @@ distinta para el driver de almacenamiento y, en consecuencia, es conveniente
 minimizarlas. Por ese motivo la directiva <kbd class="kbd docutils literal notranslate">RUN</kbd> contiene dos órdenes, en
 vez de haber definido dos directivas <kbd class="kbd docutils literal notranslate">RUN</kbd> para cada orden.</p>
 <p>Con todo, ya solo falta generar la imagen:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker build -t sio2/nginx-test:v1b .
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker build -t miusuario/nginx-test:v1b .
 </pre></div>
 </div>
-<p>Es importante tener presente también que partir de la imagen <em>nginx:alpine</em> no
-sólo implica partir del sistema de archivos de ese contenedor, sino también
-del resto de configuración. Por ese motivo, no es necesario indicar qué deseamos
-exponer el puerto <strong>80</strong> o que queremos que se ejecute <a class="reference internal" href="../../../07.serre/02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a>.
-Por eso, aunque a efectos prácticos no tenga sentido alguno, ilustremos cómo
-obtener una imagen semejante partiendo de la imagen original <a class="reference external" href="https://alpinelinux.org/">Alpine</a>, lo cual
-implica instalar <a class="reference internal" href="../../../07.serre/02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a> y hacer una configuración adicional.</p>
+<p>y <a class="reference internal" href="#docker-push"><span class="std std-ref">subir la imagen</span></a>. Es importante tener presente también que
+partir de la imagen <em>nginx:alpine</em> no sólo implica partir del sistema de
+archivos de ese contenedor, sino también del resto de configuración. Por ese
+motivo, no es necesario indicar qué deseamos exponer el puerto <strong>80</strong> o que
+queremos que se ejecute <a class="reference internal" href="../../../07.serre/02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a>.  Por eso, aunque a efectos
+prácticos no tenga sentido alguno, ilustremos cómo obtener una imagen semejante
+partiendo de la imagen original <a class="reference external" href="https://alpinelinux.org/">Alpine</a>, lo cual implica instalar <a class="reference internal" href="../../../07.serre/02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a> y hacer una configuración adicional.</p>
 <p>Para ello tomemos otro directorio de trabajo en el que incluyamos un
 <code class="file docutils literal notranslate"><span class="pre">Dockerfile</span></code>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkdir /tmp/nginx-test.2
@@ -208,7 +208,7 @@ implica instalar <a class="reference internal" href="../../../07.serre/02.web/02
 </pre></div>
 </div>
 <p>Con lo cual, ya podemos generar la imagen:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker build -t sio2/nginx-test:v1c .
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker build -t miusuario/nginx-test:v1c .
 </pre></div>
 </div>
 <p>cuyo almacenamiento debe tener tres capas: la generada por la imagen de <a class="reference external" href="https://alpinelinux.org/">Alpine</a>,
@@ -221,6 +221,89 @@ lo que puede interesar durante la fase de desarrollo de la imagen, descomponer
 las acciones en múltiples directivas <kbd class="kbd docutils literal notranslate">RUN</kbd> y solo al final minimizar el
 número de capas.</p>
 </div>
+<p>Hay otras directivas interesantes que puede incluir un <code class="file docutils literal notranslate"><span class="pre">Dockerfile</span></code>:</p>
+<dl class="docutils">
+<dt><kbd class="kbd docutils literal notranslate">VOLUME</kbd></dt>
+<dd><p class="first">permite definir <a class="reference internal" href="02.uso.html#docker-volume"><span class="std std-ref">volúmenes anónimos</span></a> que se crearán
+automáticamente al generar un contenedor a partir de la imagen sin que sea
+necesario declararlos con <kbd class="kbd docutils literal notranslate">-v</kbd>. Por ejemplo, si hubiéramos querido hacer
+permanentes los registros podríamos haber utilizado este <code class="file docutils literal notranslate"><span class="pre">Dockerfile</span></code>:</p>
+<div class="last highlight-docker notranslate"><div class="highlight"><pre><span></span><span class="k">FROM</span><span class="s">    alpine</span>
+<span class="k">RUN</span>     apk update <span class="o">&amp;&amp;</span> apk add nginx <span class="o">&amp;&amp;</span> <span class="se">\</span>
+        mkdir /srv/www<span class="p">;</span><span class="se">\</span>
+        mkdir /run/nginx
+
+<span class="k">COPY</span>    ./archives /
+
+<span class="k">VOLUME</span><span class="s">  /var/lob/nginx</span>
+
+<span class="k">EXPOSE</span><span class="s">  80/tcp</span>
+<span class="k">CMD</span>     <span class="p">[</span><span class="s2">&quot;nginx&quot;</span><span class="p">,</span> <span class="s2">&quot;-g&quot;</span><span class="p">,</span> <span class="s2">&quot;daemon off;&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+</dd>
+<dt><kbd class="kbd docutils literal notranslate">WORKDIR</kbd></dt>
+<dd>Define cuál es el directorio de trabajo dentro del contenedor.</dd>
+<dt><kbd class="kbd docutils literal notranslate">ENV</kbd></dt>
+<dd><p class="first">Permite definir variables de entorno. Por ejemplo:</p>
+<div class="last highlight-docker notranslate"><div class="highlight"><pre><span></span><span class="k">ENV</span>   <span class="nv">DEBUG</span><span class="o">=</span>True
+</pre></div>
+</div>
+</dd>
+<dt><kbd class="kbd docutils literal notranslate">ARG</kbd></dt>
+<dd><p class="first">Permite definir variables que pueden usarse en otras directivas:</p>
+<div class="highlight-docker notranslate"><div class="highlight"><pre><span></span><span class="k">ARG</span>   <span class="nv">VERSION</span><span class="o">=</span><span class="m">3</span>.9
+<span class="k">FROM</span><span class="s">  alpine${VERSION:+:$VERSION}</span>
+</pre></div>
+</div>
+<p>Las variables también pueden definirse a través de la opción
+<kbd class="kbd docutils literal notranslate">--build-arg</kbd> de <kbd class="kbd docutils literal notranslate">docker build</kbd>, que, además, tiene preferencia
+sobre la directiva <kbd class="kbd docutils literal notranslate">ARG</kbd>:</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker build -t miusuario/nginx-test:v1v --build-arg <span class="nv">VERSION</span><span class="o">=</span><span class="m">3</span>.10 .
+</pre></div>
+</div>
+</dd>
+</dl>
+<p class="rubric">Cnstrucción <em>multi-stage</em></p>
+<p>Hay por último un concepto bastante interesante que es el de la cosntrucción
+multistage de una <em>imagen</em> que se requiere cuando para crear una imagen
+necesitamos la creación de otras imágenes previas intermedias. Por ejemplo,
+imaginemos que en nuestra imagen necesitamos incluir un programa compilado
+con <a class="reference external" href="https://gcc.gnu.org/">gcc</a>. Dado que nuestra imagen necesita únicamente el ejecutable, no tiene
+sentido que incluyamos el compilador en ella, sino solamente el resultado de la
+compilación; así que pudemos crear una imagen intermedia previa con el
+compilador que genere el código compilado y la imagen definitiva que,
+simplemente, obtenga el resultado de esta compilación de esa primera imagen.
+Para ilustrarlo supongamos que creamos un directorio de trabajo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkdir /tmp/multistage
+<span class="gp">#</span> <span class="nb">cd</span> /tmp/multistage
+<span class="gp">#</span> vim app.c
+<span class="gp">#</span> vim Dockerfile
+</pre></div>
+</div>
+<p>donde el código fuente <code class="file docutils literal notranslate"><span class="pre">app.c</span></code> es simplemente el código del «Hola,
+mundo»:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span> <span class="cpf">&lt;stdio.h&gt;</span><span class="cp"></span>
+
+<span class="kt">int</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+   <span class="n">printf</span><span class="p">(</span><span class="s">&quot;Hola, mundo</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+   <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>y el <code class="file docutils literal notranslate"><span class="pre">Dockerfile</span></code> este:</p>
+<div class="highlight-docker notranslate"><div class="highlight"><pre><span></span><span class="k">FROM</span><span class="s">     gcc as builder</span>
+<span class="k">WORKDIR</span><span class="s">  /tmp</span>
+<span class="k">COPY</span>     app.c .
+<span class="k">RUN</span>      gcc -static -o app app.c
+
+<span class="k">FROM</span><span class="s">     alpine</span>
+<span class="k">COPY</span>     --from<span class="o">=</span>builder /tmp/app /bin
+<span class="k">CMD</span>      <span class="p">[</span><span class="s2">&quot;app&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>Como resulta de utlizar este <code class="file docutils literal notranslate"><span class="pre">Dockerfile</span></code>, obtendremos una imagen basada
+en <a class="reference external" href="https://alpinelinux.org/">Alpine</a> que contiene y ejecuta nuestra aplicación compilada.</p>
 <p class="rubric">Notas al pie</p>
 <table class="docutils footnote" frame="void" id="id2" rules="none">
 <colgroup><col class="label" /><col /></colgroup>

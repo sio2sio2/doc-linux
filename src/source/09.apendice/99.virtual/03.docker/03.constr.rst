@@ -126,15 +126,16 @@ vez de haber definido dos directivas :kbd:`RUN` para cada orden.
 
 Con todo, ya solo falta generar la imagen::
 
-   # docker build -t sio2/nginx-test:v1b .
+   # docker build -t miusuario/nginx-test:v1b .
 
-Es importante tener presente también que partir de la imagen *nginx:alpine* no
-sólo implica partir del sistema de archivos de ese contenedor, sino también
-del resto de configuración. Por ese motivo, no es necesario indicar qué deseamos
-exponer el puerto **80** o que queremos que se ejecute :ref:`nginx <n-ginx>`.
-Por eso, aunque a efectos prácticos no tenga sentido alguno, ilustremos cómo
-obtener una imagen semejante partiendo de la imagen original Alpine_, lo cual
-implica instalar :ref:`nginx <n-ginx>` y hacer una configuración adicional.
+y :ref:`subir la imagen <docker-push>`. Es importante tener presente también que
+partir de la imagen *nginx:alpine* no sólo implica partir del sistema de
+archivos de ese contenedor, sino también del resto de configuración. Por ese
+motivo, no es necesario indicar qué deseamos exponer el puerto **80** o que
+queremos que se ejecute :ref:`nginx <n-ginx>`.  Por eso, aunque a efectos
+prácticos no tenga sentido alguno, ilustremos cómo obtener una imagen semejante
+partiendo de la imagen original Alpine_, lo cual implica instalar :ref:`nginx
+<n-ginx>` y hacer una configuración adicional.
 
 Para ello tomemos otro directorio de trabajo en el que incluyamos un
 :file:`Dockerfile`::
@@ -176,7 +177,7 @@ y :file:`Dockerfile`, el siguiente:
 
 Con lo cual, ya podemos generar la imagen::
 
-   # docker build -t sio2/nginx-test:v1c .
+   # docker build -t miusuario/nginx-test:v1c .
 
 cuyo almacenamiento debe tener tres capas: la generada por la imagen de Alpine_,
 la generada por la directiva :kbd:`RUN` y la generada por la directiva
@@ -187,6 +188,98 @@ la generada por la directiva :kbd:`RUN` y la generada por la directiva
    las acciones en múltiples directivas :kbd:`RUN` y solo al final minimizar el
    número de capas.
 
+Hay otras directivas interesantes que puede incluir un :file:`Dockerfile`:
+
+:kbd:`VOLUME`
+   permite definir :ref:`volúmenes anónimos <docker-volume>` que se crearán
+   automáticamente al generar un contenedor a partir de la imagen sin que sea
+   necesario declararlos con :kbd:`-v`. Por ejemplo, si hubiéramos querido hacer
+   permanentes los registros podríamos haber utilizado este :file:`Dockerfile`:
+
+   .. code-block:: docker
+
+      FROM    alpine
+      RUN     apk update && apk add nginx && \
+              mkdir /srv/www;\
+              mkdir /run/nginx
+
+      COPY    ./archives /
+
+      VOLUME  /var/lob/nginx
+
+      EXPOSE  80/tcp
+      CMD     ["nginx", "-g", "daemon off;"]
+
+:kbd:`WORKDIR`
+   Define cuál es el directorio de trabajo dentro del contenedor.
+
+:kbd:`ENV`
+   Permite definir variables de entorno. Por ejemplo:
+
+   .. code-block:: docker
+
+      ENV   DEBUG=True
+
+:kbd:`ARG`
+   Permite definir variables que pueden usarse en otras directivas:
+
+   .. code-block:: docker
+
+      ARG   VERSION=3.9
+      FROM  alpine${VERSION:+:$VERSION}
+
+   Las variables también pueden definirse a través de la opción
+   :kbd:`--build-arg` de :kbd:`docker build`, que, además, tiene preferencia
+   sobre la directiva :kbd:`ARG`::
+
+      # docker build -t miusuario/nginx-test:v1v --build-arg VERSION=3.10 .
+
+.. rubric:: Cnstrucción *multi-stage*
+
+Hay por último un concepto bastante interesante que es el de la cosntrucción
+multistage de una *imagen* que se requiere cuando para crear una imagen
+necesitamos la creación de otras imágenes previas intermedias. Por ejemplo,
+imaginemos que en nuestra imagen necesitamos incluir un programa compilado 
+con gcc_. Dado que nuestra imagen necesita únicamente el ejecutable, no tiene
+sentido que incluyamos el compilador en ella, sino solamente el resultado de la
+compilación; así que pudemos crear una imagen intermedia previa con el
+compilador que genere el código compilado y la imagen definitiva que,
+simplemente, obtenga el resultado de esta compilación de esa primera imagen.
+Para ilustrarlo supongamos que creamos un directorio de trabajo::
+
+   # mkdir /tmp/multistage
+   # cd /tmp/multistage
+   # vim app.c
+   # vim Dockerfile
+
+donde el código fuente :file:`app.c` es simplemente el código del "Hola,
+mundo":
+
+.. code-block:: c
+
+   #include <stdio.h>
+
+   int main() {
+      printf("Hola, mundo\n");
+      return 0;
+   }
+
+y el :file:`Dockerfile` este:
+
+.. code-block:: docker
+
+   FROM     gcc as builder
+   WORKDIR  /tmp
+   COPY     app.c .
+   RUN      gcc -static -o app app.c
+
+   FROM     alpine
+   COPY     --from=builder /tmp/app /bin
+   CMD      ["app"]
+
+Como resulta de utlizar este :file:`Dockerfile`, obtendremos una imagen basada
+en Alpine_ que contiene y ejecuta nuestra aplicación compilada.
+
 .. rubric:: Notas al pie
 
 .. [#] Mediante :kbd:`docker login` se puede especificar cuál es el servidor de
@@ -195,3 +288,4 @@ la generada por la directiva :kbd:`RUN` y la generada por la directiva
 
 .. _Docker Hub: https://hub.docker.com/
 .. _Alpine: https://alpinelinux.org/
+.. _gcc: https://gcc.gnu.org/
