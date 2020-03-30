@@ -314,6 +314,14 @@ Relacionado con las opciones de borrado está:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker image inspect debian:buster-slim
 </pre></div>
 </div>
+<p>que las devuelve en formato <abbr title="JavaScript Object Notation">JSON</abbr>. Al inspeccionar puede interesarnos obtener
+sólo una parte de la información para lo cual puede usarse la opción <kbd class="kbd docutils literal notranslate">-f</kbd>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker image inspect -f <span class="s1">&#39;{{json .Config.Cmd}}&#39;</span> debian:buster-slim
+<span class="go">[&#39;bash&#39;]</span>
+<span class="gp">#</span> docker image inspect -f <span class="s1">&#39;{{json .RootFS}}&#39;</span> debian:buster-slim
+<span class="go">{&quot;Type&quot;:&quot;layers&quot;,&quot;Layers&quot;:[&quot;sha256:f2cb0ecef392f2a630fa1205b874ab2e2aedf96de04d0b8838e4e728e28142da&quot;]}</span>
+</pre></div>
+</div>
 <div class="admonition note">
 <p class="first admonition-title">Nota</p>
 <p class="last">Al realizar una operación sobre una imagen (lo mismo ocurre con otras
@@ -745,6 +753,83 @@ red <em>bridge1</em>.</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker network rm bridge1
 </pre></div>
 </div>
+</div>
+</div>
+<div class="section" id="limitaciones">
+<span id="docker-limit"></span><h2>9.4.2.3.1.6. Limitaciones<a class="headerlink" href="#limitaciones" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Al crear un contenedor también pueden establecerse limitaciones en el uso de los
+recursos, en particular, al uso de la memoria y el procesador.</p>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p>Es probable que al hacer <kbd class="kbd docutils literal notranslate">docker info</kbd> obtengamos el mensaje:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>WARNING: Noswaplimitsupport
+</pre></div>
+</div>
+<p>Si ese es el mensaje, es necesario añadir dos parámetros al arranque del
+núcleo, para lo cual debemos editar el fichero <code class="file docutils literal notranslate"><span class="pre">/etc/default/grub</span></code>:</p>
+<div class="last highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">GRUB_CMDLINE_LINUX</span><span class="o">=</span><span class="s2">&quot;cgroup_enable=memory swapaccount=1&quot;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="memoria">
+<h3>9.4.2.3.1.6.1. Memoria<a class="headerlink" href="#memoria" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Hay varias opciones que limitan la memoria:</p>
+<table border="1" class="docker-limit-params docutils">
+<colgroup>
+<col width="42%" />
+<col width="58%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Parámetro</th>
+<th class="head">Descripción</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>-m, –memory=numero[bkmg]</td>
+<td>Establece un límite estricto al uso de memoria.</td>
+</tr>
+<tr class="row-odd"><td>–memory-reservation=numero[bkmg]</td>
+<td>Esteblece un límite suave al uso de memoria.</td>
+</tr>
+<tr class="row-even"><td>–memory-swap=numero[bkmg]</td>
+<td>Establece un límite al uso de memoria swap.</td>
+</tr>
+</tbody>
+</table>
+<p>Por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker run --rm -d -m 256m --name<span class="o">=</span>nginx nginx:alpine
+<span class="gp">#</span> docker container stats --no-stream --format <span class="s1">&#39;{{.MemUsage}}&#39;</span> nginx
+<span class="go">4.945MiB / 256MiB</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="procesador">
+<h3>9.4.2.3.1.6.2. Procesador<a class="headerlink" href="#procesador" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Existen varias opciones relativas al uso del procesador. Por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker run --rm -d --cpus<span class="o">=</span><span class="m">1</span> --name<span class="o">=</span>nginx nginx:alpine
+</pre></div>
+</div>
+<p>limitará el uso del contenedor a una <abbr title="Central Processing Unit">CPU</abbr>. Puede también especificarse qué
+<abbr title="Central Processing Unit">CPU</abbr> exactamente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span>  docker run --rm -d --cpuset-cpus<span class="o">=</span><span class="m">0</span>,2 --name<span class="o">=</span>nginx nginx:alpine
+</pre></div>
+</div>
+<p>que limitará el uso al primer y tercer procesador.</p>
+<p>Si se tienen varios contenedores simultáneamente, puede también repartirse el
+consumo máximo de <abbr title="Central Processing Unit">CPU</abbr> entre todos ellos mediante la opción <kbd class="kbd docutils literal notranslate">--cpu-shares</kbd>
+cuyo valor predeterminado es <strong>1024</strong>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> cat /sys/fs/cgroup/cpu/docker/cpu.shares
+<span class="go">1024</span>
+</pre></div>
+</div>
+<p>De esto modo, si arrancamos estos tres contenedores:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span>  docker run --rm -d --cpuset-cpus<span class="o">=</span><span class="m">0</span> --name<span class="o">=</span>nginx nginx:alpine
+<span class="gp">#</span>  docker run --rm -d --cpuset-cpus<span class="o">=</span><span class="m">0</span> --cpu-share<span class="o">=</span><span class="m">512</span> --name<span class="o">=</span>php php:alpine
+<span class="gp">#</span>  docker run --rm -d --cpuset-cpus<span class="o">=</span><span class="m">0</span> --cpu-share<span class="o">=</span><span class="m">512</span> --name<span class="o">=</span>mysql mysql:alpine
+</pre></div>
+</div>
+<p>El primer contenedor podrá consumir hasta el 50% de la <abbr title="Central Processing Unit">CPU</abbr> y los otros dos
+hasta el 25%.</p>
 <p class="rubric">Notas al pie</p>
 <table class="docutils footnote" frame="void" id="id4" rules="none">
 <colgroup><col class="label" /><col /></colgroup>
@@ -793,6 +878,11 @@ aparecer esos registros en la terminal ocupada.</td></tr>
 <li><a class="reference internal" href="#redes">9.4.2.3.1.5. Redes</a><ul>
 <li><a class="reference internal" href="#tipos">9.4.2.3.1.5.1. Tipos</a></li>
 <li><a class="reference internal" href="#gestion-de-redes">9.4.2.3.1.5.2. Gestión de redes</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#limitaciones">9.4.2.3.1.6. Limitaciones</a><ul>
+<li><a class="reference internal" href="#memoria">9.4.2.3.1.6.1. Memoria</a></li>
+<li><a class="reference internal" href="#procesador">9.4.2.3.1.6.2. Procesador</a></li>
 </ul>
 </li>
 </ul>

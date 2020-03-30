@@ -280,6 +280,14 @@ Para consultar las características de la imagen podemos usar :kbd:`inspect`::
 
    # docker image inspect debian:buster-slim
 
+que las devuelve en formato |JSON|. Al inspeccionar puede interesarnos obtener
+sólo una parte de la información para lo cual puede usarse la opción :kbd:`-f`::
+
+   # docker image inspect -f '{{json .Config.Cmd}}' debian:buster-slim
+   ['bash']
+   # docker image inspect -f '{{json .RootFS}}' debian:buster-slim
+   {"Type":"layers","Layers":["sha256:f2cb0ecef392f2a630fa1205b874ab2e2aedf96de04d0b8838e4e728e28142da"]}
+
 .. note:: Al realizar una operación sobre una imagen (lo mismo ocurre con otras
    entidades) podemos referirnos a ella por su nombre o por su identificador
    único.
@@ -762,6 +770,78 @@ Como pueden crearse, pueden borrarse redes también::
 
    # docker network rm bridge1
 
+.. _docker-limit:
+
+Limitaciones
+============
+Al crear un contenedor también pueden establecerse limitaciones en el uso de los
+recursos, en particular, al uso de la memoria y el procesador.
+
+.. note:: Es probable que al hacer :kbd:`docker info` obtengamos el mensaje:
+
+   .. code-block:: none
+
+      WARNING: Noswaplimitsupport
+
+   Si ese es el mensaje, es necesario añadir dos parámetros al arranque del
+   núcleo, para lo cual debemos editar el fichero :file:`/etc/default/grub`:
+
+   .. code-block:: bash
+
+      GRUB_CMDLINE_LINUX="cgroup_enable=memory swapaccount=1"
+
+Memoria
+-------
+Hay varias opciones que limitan la memoria:
+
+.. table::
+   :class: docker-limit-params
+
+   =================================== =================================================
+    Parámetro                           Descripción
+   =================================== =================================================
+    -m, --memory=numero[bkmg]           Establece un límite estricto al uso de memoria.
+    --memory-reservation=numero[bkmg]   Esteblece un límite suave al uso de memoria.
+    --memory-swap=numero[bkmg]          Establece un límite al uso de memoria swap.
+   =================================== =================================================
+
+Por ejemplo::
+
+   # docker run --rm -d -m 256m --name=nginx nginx:alpine
+   # docker container stats --no-stream --format '{{.MemUsage}}' nginx
+   4.945MiB / 256MiB
+
+Procesador
+----------
+Existen varias opciones relativas al uso del procesador. Por ejemplo::
+
+   # docker run --rm -d --cpus=1 --name=nginx nginx:alpine
+
+limitará el uso del contenedor a una |CPU|. Puede también especificarse qué
+|CPU| exactamente::
+
+   #  docker run --rm -d --cpuset-cpus=0,2 --name=nginx nginx:alpine
+
+que limitará el uso al primer y tercer procesador.
+
+Si se tienen varios contenedores simultáneamente, puede también repartirse el
+consumo máximo de |CPU| entre todos ellos mediante la opción :kbd:`--cpu-shares`
+cuyo valor predeterminado es **1024**::
+
+   $ cat /sys/fs/cgroup/cpu/docker/cpu.shares
+   1024
+
+De esto modo, si arrancamos estos tres contenedores::
+
+   #  docker run --rm -d --cpuset-cpus=0 --name=nginx nginx:alpine
+   #  docker run --rm -d --cpuset-cpus=0 --cpu-share=512 --name=php php:alpine
+   #  docker run --rm -d --cpuset-cpus=0 --cpu-share=512 --name=mysql mysql:alpine
+
+El primer contenedor podrá consumir hasta el 50% de la |CPU| y los otros dos
+hasta el 25%.
+
+.. storage-opt (man docker-run)
+
 .. rubric:: Notas al pie
 
 .. [#] La configuración por defecto es que demonio y cliente se encuentran en la
@@ -783,6 +863,8 @@ Como pueden crearse, pueden borrarse redes también::
 .. |API| replace:: :abbr:`API (Application Programming Interface)`
 .. |CLI| replace:: :abbr:`CLI (Command Line Interface)`
 .. |PHP| replace:: :abbr:`PHP (PHP HyperText Preprocessor)`
+.. |JSON| replace:: :abbr:`JSON (JavaScript Object Notation)`
+.. |CPU| replace:: :abbr:`CPU (Central Processing Unit)`
 
 .. _Docker Hub: https://hub.docker.com/
 .. _Alpine: https://alpinelinux.org/
