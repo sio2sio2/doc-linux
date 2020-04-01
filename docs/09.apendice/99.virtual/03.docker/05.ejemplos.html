@@ -52,6 +52,122 @@
             
   <div class="section" id="ejemplos">
 <span id="docker-ejemplos"></span><h1>9.4.2.3.4. Ejemplos<a class="headerlink" href="#ejemplos" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>Dedicaremos este último epígrafe a resolver algunos problemas usando
+contenedores de <strong class="program">Docker</strong>.</p>
+<div class="section" id="dnsmasq">
+<h2>9.4.2.3.4.1. dnsmasq<a class="headerlink" href="#dnsmasq" title="Enlazar permanentemente con este título">¶</a></h2>
+</div>
+<div class="section" id="wordpress">
+<h2>9.4.2.3.4.2. Wordpress<a class="headerlink" href="#wordpress" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Nuestra intención ahora es instalar un <a class="reference external" href="https://wordpress.org/">Wordpress</a>, para lo cual utilizaremos
+la siguiente infraestructura:</p>
+<img alt="../../../_images/wordpress.png" src="../../../_images/wordpress.png" />
+<p>es decir, tres contenedores diferentes cada uno de los cuales levanta los tres
+servicios en que se puede descomponer la aplicación: la base de datos, la
+aplicación <abbr title="PHP Hypertext Preprocessor">PHP</abbr> (con el intérprete incluido) y un servidor web que sea el que
+ofrezca la aplicación. Además, es necesario almacenar los ficheros de la base de
+la datos y los datos de la aplicación, por lo que se requerirán dos volúmenes de
+datos.</p>
+<p>Los tres contenedores que utilizaremos son:</p>
+<ul>
+<li><p class="first">La <cite>imagen oficial de mariaDB &lt;https://hub.docker.com/_/mariadb&gt;</cite>, que se
+caracteriza porque al generar un contenedor, crea los ficheros necesarios del
+gestor de bases de datos, según los valores de las variables de entorno que
+se proporcionen (véase el <code class="file docutils literal notranslate"><span class="pre">docker-compose.yaml</span></code> más adelante). Esta
+característica nos permite preparar la base de datos para <em>wordpress</em> y el
+usuario que la maneje.</p>
+</li>
+<li><p class="first">Una <cite>imagen oficial de wordpress que incluya PHP-FPM
+&lt;https://hub.docker.com/_/wordpress&gt;</cite>. Esta imagen contiene el <abbr title="PHP Hypertext Preprocessor">PHP</abbr> necesario
+y la versión de <a class="reference external" href="https://wordpress.org/">Wordpress</a> en el momento de su generación, la cual acaba
+dejando disponible en <code class="file docutils literal notranslate"><span class="pre">/var/www/html</span></code>.</p>
+<p>Esta imagen también usa variables de entorno para conocer dónde se encuentra
+la base de datos y con qué usuarios acceder a ella.</p>
+</li>
+<li><p class="first">Una <cite>imagen mínima de nginx &lt;https://hub.docker.com/_/ngvinx&gt;</cite> que necesitará
+acceso al directorio <code class="file docutils literal notranslate"><span class="pre">/var/www/html</span></code> del contenedor anterior y alterar
+su configuración predefinida para ser capaz de servir la aplicación.</p>
+</li>
+</ul>
+<p>Dado que actúan en comandita tres contenedores, lo más juicioso es utilizar
+<a class="reference internal" href="04.compose.html#docker-compose"><span class="std std-ref">docker-compose</span></a>, el cual requerirá el siguiente
+<code class="file docutils literal notranslate"><span class="pre">docker-compose,yaml</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">version</span><span class="p">:</span> <span class="s">&quot;3&quot;</span>
+<span class="nt">services</span><span class="p">:</span>
+   <span class="nt">mysql</span><span class="p">:</span>
+      <span class="nt">image</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">mariadb</span>
+      <span class="nt">volumes</span><span class="p">:</span>
+         <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">wpmysql:/var/lib/mysql</span>
+      <span class="nt">environment</span><span class="p">:</span>
+         <span class="nt">MYSQL_ROOT_PASSWORD</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">${ROOT_PASS:-toor}</span>
+         <span class="nt">MYSQL_DATABASE</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">${WP_DB:-wordpress}</span>
+         <span class="nt">MYSQL_USER</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">${WP_USER:-wp}</span>
+         <span class="nt">MYSQL_PASSWORD</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">${WP_PASS:-wp}</span>
+      <span class="nt">restart</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
+
+   <span class="nt">wordpress</span><span class="p">:</span>
+      <span class="nt">image</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">wordpress:php7.4-fpm-alpine</span>
+      <span class="nt">depends_on</span><span class="p">:</span>
+        <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">mysql</span>
+      <span class="nt">volumes</span><span class="p">:</span>
+        <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">wpapp:/var/www/html</span>
+      <span class="nt">environment</span><span class="p">:</span>
+        <span class="nt">WORDPRESS_DB_HOST</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">mysql</span>
+        <span class="nt">MYSQL_ROOT_PASSWORD</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">${ROOT_PASS:-toor}</span>
+        <span class="nt">WORDPRESS_DB_NAME</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">${WP_DB:-wordpress}</span>
+        <span class="nt">WORDPRESS_DB_USER</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">${WP_USER:-wp}</span>
+        <span class="nt">WORDPRESS_DB_PASSWORD</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">${WP_PASS:-wp}</span>
+        <span class="nt">WORDPRESS_TABLE_PREFIX</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">${WP_PREFIX:-wp_}</span>
+      <span class="nt">restart</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
+
+   <span class="nt">nginx</span><span class="p">:</span>
+      <span class="nt">image</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">nginx:alpine</span>
+      <span class="nt">ports</span><span class="p">:</span>
+        <span class="p p-Indicator">-</span> <span class="s">&quot;80:80&quot;</span>
+      <span class="nt">volumes</span><span class="p">:</span>
+        <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">./blogs.conf:/etc/nginx/conf.d/default.conf</span>
+        <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">wpapp:/var/www/html</span>
+      <span class="nt">depends_on</span><span class="p">:</span>
+        <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">wordpress</span>
+
+<span class="nt">volumes</span><span class="p">:</span>
+   <span class="nt">wpmysql</span><span class="p">:</span>
+   <span class="nt">wpapp</span><span class="p">:</span>
+</pre></div>
+</div>
+<p>Si se observa el fichero, se verá que es necesario suministrar el fichero
+<code class="file docutils literal notranslate"><span class="pre">blogs.conf</span></code> con la configuración para que <a class="reference internal" href="../../../07.serre/02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a> sea capaz
+de ejecutar la aplicación:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>+ workdir
+    +-- blogs.conf
+    +-- docker-compose.yaml
+</pre></div>
+</div>
+<p>Su contenido puede ser este:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">server</span> <span class="p">{</span>
+   <span class="kn">listen</span>   <span class="mi">80</span><span class="p">;</span>
+   <span class="kn">root</span>     <span class="s">/var/www/html</span><span class="p">;</span>
+
+   <span class="kn">index</span> <span class="s">index.php</span><span class="p">;</span>
+
+   <span class="kn">location</span> <span class="s">/</span> <span class="p">{</span>
+      <span class="kn">try_files</span> <span class="nv">$uri</span> <span class="nv">$uri/</span> <span class="s">/index.php</span><span class="nv">$is_args$args</span><span class="p">;</span>
+   <span class="p">}</span>
+
+   <span class="kn">location</span> <span class="p">~</span> <span class="sr">\.php$</span> <span class="p">{</span>
+      <span class="kn">fastcgi_split_path_info</span> <span class="s">^(.+\.php)(/.+)</span>$<span class="p">;</span>
+      <span class="kn">fastcgi_pass</span> <span class="n">wordpress</span><span class="p">:</span><span class="mi">9000</span><span class="p">;</span>
+
+      <span class="kn">fastcgi_index</span> <span class="s">index.php</span><span class="p">;</span>
+      <span class="kn">include</span> <span class="s">fastcgi.conf</span><span class="p">;</span>
+
+      <span class="kn">fastcgi_param</span> <span class="s">SCRIPT_FILENAME</span> <span class="nv">$document_root$fastcgi_script_name</span><span class="p">;</span>
+      <span class="kn">fastcgi_param</span> <span class="s">SCRIPT_NAME</span> <span class="nv">$fastcgi_script_name</span><span class="p">;</span>
+   <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
 </div>
 
 
@@ -60,6 +176,15 @@
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
+  <h3><a href="../../../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">9.4.2.3.4. Ejemplos</a><ul>
+<li><a class="reference internal" href="#dnsmasq">9.4.2.3.4.1. dnsmasq</a></li>
+<li><a class="reference internal" href="#wordpress">9.4.2.3.4.2. Wordpress</a></li>
+</ul>
+</li>
+</ul>
+
   <h4>Tema anterior</h4>
   <p class="topless"><a href="04.compose.html"
                         title="capítulo anterior">9.4.2.3.3. Composición</a></p>

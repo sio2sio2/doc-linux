@@ -2,5 +2,145 @@
 
 Composición
 ***********
+:program:`docker-compose` es una aplicación que facilita la definición y
+ejecución de aplicaciones multicontenedor, esto es, aplicaciones que se dividen
+en aplicaciones más simples cada una de las cuales se ejecuta en un contenedor
+distinto. En particular proporciona un método declarativo para describir cómo
+construir varios contenedores y cómo ponerlos a funcionar simultáneamente.
 
-Hablar de :program:`docker-compose`.
+Requiere una instalación independiente::
+
+   # apt install docker-compose
+
+Fundamentos
+===========
+El uso de :program:`docker-compose` se basa en la creación, dentro de un
+directorio de trabajo, de un fichero :file:`docker-compose.yaml` (o
+:file:`docker-compose.yml`) donde se declaran cuáles son los contenedores, cómo
+se construyen sus imágenes (si es que hay que construirlas previamente), cuáles
+son las relaciones existentes entre ellos y cómo deben arrancarse.
+
+Para comocer la sintaxis de estos ficheros |YAML| puede recurrse a la
+`documentación oficial sobre docker-compose
+<https://docs.docker.com/compose/compose-file/>`_. Básicamente consiste en ir
+declarando entidades: contenedores (que denomina *services*), volúmenes, etc.
+
+Ejemplo ilustrativo
+===================
+Supongamos que deseamos levantar un servicio web con :ref:`nginx <n-ginx>` que
+sea capaz de generar páginas escritas en |PHP|. Para ello dispondremos dos
+contenedores:
+
+* Uno que ejecute :ref:`nginx`<n-ginx>`, que parta de una `imagen de Alpine
+  <https://hub.docker.com/_/alpine>`_ e instale :ref:`nginx <n-ginx>`\ [#]_.
+ 
+* Otro que sea capaz de ejecutar |FPM| y que tomaremos directamente de `una de
+  las imágenes oficiales de PHP <https://hub.docker.com/_/php>`_
+
+Para llevar a cabo este propósito crearemos un directorio de trabajo con el
+siguiente contenido:
+
+.. code-block:: none
+
+   + /tmp/nginx+php
+         |
+         +-- nginx
+         |     +-- default.conf
+         |     +-- Dockerfile
+         |
+         +-- webapp
+         |     +-- index.php
+         |
+         +-- docker-compose.yaml
+
+donde :file:`Dockerfile` permite construir una imagen con :ref:`nginx <n-ginx>`:
+
+.. code-block:: docker
+
+   FROM     alpine
+   RUN      apk update && apk add nginx && \
+            ln -s /dev/stdout /var/log/nginx/access.log;\
+            ln -s /dev/stderr /var/log/nginx/error.log;\
+            mkdir /run/nginx
+
+   EXPOSE   80/tcp
+   CMD      ["nginx", "-g", "daemon off;"]
+
+y una configuración del servidor que nos permita ejecutar |PHP|:
+
+.. code-block:: nginx
+
+   server {
+      listen 80;
+
+      try_files $uri $uri/ =404;
+      index index.php;
+      root /srv/www;
+
+      location ~ \.php$ {
+         fastcgi_split_path_info ^(.+\.php)(/.+)$;
+
+         include fastcgi.conf;
+         fastcgi_param PATH_INFO $fastcgi_path_info;
+
+         fastcgi_pass php:9000;
+      }
+   }
+
+.. note:: Obsérvese que para conectar el servidor web con el intérprete de
+   |PHP|, se utiliza como nombre de máquina *php*. Esto es debido a que la
+   dirección |IP| de cada máquina es resoluble utilizando el nombre de servicio
+   que se le ha asignada.
+
+El directorio :file:`webapp` es el directorio donde se almacenará la aplicación
+|PHP|. Nos limitaremos a utilizar el típico ejemplo::
+
+   # echo '<?php phpinfo(); ?>' > webapp/index.php
+
+Y, por último, el :file:`docker-compose.yaml`:
+
+.. code-block:: yaml
+
+   version: "3.7"
+   services:
+     php:
+       image: php:fpm-alpine
+       volumes:
+         - ./webapp:/srv/www
+
+     web:
+       image: alpine:nginx
+       build: ./nginx
+       ports:
+         - "80:80"
+       volumes:
+         - ./webapp:/srv/www
+         - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+       depends_on:
+         - php
+
+Para poner en funcionamiento ambos contenedores basta con encontrarse en el
+directorio :file:`nginx+php` y ejecutar\ [#]_::
+
+   # docker-compose up -d
+
+Podemos parar el funcionamiento de ambos contenedores con::
+
+   # docker-compose stop
+
+.. warning:: Una vez que se hayan creado las imágenes estas no volverán a
+   construirse a menos que se incluya la opción :kbd:`--build`::
+
+      # docker-compose up --build -d
+
+.. rubric:: Notas al pie
+
+.. [#] Es más apropiado utilizar directamente la imagen oficial *nginx:alpine*,
+   pero de esta forma se ilustra cómo :program:`docker-compose` también es capaz
+   de construir imágenes.
+
+.. [#] Sin -d, podremos observar el registro y depurar el funcionamiento.
+
+.. |YAML| replace:: :abbr:`YAML (YAML Ain't Markup Language)`
+.. |PHP| replace:: :abbr:`PHP (PHP HyperText Preprocessor)`
+.. |FPM| replace:: :abbr:`FPM (FastCGI Process Manager)`

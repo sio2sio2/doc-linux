@@ -23,8 +23,8 @@
     
     <link rel="index" title="Índice" href="../../../genindex.html" />
     <link rel="search" title="Búsqueda" href="../../../search.html" />
-    <link rel="next" title="10. Guías para ciclos formativos" href="../../../10.guias/index.html" />
-    <link rel="prev" title="9.4.2.3.2. Contrucción" href="03.constr.html" /> 
+    <link rel="next" title="9.4.2.3.4. Ejemplos" href="05.ejemplos.html" />
+    <link rel="prev" title="9.4.2.3.2. Construcción" href="03.constr.html" /> 
   </head><body>
     <div class="related" role="navigation" aria-label="related navigation">
       <h3>Navegación</h3>
@@ -33,10 +33,10 @@
           <a href="../../../genindex.html" title="Índice General"
              accesskey="I">índice</a></li>
         <li class="right" >
-          <a href="../../../10.guias/index.html" title="10. Guías para ciclos formativos"
+          <a href="05.ejemplos.html" title="9.4.2.3.4. Ejemplos"
              accesskey="N">siguiente</a> |</li>
         <li class="right" >
-          <a href="03.constr.html" title="9.4.2.3.2. Contrucción"
+          <a href="03.constr.html" title="9.4.2.3.2. Construcción"
              accesskey="P">anterior</a> |</li>
         <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../index.html" >9. Apéndices</a> &#187;</li>
@@ -52,7 +52,145 @@
             
   <div class="section" id="composicion">
 <span id="docker-compose"></span><h1>9.4.2.3.3. Composición<a class="headerlink" href="#composicion" title="Enlazar permanentemente con este título">¶</a></h1>
-<p>Hablar de <strong class="program">docker-compose</strong>.</p>
+<p><strong class="program">docker-compose</strong> es una aplicación que facilita la definición y
+ejecución de aplicaciones multicontenedor, esto es, aplicaciones que se dividen
+en aplicaciones más simples cada una de las cuales se ejecuta en un contenedor
+distinto. En particular proporciona un método declarativo para describir cómo
+construir varios contenedores y cómo ponerlos a funcionar simultáneamente.</p>
+<p>Requiere una instalación independiente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt install docker-compose
+</pre></div>
+</div>
+<div class="section" id="fundamentos">
+<h2>9.4.2.3.3.1. Fundamentos<a class="headerlink" href="#fundamentos" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>El uso de <strong class="program">docker-compose</strong> se basa en la creación, dentro de un
+directorio de trabajo, de un fichero <code class="file docutils literal notranslate"><span class="pre">docker-compose.yaml</span></code> (o
+<code class="file docutils literal notranslate"><span class="pre">docker-compose.yml</span></code>) donde se declaran cuáles son los contenedores, cómo
+se construyen sus imágenes (si es que hay que construirlas previamente), cuáles
+son las relaciones existentes entre ellos y cómo deben arrancarse.</p>
+<p>Para comocer la sintaxis de estos ficheros <abbr title="YAML Ain't Markup Language">YAML</abbr> puede recurrse a la
+<a class="reference external" href="https://docs.docker.com/compose/compose-file/">documentación oficial sobre docker-compose</a>. Básicamente consiste en ir
+declarando entidades: contenedores (que denomina <em>services</em>), volúmenes, etc.</p>
+</div>
+<div class="section" id="ejemplo-ilustrativo">
+<h2>9.4.2.3.3.2. Ejemplo ilustrativo<a class="headerlink" href="#ejemplo-ilustrativo" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Supongamos que deseamos levantar un servicio web con <a class="reference internal" href="../../../07.serre/02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a> que
+sea capaz de generar páginas escritas en <abbr title="PHP HyperText Preprocessor">PHP</abbr>. Para ello dispondremos dos
+contenedores:</p>
+<ul class="simple">
+<li>Uno que ejecute <a class="reference internal" href="../../../07.serre/02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx`</span></a>, que parta de una <a class="reference external" href="https://hub.docker.com/_/alpine">imagen de Alpine</a> e instale <a class="reference internal" href="../../../07.serre/02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a><a class="footnote-reference" href="#id3" id="id1">[1]</a>.</li>
+<li>Otro que sea capaz de ejecutar <abbr title="FastCGI Process Manager">FPM</abbr> y que tomaremos directamente de <a class="reference external" href="https://hub.docker.com/_/php">una de
+las imágenes oficiales de PHP</a></li>
+</ul>
+<p>Para llevar a cabo este propósito crearemos un directorio de trabajo con el
+siguiente contenido:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>+ /tmp/nginx+php
+      |
+      +-- nginx
+      |     +-- default.conf
+      |     +-- Dockerfile
+      |
+      +-- webapp
+      |     +-- index.php
+      |
+      +-- docker-compose.yaml
+</pre></div>
+</div>
+<p>donde <code class="file docutils literal notranslate"><span class="pre">Dockerfile</span></code> permite construir una imagen con <a class="reference internal" href="../../../07.serre/02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a>:</p>
+<div class="highlight-docker notranslate"><div class="highlight"><pre><span></span><span class="k">FROM</span><span class="s">     alpine</span>
+<span class="k">RUN</span>      apk update <span class="o">&amp;&amp;</span> apk add nginx <span class="o">&amp;&amp;</span> <span class="se">\</span>
+         ln -s /dev/stdout /var/log/nginx/access.log<span class="p">;</span><span class="se">\</span>
+         ln -s /dev/stderr /var/log/nginx/error.log<span class="p">;</span><span class="se">\</span>
+         mkdir /run/nginx
+
+<span class="k">EXPOSE</span><span class="s">   80/tcp</span>
+<span class="k">CMD</span>      <span class="p">[</span><span class="s2">&quot;nginx&quot;</span><span class="p">,</span> <span class="s2">&quot;-g&quot;</span><span class="p">,</span> <span class="s2">&quot;daemon off;&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>y una configuración del servidor que nos permita ejecutar <abbr title="PHP HyperText Preprocessor">PHP</abbr>:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">server</span> <span class="p">{</span>
+   <span class="kn">listen</span> <span class="mi">80</span><span class="p">;</span>
+
+   <span class="kn">try_files</span> <span class="nv">$uri</span> <span class="nv">$uri/</span> <span class="p">=</span><span class="mi">404</span><span class="p">;</span>
+   <span class="kn">index</span> <span class="s">index.php</span><span class="p">;</span>
+   <span class="kn">root</span> <span class="s">/srv/www</span><span class="p">;</span>
+
+   <span class="kn">location</span> <span class="p">~</span> <span class="sr">\.php$</span> <span class="p">{</span>
+      <span class="kn">fastcgi_split_path_info</span> <span class="s">^(.+\.php)(/.+)</span>$<span class="p">;</span>
+
+      <span class="kn">include</span> <span class="s">fastcgi.conf</span><span class="p">;</span>
+      <span class="kn">fastcgi_param</span> <span class="s">PATH_INFO</span> <span class="nv">$fastcgi_path_info</span><span class="p">;</span>
+
+      <span class="kn">fastcgi_pass</span> <span class="n">php</span><span class="p">:</span><span class="mi">9000</span><span class="p">;</span>
+   <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">Obsérvese que para conectar el servidor web con el intérprete de
+<abbr title="PHP HyperText Preprocessor">PHP</abbr>, se utiliza como nombre de máquina <em>php</em>. Esto es debido a que la
+dirección <abbr title="Internet Protocol">IP</abbr> de cada máquina es resoluble utilizando el nombre de servicio
+que se le ha asignada.</p>
+</div>
+<p>El directorio <code class="file docutils literal notranslate"><span class="pre">webapp</span></code> es el directorio donde se almacenará la aplicación
+<abbr title="PHP HyperText Preprocessor">PHP</abbr>. Nos limitaremos a utilizar el típico ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="nb">echo</span> <span class="s1">&#39;&lt;?php phpinfo(); ?&gt;&#39;</span> &gt; webapp/index.php
+</pre></div>
+</div>
+<p>Y, por último, el <code class="file docutils literal notranslate"><span class="pre">docker-compose.yaml</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">version</span><span class="p">:</span> <span class="s">&quot;3.7&quot;</span>
+<span class="nt">services</span><span class="p">:</span>
+  <span class="nt">php</span><span class="p">:</span>
+    <span class="nt">image</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">php:fpm-alpine</span>
+    <span class="nt">volumes</span><span class="p">:</span>
+      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">./webapp:/srv/www</span>
+
+  <span class="nt">web</span><span class="p">:</span>
+    <span class="nt">image</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">alpine:nginx</span>
+    <span class="nt">build</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">./nginx</span>
+    <span class="nt">ports</span><span class="p">:</span>
+      <span class="p p-Indicator">-</span> <span class="s">&quot;80:80&quot;</span>
+    <span class="nt">volumes</span><span class="p">:</span>
+      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">./webapp:/srv/www</span>
+      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">./nginx/default.conf:/etc/nginx/conf.d/default.conf</span>
+    <span class="nt">depends_on</span><span class="p">:</span>
+      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">php</span>
+</pre></div>
+</div>
+<p>Para poner en funcionamiento ambos contenedores basta con encontrarse en el
+directorio <code class="file docutils literal notranslate"><span class="pre">nginx+php</span></code> y ejecutar<a class="footnote-reference" href="#id4" id="id2">[2]</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker-compose up -d
+</pre></div>
+</div>
+<p>Podemos parar el funcionamiento de ambos contenedores con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker-compose stop
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="first admonition-title">Advertencia</p>
+<p>Una vez que se hayan creado las imágenes estas no volverán a
+construirse a menos que se incluya la opción <kbd class="kbd docutils literal notranslate">--build</kbd>:</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker-compose up --build -d
+</pre></div>
+</div>
+</div>
+<p class="rubric">Notas al pie</p>
+<table class="docutils footnote" frame="void" id="id3" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td>Es más apropiado utilizar directamente la imagen oficial <em>nginx:alpine</em>,
+pero de esta forma se ilustra cómo <strong class="program">docker-compose</strong> también es capaz
+de construir imágenes.</td></tr>
+</tbody>
+</table>
+<table class="docutils footnote" frame="void" id="id4" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id2">[2]</a></td><td>Sin -d, podremos observar el registro y depurar el funcionamiento.</td></tr>
+</tbody>
+</table>
+</div>
 </div>
 
 
@@ -61,12 +199,21 @@
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
+  <h3><a href="../../../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">9.4.2.3.3. Composición</a><ul>
+<li><a class="reference internal" href="#fundamentos">9.4.2.3.3.1. Fundamentos</a></li>
+<li><a class="reference internal" href="#ejemplo-ilustrativo">9.4.2.3.3.2. Ejemplo ilustrativo</a></li>
+</ul>
+</li>
+</ul>
+
   <h4>Tema anterior</h4>
   <p class="topless"><a href="03.constr.html"
-                        title="capítulo anterior">9.4.2.3.2. Contrucción</a></p>
+                        title="capítulo anterior">9.4.2.3.2. Construcción</a></p>
   <h4>Próximo tema</h4>
-  <p class="topless"><a href="../../../10.guias/index.html"
-                        title="próximo capítulo">10. Guías para ciclos formativos</a></p>
+  <p class="topless"><a href="05.ejemplos.html"
+                        title="próximo capítulo">9.4.2.3.4. Ejemplos</a></p>
   <div role="note" aria-label="source link">
     <h3>Esta página</h3>
     <ul class="this-page-menu">
@@ -97,10 +244,10 @@
           <a href="../../../genindex.html" title="Índice General"
              >índice</a></li>
         <li class="right" >
-          <a href="../../../10.guias/index.html" title="10. Guías para ciclos formativos"
+          <a href="05.ejemplos.html" title="9.4.2.3.4. Ejemplos"
              >siguiente</a> |</li>
         <li class="right" >
-          <a href="03.constr.html" title="9.4.2.3.2. Contrucción"
+          <a href="03.constr.html" title="9.4.2.3.2. Construcción"
              >anterior</a> |</li>
         <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../index.html" >9. Apéndices</a> &#187;</li>

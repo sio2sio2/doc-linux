@@ -1,4 +1,132 @@
 .. _docker-ejemplos:
 
 Ejemplos
-========
+********
+Dedicaremos este último epígrafe a resolver algunos problemas usando
+contenedores de :program:`Docker`.
+
+dnsmasq
+=======
+
+Wordpress
+=========
+Nuestra intención ahora es instalar un Wordpress_, para lo cual utilizaremos
+la siguiente infraestructura:
+
+.. image:: files/wordpress.png
+
+es decir, tres contenedores diferentes cada uno de los cuales levanta los tres
+servicios en que se puede descomponer la aplicación: la base de datos, la
+aplicación |PHP| (con el intérprete incluido) y un servidor web que sea el que
+ofrezca la aplicación. Además, es necesario almacenar los ficheros de la base de
+la datos y los datos de la aplicación, por lo que se requerirán dos volúmenes de
+datos.
+
+Los tres contenedores que utilizaremos son:
+
+- La `imagen oficial de mariaDB <https://hub.docker.com/_/mariadb>`, que se
+  caracteriza porque al generar un contenedor, crea los ficheros necesarios del
+  gestor de bases de datos, según los valores de las variables de entorno que
+  se proporcionen (véase el :file:`docker-compose.yaml` más adelante). Esta
+  característica nos permite preparar la base de datos para *wordpress* y el
+  usuario que la maneje.
+
+- Una `imagen oficial de wordpress que incluya PHP-FPM
+  <https://hub.docker.com/_/wordpress>`. Esta imagen contiene el |PHP| necesario
+  y la versión de Wordpress_ en el momento de su generación, la cual acaba
+  dejando disponible en :file:`/var/www/html`.
+
+  Esta imagen también usa variables de entorno para conocer dónde se encuentra
+  la base de datos y con qué usuarios acceder a ella.
+
+- Una `imagen mínima de nginx <https://hub.docker.com/_/ngvinx>` que necesitará
+  acceso al directorio :file:`/var/www/html` del contenedor anterior y alterar
+  su configuración predefinida para ser capaz de servir la aplicación.
+
+Dado que actúan en comandita tres contenedores, lo más juicioso es utilizar
+:ref:`docker-compose <docker-compose>`, el cual requerirá el siguiente
+:file:`docker-compose,yaml`:
+
+.. code-block:: yaml
+
+   version: "3"
+   services:
+      mysql:
+         image: mariadb
+         volumes:
+            - wpmysql:/var/lib/mysql
+         environment:
+            MYSQL_ROOT_PASSWORD: ${ROOT_PASS:-toor}
+            MYSQL_DATABASE: ${WP_DB:-wordpress}
+            MYSQL_USER: ${WP_USER:-wp}
+            MYSQL_PASSWORD: ${WP_PASS:-wp}
+         restart: unless-stopped
+
+      wordpress:
+         image: wordpress:php7.4-fpm-alpine
+         depends_on:
+           - mysql
+         volumes:
+           - wpapp:/var/www/html
+         environment:
+           WORDPRESS_DB_HOST: mysql
+           MYSQL_ROOT_PASSWORD: ${ROOT_PASS:-toor}
+           WORDPRESS_DB_NAME: ${WP_DB:-wordpress}
+           WORDPRESS_DB_USER: ${WP_USER:-wp}
+           WORDPRESS_DB_PASSWORD: ${WP_PASS:-wp}
+           WORDPRESS_TABLE_PREFIX: ${WP_PREFIX:-wp_}
+         restart: unless-stopped
+
+      nginx:
+         image: nginx:alpine
+         ports:
+           - "80:80"
+         volumes:
+           - ./blogs.conf:/etc/nginx/conf.d/default.conf
+           - wpapp:/var/www/html
+         depends_on:
+           - wordpress
+
+   volumes:
+      wpmysql:
+      wpapp:
+
+Si se observa el fichero, se verá que es necesario suministrar el fichero
+:file:`blogs.conf` con la configuración para que :ref:`nginx <n-ginx>` sea capaz
+de ejecutar la aplicación:
+
+.. code-block:: none
+
+   + workdir
+       +-- blogs.conf
+       +-- docker-compose.yaml
+
+Su contenido puede ser este:
+
+.. code-block:: nginx
+
+   server {
+      listen   80;
+      root     /var/www/html;
+
+      index index.php;
+      
+      location / {
+         try_files $uri $uri/ /index.php$is_args$args;
+      }
+
+      location ~ \.php$ {
+         fastcgi_split_path_info ^(.+\.php)(/.+)$;
+         fastcgi_pass wordpress:9000;
+
+         fastcgi_index index.php;
+         include fastcgi.conf;
+
+         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+         fastcgi_param SCRIPT_NAME $fastcgi_script_name;
+      }
+   }
+
+
+.. _Wordpress: https://wordpress.org/
+.. |PHP| replace:: :abbr:`PHP (PHP Hypertext Preprocessor)`
