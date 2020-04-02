@@ -7,6 +7,60 @@ contenedores de :program:`Docker`.
 
 dnsmasq
 =======
+El propósito es ejecutar un contenedor con :ref:`dnsmasq <dnsmasq>` capaz de
+proporcionar resolución de nombres y configuración dinámica de direcciones a los
+equipos de la red. Esto último nos obliga a que el contenedor comporta la red
+con el anfitrión.
+
+Aunque no usaremos :ref:`docker-compose <docker-compose>`, puesto que sólo
+necesitamos un contenedor, Debemos preparar un directorio de trabajo con el
+siguiente contenido:
+
+.. code-block:: none
+
+   + workdir
+      +-- dnsmasq.d
+      |     +-- dns.conf
+      |     +-- dhcp.conf
+      +-- Dockerfile
+
+El subdirectorio :file:`dnsmasq.d` contendrá la configuración que deseamos para
+nuestro :ref:`dnsmasq <dnsmasq>`. Por ejemplo:
+
+.. code-block:: bash
+
+   # dns.conf
+   no-resolv
+   server=1.0.0.1
+   server=1.1.1.
+
+y:
+
+.. code-block:: bash
+
+   # dhcp.conf
+   log-dhcp
+   dhcp-range=192.168.255.64,192.168.255.127,5m
+   domain=internal.vm,192.168.255.0/24
+
+Y el :file:`Dockerfile` la forma en construir una imagen con :ref:`dnsmasq
+<dnsmasq>` a partir de Alpine_:
+
+.. code-block:: docker
+
+   FROM    alpine
+   RUN     apk update && apk add dnsmasq; \
+           echo 'conf-dir=/etc/dnsmasq.d/,*.conf' > /etc/dnsmasq.conf
+   EXPOSE  53/UDP 67/UDP 69/UDP
+   CMD     ["dnsmasq", "--no-daemon", "-z"]
+
+Con ello, podemos construir la imagen::
+
+   # docker build -t dnsmasq:alpine .
+
+Y ejecutar el contenedor basado en esa imagen::
+
+   # docker run --rm --network host -v /workdir/dnsmasq.d:/etc/dnsmasq.d dnsmasq:alpine
 
 Wordpress
 =========
@@ -130,3 +184,4 @@ Su contenido puede ser este:
 
 .. _Wordpress: https://wordpress.org/
 .. |PHP| replace:: :abbr:`PHP (PHP Hypertext Preprocessor)`
+.. _Alpine: https://alpinelinux.org/

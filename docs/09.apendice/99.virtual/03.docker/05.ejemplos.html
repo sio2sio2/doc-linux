@@ -56,6 +56,51 @@
 contenedores de <strong class="program">Docker</strong>.</p>
 <div class="section" id="dnsmasq">
 <h2>9.4.2.3.4.1. dnsmasq<a class="headerlink" href="#dnsmasq" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>El propósito es ejecutar un contenedor con <a class="reference internal" href="../../../06.infraestructura/02.dhcp/03.dnsmasq.html#dnsmasq"><span class="std std-ref">dnsmasq</span></a> capaz de
+proporcionar resolución de nombres y configuración dinámica de direcciones a los
+equipos de la red. Esto último nos obliga a que el contenedor comporta la red
+con el anfitrión.</p>
+<p>Aunque no usaremos <a class="reference internal" href="04.compose.html#docker-compose"><span class="std std-ref">docker-compose</span></a>, puesto que sólo
+necesitamos un contenedor, Debemos preparar un directorio de trabajo con el
+siguiente contenido:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>+ workdir
+   +-- dnsmasq.d
+   |     +-- dns.conf
+   |     +-- dhcp.conf
+   +-- Dockerfile
+</pre></div>
+</div>
+<p>El subdirectorio <code class="file docutils literal notranslate"><span class="pre">dnsmasq.d</span></code> contendrá la configuración que deseamos para
+nuestro <a class="reference internal" href="../../../06.infraestructura/02.dhcp/03.dnsmasq.html#dnsmasq"><span class="std std-ref">dnsmasq</span></a>. Por ejemplo:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># dns.conf</span>
+no-resolv
+<span class="nv">server</span><span class="o">=</span><span class="m">1</span>.0.0.1
+<span class="nv">server</span><span class="o">=</span><span class="m">1</span>.1.1.
+</pre></div>
+</div>
+<p>y:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># dhcp.conf</span>
+log-dhcp
+dhcp-range<span class="o">=</span><span class="m">192</span>.168.255.64,192.168.255.127,5m
+<span class="nv">domain</span><span class="o">=</span>internal.vm,192.168.255.0/24
+</pre></div>
+</div>
+<p>Y el <code class="file docutils literal notranslate"><span class="pre">Dockerfile</span></code> la forma en construir una imagen con <a class="reference internal" href="../../../06.infraestructura/02.dhcp/03.dnsmasq.html#dnsmasq"><span class="std std-ref">dnsmasq</span></a> a partir de <a class="reference external" href="https://alpinelinux.org/">Alpine</a>:</p>
+<div class="highlight-docker notranslate"><div class="highlight"><pre><span></span><span class="k">FROM</span><span class="s">    alpine</span>
+<span class="k">RUN</span>     apk update <span class="o">&amp;&amp;</span> apk add dnsmasq<span class="p">;</span> <span class="se">\</span>
+        <span class="nb">echo</span> <span class="s1">&#39;conf-dir=/etc/dnsmasq.d/,*.conf&#39;</span> &gt; /etc/dnsmasq.conf
+<span class="k">EXPOSE</span><span class="s">  53/UDP 67/UDP 69/UDP</span>
+<span class="k">CMD</span>     <span class="p">[</span><span class="s2">&quot;dnsmasq&quot;</span><span class="p">,</span> <span class="s2">&quot;--no-daemon&quot;</span><span class="p">,</span> <span class="s2">&quot;-z&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>Con ello, podemos construir la imagen:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker build -t dnsmasq:alpine .
+</pre></div>
+</div>
+<p>Y ejecutar el contenedor basado en esa imagen:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker run --rm --network host -v /workdir/dnsmasq.d:/etc/dnsmasq.d dnsmasq:alpine
+</pre></div>
+</div>
 </div>
 <div class="section" id="wordpress">
 <h2>9.4.2.3.4.2. Wordpress<a class="headerlink" href="#wordpress" title="Enlazar permanentemente con este título">¶</a></h2>
