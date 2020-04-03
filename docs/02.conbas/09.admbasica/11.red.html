@@ -97,7 +97,7 @@ sustituciones.</p>
 <span class="go">eth0  lo</span>
 </pre></div>
 </div>
-<p>También es posible obtener las interfaces a través del comando <a class="reference internal" href="../../08.redes/index.html#ip"><span class="std std-ref">ip</span></a>:</p>
+<p>También es posible obtener las interfaces a través del comando <a class="reference internal" href="#ip"><span class="std std-ref">ip</span></a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> ip link show
 </pre></div>
 </div>
@@ -226,18 +226,35 @@ importante que antes de editar el fichero, la desactive con <a class="reference 
 no atiende a cómo se configuró la interfaz, sino a cual es la configuración
 escrita en el fichero en el momento de ejecutar <a class="reference internal" href="#ifdown"><span class="std std-ref">ifdown</span></a>. Por
 eso, si al activarse la interfaz, la configuración era estática, los
-<em>scripta</em> usarán internamente la orden <a class="reference internal" href="../../08.redes/index.html#ip"><span class="std std-ref">ip</span></a>. Si antes de
+<em>scripta</em> usarán internamente la orden <a class="reference internal" href="#ip"><span class="std std-ref">ip</span></a>. Si antes de
 desactivaer la interfaz, modifica el fichero y vuelve la configuración
 dinámica, al hacer <a class="reference internal" href="#ifdown"><span class="std std-ref">ifdown</span></a>. el <em>script</em> no desactivará la
-interfaz con <a class="reference internal" href="../../08.redes/index.html#ip"><span class="std std-ref">ip</span></a>, sino que intentará usar internamente
-<a class="reference internal" href="#dhclient"><span class="std std-ref">dhclient</span></a> y, obviamente, fallará.</p>
+interfaz con <a class="reference internal" href="#ip"><span class="std std-ref">ip</span></a>, sino que intentará usar internamente
+<a class="reference internal" href="../../06.infraestructura/02.dhcp/02.tipos.html#dhclient"><span class="std std-ref">dhclient</span></a> y, obviamente, fallará.</p>
 </div>
 <p class="rubric">DNS</p>
 <p>Queda, por último, tratar la configuración de los servidores <abbr title="Domain Name Service">DNS</abbr> en el fichero <code class="file docutils literal notranslate"><span class="pre">/etc/resolv.conf</span></code>. Si la configuración es
-dinámica, el propio cliente <em>dhcp</em> se encarga de escribir este fichero y no hay
+dinámica, el propio cliente <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> se encarga de escribir este fichero y no hay
 que hacer ninguna configuración. En cambio, si la configuración es estática, sí
 habrá que escribirlo o al menos cerciorarse que es válido. Se explicará
 su contenido <a class="reference internal" href="#bas-resolv-conf"><span class="std std-ref">dentro del epígrafe siguiente</span></a>.</p>
+<div class="admonition note" id="resolvconf">
+<p class="first admonition-title">Nota</p>
+<p>Alternativamente se puede instalar y utilizar el programa
+<em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/resolvconf">resolvconf</a></em> que se encarga de gestionar por nosotros el fichero
+<code class="file docutils literal notranslate"><span class="pre">/etc/resolv.conf</span></code>. En este caso, no debe modificarse jamás a mano tal
+fichero y cuando la configuración de la interfaz sea estática incluir en la
+definición de la interfaz una línea que le indique a <strong class="program">resolvconf</strong>
+cuáles son los servidores de nombres:</p>
+<div class="last highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">allow-hotplug eth0</span>
+<span class="go">iface eth0 inet static</span>
+<span class="go">   address        192.168.1.4/24</span>
+<span class="go">   gateway        192.168.1.1</span>
+<span class="go">   dns-nameserver 1.1.1.1</span>
+<span class="go">   dns-nameserver 1.0.0.1</span>
+</pre></div>
+</div>
+</div>
 </div>
 <div class="section" id="configuracion-universal">
 <span id="net-univ"></span><h2>2.6.5.3. Configuración universal<a class="headerlink" href="#configuracion-universal" title="Enlazar permanentemente con este título">¶</a></h2>
@@ -247,28 +264,30 @@ su contenido <a class="reference internal" href="#bas-resolv-conf"><span class="
 primero de que la interfaz no se activó mediante <a class="reference internal" href="#ifup"><span class="std std-ref">ifup</span></a>
 y, si lo está, utilice <a class="reference internal" href="#ifdown"><span class="std std-ref">ifdown</span></a> antes de empezar.</p>
 </div>
-<p class="rubric">Configuración automática</p>
-<p>La configuración más sencilla es la automática, ya que el cliente de <em>dhcp</em> se
-encargará de todo. El cliente habitual es</p>
-<span class="target" id="dhclient"></span><dl class="docutils" id="index-3">
-<dt><strong class="program">dhclient</strong></dt>
-<dd><p class="first">Permite obtener una configuración de red ofrecida un un servidor <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> dhclient eth0
+<div class="section" id="configuracion-dinamica">
+<h3>2.6.5.3.1. Configuración dinámica<a class="headerlink" href="#configuracion-dinamica" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>El cliente más utilizado para la línea de órdenes es <a class="reference internal" href="../../06.infraestructura/02.dhcp/02.tipos.html#dhclient"><span class="std std-ref">dhclient</span></a>
+que se encarga de configurar la interfaz y <a class="reference internal" href="#bas-resolv-conf"><span class="std std-ref">modificar los servidores</span></a>. Las acciones básicas son dos:</p>
+<ol class="arabic">
+<li><p class="first">Configurar la interfaz (p.e. <em>eth0</em>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> dhclient -v eth0
 </pre></div>
 </div>
-<p>Es necesario especificar la interfaz que se quiere configurar (en el ejemplo,
-<em>eth0</em>). Es interesante incluir la opción <code class="docutils literal notranslate"><span class="pre">-v</span></code> para que se nos muestre
-información adicional del proceso.</p>
-<p>Si se desea revocar la concesión, basta con:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> dhclient -r
+</li>
+<li><p class="first">Desconfigurar la interfaz:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> dhclient -r eth0
 </pre></div>
 </div>
-<p class="last">Como se ve no se expresa la interfaz. También es posible desconfigurar la
-interfaz con la opción <code class="docutils literal notranslate"><span class="pre">-x</span></code>, pero en este caso no se informa al servidor de
-que deseamos dejar de usar la <em>ip</em> con lo que el servidor no la liberará.</p>
-</dd>
-</dl>
-<p class="rubric">Configuración manual</p>
+</li>
+</ol>
+<div class="admonition seealso">
+<p class="first admonition-title">Ver también</p>
+<p class="last">Para más información, consulte la <a class="reference internal" href="../../06.infraestructura/02.dhcp/02.tipos.html#dhcp-clients"><span class="std std-ref">sección dedicada a clientes
+DHCP</span></a>.</p>
+</div>
+</div>
+<div class="section" id="configuracion-manual">
+<h3>2.6.5.3.2. Configuración manual<a class="headerlink" href="#configuracion-manual" title="Enlazar permanentemente con este título">¶</a></h3>
 <p>Si la configuración es manual, debemos realizar tres labores:</p>
 <ol class="arabic simple">
 <li>Configurar los parámetros de red de la interfaz.</li>
@@ -280,7 +299,7 @@ puerta de enlace.</li>
 <kbd class="kbd docutils literal notranslate">192.168.1.10/24</kbd>, la puerta de enlace es <kbd class="kbd docutils literal notranslate">192.168.1.1</kbd> y los
 servidores <abbr title="Domain Name Server">DNS</abbr> <kbd class="kbd docutils literal notranslate">1.1.1.1</kbd> y <kbd class="kbd docutils literal notranslate">1.0.0.1</kbd>.</p>
 <p>Para las dos primeras tareas, el comando apropiado es:</p>
-<span class="target" id="ip"></span><dl class="docutils" id="index-4">
+<span class="target" id="ip"></span><dl class="docutils" id="index-3">
 <dt><strong class="command">ip</strong></dt>
 <dd><p class="first">Permite la configuración de distintos aspectos relacionados con la red:
 políticas de encaminamiento, parámetros de configuración de la interfaz, etc.
@@ -324,7 +343,7 @@ para configurar la puerta predeterminada:</p>
 <p class="first admonition-title">Advertencia</p>
 <p class="last">En tutoriales antiguos de <em>Linux</em> podrá ver que estas órdenes se
 hacen con <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/ifconfig">ifconfig</a></em> y <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/route">route</a></em>. Estas herramientas, sin
-embargo, hace tiempo que se marcaron como obsoletas y, de hecho, ya no están
+embargo, hace tiempo que se marcaron como obsoletas y, de hecho, no están
 disponibles en <em>Debian</em> desde hace años. a menos que se instale expresamente
 el paquete <strong>net-tools</strong>.</p>
 </div>
@@ -335,6 +354,7 @@ siguientes líneas:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">nameserver 1.0.0.1</span>
 <span class="go">nameserver 1.1.1.1</span>
 </pre></div>
+</div>
 </div>
 </div>
 <div class="section" id="otros-modos-de-configuracion">
@@ -408,7 +428,11 @@ la misma dirección <abbr title="Internet Protocol">IP</abbr> que recibió diná
 <li><a class="reference internal" href="#">2.6.5. Configuración de red</a><ul>
 <li><a class="reference internal" href="#interfaces-presentes">2.6.5.1. Interfaces presentes</a></li>
 <li><a class="reference internal" href="#configuracion-en-debian">2.6.5.2. Configuración en debian</a></li>
-<li><a class="reference internal" href="#configuracion-universal">2.6.5.3. Configuración universal</a></li>
+<li><a class="reference internal" href="#configuracion-universal">2.6.5.3. Configuración universal</a><ul>
+<li><a class="reference internal" href="#configuracion-dinamica">2.6.5.3.1. Configuración dinámica</a></li>
+<li><a class="reference internal" href="#configuracion-manual">2.6.5.3.2. Configuración manual</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#otros-modos-de-configuracion">2.6.5.4. Otros modos de configuración</a></li>
 <li><a class="reference internal" href="#ejercicios-sobre-redes">2.6.5.5. Ejercicios sobre redes</a></li>
 </ul>
