@@ -62,6 +62,170 @@ Y ejecutar el contenedor basado en esa imagen::
 
    # docker run --rm --network host -v /workdir/dnsmasq.d:/etc/dnsmasq.d dnsmasq:alpine
 
+PHP-FPM con socket
+==================
+Planteamos el objetivo de utilizar la `imagen de PHP
+<https://hub.docker.com/_/php>` basada en Alpine_, pero hacer accesible el
+servicio de *FastCGI* no a través de un puerto |TCP|, sino a través de un
+*socket* UNIX. Para ello tomaremos:
+
+* La imagen ya comentada que compartirá dos volúmenes:
+
+  + Uno para albergar el *socket*.
+  + Otro que contenga la aplicación.
+
+* Una segunda `imagen de nginx <https://hub.docker.com/_/nginx>`_ que compartirá
+  los mismos dos volúmenes anteriores, más un tercero que contega su
+  configuración modular.
+
+El directorio de trabajo será el siguiente:
+
+.. code-block:: none
+
+   + workdir
+       +-- docker-compose.yaml
+       +-- nginx/
+       |    +-- Dockerfile
+       |    +-- conf.d
+       |          +-- php.conf
+       |          +-- default.conf
+       +-- php-fpm/
+       |    +-- Dockerfile
+       |    +-- etc/
+       |         +-- php-fpm.d/
+       |         |    +-- zz-docker.conf
+       |         +-- php/
+       |              +-- conf.d/
+       |                   +-- uploads.ini
+       |                   +-- [.. otros ficheros ..]
+       +-- webapp/
+            +-- [.. ficheros de la aplicación ..]
+
+.. rubric:: Preparación de php-fpm
+
+Básicamente, consiste en modificar la configuración de |PHP| para adaptarla a
+nuestras necesidades. Un camnbio consiste en sustituir el fichero
+:file:`zz-docker.conf` para alterar lograr la comunicación a través de un
+*socket*. Esto se logra con el siguiente contenido:
+
+.. code-block:: ini
+
+   [global]
+   daemonize = no
+
+   [www]
+   listen = /var/run/php-fpm/php-fpm.sock
+   listen.owner = www-data
+   listen.group = www-data
+
+Además, dentro de :file:`etc/php/conf.d` podemos crear ficheros INI que alteren
+la configuración general de |PHP|. Por ejemplo, uno ficher que aumente el
+tamaño de los ficheros subidos al servidor:
+
+.. code-block:: ini
+
+   # conf.d/uploads.ini
+
+   post_max_size = 20M
+   upload_max_filesize = 20M
+
+Por su parte, el fichero :file:`Dockerfile`, por otra parte, debe ser:
+
+.. code-block:: docker
+
+   FROM     php:fpm${ARGS}-alpine
+   COPY     ./etc /usr/local/etc
+   VOLUME   /var/run/php-fpm
+
+.. rubric:: Preparación de nginx
+
+El problema de esta imagen es que necesitamos que :ref:`nginx <n-ginx>` lo
+ejecute el mismo usuario\ [#]_ que ejecuta :program:`php-fpm`. En este segundo
+contenedor el usuario es *www-data* con |UID| 82 y cuyo grupo principal tiene un
+|GID| y nombre idénticos. En el primero existe el grupo, pero no el usuario, y
+el servidor web lo ejecuta el usuario *nginx* con un |UID| distinto. Lo que
+haremos, en este caso, es crer el usuario *www-data* y hacer que el servidor lo
+ejecute este usuario.
+
+Los ficheros de configuración del servidor son:
+
+.. code-block:: nginx
+
+   # conf.d/php.conf
+   upstream php {
+      server unix:/var/run/php-fpm/php-fpm.sock;
+   }
+
+y:
+
+.. code-block:: nginx
+
+   # conf.d/default.conf
+   server {
+      listen 80;
+
+      try_files $uri $uri/ =404;
+      index index.php;
+      root /srv/www;
+
+      location ~ \.php$ {
+         fastcgi_split_path_info ^(.+\.php)(/.+)$;
+
+         include fastcgi.conf;
+         fastcgi_param PATH_INFO $fastcgi_path_info;
+
+         fastcgi_pass php;
+      }
+   }
+
+y el :file:`Dockerfile`:
+
+.. code-block:: docker
+
+   FROM  nginx:alpine
+   RUN   adduser -Du82 -G www-data www-data; \
+         sed -ri '/^user/s:nginx:www-data:' /etc/nginx/nginx.conf
+
+.. rubric:: docker-compose
+
+Por último, el fichero para :program:`docker-compose` que levante estos dos
+contenedores puede ser el siguiente:
+
+.. code-block:: yaml
+
+   version: "3"
+   services:
+     php:
+       image: php:fpm-alpine-socket
+       build: ./php-fpm
+       volumes:
+         - socket:/var/run/php-fpm/
+         - ./webapp:/srv/www
+       restart: unless-stopped
+
+     nginx:
+       image: nginx:alpine-app
+       build: ./nginx
+       ports:
+         - "80:80"
+       depends_on:
+         - php
+       volumes:
+         - socket:/var/run/php-fpm/
+         - ./webapp:/srv/www
+         - ./nginx/conf.d:/etc/nginx/conf.d
+       restart: unless-stopped
+
+   volumes:
+     socket:
+
+.. rubric:: Aplicación
+
+En el directorio :file:`webapp` debe colocarse la aplicación de deseemos
+ejecutar. Dado que únicamente queremos hacer una prueba nos basta con::
+
+   # echo '<?php phpinfo(); ?>' > webapp/index.php
+
 Wordpress
 =========
 Nuestra intención ahora es instalar un Wordpress_, para lo cual utilizaremos
@@ -75,6 +239,11 @@ aplicación |PHP| (con el intérprete incluido) y un servidor web que sea el que
 ofrezca la aplicación. Además, es necesario almacenar los ficheros de la base de
 la datos y los datos de la aplicación, por lo que se requerirán dos volúmenes de
 datos.
+
+.. note:: En este caso, y a diferencia del anterior ejercicio, la aplicación y
+   |PHP| se encuentran en el mismo contenedor y, además, no se expone mediante
+   *socket*, sino mediante |TCP|. No es muy complicado  adaptar esta solución
+   utilizando las estrategias del ejercicio anterior.
 
 Los tres contenedores que utilizaremos son:
 
@@ -181,7 +350,15 @@ Su contenido puede ser este:
       }
    }
 
+.. rubric:: Notas al pie
+
+.. [#] En realidad, un usuario con el mismo |UID|.
+
 
 .. _Wordpress: https://wordpress.org/
-.. |PHP| replace:: :abbr:`PHP (PHP Hypertext Preprocessor)`
 .. _Alpine: https://alpinelinux.org/
+
+.. |PHP| replace:: :abbr:`PHP (PHP Hypertext Preprocessor)`
+.. |TCP| replace:: :abbr:`TCP (Transmission Control Protocol)`
+.. |UID| replace:: :abbr:`UID (User IDentifier)`
+.. |GID| replace:: :abbr:`GID (Group IDentifier)`

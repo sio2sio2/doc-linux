@@ -102,8 +102,152 @@ dhcp-range<span class="o">=</span><span class="m">192</span>.168.255.64,192.168.
 </pre></div>
 </div>
 </div>
+<div class="section" id="php-fpm-con-socket">
+<h2>9.4.2.3.4.2. PHP-FPM con socket<a class="headerlink" href="#php-fpm-con-socket" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Planteamos el objetivo de utilizar la <cite>imagen de PHP
+&lt;https://hub.docker.com/_/php&gt;</cite> basada en <a class="reference external" href="https://alpinelinux.org/">Alpine</a>, pero hacer accesible el
+servicio de <em>FastCGI</em> no a través de un puerto <abbr title="Transmission Control Protocol">TCP</abbr>, sino a través de un
+<em>socket</em> UNIX. Para ello tomaremos:</p>
+<ul class="simple">
+<li>La imagen ya comentada que compartirá dos volúmenes:<ul>
+<li>Uno para albergar el <em>socket</em>.</li>
+<li>Otro que contenga la aplicación.</li>
+</ul>
+</li>
+<li>Una segunda <a class="reference external" href="https://hub.docker.com/_/nginx">imagen de nginx</a> que compartirá
+los mismos dos volúmenes anteriores, más un tercero que contega su
+configuración modular.</li>
+</ul>
+<p>El directorio de trabajo será el siguiente:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>+ workdir
+    +-- docker-compose.yaml
+    +-- nginx/
+    |    +-- Dockerfile
+    |    +-- conf.d
+    |          +-- php.conf
+    |          +-- default.conf
+    +-- php-fpm/
+    |    +-- Dockerfile
+    |    +-- etc/
+    |         +-- php-fpm.d/
+    |         |    +-- zz-docker.conf
+    |         +-- php/
+    |              +-- conf.d/
+    |                   +-- uploads.ini
+    |                   +-- [.. otros ficheros ..]
+    +-- webapp/
+         +-- [.. ficheros de la aplicación ..]
+</pre></div>
+</div>
+<p class="rubric">Preparación de php-fpm</p>
+<p>Básicamente, consiste en modificar la configuración de <abbr title="PHP Hypertext Preprocessor">PHP</abbr> para adaptarla a
+nuestras necesidades. Un camnbio consiste en sustituir el fichero
+<code class="file docutils literal notranslate"><span class="pre">zz-docker.conf</span></code> para alterar lograr la comunicación a través de un
+<em>socket</em>. Esto se logra con el siguiente contenido:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[global]</span>
+<span class="na">daemonize</span> <span class="o">=</span> <span class="s">no</span>
+
+<span class="k">[www]</span>
+<span class="na">listen</span> <span class="o">=</span> <span class="s">/var/run/php-fpm/php-fpm.sock</span>
+<span class="na">listen.owner</span> <span class="o">=</span> <span class="s">www-data</span>
+<span class="na">listen.group</span> <span class="o">=</span> <span class="s">www-data</span>
+</pre></div>
+</div>
+<p>Además, dentro de <code class="file docutils literal notranslate"><span class="pre">etc/php/conf.d</span></code> podemos crear ficheros INI que alteren
+la configuración general de <abbr title="PHP Hypertext Preprocessor">PHP</abbr>. Por ejemplo, uno ficher que aumente el
+tamaño de los ficheros subidos al servidor:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="c1"># conf.d/uploads.ini</span>
+
+<span class="na">post_max_size</span> <span class="o">=</span> <span class="s">20M</span>
+<span class="na">upload_max_filesize</span> <span class="o">=</span> <span class="s">20M</span>
+</pre></div>
+</div>
+<p>Por su parte, el fichero <code class="file docutils literal notranslate"><span class="pre">Dockerfile</span></code>, por otra parte, debe ser:</p>
+<div class="highlight-docker notranslate"><div class="highlight"><pre><span></span><span class="k">FROM</span><span class="s">     php:fpm${ARGS}-alpine</span>
+<span class="k">COPY</span>     ./etc /usr/local/etc
+<span class="k">VOLUME</span><span class="s">   /var/run/php-fpm</span>
+</pre></div>
+</div>
+<p class="rubric">Preparación de nginx</p>
+<p>El problema de esta imagen es que necesitamos que <a class="reference internal" href="../../../07.serre/02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a> lo
+ejecute el mismo usuario<a class="footnote-reference" href="#id2" id="id1">[1]</a> que ejecuta <strong class="program">php-fpm</strong>. En este segundo
+contenedor el usuario es <em>www-data</em> con <abbr title="User IDentifier">UID</abbr> 82 y cuyo grupo principal tiene un
+<abbr title="Group IDentifier">GID</abbr> y nombre idénticos. En el primero existe el grupo, pero no el usuario, y
+el servidor web lo ejecuta el usuario <em>nginx</em> con un <abbr title="User IDentifier">UID</abbr> distinto. Lo que
+haremos, en este caso, es crer el usuario <em>www-data</em> y hacer que el servidor lo
+ejecute este usuario.</p>
+<p>Los ficheros de configuración del servidor son:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="c1"># conf.d/php.conf</span>
+<span class="k">upstream</span> <span class="s">php</span> <span class="p">{</span>
+   <span class="kn">server</span> <span class="s">unix:/var/run/php-fpm/php-fpm.sock</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>y:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="c1"># conf.d/default.conf</span>
+<span class="k">server</span> <span class="p">{</span>
+   <span class="kn">listen</span> <span class="mi">80</span><span class="p">;</span>
+
+   <span class="kn">try_files</span> <span class="nv">$uri</span> <span class="nv">$uri/</span> <span class="p">=</span><span class="mi">404</span><span class="p">;</span>
+   <span class="kn">index</span> <span class="s">index.php</span><span class="p">;</span>
+   <span class="kn">root</span> <span class="s">/srv/www</span><span class="p">;</span>
+
+   <span class="kn">location</span> <span class="p">~</span> <span class="sr">\.php$</span> <span class="p">{</span>
+      <span class="kn">fastcgi_split_path_info</span> <span class="s">^(.+\.php)(/.+)</span>$<span class="p">;</span>
+
+      <span class="kn">include</span> <span class="s">fastcgi.conf</span><span class="p">;</span>
+      <span class="kn">fastcgi_param</span> <span class="s">PATH_INFO</span> <span class="nv">$fastcgi_path_info</span><span class="p">;</span>
+
+      <span class="kn">fastcgi_pass</span> <span class="s">php</span><span class="p">;</span>
+   <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>y el <code class="file docutils literal notranslate"><span class="pre">Dockerfile</span></code>:</p>
+<div class="highlight-docker notranslate"><div class="highlight"><pre><span></span><span class="k">FROM</span><span class="s">  nginx:alpine</span>
+<span class="k">RUN</span>   adduser -Du82 -G www-data www-data<span class="p">;</span> <span class="se">\</span>
+      sed -ri <span class="s1">&#39;/^user/s:nginx:www-data:&#39;</span> /etc/nginx/nginx.conf
+</pre></div>
+</div>
+<p class="rubric">docker-compose</p>
+<p>Por último, el fichero para <strong class="program">docker-compose</strong> que levante estos dos
+contenedores puede ser el siguiente:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">version</span><span class="p">:</span> <span class="s">&quot;3&quot;</span>
+<span class="nt">services</span><span class="p">:</span>
+  <span class="nt">php</span><span class="p">:</span>
+    <span class="nt">image</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">php:fpm-alpine-socket</span>
+    <span class="nt">build</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">./php-fpm</span>
+    <span class="nt">volumes</span><span class="p">:</span>
+      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">socket:/var/run/php-fpm/</span>
+      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">./webapp:/srv/www</span>
+    <span class="nt">restart</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
+
+  <span class="nt">nginx</span><span class="p">:</span>
+    <span class="nt">image</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">nginx:alpine-app</span>
+    <span class="nt">build</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">./nginx</span>
+    <span class="nt">ports</span><span class="p">:</span>
+      <span class="p p-Indicator">-</span> <span class="s">&quot;80:80&quot;</span>
+    <span class="nt">depends_on</span><span class="p">:</span>
+      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">php</span>
+    <span class="nt">volumes</span><span class="p">:</span>
+      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">socket:/var/run/php-fpm/</span>
+      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">./webapp:/srv/www</span>
+      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">./nginx/conf.d:/etc/nginx/conf.d</span>
+    <span class="nt">restart</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
+
+<span class="nt">volumes</span><span class="p">:</span>
+  <span class="nt">socket</span><span class="p">:</span>
+</pre></div>
+</div>
+<p class="rubric">Aplicación</p>
+<p>En el directorio <code class="file docutils literal notranslate"><span class="pre">webapp</span></code> debe colocarse la aplicación de deseemos
+ejecutar. Dado que únicamente queremos hacer una prueba nos basta con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="nb">echo</span> <span class="s1">&#39;&lt;?php phpinfo(); ?&gt;&#39;</span> &gt; webapp/index.php
+</pre></div>
+</div>
+</div>
 <div class="section" id="wordpress">
-<h2>9.4.2.3.4.2. Wordpress<a class="headerlink" href="#wordpress" title="Enlazar permanentemente con este título">¶</a></h2>
+<h2>9.4.2.3.4.3. Wordpress<a class="headerlink" href="#wordpress" title="Enlazar permanentemente con este título">¶</a></h2>
 <p>Nuestra intención ahora es instalar un <a class="reference external" href="https://wordpress.org/">Wordpress</a>, para lo cual utilizaremos
 la siguiente infraestructura:</p>
 <img alt="../../../_images/wordpress.png" src="../../../_images/wordpress.png" />
@@ -113,6 +257,13 @@ aplicación <abbr title="PHP Hypertext Preprocessor">PHP</abbr> (con el intérpr
 ofrezca la aplicación. Además, es necesario almacenar los ficheros de la base de
 la datos y los datos de la aplicación, por lo que se requerirán dos volúmenes de
 datos.</p>
+<div class="admonition note">
+<p class="first admonition-title">Nota</p>
+<p class="last">En este caso, y a diferencia del anterior ejercicio, la aplicación y
+<abbr title="PHP Hypertext Preprocessor">PHP</abbr> se encuentran en el mismo contenedor y, además, no se expone mediante
+<em>socket</em>, sino mediante <abbr title="Transmission Control Protocol">TCP</abbr>. No es muy complicado  adaptar esta solución
+utilizando las estrategias del ejercicio anterior.</p>
+</div>
 <p>Los tres contenedores que utilizaremos son:</p>
 <ul>
 <li><p class="first">La <cite>imagen oficial de mariaDB &lt;https://hub.docker.com/_/mariadb&gt;</cite>, que se
@@ -212,6 +363,13 @@ de ejecutar la aplicación:</p>
 <span class="p">}</span>
 </pre></div>
 </div>
+<p class="rubric">Notas al pie</p>
+<table class="docutils footnote" frame="void" id="id2" rules="none">
+<colgroup><col class="label" /><col /></colgroup>
+<tbody valign="top">
+<tr><td class="label"><a class="fn-backref" href="#id1">[1]</a></td><td>En realidad, un usuario con el mismo <abbr title="User IDentifier">UID</abbr>.</td></tr>
+</tbody>
+</table>
 </div>
 </div>
 
@@ -225,7 +383,8 @@ de ejecutar la aplicación:</p>
   <ul>
 <li><a class="reference internal" href="#">9.4.2.3.4. Ejemplos</a><ul>
 <li><a class="reference internal" href="#dnsmasq">9.4.2.3.4.1. dnsmasq</a></li>
-<li><a class="reference internal" href="#wordpress">9.4.2.3.4.2. Wordpress</a></li>
+<li><a class="reference internal" href="#php-fpm-con-socket">9.4.2.3.4.2. PHP-FPM con socket</a></li>
+<li><a class="reference internal" href="#wordpress">9.4.2.3.4.3. Wordpress</a></li>
 </ul>
 </li>
 </ul>

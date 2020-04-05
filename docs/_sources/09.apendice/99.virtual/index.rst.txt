@@ -113,6 +113,11 @@ Antes de empezar, no obstante, hay que introducir cuatro conceptos:
    intensivo de memoria, y para el resto se usa virtualización completa del
    *hardware*.
 
+   Un ejemplo de *hardware* paravirtualizado es el `driver virtIO
+   <https://www.linux-kvm.org/page/Virtio>`_ para las tarjetas de red, que puede
+   ser usado en sistemas de virtualización completas como :ref:`Virtualbox
+   <virtualbox>` o :ref:`QEmu <qemu>`.
+
 .. _contenedores:
 
 **Contenedores**
