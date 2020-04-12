@@ -13,7 +13,7 @@ Ejercicios sobre consulta y gestión de usuarios
 #. Deshabilitar a *pepe* para que no pueda ingresar en el sistema.
 
 #. Crear el usuario *bartolo* con |UID| 2000 y cuyo grupo principal sea
-   el mismo que el de *pepe*-
+   el mismo que el de *pepe*.
 
 #. Habilitar el usuario *pepe*.
 

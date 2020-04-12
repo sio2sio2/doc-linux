@@ -98,14 +98,52 @@ dhcp-range<span class="o">=</span><span class="m">192</span>.168.255.64,192.168.
 </pre></div>
 </div>
 <p>Y ejecutar el contenedor basado en esa imagen:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker run --rm --network host -v /workdir/dnsmasq.d:/etc/dnsmasq.d dnsmasq:alpine
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker run --rm --restart<span class="o">=</span>always --network host -v /workdir/dnsmasq.d:/etc/dnsmasq.d dnsmasq:alpine
 </pre></div>
 </div>
+<p>Obsérvese un aspecto importante en esta ejecución: la opción <kbd class="kbd docutils literal notranslate">--restart</kbd>
+que introduce cuál será la <em class="dfn">política de ejecución</em> del contenedor, esto es,
+qué es lo que ocurre cuando el contenedor para. Hay cuatro posilibilidades:</p>
+<table border="1" class="docker-restart-policy docutils">
+<colgroup>
+<col width="23%" />
+<col width="77%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">Política</th>
+<th class="head">Descripción</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>no</td>
+<td>Es el valor por defecto. El contenedor al parar, no
+reinicia.</td>
+</tr>
+<tr class="row-odd"><td>on-failure</td>
+<td>El contenedor sólo se reinicia si la aplicación
+acaba con un error.</td>
+</tr>
+<tr class="row-even"><td>always</td>
+<td>Reinicia el contenedor siempre, pero si se detiene
+manualmente (con <kbd class="kbd docutils literal notranslate">docker stop</kbd>), sólo reinicia
+si se reinicia el demonio o si se reinicia
+manualmente.</td>
+</tr>
+<tr class="row-odd"><td>unless-stopped</td>
+<td>Como el caso anterior, pero no reinicia cuando el
+demonio se reinicia.</td>
+</tr>
+</tbody>
+</table>
+<p>Tenga presente que el demonio se inicia, cuando el sistema anfitrión arraca. Por
+tanto, si nuestra política es <kbd class="kbd docutils literal notranslate">always</kbd>, el contenedor arrancará
+automáticamente, al arrancar el sistema anfitrión. Precisamente ese
+comportanamiento es el preferible en un contenedor que hemos creado para dar
+servicio <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> a la red.</p>
 </div>
 <div class="section" id="php-fpm-con-socket">
 <h2>9.4.2.3.4.2. PHP-FPM con socket<a class="headerlink" href="#php-fpm-con-socket" title="Enlazar permanentemente con este título">¶</a></h2>
-<p>Planteamos el objetivo de utilizar la <cite>imagen de PHP
-&lt;https://hub.docker.com/_/php&gt;</cite> basada en <a class="reference external" href="https://alpinelinux.org/">Alpine</a>, pero hacer accesible el
+<p>Planteamos el objetivo de utilizar la <a class="reference external" href="https://hub.docker.com/_/php">imagen de PHP</a> basada en <a class="reference external" href="https://alpinelinux.org/">Alpine</a>, pero hacer accesible el
 servicio de <em>FastCGI</em> no a través de un puerto <abbr title="Transmission Control Protocol">TCP</abbr>, sino a través de un
 <em>socket</em> UNIX. Para ello tomaremos:</p>
 <ul class="simple">
@@ -220,7 +258,7 @@ contenedores puede ser el siguiente:</p>
     <span class="nt">volumes</span><span class="p">:</span>
       <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">socket:/var/run/php-fpm/</span>
       <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">./webapp:/srv/www</span>
-    <span class="nt">restart</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
+    <span class="nt">restart</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">always</span>
 
   <span class="nt">nginx</span><span class="p">:</span>
     <span class="nt">image</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">nginx:alpine-app</span>
@@ -233,7 +271,7 @@ contenedores puede ser el siguiente:</p>
       <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">socket:/var/run/php-fpm/</span>
       <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">./webapp:/srv/www</span>
       <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">./nginx/conf.d:/etc/nginx/conf.d</span>
-    <span class="nt">restart</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
+    <span class="nt">restart</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">always</span>
 
 <span class="nt">volumes</span><span class="p">:</span>
   <span class="nt">socket</span><span class="p">:</span>
@@ -299,7 +337,7 @@ su configuración predefinida para ser capaz de servir la aplicación.</p>
          <span class="nt">MYSQL_DATABASE</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">${WP_DB:-wordpress}</span>
          <span class="nt">MYSQL_USER</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">${WP_USER:-wp}</span>
          <span class="nt">MYSQL_PASSWORD</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">${WP_PASS:-wp}</span>
-      <span class="nt">restart</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
+      <span class="nt">restart</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">always</span>
 
    <span class="nt">wordpress</span><span class="p">:</span>
       <span class="nt">image</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">wordpress:php7.4-fpm-alpine</span>
@@ -314,7 +352,7 @@ su configuración predefinida para ser capaz de servir la aplicación.</p>
         <span class="nt">WORDPRESS_DB_USER</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">${WP_USER:-wp}</span>
         <span class="nt">WORDPRESS_DB_PASSWORD</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">${WP_PASS:-wp}</span>
         <span class="nt">WORDPRESS_TABLE_PREFIX</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">${WP_PREFIX:-wp_}</span>
-      <span class="nt">restart</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
+      <span class="nt">restart</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">always</span>
 
    <span class="nt">nginx</span><span class="p">:</span>
       <span class="nt">image</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">nginx:alpine</span>
@@ -325,6 +363,7 @@ su configuración predefinida para ser capaz de servir la aplicación.</p>
         <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">wpapp:/var/www/html</span>
       <span class="nt">depends_on</span><span class="p">:</span>
         <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">wordpress</span>
+      <span class="nt">restart</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">always</span>
 
 <span class="nt">volumes</span><span class="p">:</span>
    <span class="nt">wpmysql</span><span class="p">:</span>

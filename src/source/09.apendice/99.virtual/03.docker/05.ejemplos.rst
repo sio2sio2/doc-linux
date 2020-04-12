@@ -60,12 +60,43 @@ Con ello, podemos construir la imagen::
 
 Y ejecutar el contenedor basado en esa imagen::
 
-   # docker run --rm --network host -v /workdir/dnsmasq.d:/etc/dnsmasq.d dnsmasq:alpine
+   # docker run --rm --restart=always --network host -v /workdir/dnsmasq.d:/etc/dnsmasq.d dnsmasq:alpine
+
+Obsérvese un aspecto importante en esta ejecución: la opción :kbd:`--restart`
+que introduce cuál será la :dfn:`política de ejecución` del contenedor, esto es,
+qué es lo que ocurre cuando el contenedor para. Hay cuatro posilibilidades:
+
+.. table::
+   :class: docker-restart-policy
+
+   +----------------+------------------------------------------------------+
+   | Política       | Descripción                                          |
+   +================+======================================================+
+   | no             | Es el valor por defecto. El contenedor al parar, no  |
+   |                | reinicia.                                            |
+   +----------------+------------------------------------------------------+
+   | on-failure     | El contenedor sólo se reinicia si la aplicación      |
+   |                | acaba con un error.                                  |
+   +----------------+------------------------------------------------------+
+   | always         | Reinicia el contenedor siempre, pero si se detiene   |
+   |                | manualmente (con :kbd:`docker stop`), sólo reinicia  |
+   |                | si se reinicia el demonio o si se reinicia           |
+   |                | manualmente.                                         |
+   +----------------+------------------------------------------------------+
+   | unless-stopped | Como el caso anterior, pero no reinicia cuando el    |
+   |                | demonio se reinicia.                                 |
+   +----------------+------------------------------------------------------+
+
+Tenga presente que el demonio se inicia, cuando el sistema anfitrión arraca. Por
+tanto, si nuestra política es :kbd:`always`, el contenedor arrancará
+automáticamente, al arrancar el sistema anfitrión. Precisamente ese
+comportanamiento es el preferible en un contenedor que hemos creado para dar
+servicio |DHCP| a la red. 
 
 PHP-FPM con socket
 ==================
 Planteamos el objetivo de utilizar la `imagen de PHP
-<https://hub.docker.com/_/php>` basada en Alpine_, pero hacer accesible el
+<https://hub.docker.com/_/php>`_ basada en Alpine_, pero hacer accesible el
 servicio de *FastCGI* no a través de un puerto |TCP|, sino a través de un
 *socket* UNIX. Para ello tomaremos:
 
@@ -201,7 +232,7 @@ contenedores puede ser el siguiente:
        volumes:
          - socket:/var/run/php-fpm/
          - ./webapp:/srv/www
-       restart: unless-stopped
+       restart: always
 
      nginx:
        image: nginx:alpine-app
@@ -214,7 +245,7 @@ contenedores puede ser el siguiente:
          - socket:/var/run/php-fpm/
          - ./webapp:/srv/www
          - ./nginx/conf.d:/etc/nginx/conf.d
-       restart: unless-stopped
+       restart: always
 
    volumes:
      socket:
@@ -283,7 +314,7 @@ Dado que actúan en comandita tres contenedores, lo más juicioso es utilizar
             MYSQL_DATABASE: ${WP_DB:-wordpress}
             MYSQL_USER: ${WP_USER:-wp}
             MYSQL_PASSWORD: ${WP_PASS:-wp}
-         restart: unless-stopped
+         restart: always
 
       wordpress:
          image: wordpress:php7.4-fpm-alpine
@@ -298,7 +329,7 @@ Dado que actúan en comandita tres contenedores, lo más juicioso es utilizar
            WORDPRESS_DB_USER: ${WP_USER:-wp}
            WORDPRESS_DB_PASSWORD: ${WP_PASS:-wp}
            WORDPRESS_TABLE_PREFIX: ${WP_PREFIX:-wp_}
-         restart: unless-stopped
+         restart: always
 
       nginx:
          image: nginx:alpine
@@ -309,6 +340,7 @@ Dado que actúan en comandita tres contenedores, lo más juicioso es utilizar
            - wpapp:/var/www/html
          depends_on:
            - wordpress
+         restart: always
 
    volumes:
       wpmysql:
