@@ -10,7 +10,7 @@ definiciones:
 **Proceso**
    Se denomina proceso, simplemente, a un programa que está en ejecución. Cada
    procesos tiene una serie de propiedades que definen su estado. Una de ellas,
-   muy importante es el *PID*
+   muy importante es el |PID|.
 
 .. _pid:
 
@@ -50,6 +50,7 @@ Consulta
    El modo más elemental de uso es aquel que muestra todos los procesos::
 
       $ ps -e
+       PID TTY          TIME CMD
       [...]
       518 ?        00:00:00 ntpd
       520 ?        00:00:00 samba
@@ -74,7 +75,20 @@ Consulta
       545 ?        00:00:00 lpqd
       [...]
 
-   En la salida se observan entre otros el *PID* del proceso, la terminal
+   o bien todos los procesos que están asociados a una terminal::
+
+      $ ps -e
+       PID TTY          TIME CMD
+      3068 pts/1    00:00:06 vim
+      3913 pts/0    00:00:00 tmux: client
+      4354 pts/5    00:00:00 su
+      4368 pts/5    00:00:00 bash
+      5490 pts/4    00:00:00 vim
+      5654 pts/7    00:00:00 su
+      5667 pts/7    00:00:00 bash
+      5672 pts/3    00:00:00 ps
+
+   En la salida se observan entre otros el |PID| del proceso, la terminal
    asociada y el ejecutable que lo originó. Puede obtenerse un formato
    largo que da más información con ``-f``::
 
@@ -169,19 +183,44 @@ Consulta
 
       $ ps -C systemd
 
-   o por *PID* (sólo se podrá mostrar uno)::
+   o por |PID|\ [#]_::
 
-      $ ps -p 1000
+      $ ps 1000
 
    o mostrar los procesos de un determinado padre. Para ello se debe indicar el
-   *PID* del proceso padre::
+   |PID| del proceso padre::
 
       $ ps --ppid 1579
 
-   Para todas estas opciones de selección pueden indicarse varios valores,
-   separándolos por comas::
+   :command:`ps` permite incluir varias opciones de filtrado::
+
+      $ ps -C bash -u josem
+
+   incluso varias veces la misma opción::
+
+      $ ps -C bash -C system
+
+   pero nunca acomulan el efecto de filtrado, sino el resultado. Es decir, en el
+   ejemplo::
+
+      $ ps -C bash -u josem
+
+   no devuelve los procesos de :program:`bash` que esté ejecutando el usuario
+   "josem", sino cualquier proceso de :program:`bash` (sea o no de "josem") más
+   cualquier proceso que pertenezca a "josem" (sea de :program:`bash` o de
+   cualquier otro programa). En el segundo ejemplo::
+
+      $ ps -C bash -C system
+
+   la orden devuelve cualquier proceso de :program:`bash` o de :ref:`systemd
+   <systemd>`. Cuando el criterio es el mismo también se puede usar esta
+   alternativa::
 
       $ ps -C systemd,bash
+
+   .. warning:: Tenga presente que los efecto de filtro no son acomulativos.
+      Si su intención es aplicar varios criterios de filtrado a la vez, tendrá
+      que recurrir a :ref:`pgrep <pgrep>`.
 
    También se puede definir exactamente qué campos se quieren obtener mediante
    la opción ``-o`` seguida de los nombres de los campos (véase la página del
@@ -213,8 +252,44 @@ Consulta
 .. index:: pgrep
 
 :command:`pgrep`
-   Como :ref:`ps <ps>` permite obtener los PID de los procesos atendiendo a
-   distintos criterios. Por ejemplo, la orden::
+   Permite obtener el |PID| de un proceso antendiendo a distintos criterios.
+   Su uso más sencillo es obtener los |PID| asociado al nombre de un programa.
+   Por ejemplo, esto devolvería todos los procesos que se corresponden con
+   sesiones de :program:`bash`::
+
+      $ pgrep bash
+      2966
+      3004
+      3084
+      3588
+      3811
+      3967
+      4368
+      4546
+      5529
+
+   Puede no indicarse el nombre del programa, en cuyo caso se entenderá que
+   deseamos el de cualquier programa, o bien, utilizar una :ref:`expresión
+   regular <regex>` que nos permitirá hacer búsquedas más poderosas. Por
+   ejemplo, esta búsqueda::
+
+      $ pgrep 'sh$'
+
+   nos devolverá los |PID| de todos los procesos cuyo nombre de programa acabe
+   en "sh".
+
+   .. warning:: En realidad el argumento de :command:`pgrep`  es simplemente un
+      patrón expresado en forma de  expresión regular, incluso en el primer
+      ejemplo::
+
+         $ pgrep bash
+
+      Por tanto, este primer ejemplo no devuelve los |PID| de los procesos de
+      :program: bash`, sino los |PID| de cualquier programa que dentro de su
+      nombre incluya la cadena "bash".
+
+   Para filtrar los resultados podemos añadir opciones que fija criterios
+   adicionales. Por ejemplo::
 
       $ pgrep -u usuario
       1223
@@ -223,33 +298,39 @@ Consulta
       1328
       1380
       1387
-   
-   devuelve los PID de los procesos que pertenecen al usuario *usuario*. Tiene
-   diversos criterios de selección que pueden consultarse en el manual. Las dos
-   diferencias principales con respecto a :ref:`ps <ps>` son las siguientes:
 
-   * Para seleccionar por nombres de comandos no hay una opción, sino que
-     se puede incluir una :ref:`expresión regular extendida <regex>` como
-     argumento que concuerde con nuestro criterio de búsqueda. Por ejemplo::
+   permite obtener los |PID| de todos los procesos (no hemos indicado qué
+   programa) que pertenezcan al usuario de nombre "usuario". O bien::
 
-        $ pgrep bash
+      $ pgrep -P 1114
+      1116
+      2602
 
-     buscará procesos cuyo nombre de comando contenga «*bash*». Si sospecháramos
-     que :command:`bash` no es el único comando del sistema que cumple con esto
-     podríamos haber hecho más precisa la expresión::
+   devuelve los procesos cuyo proceso padre es el proceso 1114.
 
-        $ pgrep '^bash$'
+   A diferencia de :ref:`ps <ps>` los criterios de filtro son acumulativos, por
+   lo que si se utilizan varios, :command:`pgrep` sólo deolverá aquellos que
+   cumplan con todos. En consecuencia::
 
-     Con la opcion ``-f`` la concordancia no se hace sólo con el nombre del
-     ejecutable, sino con toda la línea de comando.
+      $ pgrep -u usuario bash
 
-   * :command:`pgrep`, a diferencia de :command:`ps`, permite sumar los efectos
-     de los criterios de búsqueda. De manera que::
+   devolverá los procesos de :program:`bash` a nombre del usuario "usuario".
+   Además, debe tenerse en cuenta que en las opciones (pero no en el patrón que
+   debe ser único), pueden indicarse varios criterios a la vez::
 
-        $ pgrep -u usuario bash
+      $ pgrep -u usuario,root bash
 
-     devuelve los PID de los procesos de :command:`bash` que pertenecen a
-     *usuario*\ [#]_.
+   que devolverá los procesos de :program:`bash` a nombre de "usuario" o "root".
+
+   Otra opción interesante es :kbd:`-c` que en vez de devolver los |PID| de los
+   procesos, devuleve cuántos procesos en total. Por tanto, pasa saber cuántos
+   procesos está ejecutando el usuario "usuario"::
+
+      $ pgrep -cu usuario
+      6
+
+   Lamentablemente, :command:`pgrep` sólo devuelve el |PID| y no una información
+   tan completa y configurable como :ref:`ps <ps>`.\ [#]_
 
 .. _top:
 .. index:: top
@@ -323,8 +404,7 @@ modificar la forma en que se da la orden para lograr distintos fines.
    Para usar :command:`nice` basta con anteponerlo al proceso que se quiere
    ejecutar. Por ejemplo::
 
-      $ nice ffmpeg -i input.wmv -s hd720 -c:v libx264 -crf 23 -c:a aac -strict
-      -2 output.mp4
+      $ nice ffmpeg -i input.wmv -s hd720 -c:v libx264 -crf 23 -c:a aac -strict -2 output.mp4
 
    recodifica una película en calidad HD720, haciendo que para este proceso
    bastante costoso disminuya la prioridad. Cuando :command:`nice` se usa sin
@@ -350,27 +430,89 @@ modificar la forma en que se da la orden para lograr distintos fines.
 .. index:: kill
 
 :command:`kill`
-   Cancela procesos antes de que estos hayan acabado. Podemos intentar hacer una
-   cancelación *suave* con la opción ``-1`` o *agresiva* con ``-9``. Para
-   referirnos al proceso necesitamos su pid. Además pueden indicarse varios, uno
-   por argumento::
+   Envía señales a los procesos, muy comúnmente para acabar con ellos, de ahí su
+   nombre. Hay una larga lista de señales que pueden obtenerse mediante la
+   opción :kbd:`-L`::
 
-      $ kill -1 1897 1000
+      $ kill -L
+       1) SIGHUP       2) SIGINT       3) SIGQUIT      4) SIGILL       5) SIGTRAP
+       6) SIGABRT      7) SIGBUS       8) SIGFPE       9) SIGKILL     10) SIGUSR1
+      11) SIGSEGV     12) SIGUSR2     13) SIGPIPE     14) SIGALRM     15) SIGTERM
+      16) SIGSTKFLT   17) SIGCHLD     18) SIGCONT     19) SIGSTOP     20) SIGTSTP
+      21) SIGTTIN     22) SIGTTOU     23) SIGURG      24) SIGXCPU     25) SIGXFSZ
+      26) SIGVTALRM   27) SIGPROF     28) SIGWINCH    29) SIGIO       30) SIGPWR
+      31) SIGSYS      34) SIGRTMIN    35) SIGRTMIN+1  36) SIGRTMIN+2  37) SIGRTMIN+3
+      38) SIGRTMIN+4  39) SIGRTMIN+5  40) SIGRTMIN+6  41) SIGRTMIN+7  42) SIGRTMIN+8
+      43) SIGRTMIN+9  44) SIGRTMIN+10 45) SIGRTMIN+11 46) SIGRTMIN+12 47) SIGRTMIN+13
+      48) SIGRTMIN+14 49) SIGRTMIN+15 50) SIGRTMAX-14 51) SIGRTMAX-13 52) SIGRTMAX-12
+      53) SIGRTMAX-11 54) SIGRTMAX-10 55) SIGRTMAX-9  56) SIGRTMAX-8  57) SIGRTMAX-7
+      58) SIGRTMAX-6  59) SIGRTMAX-5  60) SIGRTMAX-4  61) SIGRTMAX-3  62) SIGRTMAX-2
+      63) SIGRTMAX-1  64) SIGRTMAX
+
+   Las más usadas para acabar procesos son:
+
+   **SIGTERM** (15)
+      Que le indica al proceso que haga un apagado suave e intente cerrar antes
+      todo los recursos que tenga abiertos. Es el apagado más recomentable,
+      aunque no siempre funciona, sobre todo si el proceso tiene algún hijo.
+      Es el apagado que :command:`kill` o :command:`killall` intentan por
+      defecto si no se especifica otro concreto.
+
+   **SIGHUP** (1)
+      *HUP* proviene de *hang up*, esto es, colgar y es la señal que recibían
+      los programas cuando en accesos remotos por conexión serie el usuario
+      decide colgar. En sistemas modernos este acceso no es tan común y la señal
+      se ha reciclado y significa que la terminal dentro de la que corre el
+      programa se ha cerrado. En bastantes programas interactivos la señal puede
+      tener el efecto de un apagado suavve como *SIGTERM*, pero en los
+      demonios, que como no son interactivos, no suelen ejecutarse en una
+      terminal, es común se interprete como que es necesario volver a leer la
+      configuración y, en consecuencia, el programa no acabe. Por tanto, si
+      nuestra intención es acabar un proceso de forma suave, es más recomendable
+      la opción anterior.
+
+   **SIGINT** (2)
+      Que equivale a :kbd:`Ctrl+C` y que realiza acaba taxativamente el proceso,
+      aunque éste puede no hacer caso a la señal.
+
+   **SIGKILL** (9)
+      Provoca el apagado obligatorio, por lo que, aunque tiene las mismas
+      consecuencias de la señal anterior (puede quedar algo abierto), la señal
+      no puede ser obviada por el proceso. 
+
+   Lo habitual, cuando se intenta acabar manualmente con un proceso, es intentar
+   el apagado suave (*SIGTERM*) y, si este no es posible, intentar el apagado
+   forzoso (*SIGKILL*). Por tanto, si quisiéramos acabar con los procesos de
+   |PID| 1037 y 1000, haríamos::
+
+      $ kill 1897 1000
+
+   o bien::
+
+      $ kill -15 1897 1000
+
+   que es lo mismo. Y, si esto no funciona, no tendremos más remedio que hacer::
+
       $ kill -9 5675 6676
 
-   En ocasiones, es imposible acabar con un proceso ni aun con la señal
-   ``SIGKILL`` (*9*). En estos casos, el proceso acaba en un estado *zombi*, que
-   se nota con un **Z**\  al consultar el proceso con :command:`ps`.
+   .. note:: En ocasiones, es imposible acabar del todo con un proceso ni aun
+      con la señal ``SIGKILL`` (*9*). En estos casos, el proceso acaba en un estado
+      *zombi* por tiempo indefinido, que se nota con un **Z**\  al consultar el
+      proceso con :command:`ps`.
 
 .. _killall:
 .. index:: killall
 
 :command:`killall`
-   Cancela procesos identificándolos por su nombre. Pueden usarse los dos tipos
-   de cancelación que ya se han definido. Por ejemplo, esto cancela todas las
+   Cancela procesos identificándolos por su nombre. Pueden usarse las señales
+   indicadas anteriormente. Por ejemplo, esto cancela de forma suave todas las
    sesiones de :program:`bash` abiertas por el usuario::
 
-      $ kill -1 bash
+      $ killall bash
+
+   .. warning:: killall es parte del `paquete psmisc
+      <https://packages.debian.org/search?keywords=psmisc>`_, que puede no
+      encontrarse instalado por defecto.
 
 Por lo general, cuando se ejecuta una orden, la *shell* espera hasta que esta
 haya acabado para liberar la línea de comandos. Esto es debido a que la orden se
@@ -431,7 +573,7 @@ Es posible también ejecutar una tarea en segundo plano acabando la orden con un
    $ jobs
    [1]+  Ejecutando              sleep 60 &
 
-Al ejecutar de esta forma se facilita el número de *PID*. Es posible usar el
+Al ejecutar de esta forma se facilita el número de |PID|. Es posible usar el
 comando :command:`kill` para cancelar tareas usando el número de tarea, en vez
 de el *pid*::
 
@@ -452,11 +594,15 @@ de el *pid*::
       :code:`axf` :code:`-ef --forest`
       =========== ========================
 
+.. [#] Para utilizar el criterio del |PID| pueden utilizarse la opción
+   :kbd:`-p`::
+
+      $ ps -p 1000
+
 .. [#] Como :ref:`ps <ps>` da más posibilidades de formateo, es muy útil aunar
    ambos comandos. Por ejemplo::
 
-      $ ps -f -p $(pgrep -d, -u usuario bash)
+      $ ps -f -p $(pgrep -u usuario bash)
 
-   en donde hemos usado :command:`pgrep` para obtener la lista de PID de los
-   procesos que nos interesan (``-d`` los separa por comas en vez de sacar uno
-   por línea).
+   en donde hemos usado :command:`pgrep` para obtener la lista de |PID| de los
+   procesos que nos interesan.
