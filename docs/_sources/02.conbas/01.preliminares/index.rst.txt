@@ -361,6 +361,9 @@ Para abandonar la shell tenemos tres posibilidades:
    Permite cerrar la sesión abierta con :program:`bash`. Para saber más sobre
    esta orden, consulte :ref:`en la parte de programación <sh-exit>`.
 
+.. _logout:
+.. index:: logout
+
 :command:`logout`
    Permite cerrar la sesión *de login*\ [#]_ abierta con :program:`bash`.
 
