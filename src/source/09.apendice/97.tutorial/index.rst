@@ -151,31 +151,33 @@ al portapapel las órdenes que se ilustran.
 
 Página propia
 -------------
-Este último procedimiento es el más recomendable si se requiere sonido, puesto
-que mantiene muy pequeño el tamaño del vídeo (será el :file:`.cast` original),
-permite copiar al portapapeles las órdenes y, además, es capaz de añadir audio.
-Presenta dos limitaciones:
+Este último procedimiento es el recomendado si se requiere sonido, puesto que
+aúna todas las ventajas:
 
-- Requiere que podamos albergar los ficheros en algún espacio web propio.
-- asciinema-player_ aún no ha definido ningún evento para capturar el momento
-  en que saltamos a otro punto del vídeo (si se implementa alguna vez quizás sea
-  timeupdate_). Es útil cuando, por ejemplo, queremos saltarnos un trozo de la
-  reproducción y para ello avanzamos el vídeo con la barra inferior del
-  reproductor. En consecuencia:
+- Mantiene el formato original del vídeo (:file:`.cast`), que por tanto tendrá
+  un tamaño mínimo.
+- Permite copiar al portapapeles.
+- Proporciona todas las ventajas de la reproducción de un vídeo estándar,
+  incluyendo la sincronización con el sonido.
 
-  .. warning:: Mantener la sincronización entre vídeo y audio sólo es posible si
-     nos limitamos a arrancar y pausar el vídeo, pero no si saltamos un trozo.
+En contraprestación
 
-En este caso, partimos ya de haber generado el vídeo :kbd:`tutorial.cast` y el
-audio :kbd:`tutorial.webm` y necesitamos una :download:`página html como ésta
-<files/tutorial.html>` en que inscrustarlo:
+- Requiere que podamos albergar los ficheros en algún espacio web propio y
+  acomodar la reproducción en una página web (que puede ser tan simple como
+  la proporcionada).
+- Como grabamos audio y vídeo por separado (aunque simultáneamente) hacer que
+  estén sincronizados quizás requiera una edición mínima del vídeo.
+
+Partiendo de haber generado ya el vídeo :kbd:`tutorial.cast` y el
+audio :kbd:`tutorial.webm`, necesitamos una :download:`página html como ésta
+<files/tutorial.html>` en la que inscrustarlo:
 
 .. literalinclude:: files/tutorial.html
    :language: html
 
-.. warning:: La página debe estar alojada en un servidor, si intenta usarla
-   cargándola como un fichero en el navegador, le será imposible cargar el vídeo
-   y el audio.
+.. warning:: La página debe estar alojada en un servidor. Si intenta usarla
+   cargándola como un fichero local en el navegador, le será imposible cargar el
+   vídeo y el audio.
 
 .. rubric:: Notas al pie
 
