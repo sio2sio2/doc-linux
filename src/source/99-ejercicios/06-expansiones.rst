@@ -3,7 +3,8 @@ Ejercicios sobre expansiones
 
 #. Crear el fichero vacio :file:`captura$1.jpg`.
 
-#. Crear el siguiente árbol de directorios:
+#. Desde el directorio peronal y Utilizando expansiones, crear el siguiente
+   árbol de directorios de la manera más corta posible:
 
    .. code-block:: none
 
@@ -21,28 +22,32 @@ Ejercicios sobre expansiones
         |    +-- D25
         +-- DIR3
 
-#. Borrar los directorios :file:`D23` y :file:`D25`.
+#. Sin cambiar de directorio de trabajo, borrar los directorios :file:`D23` y
+   :file:`D25` (hágalo del modo más corto posible).
 
 #. Mostrar por pantalla los directorios hijos de :file:`/` que contengan la
    cadena «*bin*» en cualquier parte de su nombre.
 
-#. Mostrar los programas más básicos del sistema propios del administrador que
-   contengan tres letras.
+#. Mostrar los programas propios del administrador que contengan tres letras.
 
-#. Mostrar los programas más básicos del sistema propios del administrador que
-   contengan al menos tres letras.
+   .. note:: En los modernos sistemas *Debian* :file:`/sbin` y :file:`/usr/sbin`
+      contienen lo mismo.
 
-#. Mostrar los programas más básicos del sistema propios del administrador que
-   empiecen por «*a*» y acaben por cualquier vocal.
+#. Mostrar los programas propios del administrador que contengan al menos tres
+   letras.
 
-#. Mostrar los programas más básicos del sistema propios del administrador que
-   empiecen por vocal y acaben por vocal.
+#. Mostrar los programas propios del administrador que empiecen por «*a*» y
+   acaben por cualquier vocal.
+
+#. Mostrar los programas propios del administrador que empiecen por vocal y
+   acaben por vocal.
 
 #. Mostrar por pantalla todas las combinaciones con repetición que se pueden
    formar con dos vocales.
 
 #. Suponiendo que no se hayan creado usuarios con directorios personales en
-   sitios extraños, ver los usuarios cuyo nombre empieza por "u".
+   sitios extraños, ver los directorios personales de usuarios cuyo nombre
+   empieza por "u".
 
 #. Comprobar cuántos dispositivos de almacenamiento (discos, memorias usb, ...)
    hay en el sistema.

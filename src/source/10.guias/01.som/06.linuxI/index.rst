@@ -1,3 +1,5 @@
+.. _som-ud6:
+
 Uso básico de *Linux*
 *********************
 Para las unidades dedicadas a *Linux* nos limitaremos a enlazar con las partes

@@ -13,13 +13,12 @@ Salida de errores  :file:`/dev/stdrerr`  2
 
 y no haremos redirecciones permanentes.    
 
-La tercera columna, intitulada *descriptor asociado* hace referencia al
+La tercera columna, intitulada *Descriptor asociado*, hace referencia al
 descriptor de fichero, o sea, al número entero, con el que es posible hacer
 referencia al fichero en cuestión.
 
 Salida
 ------
-
 La redirección de salida consiste en redirigir la salida estándar o la salida
 de errores hacia otro fichero que puede ser la otra salida o un fichero
 regular.
@@ -51,7 +50,7 @@ dos nuevas, en vez de contener sólo estas dos últimas, lo cual habría ocurrid
 si hubiéramos usado una redirección simple.
 
 Hay ocasiones en que redirigimos la salida no porque deseemos guardar
-resultados, sino porque nb nos apetece verlos. En este caso, es sumamente útil
+resultados, sino porque deseamos no verlos. En este caso, es sumamente útil
 el fichero especial :file:`/dev/null`, que se traga todo lo que le echemos sin
 dejar rastro::
 
@@ -159,91 +158,32 @@ correctamente sangrado::
       EOF
    Mi hogar es /home/usuario
 
-:command:`bash`, además, ofrece otra dos redireccies útiles:
-
 .. _bash-here-string:
 
-**Here String**, 
-   que permite permite redirigir hacia la entrada estándar una cadena::
+.. rubric:: Here String
 
-      $ cat <<<Hola,\ don\ Pepito.
-      Hola, don Pepito.
+:command:`bash`, además, ofrece esta redirección adicional, que
+permite permite redirigir hacia la entrada estándar una cadena::
 
-   .. note:: Obsérvese que *Here String* no es más que el caso particular de un
-      *Here Document* de una sola línea::
+   $ cat <<<Hola,\ don\ Pepito.
+   Hola, don Pepito.
 
-         $ cat <<EOF
-         > Hola, don Pepito.
-         > EOF
-         Hola, don Pepito
+.. note:: Obsérvese que *Here String* no es más que el caso particular de un
+   *Here Document* de una sola línea::
 
-      por lo que si al escribir un *script* en que deseamos evitar las extensiones
-      de :program:`bash` tenemos necesidad de usar un *Here String*\ [#]_, podemos
-      usar un *Here Document*.
+      $ cat <<EOF
+      > Hola, don Pepito.
+      > EOF
+      Hola, don Pepito
 
-.. _bash-process-substitution:
-
-**Process substitution**
-   Proporciona el nombre de un fichero cuya lectura devuelve la salida del
-   subproceso incluido. Para entenderlo, empecemos por esto::
-
-      $ echo <(echo "Hola"; echo "Adios")
-      /dev/fd/63
-
-   En este caso el subproceso es :code:`echo "Hola"; echo "Adios"`, cuya salida
-   es::
-
-      Hola
-      Adios
-
-   Además, proporciona el nombre de fichero :file:`/dev/fd/63`, que es
-   precisamente lo que escribe :command:`echo`, porque si a :program:`echo` se
-   le proporciona el nombre de un fichero (o cualquier otra cosa), se limita a
-   escribirlo en pantalla. AHora bien, si hacemos::
-
-      $ cat <(echo "Hola"; echo "Adios")
-      Hola
-      Adios
-
-   ya que la orden es equivalente a :code:`cat /dev/fd/63`. Cuando se le
-   proporciona a :command:`cat` un fichero como argumento imprime su contenido
-   y, como ya hemos advertido que el contenido del fichero es la salida del
-   subproceso, :command:`cat` imprime las dos líneas.
-
-   La sustitución es muy útil cuando un programa necesita leer datos de un
-   fichero, que se pasa como argumento, y no permite sustituir el fichero por
-   la entrada estándar.
-
-   .. Una solución con dash a process substitution:
-      https://unix.stackexchange.com/a/309594
-
-      cmd1 | { cmd2 3<&- | { diff /dev/fd/3 /dev/fd/4; } 4<&0; } 3<&0
-
-   .. note:: Podemos combinar esto con la redirección de entrada. Por
-       ejemplo::
-
-         $ read a b < <(echo "1 2")
-         $ echo $a -- $b
-         1 -- 2
-
-   .. note:: También existe el equivalente para la salida. En ese caso, la
-      salida de la orden se manda al fichero y el fichero se convierte en la
-      entrada estándar del subproceso. Por ejemplo::
-
-         $ echo "Soy mostrado por cat" > >(cat) ; sleep .1
-         Soy mostrado por cat.
-
-      La frase se envía al fichero :file:`/dev/fd/63` y el contenido de tal
-      fichero se usa como entrada estándar para :command:`cat`. Se ha añadido
-      después un pequeño retardo, porque la *shell* no espera a que acabe el
-      subproceso para dar por terminada la orden, así que se mostrará antes el
-      *prompt* que la salida del :command:`cat`.
+   por lo que si al escribir un *script* en que deseamos evitar las extensiones
+   de :program:`bash` tenemos necesidad de usar un *Here String*\ [#]_, podemos
+   usar un *Here Document*.
 
 .. _pipeline:
 
 Tuberías
 --------
-
 Las tuberías (*pipelines* en inglés) son un caso particular de una redirección
 de salida junto a una redirección de entrada. Para entender su utilidad
 supongamos que, con las herramientas vistas, se nos propone mostrar únicamente
@@ -354,6 +294,114 @@ Para acabar, en lo relativo a redirecciones son muy útiles dos órdenes:
       tiempo restante y el porcentaje completado es absolutamente verídico. De
       hecho, no están sujetos a la arbitrariedad de nuestra memoria ni que a
       que, posiblemente, el tamaño de disco no sean exactamente 250GB\ [#]_.
+
+.. _bash-process-substitution:
+
+Process substitution
+--------------------
+.. warning:: Esta substitución no es *POSIX*, sino una extensión de
+   :program:`bash`.
+
+.. todo:: Reescribir esto para empezar diciendo para lo que sirve (el final)
+   y no este efecto de ver el nombre del fichero.
+
+Esta construcción, como la anterior, ejecuta una subshell con las órdenes que
+contiene, pero en vez de sustituirse por la salida estándar de éstas, se
+sustituye por el nombre de un fichero descriptor cuyo contenido es la salida
+estándar de las órdenes.
+
+Analicemos un ejemplo, bastante inútil desde un punto de vista práctico, pero
+que sirve para entender el párrafo anterior. Esta orden::
+
+   $ echo "Hola Adiós"
+   Hola Adiós
+
+es obvia la salida que produce. Si metemos la orden dentro de una *subshell*::
+
+   $ echo $(echo "Hola Adiós")
+   Hola Adiós
+
+el intérprete se limita a sustituir en la línea de órdenes la subshell por lo
+que imprime (el propio "Hola Adiós"), por lo que acaba ejecutando el
+:command:`echo` de la salida del :command:`echo` de la *subshell* y el resultado
+es el mismo.
+
+En cambio la *substitución del proceso* lo que hace es mandar la salida a un
+fichero descriptor y sustituir la expresión por el nombre de ese fichero::
+
+   $ echo <(echo "Hola Adiós")
+   /dev/fd/63
+
+En este caso, lo que ha ocurrido es que la salida del echo de la *subshell* (o
+sea, la frase "Hola Adiós"), se manda al fichero descriptor :file:`/dev/fd/63` y
+se sustituye la expresión por ese nombre de fichero. En este caso, si hubiéramos
+querido obtener el mismo efecto que con la expresión anterior (o sea ver "Hola
+Adiós"), deberíamos haber usado :ref:`cat <cat>` que es la orden apropiada para
+ver contenidos de ficheros::
+
+   $ cat <(echo "Hola Adiós")
+   Hola Adiós
+   
+Pero ¿qué utilidad tiene esto si para obtener el efecto del ejemplo basta con
+hacer simplemente?::
+
+   $ echo "Hola Adiós"
+   Hola Adiós
+
+Esta *process substitución*, en realidad, se usa cuando un programa
+:program:`ordenB` necesita como entrada la salida de otro programa
+:program:`ordenA`, pero el programa :program:`ordenB` sólo admite que se le
+pasen los datos a través de un fichero y no mediante la entrada estándar, en
+cuyo caso bastaría con :ref:`una tubería <pipeline>`. O sea, nuestra intención
+sería hacer::
+
+   $ ordenA | ordenB
+
+pero como :program:`ordenB` no es capaz de recibir datos de la entrada estándar,
+porque porque su sintaxis es :kbd:`ordenB fichero-entrada`, entonces se puede hacer::
+
+   $ ordenB <(ordenA)
+
+También existe la *substitución de proceso* para la salida que se utiliza cuando
+una :program:`ordenA` que sólo es capaz de almacenar su salida en un fichero, 
+debe pasarle esta salida a otro programa :program:`ordenB` que podría recibirla
+por la entrada estándar. O sea que nuestra intención sería hacer::
+
+   $ ordenA | ordenB
+
+pero la sintaxis de :program:`ordenA` solo nos deja hacer :kbd:`ordenA
+fichero-salida`, por lo que tenemos que recurrir a::
+
+   $ ordenA >(ordenB)
+
+.. note:: Con *POSIX* puede subsanarse la carencia, aunque utilizando :ref:`técnicas
+   de redirección <ioredirect>` algo avanzada. Así la expresión::
+
+      $ ordenB <(ordenB)
+
+   puede lograrse de este modo::
+
+      $ ordenA | ordenB /dev/fd/0
+
+   o de forma más general usando otro descriptor::
+
+      $ ordenA 3<&- | ordenB /dev/fd/3 3<&0
+
+   Por su parte:;
+
+      $ ordenA >(ordenB)
+
+   podría emularse con::
+
+      $ ordenA /dev/fd/1 | ordenB
+
+   o de forma más general usando otro descriptor::
+
+      $ ordenA /dev/fd/3 3>&1 | ordenB
+
+.. https://unix.stackexchange.com/a/309594
+
+   cmd1 | { cmd2 3<&- | { diff /dev/fd/3 /dev/fd/4; } 4<&0; } 3<&0
 
 .. rubric:: Notas al pie
 
