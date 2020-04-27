@@ -228,7 +228,7 @@ O bien, usar una sintaxis que sólo es admitida por :command:`bash`::
 
    $ ls /g* |& tail -n2
 
-Para acabar, en lo relativo a redirecciones son muy útiles dos órdenes:
+En lo relativo a redirecciones son muy útiles dos órdenes que las usan:
 
 .. _tee:
 .. index:: tee
@@ -295,113 +295,115 @@ Para acabar, en lo relativo a redirecciones son muy útiles dos órdenes:
       hecho, no están sujetos a la arbitrariedad de nuestra memoria ni que a
       que, posiblemente, el tamaño de disco no sean exactamente 250GB\ [#]_.
 
+Por último, debe tener presente que para que se pueda usar una tubería la salida
+de una orden (la "A") sea la entrada de la siguiente ("B")::
+
+   $ ordenA | ordenB
+
+exige que la :program:`ordenA` sea capaz de escribir su resultado en la salida
+estándar y la :program:`ordenB` sea capaz de leer de la entrada estándar. Sin
+embargo, puede ocurrir que la sintaxis de la :program:`ordenA` sólo nos permita
+escribir su resultado en un fichero, no en la salida estándar, o que la sintaxis
+de la :program:`ordenB` sólo nos permita leer de un fichero y no de la entrada
+estándar. En esas condiciones nos es imposible utilizar la tubería y tendremos
+que:
+
+- Utilizar el fichero intermedio, que es la estrategia más grosera. Por ejemplo,
+  si la :program:`ordenB` sólo puede leer de un fichero que se le pasa como
+  argumento::
+
+      $ ordenA > /tmp/entrada.txt
+      $ ordenB /tmp/entrada.txt
+      $ rm /tmp/entrada.txt
+
+  La estrategia funciona pero supone que esperemos a que la :program:`ordenA`
+  acabe de escribir el resultado y, además, que el resultado tengamos que
+  almacenarlo temporalmente en disco.
+
+- Utilizar tuberías con nombre.
+- Usar la sintaxis que brinda :program:`bash` llamada en su manual *process
+  substitution*.
+
+.. _mkfifo:
+.. index:: mkfifo
+
+**Tuberias con nombre**
+   Las :dfn:`tuberías con nombre` consisten en crear un fichero especial que
+   representa una tubería con la orden :manpage:`mkfifo` y hacer que los dos
+   programas involucrados lean y escriban en él, como si se tratara de un
+   fichero regular. La ventaja es que la transferencia de datos se lleva a cabo
+   del mismo que cuando se usan tuberías anónimas nrmales y por tanto, ambos
+   procesos se sincronizan la producción y el consumo, por lo que no se
+   almacenan datos en disco. De estemodo si es la :program:`ordenB` la que tiene
+   que leer de fichero, podemos hacer::
+
+      $ mkfifo /tmp/tuberia
+      $ ordenA > /tmp/tuberia & ordenB /tmp/tuberia
+      $ rmdir /tmp/tuberia
+
+   y si es la :program:`ordenA` la que solo puede escribir en un fichero::
+
+      $ mkfifo /tmp/tuberia
+      $ ordenA /tmp/tuberia & ordenB </tmp/tuberia
+
 .. _bash-process-substitution:
 
-Process substitution
---------------------
-.. warning:: Esta substitución no es *POSIX*, sino una extensión de
-   :program:`bash`.
+**Process substitution** (extensión de :program:`bash`, incompatible con *POSIX*)
+   El primer caso de limitación es que :program:`ordenB` sólo sea capaz de leer de
+   fichero, esto es, la sintaxis posible es :kbd:`ordenB fichero-entrada`. Si es
+   así, la forma imposible::
 
-.. todo:: Reescribir esto para empezar diciendo para lo que sirve (el final)
-   y no este efecto de ver el nombre del fichero.
+      $ ordenA | ordenB
 
-Esta construcción, como la anterior, ejecuta una subshell con las órdenes que
-contiene, pero en vez de sustituirse por la salida estándar de éstas, se
-sustituye por el nombre de un fichero descriptor cuyo contenido es la salida
-estándar de las órdenes.
+   se puede resolver con::
 
-Analicemos un ejemplo, bastante inútil desde un punto de vista práctico, pero
-que sirve para entender el párrafo anterior. Esta orden::
+      $ ordenB <(ordenA)
 
-   $ echo "Hola Adiós"
-   Hola Adiós
+   mientras que el segundo caso de limitación, que consiste en que
+   :program:`ordenA` sólo es capaz de escribir su resultado en un fichero, esto
+   es, que la sintaxis posibles es :kbd:`ordenA fichero-salida`, como no puede
+   resolverse::
 
-es obvia la salida que produce. Si metemos la orden dentro de una *subshell*::
+      $ ordenA | ordenB
 
-   $ echo $(echo "Hola Adiós")
-   Hola Adiós
+   se resuelve::
 
-el intérprete se limita a sustituir en la línea de órdenes la subshell por lo
-que imprime (el propio "Hola Adiós"), por lo que acaba ejecutando el
-:command:`echo` de la salida del :command:`echo` de la *subshell* y el resultado
-es el mismo.
+      $ ordenA >($ordenB)
 
-En cambio la *substitución del proceso* lo que hace es mandar la salida a un
-fichero descriptor y sustituir la expresión por el nombre de ese fichero::
+   .. note:: Con *POSIX* puede subsanarse la carencia, aunque utilizando :ref:`técnicas
+      de redirección <ioredirect>` algo avanzada. Así la expresión::
 
-   $ echo <(echo "Hola Adiós")
-   /dev/fd/63
+         $ ordenB <(ordenB)
 
-En este caso, lo que ha ocurrido es que la salida del echo de la *subshell* (o
-sea, la frase "Hola Adiós"), se manda al fichero descriptor :file:`/dev/fd/63` y
-se sustituye la expresión por ese nombre de fichero. En este caso, si hubiéramos
-querido obtener el mismo efecto que con la expresión anterior (o sea ver "Hola
-Adiós"), deberíamos haber usado :ref:`cat <cat>` que es la orden apropiada para
-ver contenidos de ficheros::
+      puede lograrse de este modo::
 
-   $ cat <(echo "Hola Adiós")
-   Hola Adiós
-   
-Pero ¿qué utilidad tiene esto si para obtener el efecto del ejemplo basta con
-hacer simplemente?::
+         $ ordenA | ordenB /dev/fd/0
 
-   $ echo "Hola Adiós"
-   Hola Adiós
+      o de forma más general usando otro descriptor::
 
-Esta *process substitución*, en realidad, se usa cuando un programa
-:program:`ordenB` necesita como entrada la salida de otro programa
-:program:`ordenA`, pero el programa :program:`ordenB` sólo admite que se le
-pasen los datos a través de un fichero y no mediante la entrada estándar, en
-cuyo caso bastaría con :ref:`una tubería <pipeline>`. O sea, nuestra intención
-sería hacer::
+         $ ordenA 3<&- | ordenB /dev/fd/3 3<&0
 
-   $ ordenA | ordenB
+      Por su parte::
 
-pero como :program:`ordenB` no es capaz de recibir datos de la entrada estándar,
-porque porque su sintaxis es :kbd:`ordenB fichero-entrada`, entonces se puede hacer::
+         $ ordenA >(ordenB)
 
-   $ ordenB <(ordenA)
+      puede emularse con::
 
-También existe la *substitución de proceso* para la salida que se utiliza cuando
-una :program:`ordenA` que sólo es capaz de almacenar su salida en un fichero, 
-debe pasarle esta salida a otro programa :program:`ordenB` que podría recibirla
-por la entrada estándar. O sea que nuestra intención sería hacer::
+         $ ordenA /dev/fd/1 | ordenB
 
-   $ ordenA | ordenB
+      o de forma más general usando otro descriptor::
 
-pero la sintaxis de :program:`ordenA` solo nos deja hacer :kbd:`ordenA
-fichero-salida`, por lo que tenemos que recurrir a::
+         $ ordenA /dev/fd/3 3>&1 | ordenB 3>&-
 
-   $ ordenA >(ordenB)
+   .. https://unix.stackexchange.com/a/309594
 
-.. note:: Con *POSIX* puede subsanarse la carencia, aunque utilizando :ref:`técnicas
-   de redirección <ioredirect>` algo avanzada. Así la expresión::
+      cmd1 | { cmd2 3<&- | { diff /dev/fd/3 /dev/fd/4; } 4<&0; } 3<&0
 
-      $ ordenB <(ordenB)
+   Para que no quede expresado de forma tan general este apartado supongamos que
+   queremos en una misma orden guardar el contenido del directorio raíz y a la
+   vez contar cuántos ficheros contiene. La salución es la siguiente::
 
-   puede lograrse de este modo::
-
-      $ ordenA | ordenB /dev/fd/0
-
-   o de forma más general usando otro descriptor::
-
-      $ ordenA 3<&- | ordenB /dev/fd/3 3<&0
-
-   Por su parte:;
-
-      $ ordenA >(ordenB)
-
-   podría emularse con::
-
-      $ ordenA /dev/fd/1 | ordenB
-
-   o de forma más general usando otro descriptor::
-
-      $ ordenA /dev/fd/3 3>&1 | ordenB
-
-.. https://unix.stackexchange.com/a/309594
-
-   cmd1 | { cmd2 3<&- | { diff /dev/fd/3 /dev/fd/4; } 4<&0; } 3<&0
+      $ ls / | tee >(wc -l) >/tmp/listado.txt
 
 .. rubric:: Notas al pie
 
