@@ -1,3 +1,5 @@
+.. _bash-texto:
+
 Tratamiento de texto
 ====================
 

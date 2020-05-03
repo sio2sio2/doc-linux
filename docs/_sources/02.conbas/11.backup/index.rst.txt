@@ -1,3 +1,5 @@
+.. _backup-simple:
+
 Copias de seguridad
 ===================
 

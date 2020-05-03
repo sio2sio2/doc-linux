@@ -1,3 +1,5 @@
+.. _ioredirect-bas:
+
 Redirección básica
 ==================
 
