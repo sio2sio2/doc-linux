@@ -171,7 +171,7 @@ comando. Analicemos el siguiente trozo de código.
    ls /
    echo '**********************'
 
-   echo 1>&3 3>&-
+   exec 1>&3 3>&-
 
    echo "Esto se vuelve a ver por pantalla"
 

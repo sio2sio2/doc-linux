@@ -15,6 +15,8 @@ Ejercicios sobre compresión y empaquetado
             +--- Da
             +--- Db
 
+   del modo más conciso posible.
+
 #. Crear los fichero vacíos:
       
    - f1.txt dentro de D1

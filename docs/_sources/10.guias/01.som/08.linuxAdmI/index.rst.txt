@@ -190,8 +190,10 @@ sustituiremos por el siguiente resumen:
 
          ^[^a]
 
-Para practicar las herramientas de manipulación de texto y las expresiones
-regulares intente la relación
+Los epígrafes sobre :ref:`herramientas de búsqueda <texto-busqueda>` y :ref:`de
+manipulación <texto-manipulación>` sí son pertinentes. Para practicar las
+herramientas de manipulación de texto y las expresiones regulares intente la
+relación:
 
 * :ref:`ej-texto`
 

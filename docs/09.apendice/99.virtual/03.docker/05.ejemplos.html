@@ -142,18 +142,18 @@ servicio <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> a la red.
 <div class="section" id="php-fpm-con-socket">
 <h2><span class="section-number">9.5.2.3.4.2. </span>PHP-FPM con socket<a class="headerlink" href="#php-fpm-con-socket" title="Enlazar permanentemente con este título">¶</a></h2>
 <p>Planteamos el objetivo de utilizar la <a class="reference external" href="https://hub.docker.com/_/php">imagen de PHP</a> basada en <a class="reference external" href="https://alpinelinux.org/">Alpine</a>, pero hacer accesible el
-servicio de <em>FastCGI</em> no a través de un puerto <abbr title="Transmission Control Protocol">TCP</abbr>, sino a través de un
-<em>socket</em> UNIX. Para ello tomaremos:</p>
+servicio de <em>FastCGI</em> a través de un <em>socket</em> UNIX, en vez  de un puerto <abbr title="Transmission Control Protocol">TCP</abbr>.
+Para ello tomaremos:</p>
 <ul class="simple">
-<li><p>La imagen ya comentada que compartirá dos volúmenes:</p>
+<li><p>La imagen ya comentada, cuyo contenedor compartirá dos volúmenes:</p>
 <ul>
 <li><p>Uno para albergar el <em>socket</em>.</p></li>
 <li><p>Otro que contenga la aplicación.</p></li>
 </ul>
 </li>
-<li><p>Una segunda <a class="reference external" href="https://hub.docker.com/_/nginx">imagen de nginx</a> que compartirá
-los mismos dos volúmenes anteriores, más un tercero que contega su
-configuración modular.</p></li>
+<li><p>Una segunda <a class="reference external" href="https://hub.docker.com/_/nginx">imagen de nginx</a> cuyo
+contenedor compartirá los mismos dos volúmenes anteriores, más un tercero que
+contenga su configuración modular.</p></li>
 </ul>
 <p>El directorio de trabajo será el siguiente:</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>+ workdir
@@ -178,9 +178,9 @@ configuración modular.</p></li>
 </div>
 <p class="rubric">Preparación de php-fpm</p>
 <p>Básicamente, consiste en modificar la configuración de <abbr title="PHP Hypertext Preprocessor">PHP</abbr> para adaptarla a
-nuestras necesidades. Un camnbio consiste en sustituir el fichero
-<code class="file docutils literal notranslate"><span class="pre">zz-docker.conf</span></code> para alterar lograr la comunicación a través de un
-<em>socket</em>. Esto se logra con el siguiente contenido:</p>
+nuestras necesidades. Un cambio consiste en sustituir el fichero
+<code class="file docutils literal notranslate"><span class="pre">zz-docker.conf</span></code> para lograr la comunicación a través de un
+<em>socket</em>. Su contenido es el siguiente:</p>
 <div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[global]</span>
 <span class="na">daemonize</span> <span class="o">=</span> <span class="s">no</span>
 
@@ -190,9 +190,9 @@ nuestras necesidades. Un camnbio consiste en sustituir el fichero
 <span class="na">listen.group</span> <span class="o">=</span> <span class="s">www-data</span>
 </pre></div>
 </div>
-<p>Además, dentro de <code class="file docutils literal notranslate"><span class="pre">etc/php/conf.d</span></code> podemos crear ficheros INI que alteren
-la configuración general de <abbr title="PHP Hypertext Preprocessor">PHP</abbr>. Por ejemplo, uno ficher que aumente el
-tamaño de los ficheros subidos al servidor:</p>
+<p>Además, dentro de <code class="file docutils literal notranslate"><span class="pre">etc/php/conf.d</span></code>, podemos crear ficheros INI que alteren
+la configuración general de <abbr title="PHP Hypertext Preprocessor">PHP</abbr>. Por ejemplo, uno que aumente el tamaño de los
+ficheros subidos al servidor:</p>
 <div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="c1"># conf.d/uploads.ini</span>
 
 <span class="na">post_max_size</span> <span class="o">=</span> <span class="s">20M</span>
@@ -206,13 +206,13 @@ tamaño de los ficheros subidos al servidor:</p>
 </pre></div>
 </div>
 <p class="rubric">Preparación de nginx</p>
-<p>El problema de esta imagen es que necesitamos que <a class="reference internal" href="../../../07.serre/02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a> lo
-ejecute el mismo usuario<a class="footnote-reference brackets" href="#id2" id="id1">1</a> que ejecuta <strong class="program">php-fpm</strong>. En este segundo
-contenedor el usuario es <em>www-data</em> con <abbr title="User IDentifier">UID</abbr> 82 y cuyo grupo principal tiene un
-<abbr title="Group IDentifier">GID</abbr> y nombre idénticos. En el primero existe el grupo, pero no el usuario, y
-el servidor web lo ejecuta el usuario <em>nginx</em> con un <abbr title="User IDentifier">UID</abbr> distinto. Lo que
-haremos, en este caso, es crer el usuario <em>www-data</em> y hacer que el servidor lo
-ejecute este usuario.</p>
+<p>Nuestro problema es que necesitamos que <a class="reference internal" href="../../../07.serre/02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a> lo ejecute el
+mismo usuario<a class="footnote-reference brackets" href="#id2" id="id1">1</a> que ejecuta <strong class="program">php-fpm</strong> en el otro contenedor.
+<strong class="program">php-fpm</strong> es ejecutado por el usuario <em>www-data</em> con <abbr title="User IDentifier">UID</abbr> 82 y cuyo
+grupo principal tiene un <abbr title="Group IDentifier">GID</abbr> y nombre idénticos. <a class="reference internal" href="../../../07.serre/02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a>, en
+cambio, lo ejecuta el usuario <em>nginx</em> con un <abbr title="User IDentifier">UID</abbr> que no es 82. Solucionaremos
+el inconveniente creando en este contenedor el usuario <em>www-data</em> con <abbr title="User IDentifier">UID</abbr> 82 y
+haciendo que ejecute el servidor web.</p>
 <p>Los ficheros de configuración del servidor son:</p>
 <div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="c1"># conf.d/php.conf</span>
 <span class="k">upstream</span> <span class="s">php</span> <span class="p">{</span>
@@ -303,20 +303,19 @@ utilizando las estrategias del ejercicio anterior.</p>
 </div>
 <p>Los tres contenedores que utilizaremos son:</p>
 <ul>
-<li><p>La <cite>imagen oficial de mariaDB &lt;https://hub.docker.com/_/mariadb&gt;</cite>, que se
+<li><p>La <a class="reference external" href="https://hub.docker.com/_/mariadb">imagen oficial de mariaDB</a>, que se
 caracteriza porque al generar un contenedor, crea los ficheros necesarios del
 gestor de bases de datos, según los valores de las variables de entorno que
 se proporcionen (véase el <code class="file docutils literal notranslate"><span class="pre">docker-compose.yaml</span></code> más adelante). Esta
 característica nos permite preparar la base de datos para <em>wordpress</em> y el
 usuario que la maneje.</p></li>
-<li><p>Una <cite>imagen oficial de wordpress que incluya PHP-FPM
-&lt;https://hub.docker.com/_/wordpress&gt;</cite>. Esta imagen contiene el <abbr title="PHP Hypertext Preprocessor">PHP</abbr> necesario
+<li><p>Una <a class="reference external" href="https://hub.docker.com/_/wordpress">imagen oficial de wordpress que incluya PHP-FPM</a>. Esta imagen contiene el <abbr title="PHP Hypertext Preprocessor">PHP</abbr> necesario
 y la versión de <a class="reference external" href="https://wordpress.org/">Wordpress</a> en el momento de su generación, la cual acaba
 dejando disponible en <code class="file docutils literal notranslate"><span class="pre">/var/www/html</span></code>.</p>
 <p>Esta imagen también usa variables de entorno para conocer dónde se encuentra
 la base de datos y con qué usuarios acceder a ella.</p>
 </li>
-<li><p>Una <cite>imagen mínima de nginx &lt;https://hub.docker.com/_/ngvinx&gt;</cite> que necesitará
+<li><p>Una <a class="reference external" href="https://hub.docker.com/_/ngvinx">imagen mínima de nginx</a> que necesitará
 acceso al directorio <code class="file docutils literal notranslate"><span class="pre">/var/www/html</span></code> del contenedor anterior y alterar
 su configuración predefinida para ser capaz de servir la aplicación.</p></li>
 </ul>
