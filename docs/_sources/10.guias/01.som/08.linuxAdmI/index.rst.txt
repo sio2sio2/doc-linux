@@ -122,7 +122,7 @@ sustituiremos por el siguiente resumen:
 
 #. Ejemplos.
 
-   Indicar las expresiones regulares que concuerden co texto que:
+   Indicar las expresiones regulares que concuerden con texto que:
 
    i. acabe en "a":
 
@@ -189,6 +189,12 @@ sustituiremos por el siguiente resumen:
       .. code-block:: none
 
          ^[^a]
+
+.. note:: Para probar que funcionan las expresiones de arriba, lo más sencillo
+   es utilizar :ref:`grep <grep>`. Por ejemplo, para ver las líneas de fichero
+   :file:`/tmp/mifichero.txt` que acaban en "a" debemos hacer::
+
+      # grep -E 'a$' /tmp/mifichero.txt
 
 Los epígrafes sobre :ref:`herramientas de búsqueda <texto-busqueda>` y :ref:`de
 manipulación <texto-manipulación>` sí son pertinentes. Para practicar las
