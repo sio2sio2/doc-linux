@@ -57,15 +57,6 @@ Ejercicios sobre herramientas de texto
 
 #. Cuénte los directorios y subdirectorios que contiene su espacio personal.
 
-#. Mostrar la lista de integrantes de cada grupo que no tienen
-   al propio grupo como grupo principal. La lista debe tener
-   la forma:
-
-   .. code-block:: none
-
-      sudo = usuario1 usuario2
-      admin = usuario2 usuario5 usuario3
-
 #. Mostrar los nombres de usuario y su |UID| del siguiente modo:
 
    .. code-block:: none
@@ -76,6 +67,15 @@ Ejercicios sobre herramientas de texto
       etc.
 
    .. note:: Puede usar tanto :command:`cut` como :command:`awk`.
+
+#. Mostrar la lista de integrantes de cada grupo que no tienen
+   al propio grupo como grupo principal. La lista debe tener
+   la forma:
+
+   .. code-block:: none
+
+      sudo = usuario1,usuario2
+      admin = usuario2,usuario5,usuario3
 
 #. Muestre exclusivamente las direcciones |IP| de los servidores |DNS| que usa
    el sistema.

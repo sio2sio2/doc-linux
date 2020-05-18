@@ -10,7 +10,7 @@ Nombre             Dipositivo           Descriptor asociado
 ================== ==================== ===================
 Entrada estándar   :file:`/dev/stdin`    0
 Salida estándar    :file:`/dev/stdout`   1
-Salida de errores  :file:`/dev/stdrerr`  2
+Salida de errores  :file:`/dev/stderr`   2
 ================== ==================== ===================
 
 y no haremos redirecciones permanentes.    
@@ -135,7 +135,7 @@ delimitador sea :kbd:`EOF`::
    En un país multicolor
    había una abeja bajo el sol.
 
-En el texto, la *shell* intentará llevar a cabo sustituiciones por lo que::
+En el texto, la *shell* intentará llevar a cabo sustituciones por lo que::
 
    $ cat <<EOF
    > 4 * 2 = $((4*2))
@@ -165,7 +165,7 @@ correctamente sangrado::
 .. rubric:: Here String
 
 :command:`bash`, además, ofrece esta redirección adicional, que
-permite permite redirigir hacia la entrada estándar una cadena::
+permite redirigir hacia la entrada estándar una cadena::
 
    $ cat <<<Hola,\ don\ Pepito.
    Hola, don Pepito.
