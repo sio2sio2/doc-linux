@@ -1,3 +1,48 @@
+**********************
+Técnicas critográficas
+**********************
+Estudiaremos bajo este epígrafe dos aspectos relacionados con la criptografía:
+
+- Las funciones de resumen o funciones *hash*.
+- El cifrado en sí y cuñáles son los algoritmos que se usan para ello.
+
+
+
+.. _hash:
+
+Funciones *hash*
+****************
+Las :dfn:`funciones hash` o :dfn:`funciones digest` o :dfn:`funciones resumen`
+son funciones que dada una entrada generan siempre una salida de la misma
+longitud. Lo deseable, a efectos de nuestro tema, es que:
+
++ sean *deterministas*, esto es, que para una misma entrada siempre generen la
+  misma salida.
+
++ minimicen las *colisiones*, esto es, que minimicen la posibilidad de obtener
+  una misma salida para dos entradas distintas.
+
++ sean de un solo sentido, esto es, que, dada una salida, sea difícil encontrar
+  una entrada cuya salida sea la especificada.
+
+Entre las funciones de *hash* más conocidas se encuentran:
+
+|MD5|
+   Genera un resumen de 128 *bits* representado habitualmente por 32 dígitos
+   hexadecimanels. Es muy común usarlo como comprobación de la integridad de
+   ficheros. Su seguridad está en entredicho, ya que presenta problemas de
+   colisiones.
+
+|SHA|
+   Es una familia de funciones *hash*  que ha ido sufriendo diversas revisiones:
+   |SHA|\ -0, |SHA|\ -1, |SHA|\ -2 y |SHA|\ -3. Tanto |SHA|\ -0 como |SHA|\ -1
+   generan resúmenes de 160 *bits*. Ambas se consideran inseguras y se
+   desaconseja su uso. para paliar esto, se desarrolló |SHA|\ -2, que implementa
+   funciones *hash* de 224, 256, 364 y 512 *bits*. Se las conoce habitualmente
+   como |SHA|\ -224, |SHA|\ -256, |SHA|\ -364 y |SHA|\ -512. |SHA|\ -3, por su
+   parte, cambia internamente los algoritmos, pero esta pensada para generar
+   resúmenes de la misma longitud que |SHA|\ -2.
+
 Algoritmos de cifrado
 *********************
 Ya se ha comentado que los algoritmos modernos de cifrado se basan en el
@@ -124,40 +169,55 @@ forma segura, que se denomina :dfn:`clave de sesión`. Una vez que la clave se
 encuentra en ambos extremos se pasa a realizar un cifrado simétrico usando esta
 clave de sesión.
 
-.. _hash:
+Herramientas prácticas
+**********************
 
-Funciones *hash*
-================
-Las :dfn:`funciones hash` o :dfn:`funciones digest` o :dfn:`funciones resumen`
-son funciones que dada una entrada generan siempre una salida de la misma
-longitud. Lo deseable, a efectos de nuestro tema, es que:
+.. index:: md5sum
+.. index:: shasum, sha256sum, sha384sum, sha512sum
 
-+ sean *deterministas*, esto es, que para una misma entrada siempre generen la
-  misma salida.
+.. _md5sum:
+.. _shasum:
 
-+ minimicen las *colisiones*, esto es, que minimicen la posibilidad de obtener
-  una misma salida para dos entradas distintas.
+Generación de resúmenes
+=======================
+Para la generación de resúmenes *hash* de ficheros y flujos de texto, existen
+dos órdenes fundamentales: :command:`md5sum` y la familia de comandos
+:program:`shasum` (:command:`sha256sum`, :command:`sha384sum`,
+:command:`sha512sum`), que comparten una misma interfaz, con lo que es
+indiferente ilustrar el uso de una u otra orden.
 
-+ sean de un solo sentido, esto es, que, dada una salida, sea difícil encontrar
-  una entrada cuya salida sea la especificada.
+La generación del resumen puede hacerse del siguiente modo::
 
-Entre las funciones de *hash* más conocidas se encuentran:
+   $ echo "Hola, caracola" > saludo1.txt
+   $ md5sum saludo1.txt
+   b18a245aba5384920d7f6a488d725181  saludo1.txt
 
-|MD5|
-   Genera un resumen de 128 *bits* representado habitualmente por 32 dígitos
-   hexadecimanels. Es muy común usarlo como comprobación de la integridad de
-   ficheros. Su seguridad está en entredicho, ya que presenta problemas de
-   colisiones.
+.. note:: Si se incluyen varios ficheros como argumento, se calculará el resumen
+   de cada uno de ellos.
 
-|SHA|
-   Es una familia de funciones *hash*  que ha ido sufriendo diversas revisiones:
-   |SHA|\ -0, |SHA|\ -1, |SHA|\ -2 y |SHA|\ -3. Tanto |SHA|\ -0 como |SHA|\ -1
-   generan resúmenes de 160 *bits*. Ambas se consideran inseguras y se
-   desaconseja su uso. para paliar esto, se desarrolló |SHA|\ -2, que implementa
-   funciones *hash* de 224, 256, 364 y 512 *bits*. Se las conoce habitualmente
-   como |SHA|\ -224, |SHA|\ -256, |SHA|\ -364 y |SHA|\ -512. |SHA|\ -3, por su
-   parte, cambia internamente los algoritmos, pero esta pensada para generar
-   resúmenes de la misma longitud que |SHA|\ -2.
+También es posible calcular el resumen de un flujo de datos::
+
+   $ echo "Hola, caracola" | sha256sum
+   d261be2aa264d38cad717fa8493dacc0b3f33f949869d39ecf7611689fb617ad  -
+
+Habitualmente, los resúmenes generados se almacenan, a fin de que puedan servir
+más adelante para comprobar la integridad de los ficheros::
+
+   $ md5sum saludo1.txt saludo2.txt > saludos.md5
+
+Con posterioridad, podrá comprobarse la integridad del siguiente modo\ [#]_::
+
+   $ LC_ALL=C md5sum -c saludos.md5
+   saludo1.txt: OK
+   saludo2.txt: OK
+
+.. note:: Si se almacenó el resumen de un flujo de datos (obsérvese que aparece
+   un "-", en vez de el nombre del fichero), puede comprobarse que otro flujo es
+   el mismo pasándolo a través de la entrada estándar::
+
+      $ echo "Hola, caracola" | md5sum >  flujo.md5
+      $ echo "Hola, caracola" | LC_ALL=C md5sum -c flujo.md5
+      -: OK
 
 .. _gnupg.1:
 
@@ -423,72 +483,118 @@ corespondiente a la pública con la que se firmó, basta con::
    $ gpg -qd secreto.asc
    Esto es un secreto
 
+Resúmens
+--------
+Aunque no está pensado para ello, también pueden obtenerse el resumen de un
+fichero::
+
+   $ gpg --print-md sha512 fichero,txt
+
+e incluso hay una opción que calcula los resúmenes según todos los algoritmos
+disponibles::
+
+   $ gpg --print-mds fichero,txt
+
 .. seealso:: Hay un extenso tutorial del uso de GnuPG_ en la `wiki de Archlinux
    <https://wiki.archlinux.org/index.php/GnuPG_(Espa%C3%B1ol)>`_.
 
-.. index:: md5sum
-.. index:: shasum, sha256sum, sha384sum, sha512sum
+Generación de claves: Open\ |SSL|
+=================================
+Open\ |SSL| es otra herramienta que permite generar y utilizar claves.
 
-.. _md5sum:
+.. warning:: La utilidad de tratar esta herramienta, más que en la de las claves
+   en sí para lo cual nos basta la anterior, está en que puede manejar
+   :ref:`certificados digitales <cert-digital>`. incluidos los emitidos por la
+   |FNMT|, y, en consecuencia, obtener de ellos las claves pública y privada que
+   contienen.
 
-.. _shasum:
+Cifrado simétrico
+-----------------
+Una forma de llevarlo a cabo es esta::
 
-Generación de resúmenes
-=======================
-Para la generación de resúmenes *hash* de ficheros y flujos de texto, existen
-dos órdenes fundamentales: :command:`md5sum` y la familia de comandos
-:program:`shasum` (:command:`sha256sum`, :command:`sha384sum`,
-:command:`sha512sum`), que comparten una misma interfaz, con lo que es
-indiferente ilustrar el uso de una u otra orden.
+   # openssl enc -aes256 -pbkdf2 -a -in fichero.txt -out fichero.txt.enc
 
-La generación del resumen puede hacerse del siguiente modo::
+que utiliza |AES|\ -256 para el proceso y genera un cifrado en `base64
+<https://es.wikipedia.org/wiki/Base64>`_ gracias a la opción `-a` (equivalente a
+:kbd:`armor` en :ref:`gpg <gpg-pgp>`). Para descrifrar basta con añadir la opción
+:kbd:`-d` y, obviamente, utilizar como entrada el texto cifrado::
 
-   $ echo "Hola, caracola" > saludo1.txt
-   $ md5sum saludo1.txt
-   b18a245aba5384920d7f6a488d725181  saludo1.txt
+   # openssl enc -aes256 -a -d -in fichero.txt.enc -out fichero-recuperado.txt
 
-.. note:: Si se incluyen varios ficheros como argumento, se calculará el resumen
-   de cada uno de ellos.
+.. note:: Tanto :kbd:`-in` como :kbd:`-out` son opcionales y, si no se
+   especifican, se entenderá que la entrada es la entrada estándar y la salida
+   la salida estándar.
 
-También es posible calcular el resumen de un flujo de datos::
+.. note:: La clave simétrica para el cifrado/descifrado se pide de forma
+   interactiva. Puede proporcionarse en la propia orden incluyendo la opción
+   :kbd:`-pass`::
 
-   $ echo "Hola, caracola" | sha256sum
-   d261be2aa264d38cad717fa8493dacc0b3f33f949869d39ecf7611689fb617ad  -
+      # openssl enc -aes256 -pbkdf2 -a -pass pass:clave-secreta -in fichero.txt -out fichero.txt.enc
+      
+Cifrado asimétrico
+------------------
+Es obvio que para poder llevarlo es necesario previamente generar un par de
+claves::
 
-Habitualmente, los resúmenes generados se almacenan, a fin de que puedan servir
-más adelante para comprobar la integridad de los ficheros::
+   # openssl genrsa -aes128 -passout pass:clave-secreta -out privkey.pem 4096
+   # openssl rsa -in private.pem -passin pass:clave-secreta -pubout -out pubkey.pem
 
-   $ md5sum saludo1.txt saludo2.txt > saludos.md5
+Las órdenes generan un par de claves |RSA| (:file:`privkey.pem` y
+:file:`pubkey.pem`) de 4096 *bits*. Para cifrar la clave privada se usa |AES|
+128.
 
-Con posterioridad, podrá comprobarse la integridad del siguiente modo\ [#]_::
+Con ellas podemos cifrar y descifrar pequeños ficheros::
 
-   $ LC_ALL=C md5sum -c saludos.md5
-   saludo1.txt: OK
-   saludo2.txt: OK
+   # echo "Hola" > saludo.txt
+   # openssl rsautl -encrypt -inkey public.pem -pubin -in saludo.txt -out saludo.enc
+   # openssl rsautl -decrypt -inkey private.pem -passin pass:clave-secreta -in texto.enc
+   Hola
 
-.. note:: Si se almacenó el resumen de un flujo de datos (obsérvese que aparece
-   un "-", en vez de el nombre del fichero), puede comprobarse que otro flujo es
-   el mismo pasándolo a través de la entrada estándar::
+En realidad, las variantes más interesantes son cuando se tiene un
+:ref:`certificado digital <cert-digital>`, cuyo concepto trataremos más
+adelante, y se pretende :ref:`firmar un documento <firma-digital>`, que también
+trataremos.
 
-      $ echo "Hola, caracola" | md5sum >  flujo.md5
-      $ echo "Hola, caracola" | LC_ALL=C md5sum -c flujo.md5
-      -: OK
+Para esto supongamos que disponemos de un certificado en formato |PKCS|\ 12 llamado
+:file:`cert.p12`, el cual traducimos a un formato manipulable por
+:program:`openssl`::
 
-.. note:: Con :command:`gpg`, aunque no está pensado para ello, también pueden
-   obtenerse el resumen de un fichero::
+   # openssl pkcs12 -in cert.p12 -nocerts -out cert.key
+   # openssl pkcs12 -in cert.p12 -clcerts -nokeys -out cert.pem
 
-      $ gpg --print-md sha512 fichero,txt
+El fichero |PKCS|\ 12 debe estar cifrando con una clave pública por lo que en
+ambos casos se requerirá la clave con la que se cifró. Además, la primera orden
+extrae la clave privada, por lo que se requerirá una clave para su cifrado
+(véase en la página de :manpage:`openssl-pkcs12` las opciones :kbd:`-passin` y
+:kbd:`-passout` para proporcionarlas en la propia orden). Con estos ficheros ya
+tenemos separadas las clave pública y privada, pero con la salvedad de que hay
+en ellos datos del certificado por lo que las órdenes son ligeramente distintas::
 
-   e incluso hay una opción que calcula los resúmenes según todos los algoritmos
-   disponibles::
+   # echo "Hola" > saludo.txt
+   # openssl rsautl -encrypt -inkey cert.pem -certin -in saludo.txt -out saludo.enc
+   # openssl rsautl -decrypt -inkey cert.key -passin pass:clave-secreta -in texto.enc
+   Hola
 
-      $ gpg --print-mds fichero,txt
+En concreto, la opción :kbd:`-certin`, que sustituye a :kbd:`-pubin`.
+
+.. note:: Para firmar un fichero, puede consultarse `esta respuesta de
+   stackoverflow <https://stackoverflow.com/a/18359743>`_.
+
+Resúmenes
+---------
+Es posible también utilizar funciones de *hash*::
+
+   # openssl dgst -sha256 fichero.txt
+   SHA256(fichero.txt)= d42650b1b27a8da408495394242e10d06f6238d15ec1c76f8f942bbdf26d419d
 
 .. rubric:: Notas al pie
 
 .. [#] De hecho, `OpenSSH <https://www.openssh.com/>`_, para su versión 7,
    `deshabilitó el uso de DSA
    <https://www.gentoo.org/support/news-items/2015-08-13-openssh-weak-keys.html>`_.
+.. [#] Se fuerza a que la orden se ejecute en inglés, para que el resultado se
+   exprese como *OK* o *FAILED*. En castellano, la leyenda se expresa de forma
+   muy farragosa.
 .. [#] Usar, sin embargo, el propio kernel para la generación de la
    entropía no es muy recomendable. Debería usarse el dispositivo
    hardware (/dev/hwrng), pero en la máquina virtual es posible que
@@ -497,9 +603,6 @@ Con posterioridad, podrá comprobarse la integridad del siguiente modo\ [#]_::
 .. [#] El algoritmo elegido utiliza una clave |RSA| de 2048 *bits* tanto para
    cifrado como para firmado. Otro posible algoritmo es *ed25519*.
 .. [#] En nuestro caso, sería una clave pública y su correspondiente privada.
-.. [#] Se fuerza a que la orden se ejecute en inglés, para que el resultado se
-   exprese como *OK* o *FAILED*. En castellano, la leyenda se expresa de forma
-   muy farragosa.
 
 .. |DES| replace:: :abbr:`DES (Data Encryption Standard)`
 .. |AES| replace:: :abbr:`AES (Advanced Encryption Standard)`
@@ -512,5 +615,8 @@ Con posterioridad, podrá comprobarse la integridad del siguiente modo\ [#]_::
 .. |SHA| replace:: :abbr:`SHA (sechure Hash Algorithm)`
 .. |PGP| replace:: :abbr:`PGP (Pretty Good Privacy)`
 .. |SSL| replace:: :abbr:`SSL (Secure Socket Layer)`
+.. |FNMT| replace:: :abbr:`FNMT (Fabrica Nacional de Moneda y Timbre)`
+.. |PKCS| replace:: :abbr:`PKCS (Public-Key Cryptography Standards)`
+
 .. _GnuPG: https://www.gnupg.org/
 .. _keyservers: http://www.keyserver.net/
