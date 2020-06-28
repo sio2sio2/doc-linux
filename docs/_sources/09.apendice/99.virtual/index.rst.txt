@@ -20,7 +20,7 @@ entre:
 
 **Virtualización de aplicaciones**
    Tiene por propósito crear un entorno virtual para las aplicaciones
-   independiente de la plataforma real (*hardware*\ + sistema operativo) sobre
+   independiente de la plataforma real (*hardware*\  + sistema operativo) sobre
    la que se pretenden ejecutar. Con ello se logra que una misma aplicación sin
    cambios pueda ejecutarse en todas aquellas plataformas para la que se haga
    esta virtualización. Ejemplos de este tipo de virtualización son la |JVM| o
@@ -59,10 +59,12 @@ Antes de empezar, no obstante, hay que introducir cuatro conceptos:
 * :dfn:`Sistema huésped`, que es aquel que se ejecuta dentro de la máquina virtual.
 
 **Virtualización completa**
-   Es aquella en que el *huésped* corre dentro de un sistema totalmente
-   virtualizado de manera que no es consciente de que en realidad se ejecuta
-   dentro de una virtualización. En consecuencia, la virtualización debe ofrecer
-   a este sistema una plataforma *hardware* virtual completamente funcional.
+   Es aquella en la que se virtualiza por completo para el *huesped* una
+   plataforma *hardware* funcional, por lo que el *huésped* debe ser tan sólo
+   capaz de utilizar los componentes de esa plataforma, esto es, tener los
+   *drivers* adecuandos para todos ellos. Normalmente el *hardware* que se virtualiza
+   con componentes reales comúnmente utilizados por lo que es bastante probable
+   que el sistema huésped disponga de los drivers apropiados.
 
    Dentro de la virtualización completa, podemos hacer dos distinciones. La
    primera hace referencia al **tipo de hipervisor**:
