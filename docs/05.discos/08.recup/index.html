@@ -1,0 +1,154 @@
+
+
+
+<!DOCTYPE html>
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>5.8. Recuperacion del sistema de archivos &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" href="../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+    
+    <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/jquery.js"></script>
+    <script src="../../_static/underscore.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/language_data.js"></script>
+    <script src="../../_static/translations.js"></script>
+    <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <link rel="index" title="Índice" href="../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../search.html" />
+    <link rel="next" title="5.9. Instalación del servidor" href="../10.instalacion/index.html" />
+    <link rel="prev" title="5.7. Diagnóstico" href="../07.diagn/index.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="../10.instalacion/index.html" title="5.9. Instalación del servidor"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="../07.diagn/index.html" title="5.7. Diagnóstico"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U"><span class="section-number">5. </span>Dispositivos de almacenamiento</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">5.8. </span>Recuperacion del sistema de archivos</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="recuperacion-del-sistema-de-archivos">
+<h1><span class="section-number">5.8. </span>Recuperacion del sistema de archivos<a class="headerlink" href="#recuperacion-del-sistema-de-archivos" title="Enlazar permanentemente con este título">¶</a></h1>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Centraremos las explicaciones en ext4.</p>
+</div>
+<p>Hay diversas circunstancias por las que un sistema de archicos puede quedar
+dañado:</p>
+<ul class="simple">
+<li><p>Cierre sucio del sistema (p.e. un corte súbito del suministro eléctrico).</p></li>
+<li><p>Daño en algún sector del disco que impida su lectura.</p></li>
+</ul>
+<p id="e2fsck"><span id="index-0"></span>Cuando esto ocurre el sistema queda dañado y es preciso repararlo. Si el
+problema se debió al apagado brusco, pero el sistema dispone de <em>journaling</em>
+(ext3, ext4), entonces es probable que el sistema se recupere detecte el
+problema, pero se recupere automática cerrando todo lo pendiente gracias
+precisamente al <em>journaling</em>. En ext2, que carece de él, esto no sucedía y era
+preciso recurrir a la comprobación manual del sistema:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> e2fsck -py /dev/sda5
+</pre></div>
+</div>
+<p>suponiendo que <code class="file docutils literal notranslate"><span class="pre">/dev/sda5</span></code> sea la partición en la que queremos hacer la
+comprobación y corregir errores (<kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">y</kbd></kbd> asume que diremos siempre que sí a
+cualquier sugerencia de corrección que se nos plantee).</p>
+<p>Hay, sin embargo, un caso especial en que será imposible hacer una recuperación
+(incluso habiendo <em>journaling</em>) y es el caso en que el superbloque del sistema
+de archivos se haya corrompido. En este caso, el sistema es absoluta inaccesible
+y no se puede hacer nada con él. Afortunadamente, al crearse el sistema de
+archivos se hacen copias de este superbloque en previsión de que ocurra la
+corrupción del superbloque principal y la forma de sortear el problema es
+recurrir a una de estas copias.</p>
+<p>Lo primero es averiguar dónde están esas copias para lo cual podemos fingir que
+damos formato a la partición, pero sin llegar a hacerlo realmente (opción
+<kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">n</kbd></kbd>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mke2fs -n /dev/sda5
+<span class="go">[...]</span>
+<span class="go">Superblock backups stored on blocks:</span>
+<span class="go">32768, 98304, 163840, 229376, 294912, 819200, 884736, 1605632, 2654208</span>
+</pre></div>
+</div>
+<p>Tras lo cual, comprobamos y corregimos el sistema con <a class="reference internal" href="#e2fsck"><span class="std std-ref">e2fsck</span></a>,
+pero indicando cuál es la primera copia del superbloque:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> e2fsck -b <span class="m">32768</span> -py /dev/sda5
+</pre></div>
+</div>
+</div>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="../07.diagn/index.html"
+                        title="capítulo anterior"><span class="section-number">5.7. </span>Diagnóstico</a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="../10.instalacion/index.html"
+                        title="próximo capítulo"><span class="section-number">5.9. </span>Instalación del servidor</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/05.discos/08.recup/index.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="../10.instalacion/index.html" title="5.9. Instalación del servidor"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="../07.diagn/index.html" title="5.7. Diagnóstico"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" ><span class="section-number">5. </span>Dispositivos de almacenamiento</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">5.8. </span>Recuperacion del sistema de archivos</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor CC BY 4.0, 2016-2020, José Miguel Sánchez Alés.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 3.2.1.
+    </div>
+  </body>
+</html>
