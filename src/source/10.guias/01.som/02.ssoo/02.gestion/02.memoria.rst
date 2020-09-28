@@ -14,6 +14,9 @@ recordar dos aspectos ya señalados:
 
   .. image:: files/espaciomemoria.png
   
+  A las direcciones que identifican a cada una de las celdas posibles del
+  *espacio físico de memoria* se las denomina :dfn:`direcciones físicas de
+  memoria`.
 
 El espacio físico de memoria está bastante limitado (la memoria |RAM| es cara),
 por lo que una labor muy importante del sistema operativo es gestionar cómo los
@@ -24,39 +27,68 @@ Ocupación de memoria
 Al crear un proceso, sus necesidades de memoria son las siguientes:
 
 - Un |PCB|, cuyos metadatos requiere el sistema operativo para gestionarlo.
-- Un :dfn:`espacio virtual de memoria` en el que se almacenan el código y
-  los datos que manipula. Éste espacio virtual, a su vez, se compone de
-  cuatro espacios:
+- Un **espacio virtual de memoria** en el que se almacenan el código y
+  los datos que manipula. El :dfn:`espacio virtual de memoria` de un proceso es
+  la parte del *espacio físico de memoria* que ocupa dicho proceso. Las celdas
+  de este espacio virtual se referencian mediante :dfn:`direcciones virtuales de
+  memoria relativas`, relativas a su comienzo.
+  
+Estas *direcciones virtuales* son con las que trabaja internamente cada
+proceso.por lo que es necesario hacer una traducción entre ellas y las
+direcciones físicas. La encargada de ello es una parte del procesador llamada
+:dfn:`Unidad de manejo de memoria` (|MMU| por sus siglas en inglés).
 
-  + **Código**, que es espacio reservado para las instrucciones del programa
-    y que, obviamente, no varía a lo largo de la ejecución del proceso.
+Por otra parte, el espacio virtual, a su vez, se compone de cuatro espacios:
 
-  + **Datos**, que se corresponden con los datos iniciales del programa
-    y que, aunque puedan cambiar de valor, no cambian su tamaño.
++ **Código**, que es espacio reservado para las instrucciones del programa
+  y que, obviamente, no varía a lo largo de la ejecución del proceso.
 
-  + **Montículo**, que contiene los datos que se creen dinámicamente durante
-    la ejecución. Este espacio es dinámico y, por tanto, de tamaño variable
-    durante la ejecución.
++ **Datos**, que se corresponden con los datos iniciales del programa
+  y que, aunque puedan cambiar de valor, no cambian su tamaño.
 
-  + **Pila**, que contiene las llamadas anidadas a fragmentos distintos de código
-    cada uno de los cuales tiene un contexto propio, esto es, un conjunto de
-    datos distintos. Es necesario mantener la pila, porque un fragmento de
-    código, sin haber terminado su ejecución, puede crear otro y pasar a
-    ejecutar este. Como al terminar este segundo, se vuelve al primer fragmento,
-    es necesario recordar por cuál instrucción iba la ejecución en el momento
-    del salto y cuáles eran los datos que se manejaban entonces. Este espacio
-    también es variable: comienza no ocupando memoria y crece y decrece 
-    durante la ejecución según haya más o menos contextos anidados.
++ **Montículo**, que contiene los datos que se creen dinámicamente durante
+  la ejecución. Este espacio es dinámico y, por tanto, de tamaño variable
+  durante la ejecución.
 
-En este espacio virtual, cuya primera dirección siempre es ``0x0`` se colocan al principio el *código* y los *datos*, que tiene tamaño fijo; el *monticulo*, que al comienzo no tendrá ningún tamaño empieza a crecer a continuación y la *pila*, que también es variable, se coloca al final del espacio y empieza a crecer hacia direcciones virtuales de memoria más bajas.
++ **Pila**, que contiene las llamadas anidadas a fragmentos distintos de código
+  cada uno de los cuales tiene un contexto propio, esto es, un conjunto de datos
+  distintos. Es necesario mantener la pila, porque un fragmento de código, sin
+  haber terminado su ejecución, puede crear otro y pasar a ejecutar este. Como
+  al terminar este segundo, se vuelve al primer fragmento, es necesario recordar
+  por cuál instrucción iba la ejecución en el momento del salto y cuáles eran
+  los datos que se manejaban entonces. Este espacio también es variable:
+  comienza no ocupando memoria y crece y decrece durante la ejecución según haya
+  más o menos contextos anidados.
+
+Al comienzo del espacio virtual, esto es, en la dirección vierual ``0x0``, se
+colocan el *código* y los *datos*, ambos espacios de tamaño fijo. El
+*monticulo*, que al iniciar el programa no tendrá ningún tamaño empieza a crecer
+a continuación y la *pila*, que también es variable, se coloca al final del
+espacio y empieza a crecer hacia direcciones virtuales de memoria más bajas.
 
 .. image:: files/segmeprog.png
 
-Estas direcciones virtuales son con las que trabaja internamente cada proceso. Ahora bien, estos datos deben estar almacenados, en realidad, en direcciones físicas de memoria, por lo que es necesario hacer una traducción entre estas direcciones virtuales y las direcciones físicas. La encargada de ello es una parte del procesador llamada :dfn:`Unidad de manejo de memoria` (|MMU| por sus siglas en inglés).
-
 Técnicas
 ========
-Existen distintas técnicas para alojar los procesos en memoria.
+Existen distintas técnicas para alojar los procesos en memoria, dependiendo de
+si un espacios virtual debe ocupar direcciones contiguas de memoria física, o
+si los espacios virtuales pueden trocearse y cada trozo albergase en en
+posiciones no contiguas de memoria física:
+
+.. table:: Resumen de técnicas de gestión de memoria
+   :class: gestion-memoria
+
+   +-----------------+-----------------------+---------------+
+   | Espacio virtual | Técnica               | Fragmentación |
+   +=================+=======================+===============+
+   | Indivisible     | Particiones fijas     | Interna       |
+   |                 +-----------------------+---------------+
+   |                 | Particiones dinámicas | Externa       |
+   +-----------------+-----------------------+---------------+
+   | Divisble        | Paginación            | Interna       |
+   +                 +-----------------------+---------------+
+   |                 | Segmentación          | Externa       |
+   +-----------------+-----------------------+---------------+
 
 Particiones
 -----------
@@ -81,14 +113,19 @@ El particionado puede ser de dos tipos:
    haya sido ocupada por el proceso al que se le ha asignado, no puede
    aprovecharse. Esta circunstancia se denomina :dfn:`fragmentación interna`.
 
+   .. image:: files/part-fijas.png
+
 **Dinámico**
    Las particiones se van creando ajustándose al tamaño de cada proceso. En
-   este caso, no existe *fragmentación interna*, pero cuando un proceso acabe,
-   se liberará la partición que tendrá el tamaño del proceso extinto. Como
-   un nuevo proceso es probable que requiera un tamaño distinto, quedan entonces
-   también huecos de memoria entre particiones sin utilizar. En este caso se habla
-   de :dfn:`fragmentación externa`.
-   
+   este caso, no existe *fragmentación interna*; pero, cuando un proceso acabe,
+   se liberará la partición que que ocupa proceso extinto y, por consiguiente,
+   tiene el tamaño de su espacio virtual de memoria. Como un nuevo proceso es
+   probable que requiera un tamaño distinto, quedan entonces también huecos de
+   memoria entre particiones sin utilizar. En este caso se habla de
+   :dfn:`fragmentación externa`.
+
+   .. image:: files/part-dinamicas.png
+
 Paginación
 ----------
 En la técnica de las particiones cada proceso ocupa siempre direcciones de
@@ -105,7 +142,10 @@ que lleva el control de estas asignaciones. En el |PCB| deberá existir un
 puntero a la correspondiente tabla de paginación.
 
 La técnica sigue produciendo *fragmentación interna*, pero en mucha menor medida
-que la técnica de particiones fijas.
+que la técnica de particiones fijas, ya que las páginas son de manor tamaño que
+las particiones.
+
+.. image:: files/paginacion.png
 
 Segmentación
 ------------
@@ -118,7 +158,8 @@ que el sistema operativo irá buscando huecos libres para ubicarlos.
 El sistema operativo debe crear para cada proceso una tabla con todos los
 segmentos de los que se compone indicando qué dirección física ocupa y cuál es
 su tamaño. Esta técnica, como la de *particiones dinámicas* presenta
-*fragmentación externa*, pero en mucha menor medida.
+*fragmentación externa*, pero en mucha menor medida; puesto que los segmentos
+son más pequeños que las particiones dinámicas.
 
 Memoria virtual
 ---------------
