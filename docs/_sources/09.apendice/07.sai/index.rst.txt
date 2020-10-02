@@ -330,7 +330,7 @@ Además, es preciso definir los usuarios con permisos en :file:`upsd.users`:
 .. code-block:: ini
 
    # Administrador con capacidad para configurar opciones
-   [ædmin]
+   [admin]
    password = secretpass
    actions = SET
    instcmds = ALL
@@ -533,7 +533,7 @@ comprar. Por ejemplo, en `esta página
 
 .. code-block:: ini
 
-   [dummy]
+   [nosai]
    driver = dummy-ups
    port = /usr/local/share/nut/SPS_One_700VA.dev
    desc = "Salicru imaginario SPS One 700VA"
@@ -541,26 +541,62 @@ comprar. Por ejemplo, en `esta página
 donde :kbd:`port` indica la ruta donde hemos guardado el fichero. La restante
 configuración es idéntica a la hecha para cuando el |SAI| es real.
 
-El *driver* relee el fichero cada cierto tiempo con lo que tenemos dos opciones
+El *driver* relee el fichero cada cierto tiempo con lo que tenemos tres opciones
 si queremos simular que nuestro |SAI| imaginario cambia su estado:
 
-- Una engorrosa que consiste en alterar directamente el fichero.
-- La recomendable que consiste en alargar el tiempo de relectura del fichero
-  (a 5 minutos, por ejemplo)::
+#. Una engorrosa que consiste en alterar directamente el fichero.
+
+   .. warning:: Si intenta esta, no escriba en el fichero que el |SAI| está
+      bajo de batería (:code:`ups.status: OB LB`), porque durante el arranque de
+      la máquina, arranca el servicio de *nut* que inmediatamente apagará la
+      máquina sin darle tiempo a rehacer la configuración.
+
+#. Definir distintos valores para el |SAI| con el tiempo que media entre esos
+   cambios:
+
+   .. code-block:: none
+
+      [... valores iniciales ...]
+      TIMER 30
+      ups.load: 10
+      TIMER 60
+      battery.charge: 80
+      TIMER 50
+
+   Para lo cual:
+
+   .. code-block:: console
+
+      # cat >> /usr/local/share/nut/SPS_One_700VA.dev
+      TIMER 30
+      ups.load: 10
+      TIMER 60
+      battery.charge: 80
+      TIMER 50
+
+   Ante un fichero de esta guisa, el servidor cargará los valores que haya en el
+   fichero hasta la directiva :code:`TIMER 30`. Entonces esperará 30 segundos,
+   pasados los cuales cambiará el valor de ``ups.load`` y esperará 1 minuto.
+   Pasado, cambiará la carga de la batería (``battery.charge``) y esperará otros
+   50 segundos. Pasados estos segundos, como se ha acabado el fichero, volverá
+   al principio cargando los valores iniciales.
+
+#. La más recomendable que consiste en alargar el tiempo de relectura del
+   fichero (a 5 minutos, por ejemplo)::
 
      # echo "TIMER 300" >> /usr/local/share/nut/SPS_One_700VA.dev
 
   y usar el comando :command:`upsrw` para alterar sobre la marcha los valores::
 
-     # upsrw -s ups.load=15 -u admin dummy
+     # upsrw -s ups.load=15 -u admin nosai
 
-  que nos pedirá la contraseña del usuario *admin* que definimos anteriormente
-  con permisos para alterar variables. Durante cinco minutos podremos ir
-  haciendo cambios sin que el driver vuelva a recargar los valores originales
-  del fichero. Incluso podemos simular que el |SAI| está en las últimas para
-  que el ordenador tome la determináción de apagarse::
+  lo cual nos pedirá la contraseña del usuario *admin* que definimos
+  anteriormente con permisos para alterar variables. Durante cinco minutos
+  podremos ir haciendo cambios sin que el *driver* vuelva a recargar los valores
+  originales del fichero. Incluso podemos simular que el |SAI| está en las
+  últimas para que el ordenador tome la determináción de apagarse::
 
-     # upsrw -s ups.status="OB LB" -u admin dummy
+     # upsrw -s ups.status="OB LB" -u admin nosai
 
 Enlaces de interés
 ==================

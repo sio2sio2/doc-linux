@@ -452,7 +452,7 @@ escuchará el servidor:</p>
 </div>
 <p>Además, es preciso definir los usuarios con permisos en <code class="file docutils literal notranslate"><span class="pre">upsd.users</span></code>:</p>
 <div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="c1"># Administrador con capacidad para configurar opciones</span>
-<span class="k">[ædmin]</span>
+<span class="k">[admin]</span>
 <span class="na">password</span> <span class="o">=</span> <span class="s">secretpass</span>
 <span class="na">actions</span> <span class="o">=</span> <span class="s">SET</span>
 <span class="na">instcmds</span> <span class="o">=</span> <span class="s">ALL</span>
@@ -648,7 +648,7 @@ monitorización en el <em>maestro</em> (como el <em>script</em> de aviso o la or
 dummy-ups</a>. Basta con
 descargar un fichero que contiene los parámetros del router que pretendemos
 comprar. Por ejemplo, en <a class="reference external" href="https://networkupstools.org/ddl/Salicru/SPS_One_700VA.html">esta página</a> hay un par de ellos y definir el <abbr title="Sistema de alimentación ininterrumpida">SAI</abbr> del siguiente modo:</p>
-<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[dummy]</span>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[nosai]</span>
 <span class="na">driver</span> <span class="o">=</span> <span class="s">dummy-ups</span>
 <span class="na">port</span> <span class="o">=</span> <span class="s">/usr/local/share/nut/SPS_One_700VA.dev</span>
 <span class="na">desc</span> <span class="o">=</span> <span class="s">&quot;Salicru imaginario SPS One 700VA&quot;</span>
@@ -656,29 +656,65 @@ comprar. Por ejemplo, en <a class="reference external" href="https://networkupst
 </div>
 <p>donde <kbd class="kbd docutils literal notranslate">port</kbd> indica la ruta donde hemos guardado el fichero. La restante
 configuración es idéntica a la hecha para cuando el <abbr title="Sistema de alimentación ininterrumpida">SAI</abbr> es real.</p>
-<p>El <em>driver</em> relee el fichero cada cierto tiempo con lo que tenemos dos opciones
+<p>El <em>driver</em> relee el fichero cada cierto tiempo con lo que tenemos tres opciones
 si queremos simular que nuestro <abbr title="Sistema de alimentación ininterrumpida">SAI</abbr> imaginario cambia su estado:</p>
-<ul>
-<li><p>Una engorrosa que consiste en alterar directamente el fichero.</p></li>
-<li><p>La recomendable que consiste en alargar el tiempo de relectura del fichero
-(a 5 minutos, por ejemplo):</p>
+<ol class="arabic">
+<li><p>Una engorrosa que consiste en alterar directamente el fichero.</p>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Si intenta esta, no escriba en el fichero que el <abbr title="Sistema de alimentación ininterrumpida">SAI</abbr> está
+bajo de batería (<code class="code docutils literal notranslate"><span class="pre">ups.status:</span> <span class="pre">OB</span> <span class="pre">LB</span></code>), porque durante el arranque de
+la máquina, arranca el servicio de <em>nut</em> que inmediatamente apagará la
+máquina sin darle tiempo a rehacer la configuración.</p>
+</div>
+</li>
+<li><p>Definir distintos valores para el <abbr title="Sistema de alimentación ininterrumpida">SAI</abbr> con el tiempo que media entre esos
+cambios:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>[... valores iniciales ...]
+TIMER 30
+ups.load: 10
+TIMER 60
+battery.charge: 80
+TIMER 50
+</pre></div>
+</div>
+<p>Para lo cual:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cat &gt;&gt; /usr/local/share/nut/SPS_One_700VA.dev
+<span class="go">TIMER 30</span>
+<span class="go">ups.load: 10</span>
+<span class="go">TIMER 60</span>
+<span class="go">battery.charge: 80</span>
+<span class="go">TIMER 50</span>
+</pre></div>
+</div>
+<p>Ante un fichero de esta guisa, el servidor cargará los valores que haya en el
+fichero hasta la directiva <code class="code docutils literal notranslate"><span class="pre">TIMER</span> <span class="pre">30</span></code>. Entonces esperará 30 segundos,
+pasados los cuales cambiará el valor de <code class="docutils literal notranslate"><span class="pre">ups.load</span></code> y esperará 1 minuto.
+Pasado, cambiará la carga de la batería (<code class="docutils literal notranslate"><span class="pre">battery.charge</span></code>) y esperará otros
+50 segundos. Pasados estos segundos, como se ha acabado el fichero, volverá
+al principio cargando los valores iniciales.</p>
+</li>
+<li><p>La más recomendable que consiste en alargar el tiempo de relectura del
+fichero (a 5 minutos, por ejemplo):</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="nb">echo</span> <span class="s2">&quot;TIMER 300&quot;</span> &gt;&gt; /usr/local/share/nut/SPS_One_700VA.dev
 </pre></div>
 </div>
-<p>y usar el comando <strong class="command">upsrw</strong> para alterar sobre la marcha los valores:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> upsrw -s ups.load<span class="o">=</span><span class="m">15</span> -u admin dummy
-</pre></div>
-</div>
-<p>que nos pedirá la contraseña del usuario <em>admin</em> que definimos anteriormente
-con permisos para alterar variables. Durante cinco minutos podremos ir
-haciendo cambios sin que el driver vuelva a recargar los valores originales
-del fichero. Incluso podemos simular que el <abbr title="Sistema de alimentación ininterrumpida">SAI</abbr> está en las últimas para
-que el ordenador tome la determináción de apagarse:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> upsrw -s ups.status<span class="o">=</span><span class="s2">&quot;OB LB&quot;</span> -u admin dummy
-</pre></div>
-</div>
 </li>
-</ul>
+</ol>
+<blockquote>
+<div><p>y usar el comando <strong class="command">upsrw</strong> para alterar sobre la marcha los valores:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> upsrw -s ups.load<span class="o">=</span><span class="m">15</span> -u admin nosai
+</pre></div>
+</div>
+<p>lo cual nos pedirá la contraseña del usuario <em>admin</em> que definimos
+anteriormente con permisos para alterar variables. Durante cinco minutos
+podremos ir haciendo cambios sin que el <em>driver</em> vuelva a recargar los valores
+originales del fichero. Incluso podemos simular que el <abbr title="Sistema de alimentación ininterrumpida">SAI</abbr> está en las
+últimas para que el ordenador tome la determináción de apagarse:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> upsrw -s ups.status<span class="o">=</span><span class="s2">&quot;OB LB&quot;</span> -u admin nosai
+</pre></div>
+</div>
+</div></blockquote>
 </div>
 </div>
 <div class="section" id="enlaces-de-interes">
