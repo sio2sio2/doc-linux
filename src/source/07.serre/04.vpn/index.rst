@@ -103,6 +103,10 @@ desear el uso de una |VPN|:
       servidor |VPN| se comprometa a no facilitar la |IP| real del cliente a
       terceros.
    
+      .. note:: Hay `algunos muy críticos
+         <https://gist.github.com/joepie91/5a9909939e6ce7d09e29>`_ con estos
+         servicios de anonimización.
+
    #. Burlar las restricciones de acceso a Internet:
 
       - Impuestas de forma global a un país, por ejemplo, por decisión judicial.
