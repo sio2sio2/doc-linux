@@ -1,5 +1,8 @@
+.. _rec-filesystem:
+
 Recuperacion del sistema de archivos
 ************************************
+.. todo:: Hablar de recuperación de tablas de particiones (testdisk).
 
 .. note:: Centraremos las explicaciones en ext4.
 
