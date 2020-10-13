@@ -5,7 +5,7 @@
 Un |SAI| (o |UPS|, si utilizamos las siglas en inglés) es un dispositivo que
 permite proteger a los equipos conectados a través de él de
 irregularidades en el suministro eléctrico, como es el caso de los apagones
-gracias a las baterías que incorpora, En consecuencia, el
+gracias a las baterías que incorpora. En consecuencia, el
 servidor no llega a apagarse y puede continuar dando servicio durante el corte
 y tras éste, si el corte no supera el tiempo de la batería. Obviamente, las
 baterías serán capaces de alimentar sólo durante un tiempo limitado a los
@@ -108,7 +108,7 @@ Hay tres tipos de |SAI|:
 **Inline** o **interactivo**
    Funcionan como los |SAI| *offline*, pero añaden un transformador que corrige
    los siete primeros tipos de anomalías (las cinco primera siempre y la sexta y
-   la séptima muy habitualmente). y que durante la conmutación es capaz de mantener
+   la séptima muy habitualmente) y que durante la conmutación es capaz de mantener
    la tensión. 
 
    .. image:: files/sai-inline.png
@@ -127,7 +127,7 @@ En la elección de un |SAI| hay diversos factores a tener en cuenta:
 **Factor de forma**
    Refiere la forma externa del |SAI|, de la que podemos distinguir dos tipos:
 
-   * *Torre*, cuyas medidas dependenrán del modelo de |SAI|.
+   * *Torre*, cuyas medidas dependerán del modelo de |SAI|.
 
    * *Enrackable*, que son aquellos |SAI| pensados para disponerlos dentro de un
      *rack* (o bastidor). Tienen interés cuando ya se tiene un bastidor en que
@@ -136,7 +136,7 @@ En la elección de un |SAI| hay diversos factores a tener en cuenta:
 **Potencia aparente** (*S*)
    Es la potencia máxima consumida por el |SAI| de la red y que suele ser con la
    que el fabricante lo caracteriza. Se mide en |VA|. Esta, sin embargo, no
-   coincide con la potencia útil capaz de sumnistrar a los dispositivos, medida
+   coincide con la potencia útil capaz de suministrar a los dispositivos, medida
    en vatios (**W**).
 
 **Potencia** (*P*) / **factor de potencia** (:math:`\cos \phi`)
@@ -151,7 +151,7 @@ En la elección de un |SAI| hay diversos factores a tener en cuenta:
 **Baterías**
    Conocer las características de las baterías que incorpora, es
    indispensable para estimar durante cuánto tiempo podrá alimentar el |SAI| a
-   los dispostivos después de un corte de suministro. Por lo general:
+   los dispositivos después de un corte de suministro. Por lo general:
 
    + Se usan baterías |SLA|, o sea, baterías selladas de ácido-plomo.
    + El voltaje es de 12V.
@@ -458,7 +458,7 @@ y podemos comprobar el estado del |SAI| con la orden::
    automáticamente sus valores cada segundo.
 
 Hay muchísimas otras variables que pueden consultarse en `la documentación de
-Nut <https://networkupstools.org/docs/user-manual.chunked/apcs01.html>`_), pero
+Nut <https://networkupstools.org/docs/user-manual.chunked/apcs01.html>`_, pero
 de las que este |SAI| no informa. De entre las que devuelve son interesantes:
 
 * **ups.status**, que informa del estado en el que está trabajando la batería.
@@ -487,7 +487,7 @@ de las que este |SAI| no informa. De entre las que devuelve son interesantes:
   |SAI|. En este caso, es el 22%, lo que significa que si la potencia total que
   soporta el dispositivo es 240W, los dispositivos conectados están consumiendo
   unos 53W. Obviamente este porcentaje depende de cuál sea el trabajo que los
-  dispotivos están realizando en cada momento, pero si estimamos cuál es la
+  dispositivos están realizando en cada momento, pero si estimamos cuál es la
   cifra en condiciones normales de trabajo, podemos sacar una buena
   :ref:`estimación de la autonomía de la batería <sai-autonomia>`.
 
