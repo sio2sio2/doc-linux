@@ -26,7 +26,7 @@ Uso
 Hay dos formas de utilizar esta tecnología:
 
 - Manualmente, mediante el comando :command:`smartctl`.
-- Monitarizando a través del demonio :command:`smartd`, que se habilita al
+- Monitorizando a través del demonio :command:`smartd`, que se habilita al
   instalar el paquete.
 
 .. _smartctl:
@@ -205,8 +205,8 @@ Hay dos formas de utilizar esta tecnología:
       199 UDMA_CRC_Error_Count    0x0032   200   200   000    Old_age   Always       -       0
       200 Multi_Zone_Error_Rate   0x0008   200   200   000    Old_age   Offline      -       1
       
-   Para conocer cuál es el significado de estos atributos puede recurrise a la
-   `página de la wikipedia
+   Para conocer cuál es el significado de estos atributos puede recurrirse a la
+   `página de la Wikipedia
    <https://en.wikipedia.org/wiki/S.M.A.R.T.#Known_ATA_S.M.A.R.T._attributes>`_.
    Hay algunos marcados como críticos (5, 10, 184, 187, 188, 196, 197, 198 y
    201) y que anuncian un fallo definitivo del disco. Nuestro disco está en la
@@ -224,7 +224,7 @@ Hay dos formas de utilizar esta tecnología:
    administrador.
 
    La configuración es simple, y la propia instalación habilita el servicio. Hay
-   que antender a dos archivos:
+   que atender a dos archivos:
 
    :file:`/etc/default/smartmontools`
       para el que sólo tiene interés la variable *smartd_opts* si usamos
@@ -266,7 +266,7 @@ Hay dos formas de utilizar esta tecnología:
   <https://en.wikipedia.org/wiki/S.M.A.R.T.>`_.
 * `What SMART Stats Tell Us About Hard Drives
   <https://www.backblaze.com/blog/what-smart-stats-indicate-hard-drive-failures>`_.
-* `Artñiculo de la Wiki de Archlinux sobre SMART
+* `Articulo de la Wiki de Archlinux sobre SMART
   <https://wiki.archlinux.org/index.php/S.M.A.R.T.>`_.
 * `Corrección de sectores defectuosos con smartctl y hdparm
   <https://hiddenc0de.wordpress.com/2015/06/12/how-to-fix-bad-sectors-or-bad-blocks-on-hard-disk/>`_.

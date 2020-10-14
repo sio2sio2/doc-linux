@@ -8,7 +8,7 @@ físico sobre el que los escribíamos. Hay tres opciones:
 - **Cifrar los datos**, lo cual nos ahorra el problema de tener que eliminarlos.
 
 - **Destruir físicamente el disco**, a fin de que quede inservible y sus datos sean
-  absolutamente ilegible. A este respecto, es muy intersante `este artículo de
+  absolutamente ilegibles. A este respecto, es muy interesante `este artículo de
   xataka
   <https://www.xataka.com/especiales/como-destruir-un-disco-duro-definitivamente-para-que-no-se-pueda-recuperar-la-informacion>`_.
 
@@ -23,7 +23,7 @@ Antes de empezar es preciso distinguir entre el borrado de discos |SSD| y el
 borrado de discos magnéticos. Dado que las técnicas se basan en hacer muchas
 sobrescrituras para asegurarse de que el dato original haya desaparecido...
 
-.. warning:: ... no utlice estas herramientas en discos |SSD|. Para ellos
+.. warning:: ... no utilice estas herramientas en discos |SSD|. Para ellos
    cada fabricante debería facilitar herramientas específicas.
 
 .. _shred:
@@ -49,7 +49,7 @@ sobrescrituras para asegurarse de que el dato original haya desaparecido...
      recurrir al uso de :ref:`find <find>` para generar la lista de archivos.
    - Si leemos la documentación, el borrado en los sistemas de ficheros con
      *journaling* o sistemas |RAID| puede ser no todo lo efectivo que
-     quiséramos.
+     quisiéramos.
 
    Un uso alternativo de :command:`shred` es el de borrar dispositivos enteros,
    lo cual evita este último inconveniente y, además, es útil si nuestra
@@ -70,7 +70,7 @@ sobrescrituras para asegurarse de que el dato original haya desaparecido...
 .. _sdmem:
 
 **secure-delete**
-   Es una *suite* con unas cuantas herramientas especialidas en el borrado de
+   Es una *suite* con unas cuantas herramientas especializadas en el borrado de
    información:
 
    - :command:`srm`, que borra ficheros.

@@ -2,9 +2,9 @@
 
 Seguridad de la información
 ===========================
-Ya se ha tratado el módo básico de gestionar la seguridad de ficheros y
+Ya se ha tratado el modo básico de gestionar la seguridad de ficheros y
 directorios a través de :ref:`usuarios y permisos <permusu>`. Ello supone usar
-un sistemas de permisos |UGO| sobre un mecanismo de control de accesos |DAC|, lo
+un sistema de permisos |UGO| sobre un mecanismo de control de accesos |DAC|, lo
 cual es posible que resulte aún palabrería técnica ininteligible. Por esto,
 antes de pasar a exponer cómo ampliar la gestión de la seguridad de los
 archivos, introduciremos algunos conceptos relativos a ella.

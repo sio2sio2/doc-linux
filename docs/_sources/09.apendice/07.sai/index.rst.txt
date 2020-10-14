@@ -31,7 +31,7 @@ en el suministro, de los cuales pueden distinguirse nueve distintos:
    :class: saifallos
 
    +----------------------+-----------------------------+--------------------------+---------------------------+
-   | Anomalía             | Descripción                 | Efecto                   | Causas frecuente          |
+   | Anomalía             | Descripción                 | Efecto                   | Causa frecuente           |
    +===+==================+=============================+==========================+===========================+
    | 1 | Corte (o apagón) | Interrupción total del      | - Pérdida de info en RAM | - Fallo en el suministro. |
    |   |                  | suministro.                 | - Corrupción de datos,   | - Fallo en la red interna.|
@@ -50,7 +50,7 @@ en el suministro, de los cuales pueden distinguirse nueve distintos:
    |   |                  | tensión a partir del minuto.|   incorrecto.            |   subestación eléctrica   |
    +---+------------------+-----------------------------+--------------------------+   (sobre todo en zonas    |
    | 5 | Subida de tensión| Subida sostenida de la      | - Daño en componentes    |   rurales).               |
-   |   |                  | tensión a partir del munuto.|   físicos.               |                           |
+   |   |                  | tensión a partir del minuto.|   físicos.               |                           |
    +---+------------------+-----------------------------+--------------------------+---------------------------+
    | 6 | Ruido eléctrico  | Distorsión de la señal      | - Funcionamiento         |                           |
    |   |                  | generada por interferencias |   incorrecto.            |                           |
@@ -82,7 +82,7 @@ Hay tres tipos de |SAI|:
    Es aquel que proporciona energía de sus baterías sólo mientras dure la
    interrupción del suministro eléctrico. En condiciones normales, los
    dispositivos que lo usan reciben corriente directamente de la red eléctrica,
-   por lo que presenta dos grandes incovenientes:
+   por lo que presenta dos grandes inconvenientes:
 
    + Sólo es capaz de proteger de los tres primeros tipos de anomalía.
    + Cuando falla el suministro de red, existe un tiempo mínimo de conmutación
@@ -107,7 +107,7 @@ Hay tres tipos de |SAI|:
 
 **Inline** o **interactivo**
    Funcionan como los |SAI| *offline*, pero añaden un transformador que corrige
-   los siete primeros tipos de anomalías (las cinco primera siempre y la sexta y
+   los siete primeros tipos de anomalías (las cinco primeras siempre y la sexta y
    la séptima muy habitualmente) y que durante la conmutación es capaz de mantener
    la tensión. 
 
@@ -140,7 +140,7 @@ En la elección de un |SAI| hay diversos factores a tener en cuenta:
    en vatios (**W**).
 
 **Potencia** (*P*) / **factor de potencia** (:math:`\cos \phi`)
-   Es la potencia útil que el |SAI| es capaz de suministrar a los dispotivos
+   Es la potencia útil que el |SAI| es capaz de suministrar a los dispositivos
    conectados a él. Alternativamente, el fabricante puede proporcionar el factor
    de potencia:
 
@@ -260,9 +260,9 @@ propósito el propio |SAI| proporcione *software*, incluso con versión para
 Linux, pero lo conveniente es procurarse uno para el que tenga soporte Nut_,
 que tiene paquete en las principales distribuciones.
 
-Por lo general, los |SAI|\ s disponen de un conexión serie o |USB| a través de
+Por lo general, los |SAI|\ s disponen de una conexión serie o |USB| a través de
 la cual pueden conectarse a un equipo que recibe los avisos en sus cambios de
-estado, al que denominaremos *maestro*. Las dos supuestos que estudiaremos son:
+estado, al que denominaremos *maestro*. Los dos supuestos que estudiaremos son:
 
 #. El |SAI| sólo proporciona protección al equipo con el que se comunica
    (*maestro*).
@@ -375,7 +375,7 @@ configuraremos el fichero :file:`upsmon.conf`:
 Esta configuración requiere explicación:
 
 * ``MONITOR`` indica cómo conectar con el |SAI|.
-* ``NOTIFYCMD`` es la orden que se ejecutará al comunicat :program:`nut-server`
+* ``NOTIFYCMD`` es la orden que se ejecutará al comunicar :program:`nut-server`
   alguno de los eventos. El *script* sólo se ejecuta para aquellos avisos
   marcados con ``EXEC`` y deberemos escribirlo nosotros sabiendo que tiene
   definida la variable de entorno *NOTIFYTYPE* con el tipo de evento y que su
