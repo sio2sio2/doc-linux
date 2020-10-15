@@ -51,14 +51,14 @@
             
   <div class="section" id="permisos-acl">
 <span id="acls"></span><h1><span class="section-number">5.2.1. </span>Permisos <abbr title="Access Control List">ACL</abbr><a class="headerlink" href="#permisos-acl" title="Enlazar permanentemente con este título">¶</a></h1>
-<p>Cuando el sistema de permisos POSIX, esto es, el sistema <abbr title="User, Group, Other">UGO</abbr>, no es suficiente
-y se requiere más granularidad en la definición de permisos, en Linux se puede
-recurrir a las listas de centrol de accesos (<abbr title="Access Control List">ACL</abbr> por su acrónimo en inglés).</p>
+<p>Cuando el <a class="reference internal" href="../../02.conbas/05.seguridad/05b.permisos.html#ugo"><span class="std std-ref">sistema de permisos POSIX</span></a>, esto es, el sistema <abbr title="User, Group, Other">UGO</abbr>, no
+es suficiente y se requiere más granularidad en la definición de permisos, en
+Linux se puede recurrir a las listas de centrol de accesos (<abbr title="Access Control List">ACL</abbr> por su
+acrónimo en inglés).</p>
 <div class="admonition note">
 <p class="admonition-title">Nota</p>
 <p>En realidad, las <abbr title="Access Control List">ACL</abbr> también forman parte del estándar POSIX; y <a class="reference external" href="https://www.usenix.org/legacy/publications/library/proceedings/usenix03/tech/freenix03/full_papers/gruenbacher/gruenbacher_html/main.html">tal
-como se definen en este estándar es como se encuentran implementadas en
-Linux</a>.</p>
+como se definen en este estándar es como se encuentran implementadas en Linux</a>.</p>
 </div>
 <div class="section" id="requisitos">
 <h2><span class="section-number">5.2.1.1. </span>Requisitos<a class="headerlink" href="#requisitos" title="Enlazar permanentemente con este título">¶</a></h2>
@@ -74,7 +74,7 @@ modernos más usado en <em>Linux</em> las soportan (ext4, brtfs, xfs, zfs).</p>
 pero es conveniente cerciorarse. Pueden estar:</p>
 <ul>
 <li><p>Habilitadas como opciones de montaje por defecto al haber creado el
-sistema. Podemos comprobar si esto es así<a class="footnote-reference brackets" href="#id2" id="id1">1</a> con:</p>
+sistema. Podemos comprobar si esto es así<a class="footnote-reference brackets" href="#id3" id="id1">1</a> con:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> tune2fs -l /dev/sda3 <span class="p">|</span> grep <span class="s1">&#39;mount options&#39;</span>
 <span class="go">Default mount options:    user_xattr acl</span>
 </pre></div>
@@ -109,14 +109,85 @@ es <code class="file docutils literal notranslate"><span class="pre">/dev/sda3</
 <div class="section" id="filosofia-de-funcionamiento">
 <h2><span class="section-number">5.2.1.2. </span>Filosofía de funcionamiento<a class="headerlink" href="#filosofia-de-funcionamiento" title="Enlazar permanentemente con este título">¶</a></h2>
 <p>Antes de que pasemos a ver cómo se definen es indispensables que entendamos cuál
-es su filosofía de funcionamiento…</p>
-</div>
+es su filosofía de funcionamiento.  Las <abbr title="Access Control List">ACL</abbr>s POSIX no son un sistema
+alternativo al sistema <abbr title="User, Group, Other">UGO</abbr>, sino complementario. Por tanto, los archivos
+siguen teniendo un propietario, un grupo propietario y tres ternas de permisos<a class="footnote-reference brackets" href="#id4" id="id2">2</a>, pero:</p>
+<ul class="simple">
+<li><p>En adición a ellos pueden añadirse ternas de permisos para aquel usuario o
+grupo que consideremos pertinente.</p></li>
+<li><p>Cuando se definen sobre un directorio, estas nuevas ternas se pueden definir
+como heredables lo cual significa que los archivos y directorios incluidos
+las heredarán.</p></li>
+</ul>
+<span class="target" id="setfacl"><span id="getfacl"></span></span></div>
 <div class="section" id="operativa">
-<h2><span class="section-number">5.2.1.3. </span>Operativa<a class="headerlink" href="#operativa" title="Enlazar permanentemente con este título">¶</a></h2>
+<span id="index-0"></span><h2><span class="section-number">5.2.1.3. </span>Operativa<a class="headerlink" href="#operativa" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Las dos herramientas fundamentales son <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/getfacl">getfacl</a></em>, para consultar las
+<abbr title="Access Control List">ACL</abbr>s y <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/setfacl">setfacl</a></em> para manipularlas. Para ilustrar su uso supongamos
+que tenemos cierto directorio llamado <code class="file docutils literal notranslate"><span class="pre">/home/share</span></code> sobre el que queremos
+definir <abbr title="Access Control List">ACL</abbr>s.</p>
+<p>Comencemos por crear el directorio:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkdir /home/share
+<span class="gp">#</span> ls -ld /home/share
+<span class="go">drwxr-xr-x 2 root root 4096 oct 15 21:32 /home/share</span>
+</pre></div>
+</div>
+<p>Hasta aquí sabemos todo y todo nos es familiar, ya que de hecho no hemos
+definido ninguna <abbr title="Access Control List">ACL</abbr> y, si usamos <a class="reference internal" href="#getfacl"><span class="std std-ref">getfacl</span></a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> getfacl /home/share
+<span class="go">getfacl: Eliminando &#39;/&#39; inicial en nombres de ruta absolutos</span>
+<span class="gp">#</span> file: home/share/
+<span class="gp">#</span> owner: root
+<span class="gp">#</span> group: root
+<span class="go">user::rwx</span>
+<span class="go">group::r-x</span>
+<span class="go">other::r-x</span>
+</pre></div>
+</div>
+<p>lo que obtendremos, con mucha palabrería son los permisos regulares del sistema
+POSIX.</p>
+<p>Podemos empezar añadiendo una regla para un usuario llamado <em>apestado</em>[#] al
+que le vamos a vetar cualquier acción sobre el directorio:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> setfacl -m <span class="s1">&#39;u:apestado.0&#39;</span> /home/share
+</pre></div>
+</div>
+<p>En este caso, la opción <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">m</kbd></kbd> indica que queremos modificar las reglas que
+ya haya definidas, no sobrescribirlas (y, consecuentemente, perderlas). A
+continuación se indica la regla, donde la «u» indica que es una regla para un
+usuario, «apestado» que ese es el usuario (también podría haberse usado un
+<abbr title="User IDentifier">UID</abbr>) y el «0» final cuáles son los permisos en formato númerico. También puede
+usarse un formato de letras en que la ausencia del permiso se indica con un
+guión (por tanto, el equivalente de «0» es «---»). Si ahora usamos <a class="reference internal" href="../../02.conbas/02.informacion/03.ficheros.html#ls"><span class="std std-ref">ls</span></a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> ls -ld /home/share
+<span class="go">drwxr-xr-x+ 2 root root 4096 oct 15 21:32 /home/share/</span>
+</pre></div>
+</div>
+<p>aparecerá un signo «+» que indica que el archivo tiene definida alguna regla de
+permisos adicional:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> getfacl -c /home/share
+<span class="go">getfacl: Eliminando &#39;/&#39; inicial en nombres de ruta absolutos</span>
+<span class="go">user::rwx</span>
+<span class="hll"><span class="go">user:apestado:---</span>
+</span><span class="go">group::r-x</span>
+<span class="hll"><span class="go">mask::r-x</span>
+</span><span class="go">other::r-x</span>
+</pre></div>
+</div>
 <p class="rubric">Notas al pie</p>
 <dl class="footnote brackets">
-<dt class="label" id="id2"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dt class="label" id="id3"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
 <dd><p>La orden equivalente en xfs es <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/xfs_info">xfs_info</a></em>.</p>
+</dd>
+<dt class="label" id="id4"><span class="brackets"><a class="fn-backref" href="#id2">2</a></span></dt>
+<dd><p>E incluso <a class="reference internal" href="../../02.conbas/05.seguridad/05b.permisos.html#perm-especiales"><span class="std std-ref">permisos especiales</span></a>, si estos son
+necesarios.</p>
+</dd>
+<dt class="label" id="id5"><span class="brackets">3</span></dt>
+<dd><p>Que deberá existir en el sistema, por lo que si seguimos las indicaciones
+nos tocará crearlo:.</p>
+<blockquote>
+<div><p># adduser –disabled-password –gecos «Usuario apestado» –no-create-home apestado</p>
+</div></blockquote>
 </dd>
 </dl>
 </div>
