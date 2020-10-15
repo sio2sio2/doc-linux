@@ -95,7 +95,7 @@ Hay dos formas de utilizar esta tecnología:
    * *long*, que comprueba más exhaustivamente la superficie del disco.
    * *conveyance*, que identifica daños que se producen durante el transporte.
 
-   Es interesante conocer cuáles son las capacidad |SMART| de nuestro disco::
+   Es interesante conocer cuáles son las capacidades |SMART| de nuestro disco::
 
       # smartctl -c /dev/sda
       smartctl 6.6 2017-11-05 r4594 [x86_64-linux-4.19.0-6-amd64] (local build)
@@ -155,7 +155,7 @@ Hay dos formas de utilizar esta tecnología:
       === START OF READ SMART DATA SECTION ===
       SMART overall-health self-assessment test result: PASSED
 
-   donde *PASSED* es buena señal. También son interasante los errores que hayan
+   donde *PASSED* es buena señal. También son interesante los errores que hayan
    podido producirse durante el funcionamiento del disco::
 
       # smartctl -l error

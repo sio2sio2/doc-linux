@@ -4,7 +4,7 @@ Seguridad de la información
 ===========================
 Ya se ha tratado el modo básico de gestionar la seguridad de ficheros y
 directorios a través de :ref:`usuarios y permisos <permusu>`. Ello supone usar
-un sistema de permisos |UGO| sobre un mecanismo de control de accesos |DAC|, lo
+el sistema de permisos |POSIX| sobre un mecanismo de control de accesos |DAC|, lo
 cual es posible que resulte aún palabrería técnica ininteligible. Por esto,
 antes de pasar a exponer cómo ampliar la gestión de la seguridad de los
 archivos, introduciremos algunos conceptos relativos a ella.
@@ -28,13 +28,13 @@ accesos:
    (*Windows*, *Linux*, etc.), y presentan dos aproximaciones distintas para la
    definición de estos permisos discrecionales:
 
-   - El tradicional en los sistemas *UNIX*, conocido como |UGO|, que define para
-     cada objeto del sistema de ficheros un usuario propietario y un grupo
-     propietario, de suerte que se definen tres grados de accesibilidad
-     (permisos) distintos: para el propietario, para los usuarios pertenecientes
-     al grupo propietario y para el resto de usuarios. Esa es la razón de su
-     nombre y a esta técnica dedicamos :ref:`la definición elemental de permisos
-     <permusu>`.
+   - El tradicional en los sistemas *UNIX* es el sistema |POSIX|, conocido también
+     como |UGO|, que define para cada objeto del sistema de ficheros un usuario
+     propietario y un grupo propietario, de suerte que se definen tres grados de
+     accesibilidad (permisos) distintos: para el propietario, para los usuarios
+     pertenecientes al grupo propietario y para el resto de usuarios. Esa es la
+     razón de su nombre y a esta técnica dedicamos :ref:`la definición elemental
+     de permisos <permusu>`.
 
    - Las listas de control de accesos (|ACL|) que consisten en poder definir
      para cada objeto los conjuntos de permisos para cualesquiera usuarios y
@@ -43,7 +43,7 @@ accesos:
      o no pertenezcan a alguno de los grupos incluidos en la lista. Este es el
      método que usa *Windows*, aunque en los sistemas *UNIX* modernos se puede
      habilitar como complemento del anterior para aquellos objetos en los que no
-     sea suficiente el sistema |UGO|, que es menos granular. Este será uno de
+     sea suficiente el sistema |POSIX|, que es menos granular. Este será uno de
      los aspectos avanzados que tratemos.
 
 #. Control de accesos obligatorio (|MAC|)
@@ -93,6 +93,7 @@ Trataremos en más profundidad:
 .. |UGO| replace:: :abbr:`UGO (User-Group-Others)`
 .. |MAC| replace::  :abbr:`MAC (Mandatory Access Control)`
 .. |RBAC| replace::  :abbr:`RBAC (Role-Based Access Control)`
+.. |POSIX| replace::  :abbr:`POSIX (Portable Operating System Interface for uniX)`
 
 .. _SELinux: https://es.wikipedia.org/wiki/SELinux
 .. _Moodle: https://www.moodle.org

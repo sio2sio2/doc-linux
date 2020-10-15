@@ -594,7 +594,7 @@ si queremos simular que nuestro |SAI| imaginario cambia su estado:
   anteriormente con permisos para alterar variables. Durante cinco minutos
   podremos ir haciendo cambios sin que el *driver* vuelva a recargar los valores
   originales del fichero. Incluso podemos simular que el |SAI| está en las
-  últimas para que el ordenador tome la determináción de apagarse::
+  últimas para que el ordenador tome la determinación de apagarse::
 
      # upsrw -s ups.status="OB LB" -u admin nosai
 

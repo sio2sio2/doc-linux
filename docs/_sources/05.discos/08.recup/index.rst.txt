@@ -1,12 +1,12 @@
 .. _rec-filesystem:
 
-Recuperacion del sistema de archivos
+Recuperación del sistema de archivos
 ************************************
 .. todo:: Hablar de recuperación de tablas de particiones (testdisk).
 
 .. note:: Centraremos las explicaciones en ext4.
 
-Hay diversas circunstancias por las que un sistema de archicos puede quedar
+Hay diversas circunstancias por las que un sistema de archivos puede quedar
 dañado:
 
 - Cierre sucio del sistema (p.e. un corte súbito del suministro eléctrico).
