@@ -39,7 +39,7 @@ Para poder usar |ACL|\ s debemos cumplir dos requisitos:
      + Fijar la opción de montaje *acl* en :file:`/etc/fstab`.
      + Habilitarlas como opción de montaje por defecto::
 
-         # tune2fs -o acl /deb/sda3
+         # tune2fs -o acl /dev/sda3
 
    .. note:: Para información sobre como habilitar las |ACL| en zfs puede leer
       `este artículo <https://blog.alt255.com/post/posix-acls/>`_.
@@ -58,7 +58,8 @@ siguen teniendo un propietario, un grupo propietario y tres ternas de permisos\
 [#]_, pero:
 
 * En adición a ellos pueden añadirse ternas de permisos para aquel usuario o 
-  grupo que consideremos pertinente.
+  grupo que consideremos pertinente. Cada una de estas ternas conforma una nueva
+  regla.
 
 * Cuando se definen sobre un directorio, estas nuevas ternas se pueden definir
   como heredables lo cual significa que los archivos y directorios incluidos
@@ -78,16 +79,16 @@ definir |ACL|\ s.
 
 Comencemos por crear el directorio::
 
-   # mkdir /home/share
-   # ls -ld /home/share
-   drwxr-xr-x 2 root root 4096 oct 15 21:32 /home/share
+   $ mkdir /tmp/share
+   $ ls -ld /tmp/share
+   drwxr-xr-x 2 root root 4096 oct 15 21:32 /tmp/share
 
 Hasta aquí sabemos todo y todo nos es familiar, ya que de hecho no hemos
 definido ninguna |ACL| y, si usamos :ref:`getfacl <getfacl>`::
 
-   # getfacl /home/share
+   # getfacl /tmp/share
    getfacl: Eliminando '/' inicial en nombres de ruta absolutos
-   # file: home/share/
+   # file: tmp/share/
    # owner: root
    # group: root
    user::rwx
@@ -95,24 +96,26 @@ definido ninguna |ACL| y, si usamos :ref:`getfacl <getfacl>`::
    other::r-x
 
 lo que obtendremos, con mucha palabrería son los permisos regulares del sistema
-POSIX.
+POSIX. Podemos, pues, considerar los permisos regulares como tres reglas |ACL|
+preañadidas.
 
+Reglas
+------
 Podemos empezar añadiendo una regla para un usuario llamado *apestado*\ [#] al
 que le vamos a vetar cualquier acción sobre el directorio::
 
-   # setfacl -m 'u:apestado.0' /home/share
+   # setfacl -m 'u:apestado:0' /tmp/share
 
 En este caso, la opción :kbd:`-m` indica que queremos modificar las reglas que
-ya haya definidas, no sobrescribirlas (y, consecuentemente, perderlas). A
-continuación se indica la regla, donde la "u" indica que es una regla para un
-usuario, "apestado" que ese es el usuario (también podría haberse usado un
-|UID|) y el "0" final cuáles son los permisos en formato númerico. También puede
-usarse un formato de letras en que la ausencia del permiso se indica con un
-guión (por tanto, el equivalente de "0" es "\-\-\-"). Si ahora usamos :ref:`ls
-<ls>`::
+ya haya definidas. A continuación se indica la regla, donde la "u" expresa que
+es una regla para un usuario (podría ser también "g" para grupo), "apestado"
+que ese es el usuario (también podría haberse usado su |UID|) y el "0" final
+cuáles son los permisos en formato númerico. También puede usarse un formato de
+letras en que la ausencia del permiso se indica con un guión (por tanto, el
+equivalente de "0" es "\-\-\-"). Si ahora usamos :ref:`ls <ls>`::
 
-   # ls -ld /home/share
-   drwxr-xr-x+ 2 root root 4096 oct 15 21:32 /home/share/
+   # ls -ld /tmp/share
+   drwxr-xr-x+ 2 root root 4096 oct 15 21:32 /tmp/share/
 
 aparecerá un signo "+" que indica que el archivo tiene definida alguna regla de
 permisos adicional:
@@ -120,7 +123,7 @@ permisos adicional:
 .. code-block:: console
    :emphasize-lines: 4, 6
 
-   # getfacl -c /home/share
+   # getfacl -c /tmp/share
    getfacl: Eliminando '/' inicial en nombres de ruta absolutos
    user::rwx
    user:apestado:---
@@ -128,15 +131,75 @@ permisos adicional:
    mask::r-x
    other::r-x
 
+Vemos dos novedades nuevas:
+
+a. La regla definida que, como esperábamos, retira todos lo permisos a
+   "apestado" sobre el fichero. Obsérvese que, sin definición de reglas |ACL|,
+   *apestado* tiene permiso de *otros*. En cambio, al existir una regla
+   específica para él, se queda sin ninguno.
+
+b. La *máscara* cuyo concepto definiremos :ref:`más adelante <acl-mask>`.
+
+Cabe preguntarnos ahora qué ocurre si a un mismo usuario le son aplicables
+varias reglas. La respuesta es que tendrá los permisos de la regla más
+específica y, si las reglas son igualmente específicas, de la más restrictiva.
+
+Por ejemplo, las reglas\ [#]_::
+
+   $ setfacl -m 'u:apestado:7,g:apestado:0' /tmp/share
+
+las cumple ambas *apestado*, pero la primera (de usuario) es más específica que
+la segunda (de grupo). En consecuencia, *apestado* tendrá todos los permisos.
+En cambio, si las reglas son::
+
+   $ setfacl -m 'u:apestado:0,g:apestado:7' /tmp/share
+
+*apestado* no tendrá permiso alguno. La especificidad de una regla
+(terna) de menor a mayor es exactamente la misma que en el
+sistema POSIX de permisos:
+
+- Regla de otros.
+- Regla de grupo (incluida la del grupo propietario).
+- Regla de usuario (incluida la del usuario propietario).
+
+La diferencia es que, mientras en el sistema POSIX, sólo hay una regla de grupo
+y una de usaurio, cuando se definen reglas |ACL| a un usuario le pueden ser
+aplicables varias reglas de grupo o varias reglas de usuario. En ese caso, si
+las reglas son de igual especificidad (suponemos que apestado también pertenece
+a *users*)::
+
+   $ setfacl -x 'u:apestado' -m 'g:users:0,g:apestado:7' /tmp/share
+
+el usuario dispondrá de la unión de los permisos concedidos por todas las
+reglas.
+
+.. note:: Véase cómo con la opción :kbd:`-x` hemos eliminado una regla
+   existente. En este caso, no deben expresarse los permisos.
+
+.. https://codingbee.net/rhcsa/rhcsa-access-control-list-acl
+.. https://codingbee.net/rhcsa/rhcsa-the-acls-mask-setting
+
+.. _reglas-heredables:
+
+Reglas heredables
+-----------------
+
+.. _acl-mask:
+
+La máscara
+----------
+
 .. rubric:: Notas al pie
 
 .. [#] La orden equivalente en xfs es :manpage:`xfs_info`.
 .. [#] E incluso :ref:`permisos especiales <perm-especiales>`, si estos son
    necesarios.
 .. [#] Que deberá existir en el sistema, por lo que si seguimos las indicaciones
-   nos tocará crearlo:.
+   nos tocará crearlo::
 
       # adduser --disabled-password --gecos "Usuario apestado" --no-create-home apestado
+
+.. [#] Obsérvese cómo podemos definir varias reglas a la vez.
 
 .. |UGO| replace:: :abbr:`UGO (User, Group, Other)`
 .. |UID| replace:: :abbr:`UID (User IDentifier)`
