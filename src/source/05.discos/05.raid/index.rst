@@ -173,7 +173,7 @@ Antes de pasar a describir los más comunes, es preciso fijar la siguiente
      mismo disco.
    - El |RAID| 3 en que ocurre lo mismo, pero además, los datos se dividen en
      *bytes* y no en bloques.
-   - El |RAID| Z, que es implementado por el sistema de fichero |ZFS| y es
+   - El |RAID| Z, que es implementado por el sistema de archivos |ZFS| y es
      semejante al |RAID| 5, pero que añade variantes para mejorar el rendimiento
      en las escrituras.
 
@@ -194,6 +194,10 @@ Antes de pasar a describir los más comunes, es preciso fijar la siguiente
      escritura.
 
    .. image:: files/RAID6.png
+
+   .. note:: También el sistema de archivos |ZFS| implementa su propia versión
+      del |RAID|\ 6 que penaliza menos las operaciones de escritura a la que
+      llama |RAID| Z2.
 
 Hay, además, sistemas |RAID|\ s que se constituyen **anidando** dos o más
 niveles de |RAID|. Los más utilizados son:
@@ -232,7 +236,7 @@ niveles de |RAID|. Los más utilizados son:
 
    - Hay tolerancia a fallos, ya que el sistema falla cuando fallan
      todos los discos de una misma división.
-   - La probabilidad de que el sistema falle es de :math:`P^{n,m}_{r10}(p) = P^{n/m}_{0}(P^m_{r1}(p)) = 1-(1-p^m)^\frac{n}{m}`.
+   - La probabilidad de que el sistema falle es de :math:`P^{n,m}_{r10}(p) = P^{n/m}_{r0}(P^m_{r1}(p)) = 1-(1-p^m)^\frac{n}{m}`.
    - Aumenta la capacidad hasta :math:`\frac{n}{m}*s`.
    - Hay mejora en el rendimiento de las lecturas y las escrituras,
 
@@ -431,7 +435,7 @@ Estudiaremos ambas posibilidades.
 
 .. [#] Incluso en los |RAID| por *hardware* y los fake\ |RAID| en los que habría
    cabido la posibilidad de que esos metadatos se hubieran registrado en memoria
-   *NVRAM* la controladora controladora o de la placa base.
+   *NVRAM* de la controladora o de la placa base.
 
 .. |GPT| replace:: :abbr:`GPT (GUID Partition Table)`
 .. |ZFS| replace:: :abbr:`ZFS (Zettabyte File System)`
