@@ -43,20 +43,20 @@ Antes de pasar a describir los más comunes, es preciso fijar la siguiente
 
 * :var:`s` es la capacidad del disco físico más pequeño.
 * :var:`n` es el número de discos físicos que constituye el |RAID|.
-* :var:`m` es, en los |RAID|\ s anidados, el número de discos del grupo anidado.
-* :var:`g` es, en los |RAID|\ s anidados, el número de grupos de discos. Por tanto,
-  :math:`n = g*s`.
 * :var:`p` es la probabilidad de que se rompa un disco en un periodo de tiempo
   determinado. Se supondrá la misma para todos los discos. Para estimarla
   podemos guiarnos por las estadísticas que publica la compañía Backblaze_
   basada en los fallos de sus propios discos duros. Para 2019, `estos fueron los
   datos <https://www.backblaze.com/blog/hard-drive-stats-for-2019/>`_.
+* En |RAID|\ s anidados, :var:`g` es el número de grupos de discos.
+* En |RAID|\ s anidados, :var:`m` es el número de discos del grupo anidado. Por
+  tanto, :math:`n = g*m`.
 * :math:`P^n_{rX}(p)` es la probabilidad de fallo irrecuperable de un |RAID| **X**
   constituido por :var:`n` discos cuya probabilidad individual de fallo es :var:`p`.
   Cuando el |RAID| es anidado, el número de discos se notará :math:`n,m`. Por
   ejemplo, :math:`P^{6,2}_{r10}(1\%)` es la probabilidad de fallo irrecuperable de
   un |RAID| 10 de seis discos con tres divisiones de dos discos y una
-  probabilidad de fallo del 1%.
+  probabilidad de fallo individual de disco del 1%.
 
 **RAID JBOD**
    |JBOD| es el acrónimo en inglés de *un mero puñado de discos* y simplemente
@@ -195,18 +195,19 @@ Antes de pasar a describir los más comunes, es preciso fijar la siguiente
 
    .. image:: files/RAID6.png
 
-   .. note:: También el sistema de archivos |ZFS| implementa su propia versión
-      del |RAID|\ 6 que penaliza menos las operaciones de escritura a la que
-      llama |RAID| Z2.
+   .. note:: El sistema de archivos |ZFS| implementa también su propia versión
+      con mejor rendimiento de escritura frente el |RAID|\ 6, a la que
+      denomina |RAID| Z2.
 
 Hay, además, sistemas |RAID|\ s que se constituyen **anidando** dos o más
 niveles de |RAID|. Los más utilizados son:
 
 **RAID 0+1** (o **Espejo de divisiones** o **RAID 01**):
    Es un sistema híbrido formado con un mínimo de cuatro discos, en los que los
-   :var:`n` discos se agrupan en grupos de :var:`m`. Cada grupo de :var:`m`
-   discos constituye un |RAID| 0 y con todos los grupos se forma un |RAID| 1.
-   Si tenemos cuatro discos y los agrupamos de 2 en 2, este será el resultado:
+   :var:`n` discos se agrupan en :var:`g` grupos de :var:`m` cada uno. Cada
+   grupo de :var:`m` discos constituye un |RAID| 0 y con todos los grupos se
+   forma un |RAID| 1.  Si tenemos cuatro discos y los agrupamos de 2 en 2, este
+   será el resultado:
 
    .. image:: files/RAID0+1.png
 
@@ -214,7 +215,7 @@ niveles de |RAID|. Los más utilizados son:
 
    - Hay tolerancia a fallos, ya que el sistema falla sólo cuando falla al menos
      un mismo disco de todos los grupos en |RAID| 0.
-   - ¿Alguien me calcula la probabilidad de que este sistema falle?
+   - La probabilidad de que falle irremediable el sistema\ [#]_ es :math:`P^{n,m}_{r01}(p) = P^{n/m}_{r1}(P^m_{r0}(p)) = (1 - (1 - p)^m)^{n/m}`
    - Aumenta la capacidad hasta :math:`m * s`.
    - Hay mejora en el rendimiento de lecturas y escrituras.
 
@@ -253,18 +254,23 @@ niveles de |RAID|. Los más utilizados son:
    - Aumenta la capacidad hasta :math:`(n - \frac{n}{m})*s`.
    - Mejora el rendimiento en lectura y escritura respecto al |RAID| 5.
 
+También son comunes las anidaciones en tres niveles del |RAID| 100 y el |RAID|
+101.
+
 .. rubric:: Consideraciones
 
 Sea cuál sea la implementación y el nivel del |RAID|, hay una serie de
 consideraciones a tener en cuenta:
 
 #. Al constituirlos es necesario que se creen una serie de **estructuras de
-   metadatos** a semejanza de lo que ocurre con los sistemas de ficheros.
+   metadatos** a semejanza de lo que ocurre con los sistemas de ficheros. Este
+   hecho, :ref:`puede darnos problemas <raid-metadatos>`.
 
 #. Debe habilitarse algún mecanismo para advertir al administrador del **fallo
    de disco**, a fin de que sea diligente en su sustitución. Estos mecanismos
-   pueden ser muy variados (pitidos, leds, apunte en el registro), pero suelen
-   incluir el envío de un correo electrónico de aviso.
+   pueden ser muy variados (pitidos, leds, apunte en el registro), pero es
+   conveniente que incluyan el envío de un correo electrónico de aviso (o
+   cualquier otro método de teleaviso).
 
 #. Al reemplazarse un dispositivo defectuoso por uno nuevo, se desencadena un
    **proceso de recuperación** para volver a la situación previa a la rotura.
@@ -274,11 +280,11 @@ consideraciones a tener en cuenta:
 #. Para minimizar el tiempo de sustitución de un disco defectuoso, algunos
    sistemas incorporan un **dispositivo de reserva** (*hot spare*) que se
    encuentra conectado pero inactivo, por lo que no forma parte efectiva del
-   |RAID|. Al surgir un fallo en algún disco, se inhabilita y automáticamente el
-   disco de reserva ocupa su lugar en el |RAID|, por lo que comienza inmediatamente
-   el *proceso de recuperación*. La labor del administrador consistirá en
-   añadir al sistema un nuevo disco de reserva para la próxima vez que se
-   produzca una rotura.
+   |RAID|. Al surgir un fallo en algún disco, éste se inhabilita y
+   automáticamente el disco de reserva ocupa su lugar en el |RAID|, por lo que
+   comienza inmediatamente el *proceso de recuperación*. La labor del
+   administrador consistirá en añadir al sistema un nuevo disco de reserva para
+   la próxima vez que se produzca una rotura.
 
 #. Tenga presente que, si el sistema sólo tenía un grado de redundancia (p.e. un
    |RAID| 5 o un |RAID| 1 de dos discos), durante el proceso de reconstrucción
@@ -361,6 +367,8 @@ Mediante **software**
       en `este artículo sobre ZFS
       <http://www.zfsbuild.com/2010/05/26/zfs-raid-levels/>`_.
 
+.. _raid-metadatos:
+
 Es importante tener presente que la constitución de un |RAID| exige el
 almacenamiento de los metadatos que lo definen. En los tres casos, esos
 metadatos se almacenan en los propios dispositivos de almacenamiento\ [#]_. Es
@@ -433,6 +441,9 @@ Estudiaremos ambas posibilidades.
 
 .. rubric:: Notas al pie
 
+.. [#] Para el cálculo se está suponiendo que no pueden recomponerse los datos
+   tomando discos de dos grupos distintos. Si esto puede hacerse, entonces la
+   probabilidad será menor. ¿Puede hacerse?
 .. [#] Incluso en los |RAID| por *hardware* y los fake\ |RAID| en los que habría
    cabido la posibilidad de que esos metadatos se hubieran registrado en memoria
    *NVRAM* de la controladora o de la placa base.
