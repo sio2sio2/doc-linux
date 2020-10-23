@@ -31,7 +31,7 @@ distribuir los datos entre todos ellos con la finalidad, respecto al uso de un
 
 - Aumentar el **rendimiento** en las operaciones de lectura y escritura.
 
-El grado de consecuención de estos propósitos depende de cuál sea el tipo de
+El grado de consecución de estos propósitos depende de cuál sea el tipo de
 |RAID| que se implemente; y el resultado aparente de la implementación será la
 creación de un dispositivo virtual sobre el que el sistema operativo podrá crear
 particiones y sistemas de archivos.
@@ -58,16 +58,22 @@ Antes de pasar a describir los más comunes, es preciso fijar la siguiente
   un |RAID| 10 de seis discos con tres divisiones de dos discos y una
   probabilidad de fallo individual de disco del 1%.
 
-**RAID JBOD**
-   |JBOD| es el acrónimo en inglés de *un mero puñado de discos* y simplemente
-   define un disco virtual que es la concatenación de todos los discos que lo
-   constituyen. El *software*, simplemente, se limita a crear el dispositivo
-   virtual e ir rellenado con datos sucesivamente los discos, de modo que cuando
-   acaba de llenar uno, sigue con el siguiente.
+**No RAID**
+   Antes de entrar en los tipos de |RAID| es conveniente citar agrupaciones de
+   discos que, aunque no lo son, suelen ser permitidas por las soluciones para
+   crear |RAID|\ s.
+
+   Por una parte suele usarse el término |JBOD| (acrónimo en inglés de *un mero
+   puñado de discos*) para identificar a un conjunto de discos del que se
+   preserva la independencia de cada uno. EN cambio, cuando estos discos definen
+   un único disco virtual que es la concatenación de todos los discos que lo
+   constituyen, se habla de *SPAN* o *BIG*. El *software*, simplemente, se
+   limita a crear el dispositivo virtual e ir rellenado con datos sucesivamente
+   los discos, de modo que cuando acaba de llenar uno, sigue con el siguiente.
 
    .. image:: files/JBOD.png
 
-   Así pues:
+   En este segundo caso, de concatenación:
 
    - El sistema no es tolerante a fallos, puesto que no existe redundancia.
      Ahora bien, la rotura de un disco implica únicamente la pérdida de los
@@ -79,11 +85,9 @@ Antes de pasar a describir los más comunes, es preciso fijar la siguiente
      tengan la misma capacidad.
    - No hay mejora alguna en el rendimiento.
 
-   .. note:: Se incluye este "tipo" de |RAID| aquí, porque es muy común verlo
-      incluido como tipo en las soluciones |NAS|. En realidad, esto es,
-      simplemente, un *grupo de volúmenes* de :ref:`LVM <lvm>` o, lo que hemos
-      denominado, *disco virtual* en nuestra :ref:`introducción teórica
-      <disk-div>`.
+   .. note:: En realidad, esto podría ser, simplemente, un *grupo de volúmenes*
+      de :ref:`LVM <lvm>` o, lo que hemos denominado, *disco virtual* en nuestra
+      :ref:`introducción teórica <disk-div>`.
 
 **RAID 0** (o **Volumen dividido**)
    Se forma con dos o más discos entre los cuales se distribuye equitativamente
@@ -165,13 +169,13 @@ Antes de pasar a describir los más comunes, es preciso fijar la siguiente
    - Hay mejora en el rendimiento de las lecturas, pero hay una penalización
      en las escrituras, ya que una escritura implica leer datos del resto de
      discos para generar la paridad y escribir ésta. Esta bajada en el
-     rendimiento en la escrituras es su principal defecto.
+     rendimiento en las escrituras es su principal defecto.
 
    Variantes de este nivel son:
 
    - El |RAID| 4 en que la información de paridad se almacena siempre en el
      mismo disco.
-   - El |RAID| 3 en que ocurre lo mismo, pero además, los datos se dividen en
+   - El |RAID| 3 en que ocurre lo mismo, pero, además, los datos se dividen en
      *bytes* y no en bloques.
    - El |RAID| Z, que es implementado por el sistema de archivos |ZFS| y es
      semejante al |RAID| 5, pero que añade variantes para mejorar el rendimiento
@@ -233,7 +237,7 @@ niveles de |RAID|. Los más utilizados son:
 
    .. image:: files/RAID1+0.png
 
-   Esta disposición sopone:
+   Esta disposición supone:
 
    - Hay tolerancia a fallos, ya que el sistema falla cuando fallan
      todos los discos de una misma división.
@@ -259,7 +263,7 @@ También son comunes las anidaciones en tres niveles del |RAID| 100 y el |RAID|
 
 .. rubric:: Consideraciones
 
-Sea cuál sea la implementación y el nivel del |RAID|, hay una serie de
+Sea cual sea la implementación y el nivel del |RAID|, hay una serie de
 consideraciones a tener en cuenta:
 
 #. Al constituirlos es necesario que se creen una serie de **estructuras de
@@ -323,7 +327,7 @@ Mediante **firmware**
    caso posterior.
 
    Aunque aparentemente es una solución similar, al no existir *hardware*
-   expecífico dedicado y delegar todos los cálculo en el procesador, su
+   específico dedicado y delegar todos los cálculos en el procesador, su
    rendimiento es peor y, por lo general, es conveniente una solución *software*
    pura.
 
@@ -428,7 +432,7 @@ tenemos fundamentalmente dos posibilidades:
   configuración.
 * :ref:`lvm <lvm>` que, desde su versión 2, permite la definición de volúmenes
   lógicos que sean a su vez dispositivos |RAID|, para lo cual el grupo de
-  volúmenes deberá haberse construido sobre dos o mas volúmenes físicos,
+  volúmenes deberá haberse construido sobre dos o más volúmenes físicos,
   obviamente.
 
 Estudiaremos ambas posibilidades.
