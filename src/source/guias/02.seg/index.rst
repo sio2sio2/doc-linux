@@ -10,7 +10,7 @@ Seguridad Informática
 
    [0-9]*
 
-.. rubric:: Ejericios
+.. rubric:: Ejercicios
 
 .. toctree::
    :maxdepth: 1
