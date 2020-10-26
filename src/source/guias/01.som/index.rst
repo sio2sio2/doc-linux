@@ -1,3 +1,5 @@
+.. _som:
+
 Sistemas Operativos Monopuesto
 ==============================
 

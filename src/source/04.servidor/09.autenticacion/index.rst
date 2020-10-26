@@ -3,7 +3,7 @@
 Autenticación
 =============
 La autenticación y, más en general, el ingreso de un usuario al sistema está
-estandarizado en los sistemas *linux* gracias a |PAM|. Es importante que
+estandarizado en los sistemas *Linux* gracias a |PAM|. Es importante que
 sea así, porque el acceso se puede lograr a través de distintos servicios y
 esto facilita que cada servicio no tenga que implementar el mecanismo de acceso,
 sino simplemente pasar las credenciales a |PAM| y que este se encargue de
@@ -193,7 +193,7 @@ Los ficheros de configuración de |PAM| contienen líneas de tres tipos:
       valor predeterminado es *die*.
 
       En el caso de que se use como valor un número, este indicará el número
-      e directivas de *pam* que se saltarán. Es importante tener en cuenta
+      e directivas de |PAM| que se saltarán. Es importante tener en cuenta
       que no se verá afectado el resultado de la línea: si acabó con éxito la
       línea contribuirá al resultado global de la autenticación con un éxito;
       y, si acabó con fracasó, contribuirá con un frcaso. Este valor es
@@ -242,8 +242,8 @@ para que el proceso de autenticación sea el adecuado, las distribuciones
 derivadas de *debian* tienen un :index:`programa <pam-auth-update>` llamado
 :program:`pam-auth-update` que permite mediante menú generar automáticamente las
 líneas de los ficheros :file:`common-*`. De esta forma, la instalación de
-servicios que aportan usuarios y grupos al sistema (como *samba* u *openldap*)
-es bastante sencilla\ [#]_.
+servicios que aportan usuarios y grupos al sistema (como :ref:`samba <samba>` u
+:ref:`openldap <openldap>`).  es bastante sencilla\ [#]_.
 
 .. warning:: La modificación de los ficheros :file:`common-*` es algo delicada
    por cuanto estos ficheros se generan con :command:`pam-auth-update`. Por lo
@@ -255,8 +255,7 @@ es bastante sencilla\ [#]_.
 
 Módulos
 -------
-
-Hay muchos módulos para *pam*. Bajo este epígrafe sólo se comentarán los más
+Hay muchos módulos para |PAM|. Bajo este epígrafe sólo se comentarán los más
 habituales y se explicarán brevemente algunos de sus argumentos. Suelen tener
 página de manual, así que es recomendable consultarla.
 
@@ -267,13 +266,18 @@ página de manual, así que es recomendable consultarla.
 
    pam_modules/[0-9]*
 
+.. _politica-password:
+
+Política de contraseñas
+-----------------------
+.. todo:: La exposición sobre política de contraseñas debe incluir las políticas
+   sobre su fortaleza o su caducidad (:ref:`chage <chage>`).
+
 Ejemplo ilustrativo
 -------------------
 
-El mejor método para entender cómo actúa *pam* es tomar algunos de sus ficheros
+El mejor método para entender cómo actúa |PAM| es tomar algunos de sus ficheros
 de configuración reales y analizarlos.
-
-.. todo:: Revisar este apartado cuando se tenga configurado un servidor samba.
 
 Empecemos con los ficheros *comunes*:
 
@@ -317,7 +321,7 @@ a continuación a un servidor *dns*, si esta disponible. De hecho, el comando
    $ getent hosts www.iescdl.es
    80.32.8.158     www.iescdl.es
 
-No forma parte en absoluto de la *PAM* ni de la autenticación, pero está ligado
+No forma parte en absoluto de |PAM| ni de la autenticación, pero está ligado
 en la medida en que permite resolver cualquier nombre del sistema. De no
 existir, el sistema sería incapaz de saber quiénes somos una vez dentro.
 
