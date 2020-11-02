@@ -1,3 +1,5 @@
+.. _tipos-ataque:
+
 Tipos
 *****
 Las redes informáticas están sometidas a innumerables ataques de muy distinta

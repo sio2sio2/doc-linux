@@ -130,6 +130,8 @@ Citaremos dos clasificaciones:
    - Rechazar cualquier conexión en la que el certificado no sea válido
      (caducado, autofirmado, etc.).
 
+.. _socks:
+
 :dfn:`Proxy SOCKS`
    Es un servicio cliente-servidor que canaliza una conexión |TCP| o |UDP|\ [#]_
    realizada en la parte cliente hasta la parte servidor, a fin de que ésta

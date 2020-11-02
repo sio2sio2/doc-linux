@@ -53,9 +53,12 @@ source_suffix = '.rst'
 # The master toctree document.
 master_doc = 'index'
 
+from datetime import date
+
 # General information about the project.
 project = 'Linuxnomicón'
-copyright = 'CC BY 4.0, 2016-2020, José Miguel Sánchez Alés'
+copyright = ('CC BY 4.0, 2016-' + str(date.today().year) +
+             ', José Miguel Sánchez Alés')
 author = 'José Miguel Sánchez Alés'
 
 # The version info for the project you're documenting, acts as replacement for
