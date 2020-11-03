@@ -12,7 +12,7 @@ físico sobre el que los escribíamos. Hay tres opciones:
   xataka
   <https://www.xataka.com/especiales/como-destruir-un-disco-duro-definitivamente-para-que-no-se-pueda-recuperar-la-informacion>`_.
 
-- Pero si nuestra intención es reaprovechar los discos o donarlos, entonce es
+- Pero si nuestra intención es reaprovechar los discos o donarlos, entonces es
   necesario usar **técnicas de borrado efectivo** de los datos. Un vistazo a
   herramientas generales se encuentra en `este artículo de genbeta
   <https://www.genbeta.com/herramientas/siete-herramientas-gratis-para-borrar-de-forma-segura-tus-discos-duros-hdd-o-ssd>`_,
