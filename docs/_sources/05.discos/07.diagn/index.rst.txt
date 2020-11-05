@@ -158,7 +158,7 @@ Hay dos formas de utilizar esta tecnología:
    donde *PASSED* es buena señal. También son interesante los errores que hayan
    podido producirse durante el funcionamiento del disco::
 
-      # smartctl -l error
+      # smartctl -l error /dev/sda
 
    que mostrará los últimos cinco de ellos. por último es conveniente echar un
    vistazo a los atributos |SMART| con::

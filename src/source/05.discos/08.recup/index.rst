@@ -5,19 +5,16 @@ Recuperación de datos
 Divideros este epígrafe sobre recuperación de datos en tres partes:
 
 * La recuperación de particiones.
-* La recuperación de archivos borrados accidentalmente.
 * La recuperación de sistemas de archivos.
+* La recuperación de archivos borrados accidentalmente.
 
 .. note:: Los dos últimos apartados los centraremos en ext4.
+
+.. _testdisk:
 
 Particiones
 ===========
 .. todo:: Tratar de la recuperación de particiones con testdisk.
-
-Archivos borrados
-=================
-.. todo:: Recuperar fichero borrados accidentalmente (extundelete, ext4magic,
-   ext3grep)
 
 Sistemas de archivos
 ====================
@@ -49,6 +46,8 @@ negará a montarse. Hay que distinguir en este caso:
 - Que este daño afecte al superbloque.
 - Que este daño afecte a otros bloques.
 
+.. _bloques-datos-dañados:
+
 Bloques dañados
 ---------------
 En este caso deberemos proceder a una reparación manual, aunque se puede perder
@@ -59,6 +58,8 @@ información en la operación::
 En esta orden, :kbd:`-y` asume que diremos siempre que sí a cualquier sugerencia
 de corrección que se nos plantee. Tras la reparación es posible que en el
 directorio :file:`lost+found` aparezca archivos recuperados por la operación.
+
+.. _superbloque-dañado:
 
 Superbloque dañado
 ------------------
@@ -88,3 +89,9 @@ pero indicando cuál es la primera copia del superbloque::
 
 .. todo:: Probar :kbd:`mke2fs -B 4k /dev/sdz5` para comprobar si se encuentra la
    copia del superbloque introduciendo el tamaño del bloque.
+
+Archivos borrados
+=================
+.. todo:: Recuperar fichero borrados accidentalmente (extundelete, ext4magic,
+   ext3grep)
+
