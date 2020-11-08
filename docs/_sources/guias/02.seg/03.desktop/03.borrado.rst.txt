@@ -1,6 +1,9 @@
 Recuperación de datos
 *********************
-La recuperación de datos perdidos es, ciertamente, un asunto propio de la :ref:`integridad de datos <integridad-datos>` estudiada en la :ref:`unidad dedicada al almacenamiento <seg-alm>`, pero que por motivos meramente relacionados con la evaluación\ [#]_ hemos reservado para esta uunidad.
+La recuperación de datos perdidos es, ciertamente, un asunto propio de la
+:ref:`integridad de datos <integridad-datos>` estudiada en la :ref:`unidad
+dedicada al almacenamiento <seg-alm>`, pero que por motivos meramente
+relacionados con la evaluación\ [#]_ hemos reservado para esta uunidad.
 
 La recuperación de datos es obvio que deriva siempre de una pérdida previa,
 pero dependiendo de si se tomó alguna contramedida de seguridad activa y de
@@ -20,6 +23,8 @@ cuál fuera la contramedida, se llevará a cabo de distinta forma:
 
   * *Fallos de disco*, que derivan en la imposibilidad de la lectura.
   * *Borrados accidentales*.
+
+Es a esta última circunstancia en la que no se previó mecanismo de salvaguarda de los datos, a la que está dedicado el texto del epígrafe.
 
 Fallos de disco
 ===============
@@ -51,8 +56,67 @@ entero resultan inaccesibles. Hay dos casos:
     sectores, aunque sea a costa de perder el archivo que contuviera. Véase
     :ref:`como recuperarlos en ext4 <bloques-datos-dañados>`.
 
+.. Ejercicios: tomar GParted Live, hacer particiones, borrarlas y recuperarlas
+   luego con testdisk.
+
 Borrados accidentales
 =====================
+Hasta *el mejor escribano echa un borrón*\ ... Es común que por equivocación se borre algún archivo que, en realidad, no quisiéramos borrar. Para evitar estas situaciones los sistemas operativos suelen habilitar una "Papelera", esto es, un lugar en el que se almacenan los archivos borrados. Funciona más o menos del siguiente modo:
+
+- El archivo no es, en realidad, borrado del sistema de archivos, sino
+  simplemente trasladado a un directorio oculto (la *Papelera*) en donde es
+  almacenado.
+- El *software* asociado a esta función no se limita a trasladar el archivo sino  que:
+
+  + Guarda la memoria de la ubicación original para que en caso de que se
+    quiera recuperar el archivo, éste se encuentre allí donde se encontraba
+    cuando se borró.
+
+  + Mantiene la "Papelera" por debajo de un tamaño máximo configurable, de modo
+    que, si es necesario para no sobrepasar este límite, borra definitivamente
+    archivos tomando primero aquellos con una fecha de borrado anterior.
+
+  .. note:: En *Linux*, los escritorios más habituales (Gnome_, KDE_, LXDE_,
+     XFCE_) disponen de Papelera. En *Windows* también existe.
+
+Por tanto, para recuperar el archivo no hay más que acudir a la "Papelera".
+Sin embargo, el borrado puede haber sido efectivo (bien porque se borró el
+archivo de la propia "Papelera", bien porque se fuerza su borrado sin pasar por
+esta, bien porque se usa la |CLI|), y entonces ¿hay forma de recuperar el archivo? La respuesta es "quizás":
+
+Cuando un archivo es borrado del sistema de archivos, sus datos (los bloques de
+disco asociados) no se sobrescriben de inmediato. Simplemente, se libera el espacio para que futuros archivos puedan ocupar esos bloques. Por tanto, si intentamos la recuperación del archivo antes que estos bloques vuelvan a ocuparse, podremos obtener de nuevo el archivo. Así pues:
+
++ Se requerirá una herramienta especializada en buscar el archivo borrado en
+  los metadatos del sistema de archivos:
+
+  **FAT32**
+     * :ref:`testdisk <testdisk>`.
+     * `Kickass Undelete`_ (*Windows*).
+
+  **NTFS**
+     * :ref:`testdisk <testdisk>`.
+     * :command:`ntfsundelete` (del paquete *ntfs-3g*).
+     * `Kickass Undelete`_ (*Windows*).
+
+  **EXT4**
+     * :ref:`testdisk <testdisk>`.
+     * :ref:`extundelete <extundelete.1>`.
+     * :ref:`ext3grep <ext3grep.1>`.
+     * :ref:`ext4magic <ext4magic>`.
+
++ La recuperación será tanto más probable cuanto menos operaciones de escritura
+  se hayan hecho desde el borrado del archivo. A este efecto, es muy útil que
+  los datos de usuario se almacenen en una partición distinta a la del sistema
+  operativo, puesto que la herramienta no suele estar ya instalada y su
+  instalación requiere escribir en disco. Si las particiones están separadas,
+  la instalación no implicará ninguna operación de escritura sobre el sistema
+  de archivos del que queremos recuperar archivos.
+
+.. note:: GParted_ Live además del propio particionador, incluye, entre otras
+   aplicaciones, :ref:`testdisk <testdisk>`, con lo que es también una excelente
+   herramienta no sólo para manipular particiones, sino también para recuperar
+   archivos (y particiones).
 
 .. rubric:: Notas al pie
 
@@ -61,3 +125,11 @@ Borrados accidentales
    enteramente con esta unidad.
 
 .. |GPT| replace:: :abbr:`GPT (Guid Partition Table)`
+.. |CLI| replace:: :abbr:`CLI (Command Line Interface)`
+
+.. _Gnome: https://www.gnome.org
+.. _KDE: https://kde.org
+.. _LXDE: http://www.lxde.org
+.. _XFCE: https://xfce.org
+.. _Kickass Undelete: https://sourceforge.net/projects/kickassundelete
+.. _Gparted: https://gparted.org

@@ -479,7 +479,7 @@ de las que este |SAI| no informa. De entre las que devuelve son interesantes:
      modificando el valor de la variable.
 
 * **battery.charge**, que informa de cuál es el porcentaje de la batería. En
-  este caso, la batería se encuentra totalmente cargada. Si desconectaramos
+  este caso, la batería se encuentra totalmente cargada. Si desconectáramos
   el |SAI| de la red.
 
 * **ups.load**, que informa de cuál es el porcentaje sobre la potencia total que

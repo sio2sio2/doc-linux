@@ -8,16 +8,19 @@ Divideros este epígrafe sobre recuperación de datos en tres partes:
 * La recuperación de sistemas de archivos.
 * La recuperación de archivos borrados accidentalmente.
 
-.. note:: Los dos últimos apartados los centraremos en ext4.
-
 .. _testdisk:
 
 Particiones
 ===========
 .. todo:: Tratar de la recuperación de particiones con testdisk.
 
+.. note:: :command:`testdisk` también es útil para :ref:`recuperar archivos
+   borrados como veremos más adelante <archivos-rec>`.
+
 Sistemas de archivos
 ====================
+.. note:: Este apartado lo centraremos en *ext4*.
+
 Hay diversas circunstancias por las que un sistema de archivos puede quedar
 dañado y es precisa su reparación:
 
@@ -90,8 +93,121 @@ pero indicando cuál es la primera copia del superbloque::
 .. todo:: Probar :kbd:`mke2fs -B 4k /dev/sdz5` para comprobar si se encuentra la
    copia del superbloque introduciendo el tamaño del bloque.
 
-Archivos borrados
-=================
-.. todo:: Recuperar fichero borrados accidentalmente (extundelete, ext4magic,
-   ext3grep)
+.. _archivos-rec:
 
+Recuperación de archivos
+========================
+La regla fundamental para ser capaz de recuperar datos borrados es no escribir
+(o al menos escribir lo mínimo) en el sistema de archivos del que se quiere
+hacer la recuperación. Cuanto más se haya escrito, menos probabilidades hay de
+que puedan recuperarse los datos. Esto se debe a que cuando se borra, los
+bloques de datos no se sobrescriben inmediatamente, sino que se borra la
+referencia al archivo, de manera que los bloques quedan disponibles para ser
+ocupados por nueva información. Si esto último, no ha llegado ha producirsa,
+entonces el archivo es recuperable.
+
+Una herramienta interactiva bastante sencilla es el propio :ref:`testdisk
+<testdisk>` que puede recuperar ficheros de un sistema de archivos (sin haber
+sido montado). Es capaz de recuperar archivos de *EXT4*, pero también de
+sistemas *FAT32* o *NTFS*:
+
+.. raw:: html
+
+   <script id="asciicast-ta5Q7TWpmHSmuNfAcU5LuRow3"
+   src="https://asciinema.org/a/ta5Q7TWpmHSmuNfAcU5LuRow3.js" async></script>
+
+El vídeo muestra cómo recuperar dos archivos borrados en un sistema *NTFS*. Para
+ello, no hay más que marcar aquellos archivos que quieren ser recuperados (con
+:kbd:`:` ) de la lista de archivos que :command:`testdisk` reconoce borrados y
+escoger en que directorio de otro sistema de archivos quiere alamcenarse la
+copia. Después podríamos montar el sistema *NTFS* y trasladar a él estas copias.
+
+Si preferimos herramientas no interactivas podemos usar :command:`dosfsck` (con
+la opción :kbd:`-u`) o :command:`ntfsundelete` para *FAT* y *NTFS*
+respectivamente. Para *EXT4* tenemos varias posibilidades:
+
+.. _extundelete.1:
+
+`extundelete <https://blog.desdelinux.net/extundelete-recupera-archivos-borrados/>`_,
+   que tiene el inconveniente de que hay que saber de antemano el nombre del
+   directorio o el archivo que se quiere recuperar.
+
+.. _ext3grep.1:
+
+`ext3grep <https://www.tecmint.com/ext3grep-recover-deleted-files-on-ubuntu-debian/>`_,
+   que es bastante más versátil que el anterior.
+
+.. _ext4magic:
+
+:command:`ext4magic`
+   que será con el que hagamos algunas pruebas en estos apuntes. Para ellas,
+   tomemos un archivo y creemos dentro de él un sistema de archivos\ [#]_::
+
+      $ truncate -s 8G /tmp/pruebas.disk
+      $ /sbin/mkfs.ext4 -b4k -Eroot_owner="$(id -u):$(id -g)" -L PRUEBAS /tmp/pruebas.disk
+
+   Ahora debemos montar el sistema en el directorio :file:`/mn/josem/PRUEBAS`\ [#]_::
+
+      $ udisksctl loop-setup -f /tmp/pruebas.disk
+      Mounted /dev/loop0 at /media/josem/PRUEBAS
+      $ udisksctl mount -b /dev/loop0
+
+   Creemos algo de contenido::
+
+      $ mkdir /media/josem/PRUEBAS/{A,B,C}
+      $ echo '0123456789' > /media/josem/PRUEBAS/B/numeros.txt
+      $ echo 'abcdefghij' > /media/josem/PRUEBAS/B/letras.txt
+      $ echo '..........' > /media/josem/PRUEBAS/B/puntos.txt
+      $ cp /bin/bash /media/josem/PRUEBAS/C
+
+   Borremos *accidentalmente* algunos archivos::
+
+      $ rm -rf /media/josem/PRUEBAS/{B/puntos,C/bash}
+
+   Pues bien, ahora que hemos descubierto el error debemos proceder
+   copiando el *ĵournal* y desmontando el sistema::
+
+      $ /sbin/debugfs -R 'dump <8> /tmp/pruebas.journal' /tmp/pruebas.disk
+      $ udisksctl unmount -b /dev/loop0
+      $ udisksctl loop-delete -b /dev/loop0     # Esto deshace la asociación entre el fichero y el dispositivo
+
+   No es estrictamente necesario lo primero, pero si copiamos el estado del
+   *journal* tendremos más posibilidades de recuperar más datos. Hecho esto,
+   puede usarse :command:`ext4magic` para ver cúales son los archivos borrados::
+
+      $ ext4magic /tmp/pruebas.disk -f / -j /tmp/pruebas.journal -l
+      Filesystem in use: /tmp/pruebas.disk
+
+      Using external Journal at File /tmp/pruebas.journal
+      Inode found ""   2
+      Inode 2 is allocated
+        100%   B/puntos.txt 
+        100%   C/bash 
+      ext4magic : EXIT_SUCCESS
+
+   Para recuperar basta con::
+
+      $ ext4magic /tmp/pruebas.disk -f / -j /tmp/pruebas.journal -r
+      $ ls RECOVERDIR
+      B C
+
+   Si los archivos no son recuperables al 100%, no se recuperarán. En ese caso,
+   quizás aún pueda recuperarse con la opción :kbd:`-m`::
+
+      $ ext4magic /tmp/pruebas.disk -j /tmp/pruebas.journal -m
+
+   .. note:: La recuperación no tiene por qué ser siempre producirse.
+
+.. rubric:: Notas al pie
+
+.. [#] Nos aseguramos que el sistema tenga bloques de 4KiB y que el directorio
+   raíz pertenezca a nuestro usuario y no a *root*. Según :manpage:`mke2fs(8)`
+   el diurectorio raiz debería pertenecer al usuario que crea el sistema de
+   archivos, pero tal cosa no parece ocurrir.
+.. [#] Por supuesto, podemos esta operación como administrador::
+
+      # mount -o loop /tmp/pruebas.disk /mnt
+
+   pero aprovechamos que tenemos instalado `udisks
+   <https://www.freedesktop.org/wiki/Software/udisks/>`_ en el sistema para
+   hacer las operaciones como usuario sin privilegios.
