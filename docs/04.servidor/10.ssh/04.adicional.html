@@ -242,7 +242,8 @@ con la contraseña del usuario remoto).</p>
 <div class="admonition note">
 <p class="admonition-title">Nota</p>
 <p>Desgraciadamente, el módulo <em>pam_ssh</em> no está disponible en <em>buster</em>,
-ya que <a class="reference external" href="https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=859054">no es compatible con la versión que usa ésta de openssl</a></p>
+ya que <a class="reference external" href="https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=859054">no es compatible con la versión que usa ésta de openssl</a>. En <em>bullseye</em>,
+no obstante, se corrigió el <em>bug</em>.</p>
 </div>
 <p>Como alternativa al uso de <em>pam_ssh</em>, en los clientes con entorno gráfico puede
 compprobarse<a class="footnote-reference brackets" href="#id16" id="id6">4</a> que está escrito lo siguiente en
@@ -281,12 +282,57 @@ pam_ssh</span></a> si no disponemos en el sistema de él.</p>
 </div>
 </div>
 <div class="section" id="gnome-keyring">
-<span id="gnome-keyring-ssh"></span><h3><span class="section-number">4.5.6.3.2. </span><strong class="command">gnome-keyring</strong><a class="headerlink" href="#gnome-keyring" title="Enlazar permanentemente con este título">¶</a></h3>
-<div class="admonition-todo admonition" id="id7">
-<p class="admonition-title">Por hacer</p>
-<p>gnome-keyring y <abbr title="Security SHell">SSH</abbr>: investigar a partir de la <a class="reference external" href="https://wiki.archlinux.org/index.php/GNOME_(Espa%C3%B1ol)/Keyring_(Espa%C3%B1ol)">wiki de Archlinux</a>.
-Adicionalmente <a class="reference external" href="https://rtfm.co.ua/en/what-is-linux-keyring-gnome-keyring-secret-service-and-d-bus/">este entrada de blog</a> da información
-sobre almancenaje de credenciales y Freedesktop.</p>
+<span id="gnome-keyring-ssh"></span><h3><span class="section-number">4.5.6.3.2. </span><strong class="program">gnome-keyring</strong><a class="headerlink" href="#gnome-keyring" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Una alternativa a lo anterior, si tenemos entorno gráfico, es usar un
+servicio como <strong class="program">gnome-keyring</strong>, que tiene soporte para claves <abbr title="Security SHell">SSH</abbr>. La
+herramienta no requiere todo el ecosistema del escritorio <em>Gnome</em>, así que
+instalarlo no resultará muy gravoso.  Eso sí, si no pensamos aprovecharlo para
+nada más, es mejor utilizar directamente <a class="reference internal" href="#ssh-agent"><span class="std std-ref">ssh-agent</span></a>, porque
+esta método, internamente, acaba echando mano de él.</p>
+<p>Si nuestro escritorio es <em>Gnome</em>, no requeriremos nada, porque ya vendrá
+instalado y preparado para ejecutarse. Si, por el contrario, usamos otra
+alternativa más ligera, tendremos que instalarlo y configurarlo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt install gnome-keyring
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Compruebe si está instalado el paquete <em>dbus-x11</em>. Si no lo está,
+debería instalarlo también.</p>
+</div>
+<p><em>Debian</em> debería instalar también <em>libpam-gnome-keyring</em> y haber preparado el
+programa que se encarga del login gráfico para arrancarlo durante el proceso de
+arranque<a class="footnote-reference brackets" href="#id17" id="id7">5</a>, lo que significa que al acceder al sistema mediante este <em>login</em>
+debería ya estar corriendo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> ps --no-header -o cmd -C gnome-keyring-d
+<span class="go">/usr/bin/gnome-keyring-daemon --daemonize --login</span>
+</pre></div>
+</div>
+<p>esto implica que el demonio ya está corriendo y que habrá intentado desbloquear
+el anillo de claves con la contraseña proporcionada por el usuario para
+validarse. Esto importa poco para nuestro propósito, pero también implica que al
+intentar usar claves <abbr title="Security SHell">SSH</abbr> las intentará desbloquear con esta misma contraseña,</p>
+<p>Necesitamos por otro lado haber generado claves tal como se ha propuesto para
+<a class="reference internal" href="#ssh-agent"><span class="std std-ref">ssh-agent</span></a>, esto es, con nombre estándar y que se encuentren
+dentro de <code class="file docutils literal notranslate"><span class="pre">~/.ssh</span></code>. Si como clave de paso usamos la contraseña del
+usuario, no se nos pedirá nunca. Si por el contrario usamos otra, no es
+demasiado grave: la primera que intentamos conectar usando la clave <abbr title="Security SHell">SSH</abbr> se nos
+pedirá (mediante un cuadro de diálogo gráfico) y, a partir de ese momento, ya no
+se nos pedirá más mientras dure nuestra sesión frente al ordenador.</p>
+<p>Sin embargo, no todo está hecho. Es preciso poder conectar con el demonio y para
+ello ha debido ejecutarse:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> <span class="nb">eval</span> <span class="nb">export</span> <span class="k">$(</span>gnome-keyring-daemon --start<span class="k">)</span>
+</pre></div>
+</div>
+<p>que definirá el valor apropiado de la variable <span class="var">SSH_AUTH_SOCK</span>. Esto, sin
+embargo, es mejor colocarlo en algún lugar que se lea durante la creación del
+entorno gráfico como <code class="file docutils literal notranslate"><span class="pre">~/.xinitrc</span></code> o, si utilizamos <a class="reference external" href="http://openbox.org/wiki/Main_Page">Openbox</a>, <code class="file docutils literal notranslate"><span class="pre">~/.config/openbox/enviroment</span></code>. El
+lugar donde debamos colocar esto dependerá de cuál sea el entorno grafico que
+usemos.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p><a class="reference external" href="http://openbox.org/wiki/Main_Page">Seahorse</a> es un programa que nos
+permite consultar <strong class="program">gnome-keyring</strong>.</p>
 </div>
 </div>
 </div>
@@ -300,7 +346,7 @@ que optamos por usar <strong class="command">ssh-agent</strong> y no disponemos 
 <p>Para poder hacer esto, es necesario saber que la variable <em>SSH_ASKPASS</em> le
 indica a <strong class="command">ssh</strong> (y toda la familia de programas clientes) qué programa
 usar para obtener la contraseña. Por este motivo, si creamos el programa
-<code class="file docutils literal notranslate"><span class="pre">$XDG_RUNTIME_DIR/askpass.sh</span></code><a class="footnote-reference brackets" href="#id17" id="id8">5</a>:</p>
+<code class="file docutils literal notranslate"><span class="pre">$XDG_RUNTIME_DIR/askpass.sh</span></code><a class="footnote-reference brackets" href="#id18" id="id8">6</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span>!/bin/sh
 <span class="go">cat</span>
 </pre></div>
@@ -309,7 +355,7 @@ usar para obtener la contraseña. Por este motivo, si creamos el programa
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> <span class="nb">echo</span> <span class="s2">&quot;mi clave de paso&quot;</span> <span class="p">|</span> <span class="nv">SSH_ASKPASS</span><span class="o">=</span><span class="nv">$XDG_RUNTIME_DIR</span>/askpass.sh ssh-add
 </pre></div>
 </div>
-<p>Pasar la clave de paso<a class="footnote-reference brackets" href="#id18" id="id9">6</a> directamente a <strong class="command">ssh</strong> es algo más
+<p>Pasar la clave de paso<a class="footnote-reference brackets" href="#id19" id="id9">7</a> directamente a <strong class="command">ssh</strong> es algo más
 complicado y no resultará en una sesión interactiva (lo cual no es un problema,
 si el propio acceso pretendemos que sea interactivo):</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span>  <span class="nb">echo</span> <span class="s2">&quot;mi clave de paso&quot;</span> <span class="p">|</span> <span class="nv">SSH_ASKPASS</span><span class="o">=</span><span class="nv">$XDG_RUNTIME_DIR</span>/askpass.sh setsid ssh castillo ls /
@@ -433,12 +479,12 @@ siguiente.</p>
 <h3><span class="section-number">4.5.6.5.2. </span><abbr title="Security SHell">SSH</abbr> sobre <abbr title="HyperText Transfer Protocol">HTTP</abbr>s<a class="headerlink" href="#ssh-sobre-https" title="Enlazar permanentemente con este título">¶</a></h3>
 <p>En este caso, la estrategia es encapsular todo lo que vaya dirigido al puerto
 <strong>443</strong> con <abbr title="Transport Layer Security">TLS</abbr>, que es en teoría el tráfico que debe circular hacia ese
-destino<a class="footnote-reference brackets" href="#id19" id="id10">7</a><a class="footnote-reference brackets" href="#id20" id="id11">8</a>. Lo más apropiado para multiplexar los distintos tráficos en
+destino<a class="footnote-reference brackets" href="#id20" id="id10">8</a><a class="footnote-reference brackets" href="#id21" id="id11">9</a>. Lo más apropiado para multiplexar los distintos tráficos en
 el servidor es instalar y configurar <a class="reference internal" href="../../07.serre/05.proxies/03.reverse/01.multi.html#haproxy"><span class="std std-ref">haproxy</span></a>. La configuración
 del servidor de <abbr title="Security SHell">SSH</abbr> no requiere ningún cambio.</p>
 <p>Para poder acceder a través del túnel <abbr title="Secure Socket Layer">SSL</abbr> necesitamos en la parte cliente
 que un <em>proxy</em> se encargue del encapsulamiento. Lo más cómo es usar
-<strong class="command">openssl</strong><a class="footnote-reference brackets" href="#id21" id="id12">9</a>:</p>
+<strong class="command">openssl</strong><a class="footnote-reference brackets" href="#id22" id="id12">10</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> ssh -p443 -o <span class="s2">&quot;ProxyCommand openssl s_client -quiet -connect %h:%p&quot;</span> usuario@servidor
 </pre></div>
 </div>
@@ -530,24 +576,27 @@ las predeterminadas de <strong class="command">ssh</strong> (<code class="file d
 <dd><p>Si se usa <em>pam_ssh</em> (o el <a class="reference internal" href="#pseudopam-ssh"><span class="std std-ref">script sustitutorio después propuesto</span></a>) conviene, precisamente, cerciorarse de que esto no está
 activo comentando la opción)</p>
 </dd>
-<dt class="label" id="id17"><span class="brackets"><a class="fn-backref" href="#id8">5</a></span></dt>
+<dt class="label" id="id17"><span class="brackets"><a class="fn-backref" href="#id7">5</a></span></dt>
+<dd><p>Al menos es eso lo que ocurre con <abbr title="Simple LogIn Manager">SLIM</abbr>.</p>
+</dd>
+<dt class="label" id="id18"><span class="brackets"><a class="fn-backref" href="#id8">6</a></span></dt>
 <dd><p>No se usa directamente <strong class="command">cat</strong> porque <strong class="program">ssh-add</strong> y el
 resto de programas pasan argumentos que lo malogran. El <em>script</em> desecha los
 argumentos y sólo atiende a la entrada estándar que es lo que interesa.</p>
 </dd>
-<dt class="label" id="id18"><span class="brackets"><a class="fn-backref" href="#id9">6</a></span></dt>
+<dt class="label" id="id19"><span class="brackets"><a class="fn-backref" href="#id9">7</a></span></dt>
 <dd><p>O la contraseña, no es necesario la autenticación mediante clave pública
 y privada.</p>
 </dd>
-<dt class="label" id="id19"><span class="brackets"><a class="fn-backref" href="#id10">7</a></span></dt>
+<dt class="label" id="id20"><span class="brackets"><a class="fn-backref" href="#id10">8</a></span></dt>
 <dd><p>En teoría, el tráfico debe ser <abbr title="HyperText Transfer Protocol">HTTP</abbr>s, es decir, <abbr title="HyperText Transfer Protocol">HTTP</abbr> ofuscado e
 irreconocible gracias a la envoltura segura que ofrece <abbr title="Transport Layer Security">TLS</abbr>.</p>
 </dd>
-<dt class="label" id="id20"><span class="brackets"><a class="fn-backref" href="#id11">8</a></span></dt>
+<dt class="label" id="id21"><span class="brackets"><a class="fn-backref" href="#id11">9</a></span></dt>
 <dd><p>De lo que se deduce que el epígrafe es inexacto: debería llamarse <em>SSH
 sobre TLS</em>.</p>
 </dd>
-<dt class="label" id="id21"><span class="brackets"><a class="fn-backref" href="#id12">9</a></span></dt>
+<dt class="label" id="id22"><span class="brackets"><a class="fn-backref" href="#id12">10</a></span></dt>
 <dd><p>Obviamente, este software de <em>proxy</em> para el cliente sólo es necesario si
 necesitamos establecer el túnel <abbr title="Transport Layer Security">TLS</abbr>. Si no es el caso (segunda variante en
 redes sin proxy que fiscalece la comunicación), en el cliente no hay más que
@@ -572,7 +621,7 @@ asegurarse de que nos conectamos al puerto <strong>443</strong>.</p>
 <li><a class="reference internal" href="#trampolin-de-acceso">4.5.6.2. Trampolín de acceso</a></li>
 <li><a class="reference internal" href="#persistencia-de-claves">4.5.6.3. Persistencia de claves</a><ul>
 <li><a class="reference internal" href="#index-4">4.5.6.3.1. <strong class="command">ssh-agent</strong></a></li>
-<li><a class="reference internal" href="#gnome-keyring">4.5.6.3.2. <strong class="command">gnome-keyring</strong></a></li>
+<li><a class="reference internal" href="#gnome-keyring">4.5.6.3.2. <strong class="program">gnome-keyring</strong></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#acceso-no-interactivo">4.5.6.4. Acceso no interactivo</a></li>

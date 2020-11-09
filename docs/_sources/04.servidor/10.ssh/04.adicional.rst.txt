@@ -205,7 +205,8 @@ con la contraseña del usuario remoto).
 
 .. note:: Desgraciadamente, el módulo *pam_ssh* no está disponible en *buster*,
    ya que `no es compatible con la versión que usa ésta de openssl
-   <https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=859054>`_
+   <https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=859054>`_. En *bullseye*,
+   no obstante, se corrigió el *bug*.
 
 Como alternativa al uso de *pam_ssh*, en los clientes con entorno gráfico puede
 compprobarse\ [#]_ que está escrito lo siguiente en
@@ -241,16 +242,67 @@ terminal.
 
 .. _gnome-keyring-ssh:
 
-:command:`gnome-keyring`
+:program:`gnome-keyring`
 ------------------------
-.. todo:: gnome-keyring y |SSH|: investigar a partir de la `wiki de Archlinux
-   <https://wiki.archlinux.org/index.php/GNOME_(Espa%C3%B1ol)/Keyring_(Espa%C3%B1ol)>`_.
-   Adicionalmente `este entrada de blog
-   <https://rtfm.co.ua/en/what-is-linux-keyring-gnome-keyring-secret-service-and-d-bus/>`_ da información
-   sobre almancenaje de credenciales y Freedesktop.
+Una alternativa a lo anterior, si tenemos entorno gráfico, es usar un
+servicio como :program:`gnome-keyring`, que tiene soporte para claves |SSH|. La
+herramienta no requiere todo el ecosistema del escritorio *Gnome*, así que
+instalarlo no resultará muy gravoso.  Eso sí, si no pensamos aprovecharlo para
+nada más, es mejor utilizar directamente :ref:`ssh-agent <ssh-agent>`, porque
+esta método, internamente, acaba echando mano de él.
 
-   .. Esta entrada tiene órdenes que no funcionan pero puede ser interesante:
-      https://rtfm.co.ua/en/linux-gnome-keyring-setup-as-freedesktop-secretservice/
+Si nuestro escritorio es *Gnome*, no requeriremos nada, porque ya vendrá
+instalado y preparado para ejecutarse. Si, por el contrario, usamos otra
+alternativa más ligera, tendremos que instalarlo y configurarlo::
+
+   # apt install gnome-keyring
+
+.. warning:: Compruebe si está instalado el paquete *dbus-x11*. Si no lo está,
+   debería instalarlo también.
+
+*Debian* debería instalar también *libpam-gnome-keyring* y haber preparado el
+programa que se encarga del login gráfico para arrancarlo durante el proceso de
+arranque\ [#]_, lo que significa que al acceder al sistema mediante este *login*
+debería ya estar corriendo::
+
+   $ ps --no-header -o cmd -C gnome-keyring-d
+   /usr/bin/gnome-keyring-daemon --daemonize --login
+
+esto implica que el demonio ya está corriendo y que habrá intentado desbloquear
+el anillo de claves con la contraseña proporcionada por el usuario para
+validarse. Esto importa poco para nuestro propósito, pero también implica que al
+intentar usar claves |SSH| las intentará desbloquear con esta misma contraseña,
+
+Necesitamos por otro lado haber generado claves tal como se ha propuesto para
+:ref:`ssh-agent <ssh-agent>`, esto es, con nombre estándar y que se encuentren
+dentro de :file:`~/.ssh`. Si como clave de paso usamos la contraseña del
+usuario, no se nos pedirá nunca. Si por el contrario usamos otra, no es
+demasiado grave: la primera que intentamos conectar usando la clave |SSH| se nos
+pedirá (mediante un cuadro de diálogo gráfico) y, a partir de ese momento, ya no
+se nos pedirá más mientras dure nuestra sesión frente al ordenador.
+
+Sin embargo, no todo está hecho. Es preciso poder conectar con el demonio y para
+ello ha debido ejecutarse::
+
+   $ eval export $(gnome-keyring-daemon --start)
+
+que definirá el valor apropiado de la variable :var:`SSH_AUTH_SOCK`. Esto, sin
+embargo, es mejor colocarlo en algún lugar que se lea durante la creación del
+entorno gráfico como :file:`~/.xinitrc` o, si utilizamos `Openbox
+<http://openbox.org/wiki/Main_Page>`_, :file:`~/.config/openbox/enviroment`. El
+lugar donde debamos colocar esto dependerá de cuál sea el entorno grafico que
+usemos.
+
+.. note:: `Seahorse <http://openbox.org/wiki/Main_Page>`_ es un programa que nos
+   permite consultar :program:`gnome-keyring`.
+
+.. Enlaces interesantes para ampliar la información (sobre todo en lo referente al
+   anillo):
+
+   https://wiki.archlinux.org/index.php/GNOME_(Espa%C3%B1ol)/Keyring_(Espa%C3%B1ol)
+   https://nurdletech.com/linux-notes/agents/keyring.html
+   https://rtfm.co.ua/en/what-is-linux-keyring-gnome-keyring-secret-service-and-d-bus/
+   https://rtfm.co.ua/en/chromium-linux-keyrings-secret-service-passwords-encryption-and-store/
 
 .. _ssh-no-interactivo:
 
@@ -495,6 +547,8 @@ con *ProxyCommand*::
    <pseudopam-ssh>`) conviene, precisamente, cerciorarse de que esto no está
    activo comentando la opción)
 
+.. [#] Al menos es eso lo que ocurre con |SLIM|.
+
 .. [#] No se usa directamente :command:`cat` porque :program:`ssh-add` y el
    resto de programas pasan argumentos que lo malogran. El *script* desecha los
    argumentos y sólo atiende a la entrada estándar que es lo que interesa.
@@ -516,5 +570,6 @@ con *ProxyCommand*::
 .. |TLS| replace:: :abbr:`TLS (Transport Layer Security)`
 .. |SSL| replace:: :abbr:`SSL (Secure Socket Layer)`
 .. |SNI| replace:: :abbr:`SNI (Server Name Identification)`
+.. |SLIM| replace:: :abbr:`SLIM (Simple LogIn Manager)`
 
 .. _Websockets: https://v0ctor.me/websocket
