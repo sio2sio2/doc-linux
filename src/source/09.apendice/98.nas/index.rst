@@ -5,7 +5,7 @@
 `Open Media Vault`_ es una distribución basada em *Debian*\ [#]_ orientada a la
 implementación de servidores |NAS|. Es quizás junto a FreeNAS_ y XigmaNAS_ (antes
 *NAS4Free*) el *software* más usada para la creación de un servidor |NAS|, pero
-presenta la ventaja de que sopora, además de *x86-64*, plataformas |ARM|, lo que
+presenta la ventaja de que soporta, además de *x86-64*, plataformas |ARM|, lo que
 la hace apta para convertir en |NAS| a una `Raspberry Pi`_. El hecho, además,
 de ser una *Debian* (las otras se basan en *FreeBSD*) la hace atractiva a
 nuestros ojos, ya que podremos cacharrear a bajo nivel o realizar una
@@ -29,7 +29,7 @@ Imagen
 ------
 La instalación es idéntica a la de *Debian*, salvo por el hecho de que algunas
 partes de la instalación se llevan a cabo automáticamente y no se crea usuario
-sin provilegios por no ser necesario.
+sin privilegios por no ser necesario.
 
 Es importante tener presente algunas consideraciones:
 
@@ -56,14 +56,14 @@ Al término y tras arrancar el sistema, podremos:
 - Acceder a la interfaz web mediante el usuario *admin* con contraseña
   *openmediavault*.
 
-  .. warning:: Asegúrese. a través de la propia interfaz web. de cambiar
-     esta contraseña predefinida..
+  .. warning:: Asegúrese a través de la propia interfaz web de cambiar
+     esta contraseña predefinida
 
 .. image:: files/interfaz.png
 
 *Script*
 --------
-El *script* puede obtenerse de Github_ en `este repositiorio oficial
+El *script* puede obtenerse de Github_ en `este repositorio oficial
 <https://github.com/OpenMediaVault-Plugin-Developers/installScript>`_, en donde
 además se encuentran las instrucciones::
 
@@ -106,7 +106,7 @@ de RAID``. Como en nuestro sistema disponemos de tres, constituiremos un |RAID|
 .. image:: files/raid.png
 
 Como estamos en *Debian* y no usamos |ZFS|, este |RAID| se ha construido con
-:ref:`mdadm <mdadm>` y la consecuencia es que aparecerá un dispostivo
+:ref:`mdadm <mdadm>` y la consecuencia es que aparecerá un dispositivo
 :file:`/dev/md0`:
 
 .. image:: files/raid-2.png
@@ -225,7 +225,7 @@ Consejos
 
 |ZFS|
 -----
-|ZFS| tiene la ventaja de incorportar la capacidad de crear |RAID|\ s dentro del
+|ZFS| tiene la ventaja de incorporar la capacidad de crear |RAID|\ s dentro del
 propio sistema de ficheros, lo que le permite mejorar los rendimientos de
 escrituras en |RAID| 5 y 6. Esto, sin embargo, se hace a costa de usar
 caché y, en consecuencia, requerir grandes cantidades de memoria |RAM|. Por
@@ -235,7 +235,7 @@ es el requisito mínimo en otros sistemas como FreeNAS_.
 Como |ZFS| no está disponible directamente en *Debian*, por `incompatibilidad
 con su licencia <https://wiki.debian.org/ZFS#Status>`_, no lo provee el
 instalador y debe instalarse más tarde por sí está disponible como paquete. Esta
-cirtcunstancia afecta a |OMV|, que también incorpora el soporte para |ZFS| como
+circunstancia afecta a |OMV|, que también incorpora el soporte para |ZFS| como
 un extra.
 
 Después de instalar :ref:`los extras <omv-extras>` tenemos disponibles dos de
