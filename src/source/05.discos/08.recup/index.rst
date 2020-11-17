@@ -6,7 +6,7 @@ Divideros este epígrafe sobre recuperación de datos en tres partes:
 
 * La recuperación de particiones.
 * La recuperación de sistemas de archivos.
-* La recuperación de archivos borrados accidentalmente.
+* La recuperación de archivos borrados, por lo general, accidentalmente.
 
 .. _testdisk:
 
@@ -197,6 +197,9 @@ respectivamente. Para *EXT4* tenemos varias posibilidades:
       $ ext4magic /tmp/pruebas.disk -j /tmp/pruebas.journal -m
 
    .. note:: La recuperación no tiene por qué ser siempre producirse.
+
+.. Recuperar con debugfs:
+   https://www.cyberciti.biz/tips/linux-ext3-ext4-deleted-files-recovery-howto.html
 
 .. rubric:: Notas al pie
 

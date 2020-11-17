@@ -65,7 +65,7 @@ Antes de pasar a describir los más comunes, es preciso fijar la siguiente
 
    Por una parte suele usarse el término |JBOD| (acrónimo en inglés de *un mero
    puñado de discos*) para identificar a un conjunto de discos del que se
-   preserva la independencia de cada uno. EN cambio, cuando estos discos definen
+   preserva la independencia de cada uno. En cambio, cuando estos discos definen
    un único disco virtual que es la concatenación de todos los discos que lo
    constituyen, se habla de *SPAN* o *BIG*. El *software*, simplemente, se
    limita a crear el dispositivo virtual e ir rellenado con datos sucesivamente
@@ -193,9 +193,9 @@ Antes de pasar a describir los más comunes, es preciso fijar la siguiente
      caso un |RAID| 5 falla, pero un |RAID| 6, no. Por tanto:
      :math:`P^n_{r6}(p) = P^n_{r5}(p) - n*(n-1)*p^2*(1-p)^{n-2}`.
    - Aumenta la capacidad, hasta :math:`(n-2)*s`.
-   - Presenta los mismos inconvenientes de rendimiento que su primo hermano el
-     |RAID|\ 5: no mejora las operaciones de lectura y penaliza las de
-     escritura.
+   - Presenta unas características de rendimiento semejantes a la de su primo
+     hermano el |RAID|\ 5, aunque respecto a éste no mejora el rendimiento en
+     las lecturas y empeora el de las escrituras.
 
    .. image:: files/RAID6.png
 
