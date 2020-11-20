@@ -2,8 +2,8 @@
 
 Eliminación de datos
 ====================
-La eliminación de datos es fundamental si es nuestra deshacernos del dispositivo
-físico sobre el que los escribíamos. Hay tres opciones:
+La eliminación de datos es fundamental si es nuestra intención deshacernos del
+dispositivo físico sobre el que los escribíamos. Hay tres opciones:
 
 - **Cifrar los datos**, lo cual nos ahorra el problema de tener que eliminarlos.
 

@@ -8,14 +8,53 @@ Divideros este epígrafe sobre recuperación de datos en tres partes:
 * La recuperación de sistemas de archivos.
 * La recuperación de archivos borrados, por lo general, accidentalmente.
 
-.. _testdisk:
-
 Particiones
 ===========
-.. todo:: Tratar de la recuperación de particiones con testdisk.
+Cuando perdemos las particiones accidentalmente, el sistema será incapaz de
+acceder a los sistemas de archivos del disco y, en consecuencia, seremos
+incapaces de leer los datos. La solución pasa, entonces, por recuperar las
+particiones perdidas lo cual depende de cuál fuera el sistema de particiones que
+usáramos:
+
+.. _testdisk:
+
+:ref:`Particiones DOS <part-dos>`
+---------------------------------
+En este caso, el registro de las particiones se encuentra en el |MBR| y, si se
+definieron particiones lógicas, se hace más complejo, porque cada partición
+lógica se registra en la partición anterior, por lo que la definición del
+esquema de particiones se distribuye a lo largo del disco.
+
+Habitualmente, perder la tabla de particiones se debe a haber manipulado el
+|MBR| y no hay copia de ella en otro lugar del disco, por lo que el único
+mecanismo para recuperarla es utilizar una herramienta que escanee el disco en
+busca de las particiones existentes. Una herramienta muy sencilla es
+:command:`testdisk`.
+
+.. todo:: Hacer un pequeño vídeo donde se ilustre la recuperación
+   de particiones con :command:`testdisk`.
 
 .. note:: :command:`testdisk` también es útil para :ref:`recuperar archivos
    borrados como veremos más adelante <archivos-rec>`.
+
+:ref:`Particiones GPT <part-gpt>`
+---------------------------------
+El particionado |GPT| funciona de un modo muy diferente. La definición de la
+tabla de particiones se concentra al principio del disco a partir del tercer
+sector (1KiB) y ocupa habitualmente 16KiB. Además, existe una copia de la tabla
+al final del disco, por lo que si accidentalmente se borra la tala inicial, aún
+se puede recuperar la copia.
+
+Por lo general:
+
+- Si se pierde la definición del principio de disco, pero no el |MBR| de
+  protección, las herramientas serán capaces de recuperar los datos utilizando
+  la copia final.
+
+- Si se pierde el |MBR| de protección, basta con regenerarlo para que se
+  aplique el caso anterior.
+
+Para la regeneración de la tabla, puiede también utilizarse :program:`testdisk`.
 
 Sistemas de archivos
 ====================
@@ -214,3 +253,6 @@ respectivamente. Para *EXT4* tenemos varias posibilidades:
    pero aprovechamos que tenemos instalado `udisks
    <https://www.freedesktop.org/wiki/Software/udisks/>`_ en el sistema para
    hacer las operaciones como usuario sin privilegios.
+
+.. |MBR| replace:: :abbr:`MBR (Master Boot Record)`
+.. |GTPT| replace:: :abbr:`GTPT (GUID Partition Table)`
