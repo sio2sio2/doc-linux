@@ -255,4 +255,4 @@ respectivamente. Para *EXT4* tenemos varias posibilidades:
    hacer las operaciones como usuario sin privilegios.
 
 .. |MBR| replace:: :abbr:`MBR (Master Boot Record)`
-.. |GTPT| replace:: :abbr:`GTPT (GUID Partition Table)`
+.. |GPT| replace:: :abbr:`GPT (GUID Partition Table)`
