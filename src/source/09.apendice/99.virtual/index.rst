@@ -51,9 +51,9 @@ de plataforma cuyos tipos pueden resumirse en el siguiente esquema:
 Antes de empezar, no obstante, hay que introducir cuatro conceptos:
 
 * :dfn:`Máquina virtual`, que es el sistema informático virtualizado, esto es,
-  el conjunto de un sistema operativo y las aplicaciones que corren sobre un
-  *hardware* virtual.
-* :dfn:`Hipervisor`, que es la plataforma software que controla la
+  el conjunto de un *hardware* virtual, un sistema operativo y las aplicaciones
+  que corren sobre ellos.
+* :dfn:`Hipervisor`, que es la plataforma *software* que controla la
   virtualización de las distintas máquinas virtuales.
 * :dfn:`Sistema anfitrión`, que es aquel sobre el que se realiza la virtualización.
 * :dfn:`Sistema huésped`, que es aquel que se ejecuta dentro de la máquina virtual.
@@ -223,7 +223,7 @@ De los referidos estudiaremos:
    sistema operativo huésped.
 
 .. |JVM| replace:: :abbr:`JVM (Java Virtual Machine)`
-.. |CLR| replace:: :abbr:`JVM (Common Language Runtime)`
+.. |CLR| replace:: :abbr:`CLR (Common Language Runtime)`
 .. |KVM| replace:: :abbr:`KVM (Kernel-baed Virtual Machine)`
 .. |CPU| replace:: :abbr:`CPU (Central Processing Unit)`
 .. |SO| replace:: :abbr:`SO (Sistema operativo)`
