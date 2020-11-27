@@ -105,7 +105,7 @@ Antes de empezar, no obstante, hay que introducir cuatro conceptos:
    directamente al anfitrión. Ello requiere modificar el sistema operativo
    cliente para incorporar estos controladores. Evitando la virtualización del
    *hardware* se mejora el rendimiento, pero a costa de no poder usar cualquier
-   sistema operativo, sino sólo aquellos que previamente preparados para su
+   sistema operativo, sino sólo aquellos previamente preparados para su
    paravirtualización.
 
 **Paravirtualización híbrida**
