@@ -10,6 +10,21 @@ Seguridad Informática
 
    [0-9]*
 
+.. todo:: El índice de temas debe cambiar en la próxima versión a:
+
+   #. **Conceptos de seguridad y disponibilidad**
+   #. **Seguridad en el entorno físico y el acceso** (nuevo), que absorberá el
+      *suministro eléctrico* de la unidad anterior y lo que hay de *control
+      lógico de accesos* incluido en la unidad sobre "Almacenamiento". Debe
+      añadir contenidos sobre ubicación física, CPD, etc; y control físico
+      del acceso.
+   #. **Criptografía**
+   #. **Redes y servidores**
+   #. **Almacenamiento**
+   #. **Sistemas de escritorio**
+   #. **Legislación**
+
+
 .. rubric:: Ejercicios
 
 .. toctree::
