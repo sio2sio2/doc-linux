@@ -10,20 +10,23 @@ Seguridad Informática
 
    [0-9]*
 
-.. todo:: El índice de temas debe cambiar en la próxima versión a:
+.. todo:: En la próxima versión se adelantan las unidades 4 y 5 a las 2 y 3, y
+   se añade tras la unidad introductoria 1 una segunda unidad con la seguridad
+   referente al entorno físico y el control de accesos.
 
-   #. **Conceptos de seguridad y disponibilidad**
-   #. **Entorno físico y acceso** (nuevo), que absorberá el *suministro
-      eléctrico* de la unidad anterior y lo que hay de *control lógico de
-      accesos* incluido en la unidad sobre "Almacenamiento". Debe añadir
-      contenidos sobre ubicación física, CPD, etc; y control físico del
-      acceso.
-   #. **Criptografía**
-   #. **Redes y servidores**
-   #. **Almacenamiento**
-   #. **Sistemas de escritorio**
-   #. **Legislación**
+   .. rubric:: Contenidos
 
+   .. toctree::
+      :maxdepth: 1
+      :glob:
+
+      01.intro
+      f02.entorno
+      04.crypto
+      05.redes
+      02.discos
+      03.desktop
+      06.ley
 
 .. rubric:: Ejercicios
 
