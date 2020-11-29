@@ -5,6 +5,8 @@ Administración de *Windows* 10
    pinceladas, salvo en el caso de los permisos en que se ofrece una descripción
    algo pormenorizada del sistema de permisos. 
 
+.. _dac-windows:
+
 Control de accesos
 ==================
 *Windows* 10 implementa un mecanismo de :ref:`control de accesos DAC

@@ -10,7 +10,7 @@ Seguridad Informática
 
    [0-9]*
 
-.. todo:: En la próxima versión se adelantan las unidades 4 y 5 a las 2 y 3, y
+.. todo:: Para el próximo curso se adelantan las unidades 4 y 5 a las 2 y 3, y
    se añade tras la unidad introductoria 1 una segunda unidad con la seguridad
    referente al entorno físico y el control de accesos.
 

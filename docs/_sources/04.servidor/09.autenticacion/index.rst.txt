@@ -266,12 +266,10 @@ página de manual, así que es recomendable consultarla.
 
    pam_modules/[0-9]*
 
-.. _politica-password:
-
 Política de contraseñas
 -----------------------
-.. todo:: La exposición sobre política de contraseñas debe incluir las políticas
-   sobre su fortaleza o su caducidad (:ref:`chage <chage>`).
+.. seealso:: Consulte los :ref:`criterios para establecer las contraseñas
+   <politica-contraseñas>`.
 
 Ejemplo ilustrativo
 -------------------

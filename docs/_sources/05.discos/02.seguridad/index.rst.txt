@@ -9,6 +9,9 @@ cual es posible que resulte aún palabrería técnica ininteligible. Por esto,
 antes de pasar a exponer cómo ampliar la gestión de la seguridad de los
 archivos, introduciremos algunos conceptos relativos a ella.
 
+.. seealso:: Debería echarle un ojo antes a los :ref:`mecanismos de control de
+   accesos <control-accesos>`.
+
 .. rubric:: Contenidos
 
 .. toctree:: 
