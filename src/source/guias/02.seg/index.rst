@@ -11,8 +11,8 @@ Seguridad Informática
    [0-9]*
 
 .. todo:: Para el próximo curso se adelantan las unidades 4 y 5 a las 2 y 3, y
-   se añade tras la unidad introductoria 1 una segunda unidad con la seguridad
-   referente al entorno físico y el control de accesos.
+   se añade tras la unidad 4 una tercera unidad con la seguridad referente al
+   entorno físico y el control de accesos.
 
    .. rubric:: Contenidos
 
@@ -21,8 +21,8 @@ Seguridad Informática
       :glob:
 
       01.intro
-      f02.entorno
       04.crypto
+      f03.entorno
       05.redes
       02.discos
       03.desktop
