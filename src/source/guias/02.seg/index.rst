@@ -36,8 +36,8 @@ desarrolla en la `Orden de 7 de julio de 2009 <https://www.juntadeandalucia.es/b
       03.desktop
       06.ley
 
-.. table:: Relación entre |RRAA| y unidades de trabajo
-   :class: unidades-seg
+.. table:: Relación entre |RRAA| y |UUTT|
+   :class: rraa-uutt
 
    +----------+-----------------------+-----------------+
    |          |  1ª Evaluación        | 2ª Evaluación   |
@@ -67,3 +67,4 @@ desarrolla en la `Orden de 7 de julio de 2009 <https://www.juntadeandalucia.es/b
 .. |RRAA| replace:: :abbr:`RRAA (Resultados de Aprendizaje)`
 .. |RA| replace:: :abbr:`RA (Resultado de Aprendizaje)`
 .. |CCEE| replace:: :abbr:`CCEE (Criterios de Evaluación)`
+.. |UUTT| replace:: :abbr:`UUTT (Unidades de Trabajo)`
