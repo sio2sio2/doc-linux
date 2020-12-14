@@ -53,8 +53,8 @@ virtual, aunque dos son sus diferencias fundamentales:
 
 Bajo el presente artículo estudiaremos:
 
-- Cómo es el proceso de arranque de un ordenador.
 - Cómo llevar a cabo la creación de particiones sobre un disco físico.
+- Cómo es el proceso de arranque de un ordenador.
 - En *Linux*, cómo definir grupos de volúmenes y cómo dividirlos en volúmenes
   lógicos.
 

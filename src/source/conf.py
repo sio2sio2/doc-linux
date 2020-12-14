@@ -371,6 +371,7 @@ rst_epilog = """
 .. |VPN| replace:: :abbr:`VPN (Virtual Private Network)`
 .. |RAID| replace:: :abbr:`RAID (Redundant Array of Inexpensive Disks)`
 .. |SAI| replace:: :abbr:`SAI (Sistema de alimentación ininterrumpida)`
+.. |SSOO| replace:: :abbr:`SSOO (Sistemas Operativos)`
 """
 
 manpages_url = "https://manpages.debian.org/{path}"
