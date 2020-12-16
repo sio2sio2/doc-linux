@@ -67,7 +67,7 @@ Antes de pasar a describir los más comunes, es preciso fijar la siguiente
    puñado de discos*) para identificar a un conjunto de discos del que se
    preserva la independencia de cada uno. En cambio, cuando estos discos definen
    un único disco virtual que es la concatenación de todos los discos que lo
-   constituyen, se habla de *SPAN* o *BIG*. El *software*, simplemente, se
+   constituyen, se habla de *span* o *big*\ [#]_. El *software*, simplemente, se
    limita a crear el dispositivo virtual e ir rellenado con datos sucesivamente
    los discos, de modo que cuando acaba de llenar uno, sigue con el siguiente.
 
@@ -445,6 +445,7 @@ Estudiaremos ambas posibilidades.
 
 .. rubric:: Notas al pie
 
+.. [#] Aunque puede llegarse a utilizar también el término |JBOD|.
 .. [#] Para el cálculo se está suponiendo que no pueden recomponerse los datos
    tomando discos de dos grupos distintos. Si esto puede hacerse, entonces la
    probabilidad será menor. ¿Puede hacerse?

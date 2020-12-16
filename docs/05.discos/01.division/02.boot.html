@@ -1,0 +1,499 @@
+
+
+
+<!DOCTYPE html>
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>5.1.2. Arranque &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+    
+    <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/jquery.js"></script>
+    <script src="../../_static/underscore.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/language_data.js"></script>
+    <script src="../../_static/translations.js"></script>
+    <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    <link rel="index" title="Índice" href="../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../search.html" />
+    <link rel="next" title="5.1.2.2.1. rEFInd" href="02.boot/01.refind.html" />
+    <link rel="prev" title="5.1.1. Particiones" href="01.part.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="02.boot/01.refind.html" title="5.1.2.2.1. rEFInd"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="01.part.html" title="5.1.1. Particiones"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" ><span class="section-number">5. </span>Dispositivos de almacenamiento</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="index.html" accesskey="U"><span class="section-number">5.1. </span>División del disco</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">5.1.2. </span>Arranque</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="arranque">
+<span id="id1"></span><h1><span class="section-number">5.1.2. </span>Arranque<a class="headerlink" href="#arranque" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>Los ordenadores, al iniciarse, cargan el <em>firmware</em> de la placa base con el
+propósito de probar el <em>hardware</em> y a continuación cargar un programa para
+cederle el control. El objetivo. normalmente, es acabar ejecutando un sistema
+operativo. Hay dos estándares fundamentales:</p>
+<ul class="simple">
+<li><p>Desde los años 80, el antiguo <abbr title="Basic I/O System">BIOS</abbr> de 16 nits.</p></li>
+<li><p>A partir de 2005, <abbr title="Extensible Firmware Interface">EFI</abbr> o <abbr title="Unified Extensible Firmware Interface">UEFI</abbr><a class="footnote-reference brackets" href="#id11" id="id2">1</a> de 32 <em>bits</em> (arquitectura <em>x86</em>) ó 64
+<em>bits</em> (arquitectura <em>x86_64</em>).</p></li>
+</ul>
+<p>No existe retrocompatibilidad entre ambos sistemas por lo que un disco
+preparado para que su sistema operativo arranque con <abbr title="Basic I/O System">BIOS</abbr> no arrancará si la
+máquina arranca con firmware <abbr title="Unified Extensible Firmware Interface">UEFI</abbr>, aunque para mejorar la transición entre uno
+y otro estándar las placas con firmware <abbr title="Extensible Firmware Interface">EFI</abbr> suelen incluir un modo de
+compatibilidad con <abbr title="Basic I/O System">BIOS</abbr> que permite seguir usando el viejo modelo de
+arranque. La situación a fecha de 2020 es la siguiente:</p>
+<ol class="loweralpha simple">
+<li><p>Pueden existir aún unos pocos equipos muy antiguos que disponen de <abbr title="Basic I/O System">BIOS</abbr>.</p></li>
+<li><p>La mayoría de los equipos incluyen <abbr title="Extensible Firmware Interface">EFI</abbr> pero está tiene un modo de
+compatibilidad. Si el equipo es algo antiguo, lo más probable es que arranque
+en modo compatibilidad con <abbr title="Basic I/O System">BIOS</abbr>.</p></li>
+<li><p>Algunos de los más recientes traen <abbr title="Extensible Firmware Interface">EFI</abbr>, pero carecen de éste modo de
+compatibilidad; y es de esperar que en el futuro el número de equipos sin la
+compatibilidad aumente<a class="footnote-reference brackets" href="#id12" id="id3">2</a>.</p></li>
+</ol>
+<p>Como en todo estado de transición, es indispensable conocer ambas tecnologías,
+que es en lo que afanará este epígrafe.</p>
+<div class="section" id="proceso-de-arranque">
+<h2><span class="section-number">5.1.2.1. </span>Proceso de arranque<a class="headerlink" href="#proceso-de-arranque" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Sea cual sea el estándar usado, en el proceso de arranque podemos distinguir las
+siguientes fases:</p>
+<ol class="arabic simple">
+<li><p>Comprobación del <em>hardware</em> (memoria y discos). Durante esta fase, el
+<em>firmware</em> mediante pulsación de algunas teclas, brinda al usuario la
+posibilidad de pausar el proceso para:</p>
+<ul class="simple">
+<li><p>Reconfigurar el <em>firmware</em>, que es lo que vulgarmente se conoce como
+«entrar en la bios». Si se hace esto, se presenta un entorno donde el
+usuario puede cambiar parámetros del <em>firmware</em> que se almacenan en memoria
+<abbr title="Non-Volatile RAM">NVRAM</abbr>. Al término de la configuración, se escoja o no salvar los cambios,
+vuelve a iniciarse el proceso.</p></li>
+<li><p>Presentar un menú para seleccionar qué programa o dispositivo se desea
+arrancar. Los ítem de este menú son los ítem de la <em>secuencia de arranque</em>
+y el interesado podrá escoger cualquiera de ellos para alterar sólo en ese
+arranque la secuencia y que ese ítem pase a ser el primero.</p></li>
+</ul>
+</li>
+<li><p>Arranque de algún programa siguiendo la <em class="dfn">secuencia de arranque</em>, que es
+una lista ordenada de todos los dispositivos detectados que se comprueban
+secuencialmente a fin de encontrar en ellos un programa de arranque válido.
+En cuanto se encuentre uno, se arranca y el <em>firmware</em> cede el control. Como
+ya veremos, en el caso de <abbr title="Unified Extensible Firmware Interface">UEFI</abbr><a class="footnote-reference brackets" href="#id13" id="id4">3</a>.  esa lista puede contener, además de
+dispositivos, programas concretos.</p></li>
+</ol>
+</div>
+<div class="section" id="cargador-de-arranque">
+<span id="boot-loader"></span><h2><span class="section-number">5.1.2.2. </span>Cargador de arranque<a class="headerlink" href="#cargador-de-arranque" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Ya hemos establecido que el <em>firmware</em> de placa base se encarga de ceder el
+control a un programa ulterior para que habitualmente a la postre acabe por
+cargarse en memoria un sistema operativo. Un <em class="dfn">cargador de arranque</em> es
+cualquier programa que se carga antes del sistema operativo principal y
+atendiendo a esta definición el propio <em>firmware</em> puede considerarse un
+<em>cargador de arranque</em>. Todos los <em>cargadores de arranque</em>, no obstante, no
+tienen la misma funcionalidad:</p>
+<ul>
+<li><p>Algunos tiene la función de cargar en memoria el núcleo de un sistema
+operativo y cederle el control de la máquina. Un ejemplo de cargador de
+arranque puro es <a class="reference external" href="https://wiki.archlinux.org/index.php/EFISTUB">EFIStub</a>, el cargador de arranque para <abbr title="Extensible Firmware Interface">EFI</abbr> incluido en el
+propio núcleo de <em>Linux</em><a class="footnote-reference brackets" href="#id14" id="id5">4</a>. Con él podremos cargar un <em>Linux</em> sin
+necesidad de usar <abbr title="GRand Unified Bootloader">GRUB</abbr>.</p></li>
+<li><p>Otros son programas que se limitan a realizar una función muy concreta como es
+el caso de <a class="reference external" href="https://www.memtest.org/">memtest</a> (que comprueba la integridad de la memoria <abbr title="Random Access Memory">RAM</abbr>) o <a class="reference external" href="https://wiki.syslinux.org/wiki/index.php?title=Hdt_(Hardware_Detection_Tool)">hdt</a>
+(que nos identifica el <em>hardware</em> de nuestro ordenador). En este caso, son
+programas terminales y no se pretende acabar cargando el sistema operativo.</p>
+</li>
+<li id="boot-manager"><p>Por último, hay cargadores cuyo propósito es, simplemente, cargar en cadena
+otro cargador de arranque. Dentro de este clase de cargadores destaca el
+<em class="dfn">gestor de arranque</em>, cuyo propósito es permitir escoger entre
+múltiples cargadores de arranque y, por tanto, brindarle al usuario la
+posibilidad de arrancar distintos sistemas operativos o programas como los del
+ítem anterior.</p>
+<p>Un <em>gestor de arranque</em> puede:</p>
+<ul class="simple">
+<li><p>ser <em>puro</em> y limitarse a cumplir el propósito descrito, por lo que todas
+las entradas de su menú deberán ser cargadores de arranque externos. Son
+gestores puros el <em>gestor de arranque</em> incluido dentro del propio <abbr title="Extensible Firmware Interface">EFI</abbr> o
+<a class="reference external" href="http://www.rodsbooks.com/refind/">rEFInd</a>.</p></li>
+<li><p>incluir cargadores de arranque para arrancar con ellos algunos sistemas
+operativos. Son ejemplos de este tipo de gestores <abbr title="GRand Unified Bootloader">GRUB</abbr> (que permite
+arrancar sistemas <em>Linux</em> sin que el núcleo de éstos incluya <a class="reference external" href="https://wiki.archlinux.org/index.php/EFISTUB">EFIStub</a>), o
+<abbr title="NT LoaDeR">NTLDR</abbr> o <em>Windows Boot Manager</em>, que arrancan sistemas <em>Windows</em>.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Tenga presente que entre los cargadores opcionales entre los que
+deja escoger un gestor de arranque puede encontrarse otro gestor de arranque
+(que al fin es un tipo de cargador). Esto se denomina <em class="dfn">carga en
+cadena</em> (<em>chain loading</em>) y es la técnica que usa <abbr title="GRand Unified Bootloader">GRUB</abbr> para cargar
+<em>Windows</em>. Como <abbr title="GRand Unified Bootloader">GRUB</abbr> no incluye cargador de arranque para <em>Windows</em> lo
+que hace es cargar <em>Windows Boot Manager</em></p>
+</div>
+</li>
+</ul>
+<p class="rubric">Gestores de arranque</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="02.boot/01.refind.html">5.1.2.2.1. rEFInd</a></li>
+<li class="toctree-l1"><a class="reference internal" href="02.boot/06.grub.html">5.1.2.2.2. <abbr title="GRand Unified Bootloader">GRUB</abbr>.</a></li>
+</ul>
+</div>
+<div class="admonition seealso">
+<p class="admonition-title">Ver también</p>
+<p><strong class="program">syslinux</strong> es otro gestor de arranque que <a class="reference internal" href="../../07.serre/06.pxe/02.nbp.html#syslinux"><span class="std std-ref">se
+describe al tratar PXE</span></a>.</p>
+</div>
+</div>
+<div class="section" id="estandares">
+<h2><span class="section-number">5.1.2.3. </span>Estándares<a class="headerlink" href="#estandares" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Analicemos las particularidades de cada estándar.</p>
+<table class="uefi-bios docutils align-default" id="id20">
+<caption><span class="caption-text">Comparativa <abbr title="Unified Extensible Firmware Interface">UEFI</abbr>/<abbr title="Basic I/O System">BIOS</abbr></span><a class="headerlink" href="#id20" title="Enlace permanente a esta tabla">¶</a></caption>
+<colgroup>
+<col style="width: 29%" />
+<col style="width: 26%" />
+<col style="width: 45%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Características</p></th>
+<th class="head"><p><abbr title="Basic I/O System">BIOS</abbr></p></th>
+<th class="head"><p><abbr title="Unified Extensible Firmware Interface">UEFI</abbr></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Arquitectura</p></td>
+<td><p>16bits</p></td>
+<td><p>32 ó 64 bits</p></td>
+</tr>
+<tr class="row-odd"><td><p>Compatibilidad</p></td>
+<td><p>No</p></td>
+<td><p>A extinguir</p></td>
+</tr>
+<tr class="row-even"><td><p>Arranque</p></td>
+<td><p>Dispositivos</p></td>
+<td><div class="line-block">
+<div class="line">Dispotivos</div>
+<div class="line">Cargadores de arranque</div>
+</div>
+</td>
+</tr>
+<tr class="row-odd"><td><p>Seguridad</p></td>
+<td><p>Ninguna</p></td>
+<td><p>Secure boot</p></td>
+</tr>
+<tr class="row-even"><td><p>Gestor externo</p></td>
+<td><p>Necesario</p></td>
+<td><p>Opcional</p></td>
+</tr>
+</tbody>
+</table>
+<div class="section" id="bios">
+<h3><span class="section-number">5.1.2.3.1. </span><abbr title="Basic I/O System">BIOS</abbr><a class="headerlink" href="#bios" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Es un sistema antiguo y bastante básico que para ceder el control se limita a
+intentar cargar el código del <abbr title="Master Boot Record">MBR</abbr><a class="footnote-reference brackets" href="#id15" id="id6">5</a>. Si no encuentra código en el <abbr title="Master Boot Record">MBR</abbr> de
+un dispositivo pasa al siguiente de la secuencia y así continua hasta que
+encuentra un <abbr title="Master Boot Record">MBR</abbr> con cargador de arranque. Cuando esto ocurre, delega el
+control en ese código y ese código es el encargado de aviárselas con los
+sistemas y particiones que pueda contener el dispositivo. Es importante, pues,
+tener presente que este <em>firmware</em> no entiende de particiones ni sistemas de
+archivos; y, por tanto, su sistema de arranque lee el comienzo del disco (los primeros 446 bytes concretamente) y es totalmente ajeno al sistema de particionado que se haya utilizado.</p>
+<p>Aunque en un arranque <abbr title="Basic I/O System">BIOS</abbr> suele existir una tecla cuya pulsación nos
+presenta un menú con el cual podemos seleccionar el dispositivo de arranque,
+esto no es propiamente un gestor de arranque en el sentido de que no podemos
+añadir y eliminar a voluntad entradas en él. Sí lo es, en cambio, en el sentido
+de que nos poermite seleccionar distintos cargadores de arranque: aquellos
+cargadores que ocupen los respectivos <abbr title="Master Boot Record">MBR</abbr> de los distintos dispositivos
+detectados. Por tanto, si instalamos dos sistemas en dos dispositivos
+diferentes, podremos con este mínimo gestor escoger entre uno y otro, pero si
+los dos sistemas se encuentran instalados en un mismo dispositivo, no es
+posible; y se requiere instalar en el <abbr title="Master Boot Record">MBR</abbr> de ese disco un gestor de arranque
+como <abbr title="GRand Unified Bootloader">GRUB</abbr>. Sin embargo, los cargadores de arranque suelen ser más grandes que
+los escasos 446 <em>bytes</em> que caben en el espacio dedicado en el <abbr title="Master Boot Record">MBR</abbr> por lo que
+este código alojado suele ser tan sólo una pequeña parte encargada de saber
+dónde debe seguir leyendo el resto del cargador.</p>
+<p>Lo habitual con <em>firmware</em> <abbr title="Basic I/O System">BIOS</abbr> es que el sistema de particiones sea <abbr title="Disk Operating System">DOS</abbr>,
+aunque no es absolutamente necesario<a class="footnote-reference brackets" href="#id16" id="id7">6</a>, puesto que, al cabo, <abbr title="Basic I/O System">BIOS</abbr> sólo se
+preocupa de leer al comienzo del dispositivo. Así pues, los condicionantes para
+conseguir que un dispositivo sea arrancable son:</p>
+<ul class="simple">
+<li><p>Un particionado <abbr title="Disk Operating System">DOS</abbr> (matizable, pero que daremos como verdadero).</p></li>
+<li><p>Un gestor de arranque en el <abbr title="Master Boot Record">MBR</abbr>, como <abbr title="GRand Unified Bootloader">GRUB</abbr> o <em>Windows Boot Manager</em>, que
+posibilite el arranque de los distintos sistemas almacenados en disco.</p></li>
+</ul>
+<p>Nótese que, cada vez que se instala un sistema operativo, el programa instalador
+sobrescribe el <abbr title="Master Boot Record">MBR</abbr> con el cargador/gestor que incluya el nuevo sistema, por lo
+que es responsabilidad de este último gestor incluir en sus entradas el nuevo
+sistema y todos los que ya estén instalados en otras particiones de
+instalaciones previas. Como <em>Windows Boot Manager</em> sólo se cuida de detectar y
+arrancar sistemas <em>Windows</em>, y <abbr title="GRand Unified Bootloader">GRUB</abbr>, sin embargo, sí busca todo tipo de
+sistemas; si planteamos instalar varios sistemas operativos en un mismo disco
+es preferible instalar primero los sistemas <em>Windows</em> (por orden de antigüedad,
+porque las versiones antiguas pueden tener problemas en detectar <em>Windows</em> más
+recientes) y después los sistemas <em>Linux</em>. Si no se sigue este orden, aún será
+posible reparar el arranque, pero nos tocará utilizar herramientas para ello.</p>
+</div>
+<div class="section" id="uefi">
+<h3><span class="section-number">5.1.2.3.2. </span><abbr title="Unified Extensible Firmware Interface">UEFI</abbr><a class="headerlink" href="#uefi" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Al contrario del sistema anterior, <abbr title="Unified Extensible Firmware Interface">UEFI</abbr> es capaz de entender la tabla de
+particiones y algunos sistemas de archivos (obligatoriamente <abbr title="File allocation Table">FAT</abbr> y, para
+dispositivos ópticos, CDFS), y dispone de un <a class="reference internal" href="#boot-manager"><span class="std std-ref">gestor de arranque</span></a> básico capaz de usar cargadores de arranque. No es preciso,
+pues, un gestor de arranque externo, aunque es muy común que se instale también.
+<em>Windows</em>, de hecho, necesita <em>Windows Boot Manager</em> para su arranque, así que
+de instalar un sistema <em>Windows</em> forzosamente requeriremos este gestor externo.
+En cambio, si sólo instaláremos distintos sistemas <em>Linux</em> podríamos arrancarlos
+todos sin necesidad de <abbr title="GRand Unified Bootloader">GRUB</abbr>.</p>
+<p>En este estándar para que un dispositivo sea arrancable es necesario:</p>
+<ul class="simple">
+<li><p>Un particionado <abbr title="GUID Partition Table">GPT</abbr>.</p></li>
+<li><p>La existencia de un partición  dedicada al arranque, denominada <abbr title="EFI System Partition">ESP</abbr>, que se
+caracteriza por ser de tipo <abbr title="Extensible Firmware Interface">EFI</abbr> (código simplificado <em>EF00</em><a class="footnote-reference brackets" href="#id17" id="id8">7</a>) y estar
+formateada en <abbr title="File allocation Table">FAT</abbr>32.</p></li>
+</ul>
+<img alt="../../_images/part-gpt-uefi.png" src="../../_images/part-gpt-uefi.png" />
+<p>El <em>firmware</em> <abbr title="Extensible Firmware Interface">EFI</abbr>, a diferencia de <abbr title="Basic I/O System">BIOS</abbr>, sí dispone de un verdadero gestor
+de arranque, donde pueden irse registrando los cargadores que se vayan
+almacenando en las particiones <abbr title="EFI System Partition">ESP</abbr> de los distintos dispositivos. Esto es
+posible porque <abbr title="Extensible Firmware Interface">EFI</abbr> entiende el particionado <abbr title="GUID Partition Table">GPT</abbr> y el sistema de archivos
+<abbr title="File allocation Table">FAT</abbr>32, y, en consecuencia, es capaz de leer archivos almacenados en un
+partición <abbr title="Globally Unique Identifier">GUID</abbr> formateada en <abbr title="GUID Partition Table">GPT</abbr>. Las entradas de este gestor tienen un
+determinado orden y con ello se constituye la <em>secuencia de arranque</em>. De este
+modo, se van probando las entradas de esta secuencia y aquella primera que
+constituya un arranque válido, será la que arranque.</p>
+<p>Las particiones <abbr title="EFI System Partition">ESP</abbr> se organizan mediante un directorio llamado <code class="file docutils literal notranslate"><span class="pre">/EFI</span></code>
+dentro del cual cada sistema operativo instalado crea un directorio con
+ficheros necesarios para llevar a cabo su propio arranque:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>/
++-- EFI/
+     +-- debian/
+     +-- Microsoft/
+     +-- etc.
+     +-- Boot/
+          +-- bootx64.efi
+</pre></div>
+</div>
+<p>De este modo, los arranques de los distintos sistemas operativos pueden
+coexistir sin problemas. Para que quepan es recomendable que tenga al menos
+100MB. En la <abbr title="Non-Volatile RAM">NVRAM</abbr> del <em>firmware</em><a class="footnote-reference brackets" href="#id18" id="id9">8</a> pueden irse manipulado las entradas de
+la secuencia de arranque, definiendo su orden, elimando entradas o añadiendo
+nuevas. Lo habitual, si instalamos un nuevo sistema operativo, es que este añada
+una entrada para su arranque y, además, la sitúe la primera en la secuencia.</p>
+<p>Además, de los subdirectorios para cada sistema operativo, suele existir un
+subdirectorio <code class="file docutils literal notranslate"><span class="pre">/EFI/Boot</span></code> con un archivo denominado <code class="file docutils literal notranslate"><span class="pre">bootx64.efi</span></code>.
+Este es el cargador de arranque que usa el <em>firmware</em> <abbr title="Extensible Firmware Interface">EFI</abbr> cuando se escoge
+arrancar por un dispositivo físico en vez de especificar en concreto el
+cargador de arranque. La razón de que existan estan entradas genéricas para
+los dispositivos no es gratuita: cuando el dispositivo arrancable es extraíble
+(pensemos en un CD-ROM, por ejemplo), no se ha utilizado ningún instalador y,
+por tanto, no se habrá añadido de antemano la entrada para arrancar el cargador
+específico del dispositivo (cuyo nombre y ruta pueden ser cualesquiera). La
+solución es que el gestor tenga la posibilidad de arrancar dispositivos y vaya
+siempre a una ruta específica para encontrar el cargador.</p>
+<p>Lo habitual es que el último sistema instalado, además de incluir su
+subdirectorio propio, sobrescriba <code class="file docutils literal notranslate"><span class="pre">/EFI/Boot/bootx64.efi</span></code>, por lo que
+arrancar por un dispositivo suele equivaler a cargar el último sistema
+operativo instalado en ese dispositivo.</p>
+<p>En definitiva, en una secuencia de arranque <abbr title="Extensible Firmware Interface">EFI</abbr> encontraremos:</p>
+<ul class="simple">
+<li><p>Dispositivos (que equivale a arrancar el último sistema operativo instalado
+en tal dispositivo).</p></li>
+<li><p>Sistemas operativos que equivale a arrancar el cargador que se haya
+instalado en el subdirectorio correspondiente. Arrancar la entrada para un
+sistema operativo supone a menudo no arrancar directamente el sistema, sino
+el gestor de arranque que usa el sistema.</p></li>
+<li><p>Utilidades como <a class="reference external" href="https://wiki.syslinux.org/wiki/index.php?title=Hdt_(Hardware_Detection_Tool)">hdt</a> o <a class="reference external" href="https://www.memtest.org/">memtest</a> que son ejecutables <abbr title="Extensible Firmware Interface">EFI</abbr>.</p></li>
+</ul>
+<img alt="../../_images/bootmanager-efi.png" src="../../_images/bootmanager-efi.png" />
+<p>Esto contrasta con la secuencia de arranque <abbr title="Basic I/O System">BIOS</abbr> que sólo muestra
+dispositivos, porque sólo es capaz de leer el cargador de arranque del <abbr title="Master Boot Record">MBR</abbr>
+correspondiente.</p>
+<p>En cuanto al orden de instalación de los sistemas, podemos seguir la misma
+regla que en el caso de <abbr title="Basic I/O System">BIOS</abbr>, aunque incumplirla no es tan grave, ya que la
+secuencia de arranque de <abbr title="Extensible Firmware Interface">EFI</abbr> debe incluir todos los sistemas instalados y
+bastará pulsar la tecla adecuada durante el proceso de arranque para que nos
+aparezca un menú de selección con todos ellos. No obstante, lo más cómodo es
+cumplir con el orden de instalación aconsejado, lo que devendrá en que el
+cargador de arranque sea un <abbr title="GRand Unified Bootloader">GRUB</abbr> con todos los sistemas instalados, tal como
+ocurre en <abbr title="Basic I/O System">BIOS</abbr>, que nos invita a escoger cuál arrancar sin necesidad de tener
+que pulsar ninguna tecla durante la comprobacón previa de <em>hardware</em>.</p>
+<p>Además de la mencionada tecla para mostrar la secuencia de arranque y escoger
+cualquiera de sus entradas, y de un metodo gráfico para modificar perennemente
+el orden de la entradas (posibilidades que ofrece <abbr title="Basic I/O System">BIOS</abbr>), <abbr title="Extensible Firmware Interface">EFI</abbr> proporciona
+otros mecanismos para manipular la secuencia de arranque almacenada en la
+<abbr title="Non-Volatile RAM">NVRAM</abbr>:</p>
+<ul class="simple">
+<li><p>Una <em>shell</em> con el comando <strong class="command">bcfg</strong>, que permite manipular la secuencia
+e incluso, añadir y borrar entradas. Esta <em>shell</em> suele incluirse como una
+entrada en la secuencia de arranque.</p></li>
+<li><p>Herramientas ejecutadas desde el sistema operativo. En <em>Linux</em>, este
+comando es <strong class="command">efibootmgr</strong><a class="footnote-reference brackets" href="#id19" id="id10">9</a>.</p></li>
+</ul>
+<div class="admonition seealso">
+<p class="admonition-title">Ver también</p>
+<p>La wiki de Archlinux tiene un muy completo <a class="reference external" href="https://wiki.archlinux.org/index.php/Unified_Extensible_Firmware_Interface_(Espa%C3%B1ol)">artículo sobre UEFI</a>.</p>
+</div>
+<p class="rubric">¿Qué es Secure Boot?</p>
+<p>Para evitar la carga de <em>software</em> malicioso (p.e. <a class="reference external" href="https://www.kaspersky.com/resource-center/definitions/boot-sector-virus">virus del sector de arranque</a>) la
+especificación <abbr title="Unified Extensible Firmware Interface">UEFI</abbr> introduce la posibilidad de cargar sólo <em>software</em> fiable,
+esto es, <em>software</em> firmado. Esto exige que el propio <em>firmware</em> <abbr title="Unified Extensible Firmware Interface">UEFI</abbr> incluya
+claves públicas de los fabricantes de <em>software</em> con el fin de que sólo sea
+válido el software firmado con estas claves. Es común que en las plataformas
+<em>x86</em> y <em>amd64</em> las únicas claves incluidas de fábrica sea las de <em>Microsoft</em>,
+pero es posible, bien deshabilitar «Secure Boot», bien añadir más claves de
+fabricantes fiables.</p>
+<div class="admonition seealso">
+<p class="admonition-title">Ver también</p>
+<p>Para entender cómo funciona esta firma digital, puede leer el
+apartado dedicado a <a class="reference internal" href="../../09.apendice/01.cryto/index.html#crypto"><span class="std std-ref">criptografía</span></a>.</p>
+</div>
+<p class="rubric">Notas al pie</p>
+<dl class="footnote brackets">
+<dt class="label" id="id11"><span class="brackets"><a class="fn-backref" href="#id2">1</a></span></dt>
+<dd><p>Intel publicó la especificación con el nombre de <abbr title="Extensible Firmware Interface">EFI</abbr>. Al ser adoptada
+por la industria en general pasó a llamarse <abbr title="Unified Extensible Firmware Interface">UEFI</abbr>. Así pues, ambos términos
+son sinónimos.</p>
+</dd>
+<dt class="label" id="id12"><span class="brackets"><a class="fn-backref" href="#id3">2</a></span></dt>
+<dd><p>Intel, por ejemplo, ha anunciado que dejará de dar soporte a <abbr title="Basic I/O System">BIOS</abbr> a
+partir de 2020 (puede leer <a class="reference external" href="https://www.genbeta.com/actualidad/se-acerca-el-fin-de-bios-intel-eliminara-el-soporte-en-2020">este artículo al respecto</a>).</p>
+</dd>
+<dt class="label" id="id13"><span class="brackets"><a class="fn-backref" href="#id4">3</a></span></dt>
+<dd><p>En <abbr title="Unified Extensible Firmware Interface">UEFI</abbr> es posible porque este firmware sí entiende de particiones y es
+capaz de leer archivos dentro de un sistema FAT32.</p>
+</dd>
+<dt class="label" id="id14"><span class="brackets"><a class="fn-backref" href="#id5">4</a></span></dt>
+<dd><p>Para que un kernel de linux pueda arrancarse directamente es necesario
+que se compile con la opción <a class="reference external" href="https://wiki.archlinux.org/index.php/EFISTUB">EFIStub</a>, disponible desde la versión 3.3.0.</p>
+</dd>
+<dt class="label" id="id15"><span class="brackets"><a class="fn-backref" href="#id6">5</a></span></dt>
+<dd><p>Es cierto que los <em>floppy</em> no disponen de <abbr title="Master Boot Record">MBR</abbr> (véase <a class="reference external" href="https://thestarman.pcministry.com/asm/mbr/DOS50FDB.htm">esta explicación</a>), pero dado lo
+anticuado del dispositivo, podemos obviarlo por completo.</p>
+</dd>
+<dt class="label" id="id16"><span class="brackets"><a class="fn-backref" href="#id7">6</a></span></dt>
+<dd><p>De hecho, con <abbr title="GRand Unified Bootloader">GRUB</abbr> puede arrancarse un sistema <abbr title="Basic I/O System">BIOS</abbr> y particionado
+<abbr title="GUID Partition Table">GPT</abbr>.</p>
+</dd>
+<dt class="label" id="id17"><span class="brackets"><a class="fn-backref" href="#id8">7</a></span></dt>
+<dd><p>En realidad, el código identificativo de esta partición es mucho más
+largo (<code class="docutils literal notranslate"><span class="pre">C12A7328-F81F-11D2-BA4B-00A0C93EC93B</span></code>). <code class="docutils literal notranslate"><span class="pre">EF00</span></code> es el código
+simplificado que usa la utilidad <a class="reference internal" href="03.pract.html#gdisk-i"><span class="std std-ref">gdisk</span></a>. Sin embargo,
+la especificación <abbr title="Unified Extensible Firmware Interface">UEFI</abbr> ni siquiera exige que la partición este marcada
+con este código, ya que las entradas que se almacenan en la <abbr title="Non-Volatile RAM">NVRAM</abbr> indican
+cuál es la partición de disco donde se encuentra el fichero que constituye el
+cargador de arranque. Lo único necesario. pues, es que el sistema de archivos
+sea comprensible, esto es, que sea <abbr title="File allocation Table">FAT</abbr>32.</p>
+</dd>
+</dl>
+<dl class="footnote brackets">
+<dt class="label" id="id18"><span class="brackets"><a class="fn-backref" href="#id9">8</a></span></dt>
+<dd><p>En la implementación <abbr title="Unified Extensible Firmware Interface">UEFI</abbr> que traen algunos <em>softwares</em> de
+virtualización (<a class="reference external" href="https://github.com/tianocore/tianocore.github.io/wiki/OVMF">OVMF</a>), la <abbr title="Non-Volatile RAM">NVRAM</abbr> se emula almacenando en el directorio
+<code class="file docutils literal notranslate"><span class="pre">EFI</span></code> un fichero llamado <code class="file docutils literal notranslate"><span class="pre">NvVars</span></code>.</p>
+</dd>
+<dt class="label" id="id19"><span class="brackets"><a class="fn-backref" href="#id10">9</a></span></dt>
+<dd><p>Por ejemplo, esta orden añade una nueva entrada:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> efibootmgr --create --disk /dev/sda --part <span class="m">2</span> --loader /EFI/so/bootx64.efi <span class="se">\</span>
+   --label <span class="s2">&quot;Mi primer arranque UEFI&quot;</span>
+</pre></div>
+</div>
+<p>en la que se intenta cargar el fichero <code class="file docutils literal notranslate"><span class="pre">/EFI/so/bootx64.efi</span></code> y la que
+se supone que la partición <abbr title="EFI System Partition">ESP</abbr> es la segunda del disco.</p>
+</dd>
+</dl>
+</div>
+</div>
+</div>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../index.html">Tabla de contenido</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">5.1.2. Arranque</a><ul>
+<li><a class="reference internal" href="#proceso-de-arranque">5.1.2.1. Proceso de arranque</a></li>
+<li><a class="reference internal" href="#cargador-de-arranque">5.1.2.2. Cargador de arranque</a></li>
+<li><a class="reference internal" href="#estandares">5.1.2.3. Estándares</a><ul>
+<li><a class="reference internal" href="#bios">5.1.2.3.1. <abbr title="Basic I/O System">BIOS</abbr></a></li>
+<li><a class="reference internal" href="#uefi">5.1.2.3.2. <abbr title="Unified Extensible Firmware Interface">UEFI</abbr></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="01.part.html"
+                        title="capítulo anterior"><span class="section-number">5.1.1. </span>Particiones</a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="02.boot/01.refind.html"
+                        title="próximo capítulo"><span class="section-number">5.1.2.2.1. </span>rEFInd</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/05.discos/01.division/02.boot.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="02.boot/01.refind.html" title="5.1.2.2.1. rEFInd"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="01.part.html" title="5.1.1. Particiones"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" ><span class="section-number">5. </span>Dispositivos de almacenamiento</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="index.html" ><span class="section-number">5.1. </span>División del disco</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">5.1.2. </span>Arranque</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor CC BY 4.0, 2016-2020, José Miguel Sánchez Alés.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 3.3.1.
+    </div>
+  </body>
+</html>
