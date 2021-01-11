@@ -33,8 +33,15 @@ Instalación
 ===========
 .. todo:: Este epígrafe debe desarrollar:
 
+   + Introducción a ambos sistemas operativos: requisitos y variantes.
+
    * Principios para la instalación de Windows (cuántas particiones se usan,
      sistema de archivos).
+
+     Para realizar las pruebas pueden utilizarse una `versión de evaluación
+     <https://www.microsoft.com/es-es/evalcenter/evaluate-windows-10-enterprise>`_
+     para 90 días que proporciona la propia Microsoft.
+
    * Principios para la instalación de Linux (particiones habituales para
      sistemas de escritorio).
    * Descripción de *Windows Boot Manager* y cómo se recupera.

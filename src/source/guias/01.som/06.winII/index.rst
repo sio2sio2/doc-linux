@@ -1,5 +1,5 @@
-Administración de *Windows* 10
-******************************
+Administración básica de *Windows* 10
+*************************************
 
 .. warning:: Los contenidos son absolutamente precarios y sólo ofrecen unas
    pinceladas, salvo en el caso de los permisos en que se ofrece una descripción
@@ -300,7 +300,7 @@ Administración de discos
 Puede llevarse a cabo a través de la "Administración de equipos" o directamente
 a través de :command:`diskmgmt.msc`.
 
-.. include:: /guias/01.som/99.ejercicios/05.winII.rst
+.. include:: /guias/01.som/99.ejercicios/06.winII.rst
 
 .. rubric:: Notas al pie
 
