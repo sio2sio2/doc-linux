@@ -142,7 +142,7 @@ hacer la recuperación. Cuanto más se haya escrito, menos probabilidades hay de
 que puedan recuperarse los datos. Esto se debe a que cuando se borra, los
 bloques de datos no se sobrescriben inmediatamente, sino que se borra la
 referencia al archivo, de manera que los bloques quedan disponibles para ser
-ocupados por nueva información. Si esto último, no ha llegado ha producirsa,
+ocupados por nueva información. Si esto último, no ha llegado a producirse,
 entonces el archivo es recuperable.
 
 Una herramienta interactiva bastante sencilla es el propio :ref:`testdisk
@@ -158,7 +158,7 @@ sistemas *FAT32* o *NTFS*:
 El vídeo muestra cómo recuperar dos archivos borrados en un sistema *NTFS*. Para
 ello, no hay más que marcar aquellos archivos que quieren ser recuperados (con
 :kbd:`:` ) de la lista de archivos que :command:`testdisk` reconoce borrados y
-escoger en que directorio de otro sistema de archivos quiere alamcenarse la
+escoger en que directorio de otro sistema de archivos quiere almacenarse la
 copia. Después podríamos montar el sistema *NTFS* y trasladar a él estas copias.
 
 Si preferimos herramientas no interactivas podemos usar :command:`dosfsck` (con

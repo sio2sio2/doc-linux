@@ -11,16 +11,6 @@ Descripción del entorno de trabajo
 + Temas y aspecto (:ref:`Práctica 2 <p5.2>`): resolución, monitores, etc.
 + Cambios de fecha e idioma.
 
-Explorador de ficheros
-======================
-+ Estructura de directorios (:ref:`Práctica 3 <p5.4>`).
-+ Extensiones de los archivos: asociación a programas, visualización de todas
-  las extensiones.
-
-Configuración de la red
-=======================
-Simplemente configurar el protocolo |TCP|/|IP| para conectar a la red.
-
 Gestión del software
 ====================
 + Actualizaciones del propio sistema operativo: cuál es la política de
@@ -29,6 +19,17 @@ Gestión del software
 + Instalación y desinstalación de aplicaciones a través de la tienda de
   *Microsoft*.
 + Instalación y desinstalación de programas obtenidos en la web.
+
+Configuración de la red
+=======================
+Simplemente, se trata de configurar el protocolo |TCP|/|IP| para conectar a la
+red (:ref:`Práctica 4e <p5.4>`).
+
+Explorador de ficheros
+======================
++ Estructura de directorios (:ref:`Práctica 3 <p5.4>`).
++ Extensiones de los archivos: asociación a programas (:ref:`Práctica 4b
+  <p5.4>`), visualización de todas las extensiones (:ref:`Práctica 3e <p5.3>`).
 
 Automatización de tareas
 ========================
@@ -44,10 +45,11 @@ de genbeta sobre cómo programar tareas en Windows 10
 <https://www.genbeta.com/paso-a-paso/como-programar-tareas-en-windows-10>`_).
 La lista de tareas definidas por el usuario pueden consultarse en la
 sección "Biblioteca del Programador de tareas", aunque, si no aparece, habrá que
-actualizar la vista con el menú contextual.
+actualizar la vista con el menú contextual (:ref:`Práctica 5a <p5.5>`).
 
 Por otra parte, en el :program:`Administrador de tareas` hay una pestaña para
-indicar qué aplicaciones quieren arrancarse durante el inicio.
+indicar qué aplicaciones quieren arrancarse durante el inicio (:ref:`Práctica 5b
+<p5.5>`).
 
 .. include:: /guias/01.som/99.ejercicios/05.winI.rst
 
