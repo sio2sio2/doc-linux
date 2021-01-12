@@ -5,25 +5,8 @@ Administración básica de *Windows* 10
    pinceladas, salvo en el caso de los permisos en que se ofrece una descripción
    algo pormenorizada del sistema de permisos. 
 
-.. _dac-windows:
-
-Control de accesos
-==================
-*Windows* 10 implementa un mecanismo de :ref:`control de accesos DAC
-<control-dac>` basado en |ACL|\ s. Así pues, el estudio del control de accesos
-en *Windows* se basa en estudiar:
-
-- Cómo crear usuarios y grupos, y cuáles son los usuarios y grupos
-  predeterminados por el sistema.
-
-- Cuáles son los permisos que sobre los objetos permite definir el sistema
-  y cómo otorgarlos a usuarios y grupos.
-
-Además, pueden definirse de forma centralizada permisos a grupos y usuarios
-sobre determinadas acciones (p.e. el acceso al sistema).
-
-Usuarios y grupos
------------------
+Gestión de usuarios
+===================
 .. note:: Nos centramos en usuarios y grupos locales.
 
 * Hay varios modos de gestionarlos, pero el modo más compacto y completo de
@@ -74,6 +57,24 @@ Usuarios y grupos
     personal del usuario, de suerte que cada vez que éste inicia sesión, se
     carga el contenido de este fichero en el registro y se aplica la
     configuración (p.e. cuál es la imagen de fondo de escritorio).
+
+Seguridad
+=========
+
+.. _dac-windows:
+
+*Windows* 10 implementa un mecanismo de :ref:`control de accesos DAC
+<control-dac>` basado en |ACL|\ s. Así pues, el estudio del control de accesos
+en *Windows* se basa en estudiar:
+
+- Cómo crear usuarios y grupos, y cuáles son los usuarios y grupos
+  predeterminados por el sistema.
+
+- Cuáles son los permisos que sobre los objetos permite definir el sistema
+  y cómo otorgarlos a usuarios y grupos.
+
+Además, pueden definirse de forma centralizada permisos a grupos y usuarios
+sobre determinadas acciones (p.e. el acceso al sistema).
 
 Permisos
 --------
@@ -212,9 +213,8 @@ por quien tenga permisos para ello:
    `este desaparecido artículo
    <https://web.archive.org/web/20100105052819/http://www.cmschill.net/stringtheory/2009/05/02/bitwise-operators/>`_.
 
-
 Directivas de seguridad
-=======================
+-----------------------
 Las :dfn:`directivas de seguridad` permiten configurar aspectos relacionados con
 la seguridad del sistema. Se accede a ellas mediante el programa
 :program:`secpol.msc` o a través de las "Herramientas administrativas". Son
@@ -227,7 +227,7 @@ interesantes:
   grupos, permiso para llevar a cabo ciertas tareas.
 
 Directivas de grupo
-===================
+-------------------
 Las :dfn:`directivas de grupo` permiten habilitar o deshabilitar ciertos
 elementos de *Windows*. Las que afectan a todos los usuarios pueden configurarse
 a través de su editor :program:`gpedit.msc`. También se pueden aplicar las
@@ -238,14 +238,40 @@ como componente el "Editor de directivas de grupo".
 .. seealso:: Puede ver cómo llevar a cabo esto último en `este tutorial
    <https://www.miprimoinformatico.es/configurar-directivas-locales-no-afecten-al-administrador-windows-10/>`_.
 
+Copias de seguridad
+-------------------
+
+Restauración del sistema
+------------------------
+*Windows* 10 permite crear puntos de restauración de sistema operativo (no del
+sistema de archivos, para lo cual tendríamos que crear copias de seguridad) a
+través del programa :program:`SystemPropertiesProtection.exe`, accesible desde
+las "Propiedades" de "Este Equipo" o la sección "Sistema" del "Panel de
+Control". La creación de estos puntos exige primero habilitar la posibilidad reservando
+una cantidad de espacio en disco para ello.
+
+.. seealso:: Puede consultar `este artículo de genbeta.com sobre restauración
+   <https://www.genbeta.com/paso-a-paso/como-crear-punto-restauracion-windows-10>`_.
+
+Monitorización
+==============
+
+Uso de recursos
+---------------
+A través del :program:`Administrador de tareas`, accesible a través del menú que
+se presenta al pulsar :kbd:`Ctrl+Alt+Supr`, o directamente pulsado
+:kbd:`Ctrl+Shift+Esc`, o ejecutando :command:`TaskManager.exe`, puede accederse
+a la pestaña de **Rendimiento** donde el sistema proporciona información sobre
+el aprovechamiento de distintos recursos (memoria, procesador, tarjeta de red).
+
+Registro de eventos
+-------------------
+
 Gestión de procesos
 ===================
-Para la *gestión de procesos*, *Windows 10* proporciona el
-:program:`Administrador de tareas`, accesible a través del menú que se presenta
-al pulsar :kbd:`Ctrl+Alt+Supr`, o directamente pulsado
-:kbd:`Ctrl+Shift+Esc`, o ejecutando :command:`TaskManager.exe`. La aplicación
-dispone de distintas pestañas cada una de las cuales sirve para un
-propósito:
+Para la *gestión de procesos* *Windows 10* proporciona el
+:program:`Administrador de tareas`. Esta aplicación dispone de distintas
+pestañas cada una de las cuales sirve para un propósito:
 
 .. image:: files/taskmanager.png
 
@@ -258,47 +284,30 @@ propósito:
 * *Inicio* lista una serie de aplicaciones que se ejecutan automáticamente
   durante el arranque del sistema. Se permite deshabilitarlas.
 
-Gestión de servicios
-====================
-Además de poder arrancar o parar servicios a través del :program:`Administrador
-de tareas` es posible llevar a cabo una gestión más exhaustiva decidiendo qué
-servicios se habilitan o deshabilitan, de manera que se levanten o no
-automáticamente al iniciar *Windows*. Esto es posible a través del gestor de
-servicios al cual puede llegarse a través del :program:`Administrador de
-Equipos` o directamente ejecutando :program:`services.msc`.
+Un tipo especial de procesos son los :dfn:`servicios`, procesos asociados a una
+tarea que se desarrolla en segundo plano. Estas tareas normalmente son
+recurrentes por lo que el sistema está preparado para que, por ejemplo, se
+activen durante el inicio. Su gestión, por tanto, excede las prosibilidades del
+:program:`Administrador de tareas` que nos permite únicamente cancelar
+puntuaLMENTE UN PROCESO. Para llevar a cabo una gestión más exhaustiva y decidir
+qué servicios se habilitan o deshabilitan, de manera que se levanten o no
+automáticamente al iniciar *Windows* debe recurrirse al *gestor de servicios*.
+al cual puede llegarse a través del :program:`Administrador de Equipos` o
+directamente ejecutando :program:`services.msc`.
 
-Programación de tareas
-======================
-Para programar tareas futuras, periódicas o que deben ejecutarse al producirse
-alguna circunstancia (p.e. al iniciar sesión), debe utilizarse el
-:program:`Programador de tareas` accesible a través de las "Herramientas
-administrativas".
+Gestión de recursos
+===================
 
-.. image:: files/programador.png
-
-Crear una *tarea básica* es relativamente sencillo (puede consultar `este enlace
-de genbeta sobre cómo programar tareas en Windows 10
-<https://www.genbeta.com/paso-a-paso/como-programar-tareas-en-windows-10>`_).
-La lista de tareas definidas por el usuario pueden consultarse en la
-sección "Biblioteca del Programador de tareas", aunque, si no aparece, habrá que
-actualizar la vista con el menú contextual.
-
-Restauración del sistema
-========================
-*Windows* 10 permite crear puntos de restauración de sistema operativo (no del
-sistema de archivos, para lo cual tendríamos que crear copias de seguridad) a
-través del programa :program:`SystemPropertiesProtection.exe`, accesible desde
-las "Propiedades" de "Este Equipo" o la sección "Sistema" del "Panel de
-Control". La creación de estos puntos exige primero habilitar la posibilidad reservando
-una cantidad de espacio en disco para ello.
-
-.. seealso:: Puede consultar `este artículo de genbeta.com sobre restauración
-   <https://www.genbeta.com/paso-a-paso/como-crear-punto-restauracion-windows-10>`_.
-
-Administración de discos
-========================
+Discos
+------
 Puede llevarse a cabo a través de la "Administración de equipos" o directamente
 a través de :command:`diskmgmt.msc`.
+
+Impresoras
+----------
+
+Compartición de recursos
+------------------------
 
 .. include:: /guias/01.som/99.ejercicios/06.winII.rst
 

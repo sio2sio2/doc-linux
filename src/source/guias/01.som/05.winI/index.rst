@@ -32,8 +32,22 @@ Gestión del software
 
 Automatización de tareas
 ========================
-+ Programar tareas a horas concretas.
-+ Ejecutar tareas tras el arranque.
+Para programar tareas futuras, periódicas o que deben ejecutarse al producirse
+alguna circunstancia (p.e. al iniciar sesión), debe utilizarse el
+:program:`Programador de tareas` accesible a través de las "Herramientas
+administrativas".
+
+.. image:: files/programador.png
+
+Crear una *tarea básica* es relativamente sencillo (puede consultar `este enlace
+de genbeta sobre cómo programar tareas en Windows 10
+<https://www.genbeta.com/paso-a-paso/como-programar-tareas-en-windows-10>`_).
+La lista de tareas definidas por el usuario pueden consultarse en la
+sección "Biblioteca del Programador de tareas", aunque, si no aparece, habrá que
+actualizar la vista con el menú contextual.
+
+Por otra parte, en el :program:`Administrador de tareas` hay una pestaña para
+indicar qué aplicaciones quieren arrancarse durante el inicio.
 
 .. include:: /guias/01.som/99.ejercicios/05.winI.rst
 
