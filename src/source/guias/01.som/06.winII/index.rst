@@ -10,8 +10,8 @@ Gestión de usuarios
 .. note:: Nos centramos en usuarios y grupos locales.
 
 * Hay varios modos de gestionarlos, pero el modo más compacto y completo de
-  hacerlo es a través de la sección correspondiente del :program:`Administrador de
-  equipos`.
+  hacerlo es a través de la sección correspondiente de la
+  :program:`Administración de equipos`.
 
 * A grandes rasgos hay tres **usuarios** locales definidos:
 
