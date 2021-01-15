@@ -35,7 +35,7 @@ Así pues, al nivel en que nos movemos, aunque se puede prescindir
 completamente de la |CLI| de *Windows* (:program:`cmd` o mejor aún la más nueva
 y potente :program:`PowerShell`) en *Linux* eso es imposible y, además,
 inapropiado, ya que lo que pudiéramos aprender a configurar al cambiar de
-entorno gráfico podría tener que hacerse de un modo completamente distinto.
+entorno gráfico podría tener que hacerse de un modo completamente distinto. La configuración y administración mediante |CLI|, en cambio, es más universal ya que suelen cambiar únicamente aspectos implementados por la propia distribución como la gestión de *software*.
 
 En consecuencia, nuestro plan de estudios será el siguiente:
 
@@ -47,6 +47,15 @@ En consecuencia, nuestro plan de estudios será el siguiente:
    administración utilizando también la interfaz de texto.
 #. :ref:`La última unidad <som-prolinux>` se centrará en algunos aspectos algo
    más avanzados de uso y que pueden mejorar nuestra productividad.
+
+para lo cual usaramos lo siguiente:
+
+- Para el sistema con entorno gráfico una *Ubuntu* normal, esto es, la que
+  viene con GNOME.
+- Para la interfaz de texto, una terminal de la propia *Ubuntu* o, simplemente,
+  una *Debian* cuyas diferencias con la primera al nivel en que nos movemos son
+  dos: la gestión de la red (a partir de Ubuntu *18.04*) y la escalada de
+  privilegios.
 
 Entornos gráficos
 =================
@@ -96,16 +105,22 @@ términos que se usan al tratar sobre ellos:
 
 Lo habitual es que los usuarios finales de *Linux* utilicen un entorno de
 escritorio integrado (como GNOME_), pero no son raros los que optan por
-un gestor de ventanas al que añaden algunas utilidades gráficas\ [1]_.
+un gestor de ventanas al que añaden algunas utilidades gráficas\ [#]_.
 
-Descripción del escritorio
-==========================
+Descripción del entorno gráfico
+===============================
+Describir las posibilidades del entorno de GNOME tal como se hice con el
+entorno de *Windows*.
 
 Configuración de la red
 =======================
+Tratar :program:`NetworkManager` para configurar la red de forma gráfica.
 
 Explorador de archivos
 ======================
++ Introducir muy por encima la estructura jerárquica de los sistemas *UNIX* (se
+  profundizará en la siguiente unidad).
++ Uso del explorador.
 
 .. rubric:: Notas al pie
 

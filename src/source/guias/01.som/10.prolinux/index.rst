@@ -1,7 +1,7 @@
 .. _som-prolinux:
 
-Profundización en linux
-***********************
+Profundización en *Linux*
+*************************
 El tema recoge otros aspectos a tener en cuenta cuando se desea manejar
 con soltura y eficacia *Linux* a través de la |CLI| más allá de los elementales
 expuestos en el :ref:`uso básico <som-conflinux>`.
@@ -26,15 +26,6 @@ sí y lograr órdenes conjuntas muy poderosas. Entendidas bien estas ideas,
 realice los ejercicios:
 
 * :ref:`Ejercicios sobre redirecciones <ej-redirect>`.
-
-Copias de seguridad
-===================
-El epígrafe persigue cónocer cuáles son herramientas habituales de compresión y
-empaquetado, lo cual supone estudiar todo este epígrafe de :ref:`copias de
-seguridad <backup-simple>`. La relación de ejericios es la que se encuentra al
-final de ese epigrafe:
-
-* :ref:`Ejercicios sobre compresión y empaquetado <ej-compr-paq>`.
 
 Tratamiento de texto
 ====================
@@ -202,52 +193,6 @@ herramientas de manipulación de texto y las expresiones regulares intente la
 relación:
 
 * :ref:`ej-texto`
-
-Planificación de tareas
-========================
-Estudiaremos este aspecto sólo haciendo uso del :ref:`método clásico <cronat>`
-con :command:`at` y :program:`crontab`. La relación de ejercicios
-correspondiente es ésta:
-
-* :ref:`ej-cronat`
-
-Escalada de privilegios
-=======================
-Hay :ref:`un epígrafe dedicado a esta tarea <escalar-priv>`, pero para nuestro
-nivel sólo requiere una lectura superficial que no implique llegar a saber cómo
-se configura :ref:`sudo <sudo>`, sino simplemente:
-
-- Entender que hay distribuciones que usan preferentemente :ref:`su <su>` y
-  otras preferentemente :ref:`sudo <sudo>`.
-
-- Que :ref:`su <su>` suele usarse para abrir una sesión interactiva dentro de la
-  cual llevar a cabo las instrucciones propias del administrador. La constraseña
-  para su uso es la del adminsitrador. Por ejemplo::
-
-   $ whoami
-   usuario
-   $ su -
-   # whoami
-   root
-   # apt upgrade
-   # apt update
-   # exit
-   $ whoami
-   usuario
-
-- Que en las distribuciones que configuran en la instalación :ref:`sudo <sudo>`,
-  la configuración está pensada para que el usuario lo utilice como "prefijo"
-  antes de la orden que requiere privilegios. Se le pedirá la contraseña del
-  propio usuario sin privilegios, no la del administrador, la cual no existe::
-
-   $ whoami
-   usuario
-   $ sudo apt upgrade
-   $ sudo apt update
-   $ whoami
-   usuario
-
-No se requiere hacer ninguna relación de ejercicios.
 
 .. |CLI| replace:: :abbr:`CLI (Command Line Interface)`
 .. |E/S| replace:: :abbr:`E/S (Entrada/Salida)`

@@ -7,6 +7,22 @@ Interfaz |CLI|
 ==============
 Desarrollado en el :ref:`epígrafe sobre entorno de texto <cli>`.
 
+Gestión de *software*
+=====================
+Debe ser una versión resumida de :ref:`paqueteria` que incluya el
+:ref:`paq-vistazo` (cómo se organizan los repositorios) y las :ref:`paq-bas`,
+pero utilizando más bien :ref:`apt <apt>`. Las relaciones de ejericicios
+asociados a este apartado son:
+
+* :ref:`ej-softw`
+
+Configuración de red
+====================
+Para interfaz de texto puede usarse el epígrafe de :ref:`configuración mínima de
+la red <redminima>`.
+
+* :ref:`ej-redmin`
+
 Sistema de archivos
 ===================
 Desarrollado en los epígrafes que componen:
@@ -24,23 +40,12 @@ Dentro de este apartado hay dos relaciones de ejercicios pertinentes:
 * :ref:`ej-rutas`
 * :ref:`ej-fic`
 
-Instalación y gestión de programas
-==================================
-Debe ser una versión resumida de :ref:`paqueteria` que incluya el
-:ref:`paq-vistazo` (cómo se organizan los repositorios) y las :ref:`paq-bas`,
-pero utilizando más bien :ref:`apt <apt>`. Las relaciones de ejericicios
-asociados a este apartado son:
+Automatización de tareas
+========================
+Estudiaremos este aspecto sólo haciendo uso del :ref:`método clásico <cronat>`
+con :command:`at` y :program:`crontab`. La relación de ejercicios
+correspondiente es ésta:
 
-* :ref:`ej-softw`
-
-Interfaz de red
-===============
-Para interfaz de texto puede usarse el epígrafe de :ref:`configuración mínima de
-la red <redminima>`. Ahora bien, sería conveniente cómo configurarla en entornos
-gráficos que utilizan otros mecanismos de configuración (p.e `network-manager
-<https://es.wikipedia.org/wiki/NetworkManager>`_). Esto último puede hacerse a
-través de los ejercicios:
-
-* :ref:`ej-redmin`
+* :ref:`ej-cronat`
 
 .. |CLI| replace:: :abbr:`CLI (Command Line Interface)`
