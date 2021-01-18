@@ -119,23 +119,50 @@ Esquematizando, pues, un *certificado digital* se compone:
 * La firma digital de una autoridad de certificación sobre la clave pública y
   los datos identificativos.
 
-La verificación de unos datos firmados con certificado añade un paso previo a lo
-explicado anteriormente:
+Así pues, cuando se firma con un certificado digital el receptor del mensaje
+puede:
 
-+ De la firma digital de los datos, se deduce la clave pública del autor de
-  estos y el hecho de estar firmada por la autoridad de certificacación
-  asegura que esta clave pública es realmente del autor.
-+ Se usa el resumen contenido en la firma para verificar la integridad del
-  mensaje.
++ Deducir de la clave pública que permite verificar la firma la identidad del
+  firma con total seguridad, ya que ésta está refrendada (o sea, firmada a su
+  vez) por una autoridad de certificación.
+
++ Por supuesto, comprobar la integridad del mensaje gracias al resumen que
+  contiene la firma.
 
 Así todo queda resuelto. Ahora bien, ¿quién es esta autoridad de certificación y
-por qué es digna de confianza?
+por qué es digna de confianza? Una :dfn:`autoridad de certificación` (a partir
+de ahora, |CA|) es aquella entidad de confianza encargada de emitir (y revocar)
+certificados digitales.  Para llevar a cabo esta tarea la propia |CA| dispone de
+un certificado, de manera que con su clave privada firma los certificados que
+emite. La estructura es jerárquica y el certificado de una |CA| puede estar
+avalado por la firma de otro |CA| de rango superior. Sin embargo, en la cúspide
+se encuentran las |CA| raíz, cuyos certificados son autofirmado, lo que
+significa que nadie certifica digitalmente la identidad de la |CA|. La garantía
+de estos certificados viene avalada porque los propios sistemas operativos y
+navegadores web incorporan los certificados raíz de estas autoridades, que
+habrán avalado de algún modo su identidad. Por ejemplo, *Debian*, incluye el
+paquete `ca-certificates
+<https://packages.debian.org/search?keywords=ca-certificates>`_, que las
+contiene.
 
-.. rubric:: Autoridad de certificación
+Un ejemplo de esta jerarquía es el :ref:`certificado gratuito para servidores
+web <nginx-https>` emitido por LetsEncrypt_, cuyo certificado a
+su vez esta firmado por `Digital Signature Trust`_, que sí es una |CA| raíz::
 
-Una :dfn:`autoridad de certificación` (a partir de ahora, |CA|) es aquella
-entidad de confianza encargada de emitir (y revocar) certificados digitales. El
-proceso típico de emisión es el siguiente:
+   $ openssl x509 -in cert.pem -text -noout | egrep -E '^\s*(?Issuer|Subject):'
+           Issuer: O = Digital Signature Trust Co., CN = DST Root CA X3
+           Subject: C = US, O = Let's Encrypt, CN = Let's Encrypt Authority X3
+
+Sea como sea, las |CA| generarn certificados finales:
+
++ Para otra |CA| subordinada.
++ Para una persona física.
++ Para una aplicación de *software*
++ Para un servidor.
+
+.. rubric:: Certificados personales
+
+El proceso típico de emisión de un certificado personal es el siguiente:
 
 #. El interesado realiza una solicitud a la |CA|, por lo general a través de
    un servicio web, en que se recogen los datos identificativos y se genera una
@@ -154,15 +181,6 @@ proceso típico de emisión es el siguiente:
 
 .. image:: files/certificados.png
 
-Para llevar a cabo esta tarea la propia |CA| dispone de un certificado, de
-manera que con su clave privada firma los certificados que emite. La
-infraestructura de autoridades, no obstante, no es plana, sino jerárquica
-Cuando. la |CA| es una |CA| raíz, este certificado es autofirmado, lo que
-significa que nadie certifica digitalmente la identidad de la |CA|. Ahora bien,
-una entidad puede generar certificados finales (para una persona, para un
-servidor web o para una aplicación *software*) o certificados para |CA|
-subordinadas, las cuales a su vez podrán firmar certificados.
-
 .. note:: En España la autoridad de certificación que usan la inmensa mayoría de
    las administraciones públicas es la `Fábrica Nacional de Moneda y Timbre
    <http://www.cert.fnmt.es>`_.  Muchas particulares españoles también usan esta
@@ -171,28 +189,23 @@ subordinadas, las cuales a su vez podrán firmar certificados.
    incluye oficinas de la seguridad social, de la agencia tributaria o
    ayuntamientos.
 
-Un ejemplo de esta jerarquía es el :ref:`certificado gratuito para servidores
-web <certbot>`. Lo emite LetsEncrypt_, cuyo certificado a su vez esta firmado
-por `Digital Signature Trust`_, que sí es una |CA| raíz::
-
-   $ openssl x509 -in cert.pem -text -noout | egrep -E '^\s*(?Issuer|Subject):'
-           Issuer: O = Digital Signature Trust Co., CN = DST Root CA X3
-           Subject: C = US, O = Let's Encrypt, CN = Let's Encrypt Authority X3
-
-Para que los sistemas puedan verificar la autenticidad de un certificado es
-necesario que dispongan de las claves públicas de las |CA|. Por ello, las
-aplicaciones o, más modernamente, los propios sistemas operativos, traen las
-claves públicas de las autoridades que consideran de confianza. Por ejemplo,
-*debian*, incluye el paquete `ca-certificates
-<https://packages.debian.org/search?keywords=ca-certificates>`_, que las
-contiene.
-
 Por último, es necesario señalar que, para asegurar la validez de un
 certificado, no basta sólo con comprobar si el certificado no ha caducado y
 hacer uso de la firma pública de la |CA|. Un certificado puede haberse revocado
 antes de caducar y, en consecuencia, dejar de ser válido antes de tiempo. Por
 eso, las |CA| deben ofrecer un servicio para la comprobación de estas
 revocaciones.
+
+.. rubric:: Certificados de servidor
+
+Estos certificados avalan que una determinada máquina (o conjunto de máquinas, si
+el servidor es distribuido) tienen un determinado nombre en internet. Así,
+cuando conectamos a la `página oficial de Ministerio de Educación
+<https://educacionyfp.gob.es>`_, el certificado de servidor avala que la máquina
+con la que conectamos es :kbd:`educacionyfp.gob.es`. En este caso, existen
+distintos niveles de acreditación, pero en el más básico es posible que la
+autoridad teleacredite al servidor. Échele un ojo al :ref:`procedimiento para
+obtener certificados mediante el protocolo ACME <nginx-https>`.
 
 Correo electrónico
 ==================

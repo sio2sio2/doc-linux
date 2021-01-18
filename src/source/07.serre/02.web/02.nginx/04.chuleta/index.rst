@@ -7,7 +7,6 @@ Chuleta
 
 * :ref:`Instalación <nginx-install>`.
 * :ref:`Configuración básica <nginx-basico>`.
-* :ref:`Generación de un certificado autofirmado <auto-cert>` y
-  :ref:`configuración de la conexión segura <nginx-https>`.
+* :ref:`Configuración de la conexión segura <auto-cert>` (con certificado autofirmado).
 * :ref:`Contenido dinámico con PHP <nginx-php>`.
 * :ref:`Control de accesos mediante autenticación <nginx-auth>`
