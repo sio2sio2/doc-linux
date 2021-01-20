@@ -57,6 +57,19 @@ Dentro de este apartado hay dos relaciones de ejercicios pertinentes:
 * :ref:`ej-rutas`
 * :ref:`ej-fic`
 
+Recuperación del sistema
+========================
+En *Linux* puede restaurarse el sistema a un punto anterior mediante el uso de
+:ref:`instantáneas de volúmenes lógicos <lvm-snapshots>`. Esto, sin embargo,
+excede con mucho el propósito del módulo de conocer cómo se configura a nivel
+básico un sistema *Linux*, así que centraremos nuestro estudio en la creación de
+copias de seguridad. Por tanto, el epígrafe persigue cónocer cuáles son las
+herramientas habituales de compresión y empaquetado, lo cual supone estudiar
+todo este epígrafe de :ref:`copias de seguridad <backup-simple>`. La relación de
+ejericios es la que se encuentra al final de ese epigrafe:
+
+* :ref:`Ejercicios sobre compresión y empaquetado <ej-compr-paq>`.
+
 Automatización de tareas
 ========================
 Estudiaremos este aspecto sólo haciendo uso del :ref:`método clásico <cronat>`

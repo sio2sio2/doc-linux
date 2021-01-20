@@ -56,15 +56,6 @@ relación de ejercicios:
 
 * :ref:`ej-perm`
 
-Copias de seguridad
--------------------
-El epígrafe persigue cónocer cuáles son herramientas habituales de compresión y
-empaquetado, lo cual supone estudiar todo este epígrafe de :ref:`copias de
-seguridad <backup-simple>`. La relación de ejericios es la que se encuentra al
-final de ese epigrafe:
-
-* :ref:`Ejercicios sobre compresión y empaquetado <ej-compr-paq>`.
-
 Monitorización
 ==============
 

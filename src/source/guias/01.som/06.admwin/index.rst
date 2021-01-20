@@ -240,21 +240,6 @@ como componente el "Editor de directivas de grupo".
 .. seealso:: Puede ver cómo llevar a cabo esto último en `este tutorial
    <https://www.miprimoinformatico.es/configurar-directivas-locales-no-afecten-al-administrador-windows-10/>`_.
 
-Copias de seguridad
--------------------
-
-Restauración del sistema
-------------------------
-*Windows* 10 permite crear puntos de restauración de sistema operativo (no del
-sistema de archivos, para lo cual tendríamos que crear copias de seguridad) a
-través del programa :program:`SystemPropertiesProtection.exe`, accesible desde
-las "Propiedades" de "Este Equipo" o la sección "Sistema" del "Panel de
-Control". La creación de estos puntos exige primero habilitar la posibilidad reservando
-una cantidad de espacio en disco para ello.
-
-.. seealso:: Puede consultar `este artículo de genbeta.com sobre restauración
-   <https://www.genbeta.com/paso-a-paso/como-crear-punto-restauracion-windows-10>`_.
-
 Monitorización
 ==============
 
