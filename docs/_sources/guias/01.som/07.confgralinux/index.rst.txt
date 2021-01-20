@@ -41,7 +41,7 @@ En consecuencia, nuestro plan de estudios será el siguiente:
 
 #. Revisaremos en esta unidad algunos aspectos de configuración básica usando un
    entorno gráfico.
-#. En :ref:`la siguiente <som-conflinux>`, trataremos casi los aspectos de
+#. En :ref:`la siguiente <som-conflinux>`, trataremos casi todos los aspectos de
    configuración utilizando la |CLI|.
 #. En :ref:`la tercera  <som-admlinux>` trataremos los aspectos de
    administración utilizando también la interfaz de texto.
