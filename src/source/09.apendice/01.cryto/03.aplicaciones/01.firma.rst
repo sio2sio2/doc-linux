@@ -1,0 +1,556 @@
+.. _firma-digital:
+
+Firma digital
+*************
+Una *firma digital* es al mundo digital lo que la firma manuscrita al papel, la
+cual certifica la identidad de quien firma y que se está de acuerdo con los
+términos de lo firmado.
+
+Para llevar a cabo la *firma digital* de unos datos (un fichero o un mensaje de
+correo, por ejemplo) se obra del siguiente modo:
+
++ Se obtiene un resumen de los datos mediante una función *hash*.
++ Se cifra tal resumen con la clave privada del firmante.
++ Se envían los datos (o se almacena el fichero) junto al resumen cifrado.
+
+Ante esto, un tercero (por ejemplo, el destinatario de un mensaje de correo
+firmado), es capaz de certificar que el origen es quien dice ser, ya que
+descifrará el resumen con la clave pública de éste y, por otra parte, podrá
+comprobar si los datos conservan su integridad gracias al propio resumen
+descifrado.
+
+Conceptualmente, pues, es bastante sencillo y podemos ilustrar los pasos
+anteriores haciendo uso de la :ref:`orden gpg <gnupg.1>`::
+
+
+   $ echo "Este es el contenido del fichero que firmo" > fichero.txt
+   $ gpg --detach-sign --default-key mi_cuenta@example.com -o fichero.sig fichero.txt
+
+De esta manera tenemos un fichero original (:file:`fichero.txt`) y su resumen
+cifrado digitalmente con nuestra clave privada en :file:`fichero.sign`. Si
+analizamos el fichero de firma::
+
+   $ gpg --list-packets fichero.sign
+   :signature packet: algo 1, keyid 53175AA29C972B7B
+           version 4, created 1543050622, md5len 0, sigclass 0x00
+           digest algo 10, begin of digest 04 9e
+           hashed subpkt 33 len 21 (issuer fpr v4 040968BBC05C39A4DD2A43BD53175AA29C972B7B)                                                  
+           hashed subpkt 2 len 4 (sig created 2018-11-24)
+           hashed subpkt 28 len 23 (signer's user ID)
+           subpkt 16 len 8 (issuer key ID 53175AA29C972B7B)
+           data: [3071 bits]
+
+veremos algunas características de la firma, como:
+
+* qué algoritmo de clave simétrica se usó, el **1**, que se corresponde con una
+  clave asimétrica |RSA|, válida tanto para firma como para cifrado. El
+  significado de los códigos puede encontrarse en el :rfc:`4880`, y en concreto
+  en la `sección 9.1 <https://tools.ietf.org/html/rfc4880#section-9.1>`_.
+
+* qué clave se usó: la *53175AA29C972B7B*, que efectivamente es la nuestra:
+
+  .. code-block:: console
+     :emphasize-lines: 4
+
+     $ gpg --keyid-format long -list-keys
+     /home/usuario/.gnupg/pubring.kbx
+     --------------------------------
+     pub   rsa3072/53175AA29C972B7B 2018-11-21 [SC] [expires: 2020-11-20]
+           040968BBC05C39A4DD2A43BD53175AA29C972B7B
+     uid                 [ unknown] Soy el que soy <mi_cuenta@example.com>
+           sub   rsa3072/4B1F09C9B84F038E 2018-11-21 [E] [expires: 2020-11-20]
+
+* con qué algoritmo se resumió el fichero, el **10**, que es *SHA512* según 
+  `la sección 9.4 <https://tools.ietf.org/html/rfc4880#section-9.4>`_ del
+  :rfc:`4880`.
+
+Si hacemos llegar **ambos** archivos a un tercero, y éste posee nuestra clave
+pública, podrá verificar nuestra identidad gracias al cifrado de la firma y la
+integridad del fichero gracias al resumen que contiene esta::
+
+   $ gpg --verify fichero.sign fichero.txt
+   [...]
+   Primary key fingerprint: 0409 68BB C05C 39A4 DD2A  43BD 5317 5AA2 9C97 2B7B
+   $ echo $?
+   0
+
+Todo parece perfecto... pero hay un pequeño problema. ¿Cómo está seguro el
+tercero de que la clave pública que posee es realmente de quien dice ser y no
+otro que suplanta su identidad? Para subsanar este último escollo existen los
+*certificados digitales*.
+
+.. note:: Retenga el adagio de que la clave pública del destinatario se usa para
+   cifrar, y la clave privada del emisor para firmar.
+
+Correo electrónico
+==================
+La firma digital es muy usada en el correo electrónico, ya que si se firma el
+conjunto de las cabeceras del mensaje, el cuerpo y los adjuntos, y finalmente
+esa firma se adhiere al propio mensaje como adjunto adicional, el destinatario
+puede tener seguridad al recibir un mensaje de que éste fue escrito por quien
+dice y que no ha sido modificado por el camino.
+
+Lo habitual es que se usen claves |PGP| un estándar desarrollado para el cifrado
+y firma de mensajes de correos electrónicos, cuya generación, importación y
+exportación de claves se :ref:`practicamos al tratar el cifrado asimétrico
+<gpg-pgp>`. Obviamente, el proceso de firma de un mensaje no exige la
+elaboración *artesanal* de la firma, sino que los clientes de correo como
+:ref:`mutt <mutt>` o Thunderbird_ suelen incorporar esa funcionalidad para que
+el proceso sea muy sencillo.
+
+.. note:: También es posible firmar y cifrar mensajes con determinados servicios
+   de *webmail* y la extensión adecuada del navegador. Por ejemplo, en
+   :program:`Chrome` existe la extensión Mailenvelope_ que permite el cifrado de
+   mensajes para los principales sitios de webmail (Gmail_, Yahoo_, Outlook_,
+   etc.).
+
+.. seealso:: Para ver cómo firmar mensajes de correo en :ref:`mutt <mutt>` con
+   el certificado de la |FNMT|, puede consultar :ref:`este epígrafe <mutt-fnmt>`.
+
+.. _cert-digital:
+
+Certificado digital
+===================
+.. note:: Tratamos los *certificados digitales de clave pública*, por lo que a
+   partir de ahora hablaremos, simplemente, de *certificados digitales*.
+
+Un :dfn:`certificado digital` es un documento firmado digitalmente por una
+*autoridad de certificación* que asocia unos datos de identificación con una
+clave pública. Esto, pues, resuelve el problema de suplantación: sabemos que la
+clave pública pertenece a quien dice pertenecer, porque un tercero, la autoridad
+de certificación, en el que tenemos absoluta confianza, lo acredita y ha firmado
+para ello. Suelen basarse en el `estándar X.509
+<https://www.ssl.com/faqs/what-is-an-x-509-certificate/>`_ definido en el
+:rfc:`5280`.
+
+
+Esquematizando, pues, un *certificado digital* se compone:
+
+* Una pareja de claves.
+* La identidad del propietario de dichas claves.
+* La firma digital de una autoridad de certificación sobre la clave pública y
+  los datos identificativos.
+
+Así pues, cuando se firma con un certificado digital el receptor del mensaje
+puede:
+
++ Deducir de la clave pública que permite verificar la firma la identidad del
+  firmante con total seguridad, ya que la clave pública está refrendada (o sea,
+  firmada a su vez) por una autoridad de certificación.
+
++ Por supuesto, comprobar la integridad del mensaje gracias al resumen que
+  contiene la firma.
+
+Así todo queda resuelto. Ahora bien, ¿quién es esta autoridad de certificación y
+por qué es digna de confianza? Una :dfn:`autoridad de certificación` (a partir
+de ahora, |CA|) es aquella entidad de confianza encargada de emitir (y revocar)
+certificados digitales.  Para llevar a cabo esta tarea la propia |CA| dispone de
+un certificado, de manera que con su clave privada firma los certificados que
+emite. La estructura es jerárquica y el certificado de una |CA| puede estar
+avalado por la firma de otro |CA| de rango superior. Sin embargo, en la cúspide
+se encuentran las |CA| raíz, cuyos certificados son autofirmado, lo que
+significa que nadie certifica digitalmente la identidad de la |CA|. La garantía
+de estos certificados viene avalada porque los propios sistemas operativos y
+navegadores web incorporan los certificados raíz de estas autoridades, que
+habrán avalado de algún modo su identidad. Por ejemplo, *Debian*, incluye el
+paquete `ca-certificates
+<https://packages.debian.org/search?keywords=ca-certificates>`_, que las
+contiene.
+
+Un ejemplo de esta jerarquía es el :ref:`certificado gratuito para servidores
+web <nginx-https>` emitido por `Let's Encrypt`_, cuyo certificado a
+su vez esta firmado por `Digital Signature Trust`_, que sí es una |CA| raíz::
+
+   $ openssl x509 -in cert.pem -text -noout | egrep -E '^\s*(?Issuer|Subject):'
+           Issuer: O = Digital Signature Trust Co., CN = DST Root CA X3
+           Subject: C = US, O = Let's Encrypt, CN = Let's Encrypt Authority X3
+
+Sea como sea, las |CA| generan certificados finales:
+
++ Para otra |CA| subordinada.
++ Para una persona física.
++ Para una aplicación de *software*
++ Para un servidor.
+
+Los certificados, no obstante, no son eternos: la |CA| los acredita por un
+tiempo determinado, por lo que son sólo válidos entre una fecha inicial
+(normalmente la fecha en que son acreditados) y una fecha final que varía según
+el tiempo de validez por el que se certifiquen. Ambas fechas se incluyen dentro
+de los datos identificativos.
+
+Certificados personales
+-----------------------
+El proceso típico de emisión de un certificado personal es el siguiente:
+
+#. El interesado realiza una solicitud a la |CA|, por lo general a través de
+   un servicio web, en que se recogen los datos identificativos y se genera una
+   pareja de claves. Ahora bien, como la identidad del interesado no ha podido
+   verificarse, la |CA| genera una petición |CSR|.
+
+#. El interesado se acerca físicamente a la oficina de una |RA| (autoridad de
+   registro) a fin de confirmar ante ésta que es quien dice ser.
+
+#. La |RA| notifica a la |CA| tal verificación, con lo que esta pone a
+   disposición del interesado (p.e. a través del servicio web que utilizó
+   primeramente) el certificado solicitado.
+
+#. El interesado obtiene el certificado y lo instala en su sistema (navegador,
+   cliente de correo, etc).
+
+.. image:: files/certificados.png
+
+.. note:: En España la autoridad de certificación que usan la inmensa mayoría de
+   las administraciones públicas es la `Fábrica Nacional de Moneda y Timbre
+   <http://www.cert.fnmt.es>`_.  Muchas particulares españoles también usan esta
+   autoridad para sus certificados personales, gracias a una `extensa red de
+   oficinas de registro <http://mapaoficinascert.appspot.com/>`_ (|RA|) que
+   incluye oficinas de la seguridad social, de la agencia tributaria o
+   ayuntamientos.
+
+Por último, es necesario señalar que, para asegurar la validez de un
+certificado, no basta sólo con comprobar si el certificado no ha caducado y
+hacer uso de la firma pública de la |CA|. Un certificado puede haberse revocado
+antes de caducar y, en consecuencia, dejar de ser válido antes de tiempo. Por
+eso, las |CA| deben ofrecer un servicio para la comprobación de estas
+revocaciones. Por ejemplo, la |FNMT| ofrece este servicio de forma gratuita\
+[#]_ mediante el protocolo estándar |OCSP| descrito en el :rfc:`6960`.
+
+.. seealso:: Ëchele un ojo a la `entrada de este blog donde habla del
+   asunto
+   <http://blog.marcnuri.com/ocsp-validar-estado-de-revocacion-de-certificados-fnmt-mediante-protocolo-ocsp-y-openssl/>`_
+   y se cuenta cómo verificar los certificados emitidos por la |FNMT| usando
+   :command:`openssl`.
+
+Certificados de servidor
+------------------------
+Estos certificados avalan que una determinada máquina (o conjunto de máquinas, si
+el servidor es distribuido) tienen un determinado nombre en internet. Así,
+cuando conectamos a la `página oficial de Ministerio de Educación
+<https://educacionyfp.gob.es>`_, el certificado de servidor avala que la máquina
+con la que conectamos es :kbd:`educacionyfp.gob.es`. En este caso, existen
+distintos niveles de acreditación, pero en el más básico es posible que la
+autoridad teleacredite al servidor. Échele un ojo al :ref:`procedimiento para
+obtener certificados mediante el protocolo ACME <nginx-https>`.
+
+Formatos de certificados X.509
+------------------------------
+Los certificados digitales se presentan en distintos formatos de archivo que
+conviene conocer, porque en ocasiones para hacer una determinada operación o
+utilizarlo con cierta aplicación lo necesitaremos en uno concreto. Además, de la
+descripción de estos formatos incluimos, a modo de vademécum, las órdenes más
+comunes con :program:`openssl` para transformar del formato |PEM| (el estándar
+común en el *software* libre) al resto de formatos y viceversa\ [#]_:
+
+|PEM|
+   Es el estándar desarrollado por los :rfc:`1421`, :rfc:`1422`, :rfc:`1423` y
+   :rfc:`1424` y muy usado por aplicaciones de *software* libre (p.e. los
+   certificados de servidor de :ref:`nginx <n-ginx>` o :program:`apache` se
+   almacenan usando este estándar). Cuando se cifra, sólo se cifra la parte
+   privada. Da lugar a distintos tipos de archivos que pueden contener el
+   certificado privado, el público y el certificado (o los certificados) de la
+   autoridad de certificación.
+
+   Este estándar genera archivos imprimibles (está codificado en Base64_) y
+   suele presentarse bajo estas extensiones:
+
+   * ``.pem`` tanto cuando contienen sólo el certificado público (y,
+     opcionalmente, también los de la autoridad de certificación) como cuando
+     contienen además el privado. 
+   * ``.key`` cuando el fichero contiene sólo la parte privada.
+   * ``.cer`` y ``.crt`` cuando contiene sólo la parte pública. Frecuentemente,
+     sin embargo, el formato de este fichero no es |PEM| sino |DER|.
+
+   Algunas operaciones habituales con este tipo de certificado son:
+
+   #. Ver los datos del certificado público::
+
+         # openssl x509 -in CERTIFICADO.pem -text -noout
+
+   #. Transformar el certificado público |PEM| a formato |DER|::
+
+         # openssl x509 -inform pem -in CERTIFICADO.pem -outform der -out CERTIFICADO.crt
+
+   #. Trasformar la clave privada |PEM| al formato |DER|::
+
+         # openssl rsa -inform pem -in CERTIFICADO.key -outform der -out CERTIFICADO.key.der
+
+      .. warning:: El formato resultante no estará cifrado y, por tanto, la
+         clave privada estará totalmente desprotegida.
+
+   #. Generar un archivo ``.p12`` a partir de los archivos ``.pem`` y ``,key``::
+
+         # openssl pkcs12 -export -out CERTIFICADO.p12 -in CERTIFICADO.pem -inkey CERTIFICADO.pem
+
+      Si el archivo ``.pem`` contiene ambas partes pública y privada, basta con
+      incluir este único fichero como argumento de :kbd:`-in` y prescindir de
+      :kbd:`-inkey`.  La archivo con la parte pública debe contener al menos la
+      clave pública del certificado, pero también puede contener la de la
+      autoridad de certificación. Si la clave de la autoridad está en archivo
+      distinto pero se quiere incluirla dentro del resultado puede referirse
+      este tercer archivo mediante la opción :kbd:`-CAfile`.
+     
+      .. note:: Como se necesita introducir una clave para descifrar el
+         contenido de :file:`CERTIFCADO.key` y otra para cifrar
+         :file:`CERTIFICADO.p12`\ [#]_ se pedirán interactivamente las dos claves. Si
+         se quieren pasarlas por la línea de órdenes utilice las opciones
+         :kbd:`-passin` y :kbd:`-passout` y consulte la sección "Pass Plhare
+         Options" de :manpage:`openssl(1)`.
+
+   #. Transformar el certificado público |PEM| al formato |PKCS| #7::
+
+         # openssl crl2pkcs7 -nocrl  -certfile CERTIFICADO.pem -out CERTIFICADO.p7b
+
+|DER|
+   Es un formato de certificado binario (o sea, no imprimible) muy usando en los
+   sistemas *Windows*. O contiene la parte privada o la pública, pero no ambas.
+   Suele encontrase en archivos con extensión:
+
+   * ``.der``, que generalmente contiene una u otra parte.
+   * ``.cer`` o ``.crt``, cuando contiene sólo la parte pública. La forma más
+     simple de distinguir si un fichero con esta extensión es |PEM| o |DER| es
+     mirar su contenido con :ref:`cat <cat>` y ver si contiene caracteres
+     imprimibles o no.
+
+   Operaciones habituales:
+
+   #. Ver los datos del certificado público::
+
+         # openssl x509 -inform der -in CERTIFICADO.crt -text -noout
+
+   #. Trasformar un certificado público |DER| al formato |PEM|::
+
+         # openssl x509 -inform der -in CERTIFICADO.crt -outform pem -out CERTIFICADO.pem
+
+   #. Trasformar la clave pública |DER| al formato |PEM| (y proteger la
+      clave con un cifrado |AES|\ 256)::
+
+         # openssl rsa -inform der -in CERTIFICADO.key.der -outform pem -aes256 -out CERTIFICADO.key
+
+      .. note:: Consulte :manpage:`openssl-rsa(1)` para ver qué otros parámetros
+         cifran la clave con algoritmos distintos.
+
+
+|PKCS| #12 (``.p12`` o, a veces, ``.pfx``)
+   Formato originario de Microsoft_ que se acabó estandarizando mediante el
+   :rfc:`7292` y contiene tanto la clave pública como la privada del
+   certificado. En este formato toda la información contenida esta cifrada con
+   una clave simétrica (a diferencia del |PEM| que sólo cifra la privada) y es
+   el que suelen usar los navegadores para exportar e importar los certificados
+   personales de los usuarios.
+
+   Operaciones habituales:
+
+   #. Convertir el archivo ``.p12`` al formato |PEM| en un sólo archivo::
+
+         # openssl pkcs12 -in CERTIFICADO.p12 -out CERTIFICADO.pem
+
+   #. Ídem pero separando en dos archivos la clave pública y la privada::
+
+         # openssl pkcs12 -in CERTIFICADO.p12 -nocerts -out CERTIFICADO.key
+         # openssl pkcs12 -in CERTIFICADO.p12 -nokeys -out CERTIFICADO.pem
+
+      .. note:: Al generar el |PEM| con el certificado público se puede querer
+         no incluir los certificados públicos de las autoridades de
+         certificación (añadiendo :kbd:`-clcerts`) o, justo lo contrario, y sólo
+         incluir los certificados públicos de |CA| (añadiendo :kbd:`-cacerts`).
+
+   #. Ver los datos del certificado público (no hay forma directa, así que hay
+      que traducir a |PEM| y obtener la información de la traducción)::
+
+         # openssl pkcs12 -in CERTIFICADO.p12 -clcerts -nokeys | openssl x509 -text -noout
+
+|PKCS| #7 (``.p7b``)
+   Formato estandarizado a través del :rfc:`2315` que sólo contiene la parte
+   pública del certificado. Suele usarse en sistemas *Windows* y aplicaciones
+   escritas en Java.
+
+   Operaciones habituales:
+
+   #. Consultar los datos del certificado::
+
+         # openssl pkcs7 -in CERTIFICADO.p7b -print_certs -text -noout
+
+   #. Transformar el certificado |PKCS| #7 al formato |PEM|::
+
+         # openssl pkcs7 -in certificate.p7b -print_certs -out certificate.cer
+
+.. seealso:: Como referencia para este apartado se ha usado la `extensa
+   respuesta a una pregunta formulada en serverfault
+   <https://serverfault.com/questions/9708/what-is-a-pem-file-and-how-does-it-differ-from-other-openssl-generated-key-file>`_
+
+.. _info-cert:
+
+Destripando certificados
+------------------------
+Ya se ha establecido que un certificado consta de:
+
++ Una **parte pública** compuesta por unos datos identificativos y una clave pública
+  firmada por una |CA|.
++ Una **parte privada** constituida por una clave privada, cifrada o no por una
+  clave simétrica.
+
+Consultar la información contenida en la parte pública puede proporcionar datos
+muy jugosos sobre el propio certificado y eso es lo que haremos con
+:command:`openssl`, ya que aunque el formato |PEM| sea imprimible la información
+está codificada en base64, por lo que un :ref:`cat <cat>` es de poca ayuda. La
+orden ya se encuentra escrita en el epígrafe anterior::
+
+   # openssl x509 -in CERTFICADO.pem -text -noout
+
+Si aplicamos esta orden sobre, por ejemplo, un certificado de servidor emitido por  `Let's
+Encrypt`_ obtendremos lo siguiente:
+
+.. literalinclude:: files/azure-lets.pem
+   :language: none
+
+Observando la salida se distinguen dos partes:
+
+- Los datos en sí (:kbd:`Data`).
+- La firma de tales datos (:kbd:`Signature Algorithm`) para lo cual han usado 
+  como :ref:`función hash el algoritmo sha256 <hash>`.
+
+Dento de los datos podemos distinguir:
+
+* Datos propiamente identificativos como su número de serie o la identidad del
+  propietario del certificado (``Subject``).
+* Datos referentes al propio certificado como su validez o quién es el firmante
+  (``Issuer``)\ [#]_.
+* La clave pública del certificado (``Subject Public Key Info``).
+
+Uno de los campos (``X509v3 extensions``) contiene campos adicionales con
+información de cualquiera de los tres tipos anteriores. Algunos de estos campos
+ofrecen información interesante como:
+
++ La |URL| en la que comprobar si el certificado está revocado (``Authority
+  Information Acces``).
++ Un identificador para el propio certificado (``X509v3 Subject Key Identifier``).
++ El identificador para el certificado con que la |CA| firmó (``X509v3 Authority
+  Key Identifier``).
+
+La opción ``-text`` de :command:`openssl` devuelve toda la información, pero
+podemos afinar::
+
+   # openssl x509 -in CERTIFICADO.pem -subject -noout
+   subject=CN = lets2.iescdl.es
+   # openssl x509 -in CERTIFICADO.pem -dates -noout
+   notBefore=Jan 18 10:03:44 2021 GMT
+   notAfter=Apr 18 10:03:44 2021 GM
+   # openssl x509 -in CERTIFICADO.pem -issuer -noout
+   issuer=C = US, O = Let's Encrypt, CN = R3
+
+La campos propios de la extensión también pueden obtenerse, aunque hay que
+recurrir a :manpage:`x509v3_config(5)` para saber cuáles son sus nombres::
+
+   # openssl x509 -in CERTIFICADO.pem -ext authorityInfoAccess -noout
+   Authority Information Access: 
+       OCSP - URI:http://r3.o.lencr.org
+       CA Issuers - URI:http://r3.i.lencr.org
+
+En este caso, el campo nos indica cuál es la |URL| con el servicio |OCSP| donde
+podemos comprobar si el certificado está revocado y dónde se encuentra el
+certificado con el que firmo este certificado. No obstante lo anterior
+:command:`openssl` ya ofrece una opción para obtener directamente la |URL| con
+el servicio |OCSP|::
+
+   # openssl x509 -in CERTIFICADO.pem -ocsp_uri -noout
+   http://r3.o.lencr.org
+
+.. _verif-cert:
+
+Verificación
+------------
+:command:`openssl` proporciona la suborden ``verify`` para verificar la validez
+de un certificado en lo referente a las fechas y a la firma de la |CA|. Aún, sin
+embargo, faltaría comprobar si el certificado está revocado para lo cual hay que
+consultar a la propia |CA| a través de |OCSP|.
+
+Supongamos que tenemos el certificado :file:`CERTIFICADO.pem` del epigrafe
+anterior emitido por `Let's Encrypt`_, la orden :::
+
+   # openssl verify CERTIFICADO.pem
+
+comprobará si el certificado es válido utilizando las certificados raíz
+instalados en el sistema (en una *Debian* en :file:`/etc/ssl/certs`). Sin
+embargo, en este caso el certificado firmante de `Let's Encrypt`_ no es un
+certificado raíz, ya que esta actúa como una |CA| subordinada. Por tal motivo,
+fallará y requeriremos obtener también el certificado firmante. Es probable que
+:file:`CERTIFICADO.pem` también contenga el de `Let's Encrypt`\ [#]_, pero si no
+fuera el caso, podríamos obtenerlo muy fácilmente de la  |URL|
+`http://r3.i.lencr.org <http://r3.i.lencr.org>`_ según nos informa el propio
+certificado. Con ambos certificados podríamos reintentar la verificación con::
+
+   #  openssl verify -CAfile FIRMANTE.pem CERTIFICADO.pem
+
+Esta comprobación ya funcionará, porque el certificado firmante sí está firmado
+a su vez por un certificado raíz que posee el sistema. Si no fuera así,
+podríamos ir añadiendo los sucesivos certificados de las |CA| intermedias dentro
+de :file:`FIRMANTE.pem`.
+
+Hay algunas variamtes interesantes a esta orden:
+
+* La opción :kbd:`-no-CApath` evita que se usen los certificados raiz instalados
+  en el sistema. La verificación obligaría, pues, a incluir en
+  :file:`FIRMANTE.pem` también el certificado raíz de la |CA| pertinente.
+
+* La opción :kbd:`-partial_chain` permite hacer la verificación aunque no se
+  tenga la cadena completa de |CA|. Por consiguiente::
+
+   # openssl verify -no-CApath -partial_chain -CAfile FIRMANTE.pem CERTIFICADO.pem
+
+  podría verificar el certificado, aunque :file:`FIRMANTE.pem` no contuviera
+  también el certificado raíz.
+
+Lo anterior, no obstante, no puede verificar si el certificado ha sido revocado
+y, por tanto, es a pesar de todo inválido. Para ello hay que recurrir a la |CA|
+y en el caso de `Let's Encrypt` la verificación es sencilla porque ofrece el
+servicio a través del estándar |OCSP|::
+
+   # openssl ocsp -url "$(openssl x509 -in CERTIFICADO.pem -ocsp_uri -noout)" \
+        -issuer FIRMANTE.pem -cert CERTIFICADO.pem
+   WARNING: no nonce in response
+   Response verify OK
+   azure.pem: good
+           This Update: Jan 21 11:00:00 2021 GMT
+           Next Update: Jan 28 11:00:00 2021 GMT
+
+Obsérvese que hay que proporcionar la |URL| con el servicio, el certificado que
+se desea comprobar y el certificado firmante.
+
+.. warning:: En el caso del |PEM| con el certificado firmante, cerciórese de que
+   no está incluido el propio certificado u obtendrá un :kbd:`Unauthorized (6)`. 
+
+.. rubric:: Notas al pie
+
+.. [#] Gratuito actualmente. Durante mucho el servicio fue de pago y
+       restringido.
+.. [#] Las órdenes sólo exponen cómo hacer conversiones entre formatos y ver ls
+       datos del certificado. Por supuesto, se hay otras operaciones
+       interesantes como crear certificados o verificar su validez.
+.. [#] La opción :kbd:`-nodes` deja la clave privada sin cifrar, pero
+       posiblemente no sea una buena idea.
+.. [#] En un certificado autofirmado ``Subject`` e ``Issuer`` coincidirán.
+.. [#] Basta con hacer un :ref:`cat <cat>` y ver si hay uno o dos certificados
+       en el archivo.
+
+.. |CA| replace:: :abbr:`CA (Certification Authority)`
+.. |CSR| replace:: :abbr:`CSR (Certificate Signing Request)`
+.. |RA| replace:: :abbr:`RA (Registration Authority)`
+.. |FNMT| replace:: :abbr:`FNMT (Fábrica Nacional de Moneda y Timbre)`
+.. |RSA| replace:: :abbr:`RSA (Rivest, Shamir y Adleman)`
+.. |PGP| replace:: :abbr:`PGP (Pretty Good Privacy)`
+.. |PKCS| replace:: :abbr:`PKCS (Public-Key Cryptography Standards)`
+.. |PEM| replace:: :abbr:`PEM (Private Enhanced Mail)`
+.. |DER| replace:: :abbr:`DER (Distinguished Encoding Rules)`
+.. |OCSP| replace:: :abbr:`OCSP (Online Certificate Status Protocol)`
+.. |AES| replace:: :abbr:`AES (Advanced Encryption Standard)`
+.. |URL| replace:: :abbr:`URL (Uniform Resource Locator)`
+
+.. _Digital Signature Trust: https://www.identrust.com/
+.. _Let's Encrypt: https://letsencrypt.org/
+.. _Mailenvelope: https://www.mailvelope.com/en
+.. _Gmail: https://gmail.google.com
+.. _Outlook: https://www.outlook.com
+.. _Yahoo: https://mail.yahoo.com
+.. _Thunderbird: https://www.thunderbird.net
+.. _Microsoft: https://www.microsoft.com
+.. _Base64: https://es.wikipedia.org/wiki/Base64

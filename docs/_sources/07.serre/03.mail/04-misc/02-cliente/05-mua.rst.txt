@@ -165,8 +165,8 @@ La mayor dificultad de lograr habilitar el uso de este certificado es que desde
 hace un tiempo la |FNMT|, no firma directamente los certificados personales de
 usuario con un certificado raíz\ [#]_, sino que lo hace a través de un
 certificado intermedio. En cualquier caso, sigamos el rastro y vayámoslo
-descubriendo nosotros mismos. Para empezar vamos a cambiar el formato y a
-separar el certificado público de la clave privada::
+descubriendo nosotros mismos. Para empezar vamos a cambiar el formato a |PEM|
+separando el certificado público de la clave privada::
 
    $ openssl pkcs12 -in /tmp/micert.p12 -nocerts -out /tmp/micert.key
    $ openssl pkcs12 -in /tmp/micert.p12 -clcerts -nokeys -out /tmp/micert.pem
@@ -190,7 +190,8 @@ tanto::
 
    $ wget -q 'http://www.cert.fnmt.es/certs/ACUSU.crt'
 
-Tal certificado no está en el formato que nos interesa, asi que traducimos::
+Tal certificado está en formato |DER|, no en |PEM|, que es el que nos interesa,
+asi que traducimos::
 
    $ openssl x509 -in /tmp/ACUSU.crt -inform DER -outform PEM > /tmp/acusu.crt
 
@@ -206,7 +207,7 @@ certificado raíz, sino que está firmado por otro certificado::
        CA Issuers - URI:http://www.cert.fnmt.es/certs/ACRAIZFNMTRCM.crt
    [...]
 
-De modo que descargamos (y traducimos) este otro certificado::
+De modo que descargamos (y traducimos) también este otro certificado::
 
    $ wget -q 'http://www.cert.fnmt.es/certs/ACRAIZFNMTRCM.crt'
    $ openssl x509 -in /tmp/ACRAIZFNMTRCM.crt -inform DER -outform PEM > /tmp/raiz.crt
@@ -293,3 +294,5 @@ Cada fichero contiene básicamente:
 .. |MSA| replace:: :abbr:`MSA (Mail Submission Agent)`
 .. |MRA| replace:: :abbr:`MRA (Mail Retreival Agent)`
 .. |FNMT| replace:: :abbr:`FNMT (Fábrica Nacional de Moneda y Timbre)`
+.. |PEM| replace:: :abbr:`PEM (Private Enhanced Mail)`
+.. |DER| replace:: :abbr:`DER (Distinguished Encoding Rules)`
