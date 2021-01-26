@@ -489,7 +489,7 @@ recurrir a :manpage:`x509v3_config(5)` para saber cuáles son sus nombres::
 
 En este caso, el campo nos indica cuál es la |URL| con el servicio |OCSP| donde
 podemos comprobar si el certificado está revocado y dónde se encuentra el
-certificado con el que firmo este certificado. No obstante lo anterior
+certificado con el que firmo este certificado. No obstante lo anterior,
 :command:`openssl` ya ofrece una opción para obtener directamente la |URL| con
 el servicio |OCSP|::
 
@@ -555,10 +555,30 @@ servicio a través del estándar |OCSP|::
            Next Update: Jan 28 11:00:00 2021 GMT
 
 Obsérvese que hay que proporcionar la |URL| con el servicio, el certificado que
-se desea comprobar y el certificado firmante.
+se desea comprobar y el certificado firmante. Un certificado revocado, por su
+parte, podría ser verificado, porque está correctamente firmado y no está
+caducado::
 
-.. warning:: En el caso del |PEM| con el certificado firmante, cerciórese de que
-   no está incluido el propio certificado u obtendrá un :kbd:`Unauthorized (6)`. 
+   $ openssl verify -CAfile FIRMANTE.pem CERTIFICADO.pem
+   CERTFICADO.pem: OK
+
+pero al comprobarse su validez ante la autoridad certificadora::
+
+   # openssl ocsp -url "$(openssl x509 -in CERTIFICADO.pem -ocsp_uri -noout)" \
+        -issuer FIRMANTE.pem -cert CERTIFICADO.pem
+   WARNING: no nonce in response
+   Response verify OK
+   CERTIFICADO.pem: revoked
+           This Update: Jan 25 11:34:36 2021 GMT
+           Next Update: Feb  1 11:34:36 2021 GMT
+           Revocation Time: Jan 18 17:40:13 2021 GMT
+
+nos descubriría que el certificado ha sido revocado; y, por tanto, es
+inadmisible.
+
+.. warning:: Cerciórese de que el archivo |PEM| del certificado firmante no
+   contiene también el propio certificado u obtendrá un :kbd:`Unauthorized
+   (6)`. 
 
 .. rubric:: Notas al pie
 

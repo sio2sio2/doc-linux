@@ -90,7 +90,7 @@ Hagamos antes de empezar una serie de aclaraciones:
 :dfn:`Regla heredada`
    Aquella que el recurso recibe por herencia de un directorio que lo contiene
    (o que contiene al que lo contiene), etc.
-:dfn:`Regla de permisión`
+:dfn:`Regla de concesión`
    Aquella que concede permisos.
 :dfn:`Regla de denegación`
    Aquella que niega permisos.
@@ -115,7 +115,7 @@ La precedencia de las reglas viene dado por lo siguiente:
 
 #. Tiene precedencia cualquier *regla explícita* sobre cualquuier *regla heredada*.
 #. Dentro de cada grupo anterior, las *reglas de denegación* tienen precedencia
-   sobre las *reglas de permisión*.
+   sobre las *reglas de concesión*.
 
 Poniendo estas ideas en una tabla:
 
