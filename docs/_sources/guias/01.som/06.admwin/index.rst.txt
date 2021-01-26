@@ -7,6 +7,8 @@ Administración básica de *Windows* 10
    pinceladas, salvo en el caso de los permisos en que se ofrece una descripción
    algo pormenorizada del sistema de permisos. 
 
+.. _usu-windows:
+
 Gestión de usuarios
 ===================
 .. note:: Nos centramos en usuarios y grupos locales.
@@ -62,21 +64,84 @@ Gestión de usuarios
 
 Seguridad
 =========
-
 .. _dac-windows:
 
 *Windows* 10 implementa un mecanismo de :ref:`control de accesos DAC
-<control-dac>` basado en |ACL|\ s. Así pues, el estudio del control de accesos
-en *Windows* se basa en estudiar:
+<control-dac>` basado en reglas |ACL|\ s.
+
+Para el sistema de archivos |NTFS| las reglas se definen en los recursos
+(archivos o directorios), se aplican sobre un usuario o grupo, y niegan o
+conceden una serie de permisos. Por supuesto, sobre un mismo recurso pueden
+definirse varias reglas. Además, existe el concepto de :dfn:`regla heredada`
+que es una regla que se define sobre un directorio, pero que, además de afectar
+al propio directorio, afecta recursivamente a todos los recursos contenidos
+dentro de él.
+
+Una regla |ACL| es aplicable a la acción de un usuario cuando es pertinente al
+usuario o a un grupo que contiene al usuario y los permisos que define afectan
+a la acción.  Por ejemplo, "¿puede el usuario **X** crear un nuevo archivo en
+su carpeta de *Imágenes*?" implica el permiso "Crear archivos regulares dentro
+de un directorio" (que :ref:`se ha numerado como 6 más adelante <winperm>`).
+
+Hagamos antes de empezar una serie de aclaraciones:
+
+:dfn:`Regla explícita`
+   Aquella que se ha definido directamente en el propio recurso.
+:dfn:`Regla heredada`
+   Aquella que el recurso recibe por herencia de un directorio que lo contiene
+   (o que contiene al que lo contiene), etc.
+:dfn:`Regla de permisión`
+   Aquella que concede permisos.
+:dfn:`Regla de denegación`
+   Aquella que niega permisos.
+
+La correcta comprensión y creación de permisos sobre recursos implica:
 
 - Cómo crear usuarios y grupos, y cuáles son los usuarios y grupos
-  predeterminados por el sistema.
-
+  predeterminados por el sistema (que se trató en el :ref:`epígrafe anterior
+  <usu-windows>`).
+- Cuando un recurso tiene definidas varias reglas de acceso, en qué orden se
+  leen estas.
 - Cuáles son los permisos que sobre los objetos permite definir el sistema
   y cómo otorgarlos a usuarios y grupos.
 
-Además, pueden definirse de forma centralizada permisos a grupos y usuarios
-sobre determinadas acciones (p.e. el acceso al sistema).
+Al margen de las |ACL|, pueden definirse de forma centralizada permisos a
+grupos y usuarios sobre determinadas acciones (p.e. el acceso al sistema) a
+través de directivas de seguridad.
+
+Precedencia
+-----------
+La precedencia de las reglas viene dado por lo siguiente:
+
+#. Tiene precedencia cualquier *regla explícita* sobre cualquuier *regla heredada*.
+#. Dentro de cada grupo anterior, las *reglas de denegación* tienen precedencia
+   sobre las *reglas de permisión*.
+
+Poniendo estas ideas en una tabla:
+
+.. table:: Precedencia de |ACL|\ s en |NTFS|
+   :class: ntfs-acl
+
+   +-------------+------------+
+   | Ubicación   | Carácter   |
+   +=============+============+
+   | Explícitas  | Denegación |
+   |             +------------+
+   |             | Permisión  |
+   +-------------+------------+
+   | Implícitas  | Denegación |
+   |             +------------+
+   |             | Permisión  |
+   +-------------+------------+
+
+Ahora bien, ¿qué es lo que pasa si ninguna de las reglas es aplicable a la
+acción de un usuario y por tanto el sistema agota la lista de reglas |ACL| sin
+poder aplicar ninguna? En ese caso, la acción se considera denegada.
+
+.. seealso:: Para una explicación más exhaustiva, puede consultar `este
+   artículo de ntfs.com <https://www.ntfs.com/ntfs-permissions-acl-use.htm>`_.
+
+.. _winperm:
 
 Permisos
 --------
