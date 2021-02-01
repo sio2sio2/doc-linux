@@ -68,6 +68,10 @@ y la relación de ejercicios:
 
 Gestión de recursos
 ===================
+Hardware
+--------
+Para conocer el *hardware* del que dispone nuestra máquina, existen algunas
+órdenes explicadas en el :ref:`epígrafe sobre análisis de hardware <hardware>`.
 
 Discos
 ------
