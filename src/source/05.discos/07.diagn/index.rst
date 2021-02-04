@@ -266,7 +266,7 @@ Hay dos formas de utilizar esta tecnología:
   <https://en.wikipedia.org/wiki/S.M.A.R.T.>`_.
 * `What SMART Stats Tell Us About Hard Drives
   <https://www.backblaze.com/blog/what-smart-stats-indicate-hard-drive-failures>`_.
-* `Articulo de la Wiki de Archlinux sobre SMART
+* `Artículo de la Wiki de Archlinux sobre SMART
   <https://wiki.archlinux.org/index.php/S.M.A.R.T.>`_.
 * `Corrección de sectores defectuosos con smartctl y hdparm
   <https://hiddenc0de.wordpress.com/2015/06/12/how-to-fix-bad-sectors-or-bad-blocks-on-hard-disk/>`_.
