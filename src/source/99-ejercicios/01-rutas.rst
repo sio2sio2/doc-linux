@@ -30,16 +30,13 @@ Usando el usuario del sistema sin privilegios:
 
 6. Pasarse al directorio :file:`local` dentro de :file:`usr`.
 
-7. Suponiendo que el administrador del sistema respete los estándares, ¿hay algún
-   ejecutable instalado en el sistema que haya instalado él y no forme parte de la
-   distribución?
+7. Suponiendo que el administrador del sistema respete los estándares, ¿hay
+   algún ejecutable instalado en el sistema que haya instalado él y no forme
+   parte de los paquetes de la distribución?
 
 8. Con ruta relativa, volver al directorio personal.
 
 9. Listar el contenido del directorio raíz usando ruta relativa.
 
-10. Listar las interfaces de red mirando en el directorio apropiado, no
-    usando comandos como :command:`ip` o :command:`ifconfig`.
-
-    .. note:: Deberá averiguar cuál es este directorio donde el sistema muestra
-       las interfaces de red detectadas.
+10. Suponiendo que en el sistema no se han hecho definiciones raras, mirar
+    cuáles son los directorios personales de usuario que hay ya definidos.
