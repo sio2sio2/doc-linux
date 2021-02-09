@@ -12,7 +12,8 @@ Gestión de *software*
 Una de las funciones principales de las distribuciones de *Linux* es
 seleccionar y empaquetar *software* para ofrecer su instalación sencilla al
 usuario. De ahí que la gestión de *software* sea uno de los aspectos que,
-aun usando la interfaz |CLI|, varíe entre distribuciones. Los principales sistemas de empaquetado son:
+aun usando la interfaz |CLI|, varíe entre distribuciones. Los principales
+sistemas de paquetes son:
 
 - El de Debian_ (y todas sus derivadas como Ubuntu_) basado en la gestión de
   paquetes ``.deb``. Este será el sistema que trataremos en esta guía.
@@ -26,10 +27,26 @@ aun usando la interfaz |CLI|, varíe entre distribuciones. Los principales siste
   :command:`emerge`.
 - El de Slackware_ basado en las utilidades :program:`pkgtools`.
 
-Este epígrafe debe ser una versión resumida de :ref:`paqueteria` que incluya el
-:ref:`paq-vistazo` (cómo se organizan los repositorios) y las :ref:`paq-bas`,
-pero utilizando más bien :ref:`apt <apt>`. Las relaciones de ejericicios
-asociados a este apartado son:
+Hay, además, sistemas de paquetes universales con una filosofía diferente y que
+pueden convivir con el sistema de empaquetado de la propia distribuición. Todos
+conceptos se tratan en los :ref:`párrafos instroductorios del epígrafe sobre
+gestión de software del manual <paqueteria>` y es conveniente tenerlos claros.
+
+Los contenidos apropiados para esta sección, aparte de lo anterior son:
+
+- Las `ramas y secciones de Debian <paquetes-deb>`_, aunque solamente si se usa
+  como base la propia *Debian*. Si se usa otra derivada como *Ubuntu*, debería
+  adaptarse el epúgrafe\ [#]_.
+- Los :ref:`repositorios <deb-repo>`.
+- Las :ref:`operaciones básicas <paq-bas>`.
+
+.. note:: Pueden, además, revisarse someramente las herramientas gráficas de
+   instalación como :program:`Synaptic` (instalador gráfico de paquetes web) o
+   el agregador :program:`Gnome Software`, que aunque se habrán visto
+   superficialmente en la unidad anterior al presentar el entorno gráfico, ahora
+   pueden contemplarse con más conocimiento de causa.
+
+Las relaciones de ejericicios asociados a este apartado son:
 
 * :ref:`ej-softw`
 
@@ -77,6 +94,14 @@ con :command:`at` y :program:`crontab`. La relación de ejercicios
 correspondiente es ésta:
 
 * :ref:`ej-cronat`
+
+.. rubric:: Notas al pie
+
+.. [#] En *Ubuntu*, por ejemplo, las ramas son siempre los nombres de las
+   versiones (de hecho se puede hacer en *Debian*, utilizando el nombre *buster*
+   en vez de *stable* si es que *Buster* es en ese momento la distribución
+   estable) y los componentes son *main*, *universe*, *multiverse* y
+   *restricted*.
 
 .. |CLI| replace:: :abbr:`CLI (Command Line Interface)`
 
