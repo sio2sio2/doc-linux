@@ -38,6 +38,7 @@ Usando el usuario del sistema sin privilegios:
 
 9. Listar el contenido del directorio raíz usando ruta relativa.
 
-10. Suponiendo que en el sistema no se han hecho definiciones raras, mirar
-    cuáles son los directorios personales de cada usuario para saber cuántos
+10. Suponiendo que en el sistema no se han hecho definiciones raras, sacar
+    la lista de directorios personales de usuario (no la lista de directorios
+    que contiene cada directorio personal de usuario) para saber cuántos
     usuarios físicos hay definidos en el sistema.
