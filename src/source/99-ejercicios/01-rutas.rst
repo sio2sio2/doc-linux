@@ -39,4 +39,5 @@ Usando el usuario del sistema sin privilegios:
 9. Listar el contenido del directorio raíz usando ruta relativa.
 
 10. Suponiendo que en el sistema no se han hecho definiciones raras, mirar
-    cuáles son los directorios personales de usuario que hay ya definidos.
+    cuáles son los directorios personales de cada usuario para saber cuántos
+    usuarios físicos hay definidos en el sistema.
