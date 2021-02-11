@@ -150,83 +150,60 @@ buzón por lista. La configuración permite gestionarlas de forma cómoda.
 Firma digital (:file:`smime.rc`)
 --------------------------------
 Fundamentalmente define cómo firmar los correos electrónicos. Lo habitual es usar
-`gpg <https://www.gnupg.org/>`_, aunque nosotros usaremos el certificado
-expedido por la |FNMT|. Por tal motivo, como dispondremos de un solo certificado
-y éste está asociado a una dirección de correo, sólo podremos firmar (y así
-haremos) mensajes enviados desde una única dirección de correo.
+`gpg <https://www.gnupg.org/>`_, aunque también es posible usar el certificado
+expedido por la |FNMT|. 
 
-La configuración del fichero, además, tiene una preparación del certificado que
-es preciso explicar. En primer lugar, deberemos ser capaces de obtener nuestro
-certificado digital en formato *pcks12*, muy posiblemente, exportándolo del
-navegador en que lo tengamos instalado. Supongamos que lo guardamos con el
-nombre :file:`micert.p12`.
+.. note:: Para la perfecta compresión de este apartado, debería echarle un ojo
+   a las :ref:`explicaciones sobre certificado digital <cert-digital>`.
 
-La mayor dificultad de lograr habilitar el uso de este certificado es que desde
-hace un tiempo la |FNMT|, no firma directamente los certificados personales de
-usuario con un certificado raíz\ [#]_, sino que lo hace a través de un
-certificado intermedio. En cualquier caso, sigamos el rastro y vayámoslo
-descubriendo nosotros mismos. Para empezar vamos a cambiar el formato a |PEM|
-separando el certificado público de la clave privada::
+Antes de empezar es necesario tener presente (aunque esto puede deducirse del
+estudio del propio certificado) que los certificados personales expedidos por la
+|FNMT| se firman con un certificado intermedio (*AC FNMT Usuarios*) que a su vez
+sí se firmó con un certiticado raíz (*AC RAIZ FNMT-RCM*)\ [#]_.
 
-   $ openssl pkcs12 -in /tmp/micert.p12 -nocerts -out /tmp/micert.key
-   $ openssl pkcs12 -in /tmp/micert.p12 -clcerts -nokeys -out /tmp/micert.pem
+Lo habitual es que nuestro certificado se encuentre en formado |PKCS| #12,
+quizás exportado desde el navegador. Existen varias posibilidades:
 
-Hecho esto, podemos comprobar con qué certificado se ha firmado nuestro
-certificado::
++ Que el archivo ``.p12`` se limite a recoger nuestro certficado.
++ Que incluya también el certificado intermedio.
++ Que incluya, además, el certificado raíz.
+ 
+.. note:: En principio, el certificado raíz debería estar incluido en el sistema
+   y no necesitamos preocuparnos de él. El antiguo certificado raíz de la |FNMT|
+   no lo estaba y bera necesario hacerse en formato |PEM| (codificación
+   Base64_). En ese caso era necesario hacerse con él y, una vez creado el
+   directorio :file:`~/.smime` como se expone más adelante, copiarlo en el
+   fichero adecuado\ [#]_ (siempre formato |PEM| codificado en Base64_)::
 
-   $ openssl x509 -in /tmp/micert.pem -text -noout
-   [...]
-   X509v3 Authority Key Identifier:                   
-       keyid:B1:D4:4F:C4:23:79:FA:44:05:09:C6:EB:39:CF:E8:35:B0:B8:20:64
-                                                                                                                              
-   Authority Information Access:
-       OCSP - URI:http://ocspusu.cert.fnmt.es/ocspusu/OcspResponder
-       CA Issuers - URI:http://www.cert.fnmt.es/certs/ACUSU.crt
-   [...]
+      ·$ cat raiz.crt > ~/.smime/ca-bundle.crt
 
-Ahí tenemos el identificador del certificado que se usó para firmar nuestro
-certificado y, lo que es más cómodo, la dirección de la que descargárselo. Por
-tanto::
+Por otra parte el certificado debería incluir la dirección de correo
+electrónico::
 
-   $ wget -q 'http://www.cert.fnmt.es/certs/ACUSU.crt'
+   $ openssl pkcs12 -in micert.p12 -clcerts -nokeys | openssl x509 -ext subjectAltName -noout
+   X509v3 Subject Alternative Name:
+      email:midireccion@example.net, [...]
 
-Tal certificado está en formato |DER|, no en |PEM|, que es el que nos interesa,
-asi que traducimos::
+porque si no la incluye, aunque podremos firmar, tendremos que completar el
+proceso de instalación manualmente.
 
-   $ openssl x509 -in /tmp/ACUSU.crt -inform DER -outform PEM > /tmp/acusu.crt
+Si nuestro ``.p12`` no incluye el certificado intermedio, deberemos obtenermos y
+generar un ``.p12`` que sí lo incluya. No debería tener problemas para hacer
+esta operación si ha leído con detenimiento las explicaciones sobre
+:ref:`certificados digitales <cert-digital>`.
 
-Y si échamos un vistazo a este otro certificado, veremos que no es un
-certificado raíz, sino que está firmado por otro certificado::
-
-   $ openssl x509 -in /tmp/acusu.crt -text -noout
-   [...]
-   X509v3 Subject Key Identifier:                     
-       B1:D4:4F:C4:23:79:FA:44:05:09:C6:EB:39:CF:E8:35:B0:B8:20:64
-   Authority Information Access:                      
-       OCSP - URI:http://ocspfnmtrcmca.cert.fnmt.es/ocspfnmtrcmca/OcspResponder
-       CA Issuers - URI:http://www.cert.fnmt.es/certs/ACRAIZFNMTRCM.crt
-   [...]
-
-De modo que descargamos (y traducimos) también este otro certificado::
-
-   $ wget -q 'http://www.cert.fnmt.es/certs/ACRAIZFNMTRCM.crt'
-   $ openssl x509 -in /tmp/ACRAIZFNMTRCM.crt -inform DER -outform PEM > /tmp/raiz.crt
-
-Si echamos un vistazo a las propiedades del certificado veremos que este sí que
-no está firmado por ningún otro (el propio nombre ya nos daba la pista).
-
-Con la cuestión de los certificados averiguada, ya sólo es cuestión de añadirlos
-a :command:`mutt` para lo cual hay primero que preparar el directorio :file:`~/.smime`::
+Completado esto, si es la primera vez que instalamos el certificado para
+:command:`mutt`, deberemos preparar el directorto para certificados
+(:file:`~/.smime`)::
 
    $ smime_keys init
 
-y copiar el certificado raíz dentro\ [#]_::
+Y ya preparado basta con instalar el certificado propio y el intermedio::
 
-   $ mv /tmp/raiz.crt ~/.smime/ca-bundle.crt
-
-Por último, debemos añadir nuestro certificado, pero indicando el intermedio::
-
-   $ smime_keys add_chain /tmp/micert.key /tmp/micert.pem /tmp/acusu.crt
+   $ smime_keys add_p12 /tmp/micert.p12
+   Enter Import Password:
+   Enter PEM pass phrase:
+   Verifying - Enter PEM pass phrase:
 
    You may assign a label to this key, so you don't have to remember
    the key ID. This has to be _one_ word (no whitespaces).
@@ -237,14 +214,33 @@ Por último, debemos añadir nuestro certificado, pero indicando el intermedio::
    /home/josem/.smime/certificates/f8ecaf67.0: OK
 
 
-   certificate f8ecaf67.0 (micert_ceres) for mi_cuenta@gmail.com added.
-   added private key: /home/usuario/.smime/keys/f8ecaf67.0 for mi_cuenta@gmail.com
+   certificate f8ecaf67.0 (micert_ceres) for midireccion@example.net.com added.
+   added private key: /home/usuario/.smime/keys/f8ecaf67.0 for midireccion@example.net
+
+Nuestro certificado está asociado al nombre :file:`f8ecaf67.0` que será el que
+haya que incluir en la configuración propuesta para :file:`smime.rc`.
+
+Podemos, sin embargo, encontrarnos con el problema de que el certificado no
+incluya la dirección de correo. En ese caso, la orden :command:`smime_keys` no
+lo reconocerá como un certificado propio y aunque copiará el certificado público
+en :file:`~/.smime/certificates/f8ecaf67.0`, no lo añadirá al archivo
+:file:`.index` de ese directorio, ni instalrá la parte privada en
+:file:`~/.smime/certifcates/keys`. Para solucionarlo podemos completar nosotros
+mismos la instalación::
+
+   $ echo "midireccion@example.net f8ecef67.0 ceres_2021 1fe0bb9f.0 t se" >> ~/.smime/certificates/.index
+   $ cp micert.key ~/.smime/keys/f8ecef67.0
+   $ echo "midireccion@example.net f8ecef67.0 ceres_2021 ? t se" >> ~/.smime/keys/.index
+
+donde :file:`1fe0bb9f.0` es el nombre que haya adquirido el certificado
+intermedio y :file:`micert.key` el archivo donde hayamos guardado la parte
+privada de nuestro certificado en formato |PEM|.
 
 .. note:: Con la configuración incluida en :file:`smime.rc`, se firmarán
    automáticamente los mensajes cuyo emisor sea la cuenta a la que hayamos asociado
-   el certificado (en el ejemplo, *mi_cuenta@gmail.com*), excepto aquellos dirigidos
-   a listas de distribución. No obstante, justamente antes de enviar el mensaje
-   se podrá evitar o incorporar la firma pulsando "*C*".
+   el certificado (en el ejemplo, *midireccion@example.net*), excepto aquellos
+   dirigidos a listas de distribución. No obstante, justamente antes de enviar
+   el mensaje se podrá evitar o incorporar la firma pulsando "*C*".
 
 Declaración de cuentas (:file:`servers.rc`)
 -------------------------------------------
@@ -285,7 +281,8 @@ Cada fichero contiene básicamente:
 
 .. [#] :program:`vim` como no podía ser de otra forma.
 
-.. [#] Antes lo hacía con el certificado raíz *FNMT Clase 2 CA*.
+.. [#] Pero esto no fue siempre así. Los antiguos certificados personales se
+   firmaban direntamente con el certificado raíz *FNMT Clase 2 CA*.
 
 .. [#] El nombre del directorio y del almacen de certificados acreditadores se
    define en :file:`/etc/Muttrc.d/smime.rc`
@@ -296,3 +293,6 @@ Cada fichero contiene básicamente:
 .. |FNMT| replace:: :abbr:`FNMT (Fábrica Nacional de Moneda y Timbre)`
 .. |PEM| replace:: :abbr:`PEM (Private Enhanced Mail)`
 .. |DER| replace:: :abbr:`DER (Distinguished Encoding Rules)`
+.. |PKCS| replace:: :abbr:`PKCS (Public-Key Cryptography Standards)`
+
+.. _Base64: https://en.wikipedia.org/wiki/Base64

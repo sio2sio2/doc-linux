@@ -195,79 +195,60 @@ buzón por lista. La configuración permite gestionarlas de forma cómoda.</p>
 <div class="section" id="firma-digital-smime-rc">
 <span id="mutt-fnmt"></span><h3><span class="section-number">7.3.5.3.5.2.9. </span>Firma digital (<code class="file docutils literal notranslate"><span class="pre">smime.rc</span></code>)<a class="headerlink" href="#firma-digital-smime-rc" title="Enlazar permanentemente con este título">¶</a></h3>
 <p>Fundamentalmente define cómo firmar los correos electrónicos. Lo habitual es usar
-<a class="reference external" href="https://www.gnupg.org/">gpg</a>, aunque nosotros usaremos el certificado
-expedido por la <abbr title="Fábrica Nacional de Moneda y Timbre">FNMT</abbr>. Por tal motivo, como dispondremos de un solo certificado
-y éste está asociado a una dirección de correo, sólo podremos firmar (y así
-haremos) mensajes enviados desde una única dirección de correo.</p>
-<p>La configuración del fichero, además, tiene una preparación del certificado que
-es preciso explicar. En primer lugar, deberemos ser capaces de obtener nuestro
-certificado digital en formato <em>pcks12</em>, muy posiblemente, exportándolo del
-navegador en que lo tengamos instalado. Supongamos que lo guardamos con el
-nombre <code class="file docutils literal notranslate"><span class="pre">micert.p12</span></code>.</p>
-<p>La mayor dificultad de lograr habilitar el uso de este certificado es que desde
-hace un tiempo la <abbr title="Fábrica Nacional de Moneda y Timbre">FNMT</abbr>, no firma directamente los certificados personales de
-usuario con un certificado raíz<a class="footnote-reference brackets" href="#id7" id="id3">3</a>, sino que lo hace a través de un
-certificado intermedio. En cualquier caso, sigamos el rastro y vayámoslo
-descubriendo nosotros mismos. Para empezar vamos a cambiar el formato a <abbr title="Private Enhanced Mail">PEM</abbr>
-separando el certificado público de la clave privada:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl pkcs12 -in /tmp/micert.p12 -nocerts -out /tmp/micert.key
-<span class="gp">$</span> openssl pkcs12 -in /tmp/micert.p12 -clcerts -nokeys -out /tmp/micert.pem
+<a class="reference external" href="https://www.gnupg.org/">gpg</a>, aunque también es posible usar el certificado
+expedido por la <abbr title="Fábrica Nacional de Moneda y Timbre">FNMT</abbr>.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Para la perfecta compresión de este apartado, debería echarle un ojo
+a las <a class="reference internal" href="../../../../09.apendice/01.cryto/03.aplicaciones/01.firma.html#cert-digital"><span class="std std-ref">explicaciones sobre certificado digital</span></a>.</p>
+</div>
+<p>Antes de empezar es necesario tener presente (aunque esto puede deducirse del
+estudio del propio certificado) que los certificados personales expedidos por la
+<abbr title="Fábrica Nacional de Moneda y Timbre">FNMT</abbr> se firman con un certificado intermedio (<em>AC FNMT Usuarios</em>) que a su vez
+sí se firmó con un certiticado raíz (<em>AC RAIZ FNMT-RCM</em>)<a class="footnote-reference brackets" href="#id7" id="id3">3</a>.</p>
+<p>Lo habitual es que nuestro certificado se encuentre en formado <abbr title="Public-Key Cryptography Standards">PKCS</abbr> #12,
+quizás exportado desde el navegador. Existen varias posibilidades:</p>
+<ul class="simple">
+<li><p>Que el archivo <code class="docutils literal notranslate"><span class="pre">.p12</span></code> se limite a recoger nuestro certficado.</p></li>
+<li><p>Que incluya también el certificado intermedio.</p></li>
+<li><p>Que incluya, además, el certificado raíz.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>En principio, el certificado raíz debería estar incluido en el sistema
+y no necesitamos preocuparnos de él. El antiguo certificado raíz de la <abbr title="Fábrica Nacional de Moneda y Timbre">FNMT</abbr>
+no lo estaba y bera necesario hacerse en formato <abbr title="Private Enhanced Mail">PEM</abbr> (codificación
+<a class="reference external" href="https://en.wikipedia.org/wiki/Base64">Base64</a>). En ese caso era necesario hacerse con él y, una vez creado el
+directorio <code class="file docutils literal notranslate"><span class="pre">~/.smime</span></code> como se expone más adelante, copiarlo en el
+fichero adecuado<a class="footnote-reference brackets" href="#id8" id="id4">4</a> (siempre formato <abbr title="Private Enhanced Mail">PEM</abbr> codificado en <a class="reference external" href="https://en.wikipedia.org/wiki/Base64">Base64</a>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">·$ cat raiz.crt &gt; ~/.smime/ca-bundle.crt</span>
 </pre></div>
 </div>
-<p>Hecho esto, podemos comprobar con qué certificado se ha firmado nuestro
-certificado:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl x509 -in /tmp/micert.pem -text -noout
-<span class="go">[...]</span>
-<span class="go">X509v3 Authority Key Identifier:</span>
-<span class="go">    keyid:B1:D4:4F:C4:23:79:FA:44:05:09:C6:EB:39:CF:E8:35:B0:B8:20:64</span>
-
-<span class="go">Authority Information Access:</span>
-<span class="go">    OCSP - URI:http://ocspusu.cert.fnmt.es/ocspusu/OcspResponder</span>
-<span class="go">    CA Issuers - URI:http://www.cert.fnmt.es/certs/ACUSU.crt</span>
-<span class="go">[...]</span>
+</div>
+<p>Por otra parte el certificado debería incluir la dirección de correo
+electrónico:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl pkcs12 -in micert.p12 -clcerts -nokeys <span class="p">|</span> openssl x509 -ext subjectAltName -noout
+<span class="go">X509v3 Subject Alternative Name:</span>
+<span class="go">   email:midireccion@example.net, [...]</span>
 </pre></div>
 </div>
-<p>Ahí tenemos el identificador del certificado que se usó para firmar nuestro
-certificado y, lo que es más cómodo, la dirección de la que descargárselo. Por
-tanto:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> wget -q <span class="s1">&#39;http://www.cert.fnmt.es/certs/ACUSU.crt&#39;</span>
-</pre></div>
-</div>
-<p>Tal certificado está en formato <abbr title="Distinguished Encoding Rules">DER</abbr>, no en <abbr title="Private Enhanced Mail">PEM</abbr>, que es el que nos interesa,
-asi que traducimos:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl x509 -in /tmp/ACUSU.crt -inform DER -outform PEM &gt; /tmp/acusu.crt
-</pre></div>
-</div>
-<p>Y si échamos un vistazo a este otro certificado, veremos que no es un
-certificado raíz, sino que está firmado por otro certificado:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl x509 -in /tmp/acusu.crt -text -noout
-<span class="go">[...]</span>
-<span class="go">X509v3 Subject Key Identifier:</span>
-<span class="go">    B1:D4:4F:C4:23:79:FA:44:05:09:C6:EB:39:CF:E8:35:B0:B8:20:64</span>
-<span class="go">Authority Information Access:</span>
-<span class="go">    OCSP - URI:http://ocspfnmtrcmca.cert.fnmt.es/ocspfnmtrcmca/OcspResponder</span>
-<span class="go">    CA Issuers - URI:http://www.cert.fnmt.es/certs/ACRAIZFNMTRCM.crt</span>
-<span class="go">[...]</span>
-</pre></div>
-</div>
-<p>De modo que descargamos (y traducimos) también este otro certificado:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> wget -q <span class="s1">&#39;http://www.cert.fnmt.es/certs/ACRAIZFNMTRCM.crt&#39;</span>
-<span class="gp">$</span> openssl x509 -in /tmp/ACRAIZFNMTRCM.crt -inform DER -outform PEM &gt; /tmp/raiz.crt
-</pre></div>
-</div>
-<p>Si echamos un vistazo a las propiedades del certificado veremos que este sí que
-no está firmado por ningún otro (el propio nombre ya nos daba la pista).</p>
-<p>Con la cuestión de los certificados averiguada, ya sólo es cuestión de añadirlos
-a <strong class="command">mutt</strong> para lo cual hay primero que preparar el directorio <code class="file docutils literal notranslate"><span class="pre">~/.smime</span></code>:</p>
+<p>porque si no la incluye, aunque podremos firmar, tendremos que completar el
+proceso de instalación manualmente.</p>
+<p>Si nuestro <code class="docutils literal notranslate"><span class="pre">.p12</span></code> no incluye el certificado intermedio, deberemos obtenermos y
+generar un <code class="docutils literal notranslate"><span class="pre">.p12</span></code> que sí lo incluya. No debería tener problemas para hacer
+esta operación si ha leído con detenimiento las explicaciones sobre
+<a class="reference internal" href="../../../../09.apendice/01.cryto/03.aplicaciones/01.firma.html#cert-digital"><span class="std std-ref">certificados digitales</span></a>.</p>
+<p>Completado esto, si es la primera vez que instalamos el certificado para
+<strong class="command">mutt</strong>, deberemos preparar el directorto para certificados
+(<code class="file docutils literal notranslate"><span class="pre">~/.smime</span></code>):</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> smime_keys init
 </pre></div>
 </div>
-<p>y copiar el certificado raíz dentro<a class="footnote-reference brackets" href="#id8" id="id4">4</a>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> mv /tmp/raiz.crt ~/.smime/ca-bundle.crt
-</pre></div>
-</div>
-<p>Por último, debemos añadir nuestro certificado, pero indicando el intermedio:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> smime_keys add_chain /tmp/micert.key /tmp/micert.pem /tmp/acusu.crt
+<p>Y ya preparado basta con instalar el certificado propio y el intermedio:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> smime_keys add_p12 /tmp/micert.p12
+<span class="go">Enter Import Password:</span>
+<span class="go">Enter PEM pass phrase:</span>
+<span class="go">Verifying - Enter PEM pass phrase:</span>
 
 <span class="go">You may assign a label to this key, so you don&#39;t have to remember</span>
 <span class="go">the key ID. This has to be _one_ word (no whitespaces).</span>
@@ -278,17 +259,34 @@ a <strong class="command">mutt</strong> para lo cual hay primero que preparar el
 <span class="go">/home/josem/.smime/certificates/f8ecaf67.0: OK</span>
 
 
-<span class="go">certificate f8ecaf67.0 (micert_ceres) for mi_cuenta@gmail.com added.</span>
-<span class="go">added private key: /home/usuario/.smime/keys/f8ecaf67.0 for mi_cuenta@gmail.com</span>
+<span class="go">certificate f8ecaf67.0 (micert_ceres) for midireccion@example.net.com added.</span>
+<span class="go">added private key: /home/usuario/.smime/keys/f8ecaf67.0 for midireccion@example.net</span>
 </pre></div>
 </div>
+<p>Nuestro certificado está asociado al nombre <code class="file docutils literal notranslate"><span class="pre">f8ecaf67.0</span></code> que será el que
+haya que incluir en la configuración propuesta para <code class="file docutils literal notranslate"><span class="pre">smime.rc</span></code>.</p>
+<p>Podemos, sin embargo, encontrarnos con el problema de que el certificado no
+incluya la dirección de correo. En ese caso, la orden <strong class="command">smime_keys</strong> no
+lo reconocerá como un certificado propio y aunque copiará el certificado público
+en <code class="file docutils literal notranslate"><span class="pre">~/.smime/certificates/f8ecaf67.0</span></code>, no lo añadirá al archivo
+<code class="file docutils literal notranslate"><span class="pre">.index</span></code> de ese directorio, ni instalrá la parte privada en
+<code class="file docutils literal notranslate"><span class="pre">~/.smime/certifcates/keys</span></code>. Para solucionarlo podemos completar nosotros
+mismos la instalación:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> <span class="nb">echo</span> <span class="s2">&quot;midireccion@example.net f8ecef67.0 ceres_2021 1fe0bb9f.0 t se&quot;</span> &gt;&gt; ~/.smime/certificates/.index
+<span class="gp">$</span> cp micert.key ~/.smime/keys/f8ecef67.0
+<span class="gp">$</span> <span class="nb">echo</span> <span class="s2">&quot;midireccion@example.net f8ecef67.0 ceres_2021 ? t se&quot;</span> &gt;&gt; ~/.smime/keys/.index
+</pre></div>
+</div>
+<p>donde <code class="file docutils literal notranslate"><span class="pre">1fe0bb9f.0</span></code> es el nombre que haya adquirido el certificado
+intermedio y <code class="file docutils literal notranslate"><span class="pre">micert.key</span></code> el archivo donde hayamos guardado la parte
+privada de nuestro certificado en formato <abbr title="Private Enhanced Mail">PEM</abbr>.</p>
 <div class="admonition note">
 <p class="admonition-title">Nota</p>
 <p>Con la configuración incluida en <code class="file docutils literal notranslate"><span class="pre">smime.rc</span></code>, se firmarán
 automáticamente los mensajes cuyo emisor sea la cuenta a la que hayamos asociado
-el certificado (en el ejemplo, <em>mi_cuenta&#64;gmail.com</em>), excepto aquellos dirigidos
-a listas de distribución. No obstante, justamente antes de enviar el mensaje
-se podrá evitar o incorporar la firma pulsando «<em>C</em>».</p>
+el certificado (en el ejemplo, <em>midireccion&#64;example.net</em>), excepto aquellos
+dirigidos a listas de distribución. No obstante, justamente antes de enviar
+el mensaje se podrá evitar o incorporar la firma pulsando «<em>C</em>».</p>
 </div>
 </div>
 <div class="section" id="declaracion-de-cuentas-servers-rc">
@@ -333,7 +331,8 @@ directorio <code class="file docutils literal notranslate"><span class="pre">/et
 <dd><p><strong class="program">vim</strong> como no podía ser de otra forma.</p>
 </dd>
 <dt class="label" id="id7"><span class="brackets"><a class="fn-backref" href="#id3">3</a></span></dt>
-<dd><p>Antes lo hacía con el certificado raíz <em>FNMT Clase 2 CA</em>.</p>
+<dd><p>Pero esto no fue siempre así. Los antiguos certificados personales se
+firmaban direntamente con el certificado raíz <em>FNMT Clase 2 CA</em>.</p>
 </dd>
 <dt class="label" id="id8"><span class="brackets"><a class="fn-backref" href="#id4">4</a></span></dt>
 <dd><p>El nombre del directorio y del almacen de certificados acreditadores se
