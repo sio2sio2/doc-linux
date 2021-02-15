@@ -253,7 +253,7 @@ Hay dos formas de utilizar esta tecnología:
 
       El efecto de la configuración es que se envían un mensaje de aviso cada
       vez que se detecta un fallo y, si no se corrige,  se repite diariamente el
-      mensaje. Esta comportamiento puede alterarse añadiendo :file:`-M
+      mensaje. Este comportamiento puede alterarse añadiendo :file:`-M
       diminishing` a la línea que ira espaciando al doble del intervalo anterior
       los mensajes (al día siguiente, a los dos días, a los cuatro, etc.)
 

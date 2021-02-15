@@ -76,7 +76,7 @@ a. Lleve a cabo las siguienes tareas:
    #. Buscar todos los ficheros de texto plano (extensión :file:`.txt`)
       contenidos en el directorio temporal.
              
-   #, Hacer en enlace duro dentro de :file:`dirAB` del archivo
+   #. Hacer en enlace duro dentro de :file:`dirAB` del archivo
       :file:`fichero3.txt`.
 
    #. Hacer un enlace simbólico en :file:`dirB` de :file:`fichero1.txt` y llamar
