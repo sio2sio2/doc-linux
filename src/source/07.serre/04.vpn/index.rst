@@ -30,7 +30,7 @@ el protocolo de éste.
    Protocolo desarrollado por *Microsoft*, que incluyen todos los sistemas
    *Windows* y la mayoría de dispositivos de red que son capaces de crear
    túneles |VPN|. Es rápido y consume pocos recursos, pero por cuestiones
-   de seguridad se desancoseja su uso.
+   de seguridad se desaconseja su uso.
 
 IPSec |VPN|
    Estos protocolos utilizan IPSec (o sea, un cifrado en la capa de red) para
@@ -55,7 +55,7 @@ IPSec |VPN|
   Dispone, además, de versiones para otros sistemas operativos como *Windows* o
   *MacOs*.
 
-.. seealso:: Para más informacion puede echarse un ojo a `este enlace de ExpressVPN
+.. seealso:: Para más información puede echarse un ojo a `este enlace de ExpressVPN
    <https://www.expressvpn.com/es/what-is-vpn/protocols>`_ o `este otro de
    vpnMentor
    <https://es.vpnmentor.com/blog/comparacion-de-protocolos-de-vpn-pptp-vs-l2tp-vs-openvpn-vs-sspt-vs-ikev2/>`_.
@@ -65,7 +65,7 @@ Generalidades
 
 Definiciones
 ------------
-Como comienzo es conveniente establecer una serie de terminos que usaremos a lo
+Como comienzo es conveniente establecer una serie de términos que usaremos a lo
 largo de este documento.
 
 :dfn:`Túnel VPN`
@@ -120,7 +120,7 @@ desear el uso de una |VPN|:
         comúnmente que sólo se permita tráfico |HTTP| y |HTTP|\ s). En este último
         caso, el establecimiento del túnel no es trivial e implicar idear
         mecanismos que permitan hacer pasar al tráfico |VPN| por tráfico web.
-        Los trataremos en el estudio práctio de :ref:`OpenVPN <openvpn>` y
+        Los trataremos en el estudio práctico de :ref:`OpenVPN <openvpn>` y
         :ref:`Wireguard <wireguard>`.
 
 Aunque no sean excluyentes, por lo general, una conexión |VPN| persigue o el
