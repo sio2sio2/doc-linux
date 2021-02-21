@@ -3,29 +3,49 @@
 ********
 Arranque
 ********
-Los ordenadores, al iniciarse, cargan el *firmware* de la placa base con el
-propósito de probar el *hardware* y a continuación cargar un programa para
-cederle el control. El objetivo. normalmente, es acabar ejecutando un sistema
-operativo. Hay dos estándares fundamentales:
+El primer *software* que carga un ordenador al iniciarse es el *firmware*
+almacenado en la placa base. que cumple cuatro funciones fundamentalmente:
 
-- Desde los años 80, el antiguo |BIOS| de 16 nits.
++ Analizar el *hardware* presente en el ordenador con un proceso conocido como
+  |POST|. El análisis puede no detectar problemas irresolubles (lo que
+  generalmente se señala con un breve pitido) y encontrar algún defecto que
+  impida el funcionamiento del equipo y para el arranque. De cuál sea en
+  particular el defecto se informa mediante un código constituido por una
+  combinación de pitidos breves y largos, cada una de las cuales identifica un
+  problema distintos.
+
+  El proceso de arranque que contiene esta comprobación se denominan
+  :dfn:`arranque en frío`, frente al :dfn:`arranque en calente` que carece de
+  ella. La regla es que los *arranques en frío* se producen cuando se enciende
+  un ordenador apagado y los *arranques en caliente*, cuando se reinicia un
+  ordenador.
+
++ Proporcionar una gestión básica de E/S para que al menos el usuario pueda
+  utilizar el teclado.
++ Permitir la reconfiguración del firmware con el fin de que se pueda cambiar el
+  comportamiento del *firmware* (p.e. para aligerar el proceso |POST| o
+  cambiar cuál será el cargador de arranque que se lanzará posteriormente).
++ Cargar un programa posterior al que se le ceda el control, el cual
+  habitualmente es el núcleo de un sistema operativo.
+
+Hay dos **estándares** fundamentales:
+
+- Desde los años 70, el antiguo |BIOS| de 16 bits.
 - A partir de 2005, |EFI| o |UEFI|\ [#]_ de 32 *bits* (arquitectura *x86*) ó 64
   *bits* (arquitectura *x86_64*).
 
-No existe retrocompatibilidad entre ambos sistemas por lo que un disco
-preparado para que su sistema operativo arranque con |BIOS| no arrancará si la
-máquina arranca con firmware |UEFI|, aunque para mejorar la transición entre uno
-y otro estándar las placas con firmware |EFI| suelen incluir un modo de
-compatibilidad con |BIOS| que permite seguir usando el viejo modelo de
-arranque. La situación a fecha de 2020 es la siguiente:
+No existe en principio retrocompatibilidad entre ambos sistemas y a fecha de
+2020 la situación es la siguiente:
 
-a. Pueden existir aún unos pocos equipos muy antiguos que disponen de |BIOS|.
-#. La mayoría de los equipos incluyen |EFI| pero está tiene un modo de
-   compatibilidad. Si el equipo es algo antiguo, lo más probable es que arranque
-   en modo compatibilidad con |BIOS|.
-#. Algunos de los más recientes traen |EFI|, pero carecen de éste modo de
-   compatibilidad; y es de esperar que en el futuro el número de equipos sin la
-   compatibilidad aumente\ [#]_.
+a. Pueden existir aún equipos muy antiguos que disponen de |BIOS|.
+#. Muchos equipos incluyen |EFI|, pero añaden un modo de comopatibilidad
+   (normalmente denominado :dfn:`modo legacy`) que permite a la placa base
+   buscar un cargador de arranque de 16 *bits* para |BIOS| o un
+   cargador de arranque de 32 ó 64 *bits* para |EFI|. Muy comúnmente, se puede
+   tener habilitado el modo compatibilidad a la vez que el modo normal.
+#. Algunos de los equopos más recientes traen un *firmware* |EFI|, que carece
+   de *modo legacy*; y es de esperar que en el futuro el número de equipos sin
+   la compatibilidad aumente\ [#]_.
 
 Como en todo estado de transición, es indispensable conocer ambas tecnologías,
 que es en lo que afanará este epígrafe.
@@ -35,20 +55,26 @@ Proceso de arranque
 Sea cual sea el estándar usado, en el proceso de arranque podemos distinguir las
 siguientes fases:
 
-#. Comprobación del *hardware* (memoria y discos). Durante esta fase, el
-   *firmware* mediante pulsación de algunas teclas, brinda al usuario la
+#. Proceso |POST| de comprobación del *hardware*. Durante esta fase, el
+   *firmware* mediante pulsación de ciertas teclas\ [#]_, brinda al usuario la
    posibilidad de pausar el proceso para:
 
    + Reconfigurar el *firmware*, que es lo que vulgarmente se conoce como
      "entrar en la bios". Si se hace esto, se presenta un entorno donde el
      usuario puede cambiar parámetros del *firmware* que se almacenan en memoria
-     |NVRAM|. Al término de la configuración, se escoja o no salvar los cambios,
-     vuelve a iniciarse el proceso.
+     |NVRAM| (o CMOS_ en equipos antiguos). Al término de la configuración, se
+     escoja o no salvar los cambios, se inicia un proceso de *arranque en
+     caliente*.
 
    + Presentar un menú para seleccionar qué programa o dispositivo se desea
      arrancar. Los ítem de este menú son los ítem de la *secuencia de arranque*
      y el interesado podrá escoger cualquiera de ellos para alterar sólo en ese
      arranque la secuencia y que ese ítem pase a ser el primero.
+
+   Aunque esta primera fase sólo está presente en un *arranque en frío*,
+   generalmente en un *arranque en caliente* , si se es rápido pulsando la tecla
+   apropiada se puede entrar en la configuración del *firmware* o el *menú de
+   arranque*.
 
 #. Arranque de algún programa siguiendo la :dfn:`secuencia de arranque`, que es
    una lista ordenada de todos los dispositivos detectados que se comprueban
@@ -315,12 +341,15 @@ fabricantes fiables.
 
 .. rubric:: Notas al pie
 
-.. [#] Intel publicó la especificación con el nombre de |EFI|. Al ser adoptada
-   por la industria en general pasó a llamarse |UEFI|. Así pues, ambos términos
-   son sinónimos.
+.. [#] Intel publicó la especificación con el nombre de |EFI|. Al ser  adoptada
+   en 2005 por la industria en general pasó a llamarse |UEFI|. Así pues, ambos
+   términos son sinónimos y debemos entender lo mismo por ellos.
 .. [#] Intel, por ejemplo, ha anunciado que dejará de dar soporte a |BIOS| a
    partir de 2020 (puede leer `este artículo al respecto
    <https://www.genbeta.com/actualidad/se-acerca-el-fin-de-bios-intel-eliminara-el-soporte-en-2020>`_). 
+.. [#] Las teclas varían sea cual sea el fabricante del *firmware*, por lo que
+   no se puede indicar cuáles son exactamente.Habitualmente suelen escogerse
+   :kbd:`Suprimir`, :kbd:`F2`, :kbd:`F8`, :kbd:`F10`, :kbd:`F11` o :kbd:`F12`.
 .. [#] En |UEFI| es posible porque este firmware sí entiende de particiones y es
    capaz de leer archivos dentro de un sistema FAT32.
 .. [#] Para que un kernel de linux pueda arrancarse directamente es necesario
@@ -339,6 +368,17 @@ fabricantes fiables.
    cargador de arranque. Lo único necesario. pues, es que el sistema de archivos
    sea comprensible, esto es, que sea |FAT|\ 32.
 
+.. [#] En la implementación |UEFI| que traen algunos *softwares* de
+   virtualización (OVMF_), la |NVRAM| se emula almacenando en el directorio
+   :file:`EFI` un fichero llamado :file:`NvVars`.
+.. [#] Por ejemplo, esta orden añade una nueva entrada::
+
+      # efibootmgr --create --disk /dev/sda --part 2 --loader /EFI/so/bootx64.efi \
+         --label "Mi primer arranque UEFI"
+
+   en la que se intenta cargar el fichero :file:`/EFI/so/bootx64.efi` y la que
+   se supone que la partición |ESP| es la segunda del disco.
+
 .. |BIOS| replace:: :abbr:`BIOS (Basic I/O System)`
 .. |EFI| replace:: :abbr:`EFI (Extensible Firmware Interface)`
 .. |UEFI| replace:: :abbr:`UEFI (Unified Extensible Firmware Interface)`
@@ -355,20 +395,11 @@ fabricantes fiables.
 .. |DOS| replace:: :abbr:`DOS (Disk Operating System)`
 .. |GPT| replace:: :abbr:`GPT (GUID Partition Table)`
 .. |GUID| replace:: :abbr:`GUID (Globally Unique Identifier)`
+.. |POST| replace:: :abbr:`POST (Power On Self Test)`
 
+.. _OVMF: https://github.com/tianocore/tianocore.github.io/wiki/OVMF
 .. _memtest: https://www.memtest.org/
 .. _hdt: https://wiki.syslinux.org/wiki/index.php?title=Hdt_(Hardware_Detection_Tool)
 .. _EFIStub: https://wiki.archlinux.org/index.php/EFISTUB
+.. _CMOS: https://es.wikipedia.org/wiki/RAM-CMOS
 
-.. [#] En la implementación |UEFI| que traen algunos *softwares* de
-   virtualización (OVMF_), la |NVRAM| se emula almacenando en el directorio
-   :file:`EFI` un fichero llamado :file:`NvVars`.
-.. [#] Por ejemplo, esta orden añade una nueva entrada::
-
-      # efibootmgr --create --disk /dev/sda --part 2 --loader /EFI/so/bootx64.efi \
-         --label "Mi primer arranque UEFI"
-
-   en la que se intenta cargar el fichero :file:`/EFI/so/bootx64.efi` y la que
-   se supone que la partición |ESP| es la segunda del disco.
-
-.. _OVMF: https://github.com/tianocore/tianocore.github.io/wiki/OVMF
