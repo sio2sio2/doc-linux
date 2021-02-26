@@ -171,12 +171,14 @@ Analicemos las particularidades de cada estándar.
 ======
 Es un sistema antiguo y bastante básico que para ceder el control se limita a
 intentar cargar el código del |MBR|\ [#]_. Si no encuentra código en el |MBR| de
-un dispositivo pasa al siguiente de la secuencia y así continua hasta que
-encuentra un |MBR| con cargador de arranque. Cuando esto ocurre, delega el
-control en ese código y ese código es el encargado de aviárselas con los
-sistemas y particiones que pueda contener el dispositivo. Es importante, pues,
-tener presente que este *firmware* no entiende de particiones ni sistemas de
-archivos; y, por tanto, su sistema de arranque lee el comienzo del disco (los primeros 446 bytes concretamente) y es totalmente ajeno al sistema de particionado que se haya utilizado.
+un dispositivo pasa al siguiente dispositivo de la secuencia y así continua
+hasta que encuentra un |MBR| con cargador de arranque. Cuando esto ocurre,
+delega el control en ese código y ese código es el encargado de aviárselas con
+los sistemas y particiones que pueda contener el dispositivo. Es importante,
+pues, tener presente que este *firmware* no entiende de particiones ni sistemas
+de archivos; y, por tanto, su sistema de arranque lee el comienzo del disco (los
+primeros 446 bytes concretamente) y es totalmente ajeno al sistema de
+particionado que se haya utilizado.
 
 Aunque en un arranque |BIOS| suele existir una tecla cuya pulsación nos
 presenta un menú con el cual podemos seleccionar el dispositivo de arranque,
@@ -216,128 +218,166 @@ posible reparar el arranque, pero nos tocará utilizar herramientas para ello.
 
 |UEFI|
 ======
-Al contrario del sistema anterior, |UEFI| es capaz de entender la tabla de
-particiones y algunos sistemas de archivos (obligatoriamente |FAT| y, para
+Al contrario del sistema anterior, |UEFI| es capaz de entender una tabla de
+particiones |GPT| y algunos sistemas de archivos (obligatoriamente |FAT| y, para
 dispositivos ópticos, CDFS), y dispone de un :ref:`gestor de arranque
-<boot-manager>` básico capaz de usar cargadores de arranque. No es preciso,
-pues, un gestor de arranque externo, aunque es muy común que se instale también.
-*Windows*, de hecho, necesita *Windows Boot Manager* para su arranque, así que
-de instalar un sistema *Windows* forzosamente requeriremos este gestor externo.
-En cambio, si sólo instaláremos distintos sistemas *Linux* podríamos arrancarlos
-todos sin necesidad de |GRUB|.
+<boot-manager>` básico. No es preciso, pues, un gestor de arranque externo,
+aunque es muy común que se instale también. *Windows*, de hecho, necesita
+*Windows Boot Manager* para su arranque, así que de instalar un sistema
+*Windows* forzosamente requeriremos este gestor externo. En cambio, si sólo
+instaláremos distintos sistemas *Linux* podríamos arrancarlos todos sin
+necesidad de |GRUB| (aunque lo habitual es que también se insale)
 
-En este estándar para que un dispositivo sea arrancable es necesario:
-
-- Un particionado |GPT|.
-- La existencia de un partición  dedicada al arranque, denominada |ESP|, que se
-  caracteriza por ser de tipo |EFI| (código simplificado *EF00*\ [#]_) y estar
-  formateada en |FAT|\ 32.
-
-.. image:: files/part-gpt-uefi.png
-
-El *firmware* |EFI|, a diferencia de |BIOS|, sí dispone de un verdadero gestor
-de arranque, donde pueden irse registrando los cargadores que se vayan
-almacenando en las particiones |ESP| de los distintos dispositivos. Esto es
-posible porque |EFI| entiende el particionado |GPT| y el sistema de archivos
-|FAT|\ 32, y, en consecuencia, es capaz de leer archivos almacenados en un
-partición |GUID| formateada en |GPT|. Las entradas de este gestor tienen un
-determinado orden y con ello se constituye la *secuencia de arranque*. De este
-modo, se van probando las entradas de esta secuencia y aquella primera que
-constituya un arranque válido, será la que arranque.
-
-Las particiones |ESP| se organizan mediante un directorio llamado :file:`/EFI`
-dentro del cual cada sistema operativo instalado crea un directorio con
-ficheros necesarios para llevar a cabo su propio arranque:
-
-.. code-block:: none
-
-   /
-   +-- EFI/
-        +-- debian/
-        +-- Microsoft/
-        +-- etc.
-        +-- Boot/
-             +-- bootx64.efi
-
-De este modo, los arranques de los distintos sistemas operativos pueden
-coexistir sin problemas. Para que quepan es recomendable que tenga al menos
-100MB. En la |NVRAM| del *firmware*\ [#]_ pueden irse manipulado las entradas de
-la secuencia de arranque, definiendo su orden, elimando entradas o añadiendo
-nuevas. Lo habitual, si instalamos un nuevo sistema operativo, es que este añada
-una entrada para su arranque y, además, la sitúe la primera en la secuencia.
-
-Además, de los subdirectorios para cada sistema operativo, suele existir un
-subdirectorio :file:`/EFI/Boot` con un archivo denominado :file:`bootx64.efi`.
-Este es el cargador de arranque que usa el *firmware* |EFI| cuando se escoge
-arrancar por un dispositivo físico en vez de especificar en concreto el
-cargador de arranque. La razón de que existan estan entradas genéricas para
-los dispositivos no es gratuita: cuando el dispositivo arrancable es extraíble
-(pensemos en un CD-ROM, por ejemplo), no se ha utilizado ningún instalador y,
-por tanto, no se habrá añadido de antemano la entrada para arrancar el cargador
-específico del dispositivo (cuyo nombre y ruta pueden ser cualesquiera). La
-solución es que el gestor tenga la posibilidad de arrancar dispositivos y vaya
-siempre a una ruta específica para encontrar el cargador.
-
-Lo habitual es que el último sistema instalado, además de incluir su
-subdirectorio propio, sobrescriba :file:`/EFI/Boot/bootx64.efi`, por lo que
-arrancar por un dispositivo suele equivaler a cargar el último sistema
-operativo instalado en ese dispositivo.
-
-En definitiva, en una secuencia de arranque |EFI| encontraremos:
-
-+ Dispositivos (que equivale a arrancar el último sistema operativo instalado
-  en tal dispositivo).
-+ Sistemas operativos que equivale a arrancar el cargador que se haya
-  instalado en el subdirectorio correspondiente. Arrancar la entrada para un
-  sistema operativo supone a menudo no arrancar directamente el sistema, sino
-  el gestor de arranque que usa el sistema.
-+ Utilidades como hdt_ o memtest_ que son ejecutables |EFI|.
+El gestor de arranque integrado es capaz de almacenar en memoria |NVRAM|\ [#]_
+entradas ordenadas de arranque. Cada entrada recibe un nombre (p.e. "Debian") y
+refiere la ruta a un archivo contenida en la partición |GUID| de un determinado
+dispositivo. Cuáles sean la ruta, la partición y el dispositivo es lo de menos
+con tal de que el archivo sea un cargador de arranque. La única condición es que
+la partición esté formateada con un sistema de archivos inteligible por el
+*firmware*. Por tanto, para arrancar un sistema opèrativo basta con que haya una
+partición adecuada para albergar su cargador de arranque y que la referencia a
+este cargador se haya incluido como entrada. De este modo, las entradas en el
+gestor integrado no son referencias a un dispositivo, como pasa con |BIOS|, sino
+a un cargador concreto, por lo que podemos tener conviviendo en un único disco
+arranques de distintos sistemas operativos sin necesidad de ningún gestor
+externo. A pesar de esto, nos podemos encontrar en una secuencia de arranque
+|EFI| una o varias entradas que refieren dispositivos. Estas entradas en
+realidad lo que hacen es buscar un archivo (un cargador de arranque) en una ruta
+predefinida dentro de ese dispositivo. Desvaleremos más adelante cuál.
 
 .. image:: files/bootmanager-efi.png
 
-Esto contrasta con la secuencia de arranque |BIOS| que sólo muestra
-dispositivos, porque sólo es capaz de leer el cargador de arranque del |MBR|
-correspondiente.
+Además, a las entradas ya almacenadas en la |NVRAM|, el *firmware* añade
+dinámicamente una entrada por cada dispositivo extraíble detectado en la fase
+|POST| y que no estuviera presente ya en la secuencia. De este modo, es posible
+arrancar desde una memoria |USB| que se haya pinchado circunstancialmente.
 
-En cuanto al orden de instalación de los sistemas, podemos seguir la misma
-regla que en el caso de |BIOS|, aunque incumplirla no es tan grave, ya que la
-secuencia de arranque de |EFI| debe incluir todos los sistemas instalados y
-bastará pulsar la tecla adecuada durante el proceso de arranque para que nos
-aparezca un menú de selección con todos ellos. No obstante, lo más cómodo es
-cumplir con el orden de instalación aconsejado, lo que devendrá en que el
-cargador de arranque sea un |GRUB| con todos los sistemas instalados, tal como
-ocurre en |BIOS|, que nos invita a escoger cuál arrancar sin necesidad de tener
-que pulsar ninguna tecla durante la comprobacón previa de *hardware*.
+Aunque los cargadores de arranque podrían estar almacenados en distintas
+particiones de distintos dispositivos y en rutas arbitrarias, en la práctica
+esto se hace con ciertos criterios que acatan los instaladores de los sistemas
+operativos:
 
-Además de la mencionada tecla para mostrar la secuencia de arranque y escoger
-cualquiera de sus entradas, y de un metodo gráfico para modificar perennemente
-el orden de la entradas (posibilidades que ofrece |BIOS|), |EFI| proporciona
-otros mecanismos para manipular la secuencia de arranque almacenada en la
-|NVRAM|:
++ En el particionado |GPT| de un disco se crea una partición formateada con
+  sistema de archivos |FAT|\ 32 y de tipo |ESP| (código simplificado *EF00*\
+  [#]_), Si disponemnos de varios discos, basta que esta partición esté en uno
+  de ellos:
 
-- Una *shell* con el comando :command:`bcfg`, que permite manipular la secuencia
-  e incluso, añadir y borrar entradas. Esta *shell* suele incluirse como una
-  entrada en la secuencia de arranque.
+  .. image:: files/part-gpt-uefi.png
+
++ Dentro de esa partición se crea una estructura de directorios con este aspecto:
+
+  .. code-block:: none
+
+     /
+     +-- EFI/
+          +-- debian/
+          +-- Windows Boot Manager/
+          +-- etc.
+          +-- Boot/
+               +-- bootx64.efi
+
+  esto es, un directorio :file:`EFI` dentro del cual cada sistema operativo crea
+  un subdirectorio con los archivos oportunos para el arranque o para al menos
+  comenzar el arranque. Uno de esos archivos será el que deba cargar el
+  *firmware* |EFI|, por lo que su ruta será la que se añada como entrada en la
+  secuencia de arranque.
+
+Como se deduce, todo está perfectamente estructurado y, por tanto, mientras
+exista espacio suficiente (habitualmente con **100** MiB hay más que de sobra)
+no hay riesgo de que el arranque de un sistema operativo interfiera con el de
+otros, como sí ocurre en |BIOS| en que cómo sólo hay un punto de arranque por
+dispositivo (su |MBR|) el arranque de un sistema instalado sobrescribirá el
+código que en el |MBR| pudiera haber escrito la instalación de un sistema
+operativo instalado anteriormente.
+
+Lo normal, sin embargo, es que, al registrar un sistema operativo la entrada
+para su arranque, la registre como la primera en la secuencia, lo que determina
+que se cargue con preferencia en detrimento del resto de sistemas operativos que
+se hubieran podido instalar antes. Si este arranque es respetuoso con el resto y
+consiste en un gestor de arranque que también permite la carga de los demás,
+como es el caso de |GRUB|, este hecho no es relevante, ya que este gestor
+externo nos brindará la posibilidad de seguir arrancando el que queramos. Si en
+cambio el gestor no es tan gentil (como es el caso de *Windows Boot Manager*),
+aparentemente dejaremos de poder arrancar el resto de sistemas no *Windows*;
+pero sólo aparentemente, porque bastará con pulsar la tecla apropiada que nos
+muestre todas las entradas del gestor |EFI| integrado para que podamos escoger
+cualquier otra distinta de la primera.
+
+Además de poder escoger entrada a voluntad en cada arranque, también es posible
+cambiar la secuencia de arranque para reordenar sus entradas. Hay diversas vías:
+
+- Quizás algún método gráfico en la configuración del *firmware*.
+- Quizás alguna *shell* de comandos proporcionada por el propio *firmware*. Esta
+  *shell* disponde de la orden :command:`bcfg`, que permite manipular la
+  secuencia e incluso, añadir y borrar entradas.
 - Herramientas ejecutadas desde el sistema operativo. En *Linux*, este
   comando es :command:`efibootmgr`\ [#]_.
 
-.. seealso:: La wiki de Archlinux tiene un muy completo `artículo sobre UEFI
-   <https://wiki.archlinux.org/index.php/Unified_Extensible_Firmware_Interface_(Espa%C3%B1ol)>`_.
+Peso a lo anterior, lo que ahorra más trabajo es seguir la misma regla ya
+enunciada al tratar |BIOS| para organizar la instalación de sistemas operativos:
+sistemas *Windows* de más antiguo a más nuevo y sistemas *Linux* después.
+
+Volvamos para terminar a un aspecto que dejamos en suspenso: la adición dinámica
+de entradas para arrancar dispositivos extraíbles. De hecho, en un equipo virgen
+siin nada instalado aún, éstas serán las únicas entradas disponibles. Ya hemos
+explicado cómo el *firmware* |EFI| intenta cargar la ruta especificada en cada
+una de las entradas de la secuencia. En este caso, sin embargo, el sistema
+operativo del disposivo extraíble no ha sido instalado por un instalador que
+haya manipulado la |NVRAM| para registrar la ruta al cargador, por lo que la
+única solución es que la entrada que representa al dispositivo siempre busque lo
+mismo: la primera partición del dispositivo de tipo |ESP| y dentro de ella la
+ruta :file:`/EFI/Boot/bootx64.efi`. Si tal cosa existe, el dispositivo extraíble
+arrancará.
 
 .. rubric:: ¿Qué es Secure Boot?
+
+.. note:: Para la perfecta compresión de este apartado es forzoso que al menos
+   se entiendan los fundamentos dewl :ref:`cifrado asimétrico <asimetrico>`.
 
 Para evitar la carga de *software* malicioso (p.e. `virus del sector de arranque
 <https://www.kaspersky.com/resource-center/definitions/boot-sector-virus>`_) la
 especificación |UEFI| introduce la posibilidad de cargar sólo *software* fiable,
-esto es, *software* firmado. Esto exige que el propio *firmware* |UEFI| incluya
-claves públicas de los fabricantes de *software* con el fin de que sólo sea
-válido el software firmado con estas claves. Es común que en las plataformas
-*x86* y *amd64* las únicas claves incluidas de fábrica sea las de *Microsoft*,
-pero es posible, bien deshabilitar "Secure Boot", bien añadir más claves de
-fabricantes fiables.
+esto es, *software* firmado. Para ello existe una cadena de confianza:
 
-.. seealso:: Para entender cómo funciona esta firma digital, puede leer el
-   apartado dedicado a :ref:`criptografía <crypto>`.
+* El fabricante del *hardware* dispone una clave pública, llamada clave de
+  plataforma (|PK|).
+* Sólo el fabricante (que posee la clave privada correspondiente a la |PK|)
+  podrá añadir claves públicas a la lista de |KEK|\ s.
+* Los propietarios de las claves públicas anteriores (|KEK|) son los únicos
+  capaces de añadir claves públicas a la base de firmas (**db**) o a la base de
+  firmas prohibidas (**dbx**).
+* La **db** es la lista de claves autorizadas para firmar cargadores de
+  arranque.
+* La **dbx** es la lista de claves vetadas: ningún cargador firmado con
+  alguna de estas claves podrá ser cargado por el *firmware* |EFI|.
+* El primer cargador contiene a su vez una lista de claves que autorizan
+  al *software* subsiguiente.
+
+|PK|, |KEK|, **db** y **dbx** vienen incluidas en el propio *firmware* de la
+placa y en la práctica los fabricantes de *hardware* convencional sólo incluyen
+en la lista de |KEK|\ s y en la **db** sendas claves propiedad de *Microsoft*,
+por lo que sólo *Microsoft* tiene capacidad para firmar el primer cargador tras
+|EFI|. Por este motivo algunas distribuciones de *Linux* (*Debian* entre ellas)
+incluyen un `cargador llamado shim <https://github.com/rhboot/shim>`_
+(paquete `shim-signed <https://packages.debian.org/stable/shim-signed>`_) cuyo
+ejecutable ha pedido cada cual a *Microsoft* que firme con la "Microsoft
+Corporation UEFI CA" y en el que han incluido su propia clave para poder firmar
+a su vez ya ellas mismas el |GRUB| (paquete `grub-efi-amd64-signed
+<https://packages.debian.org/stable/grub-efi-amd64-signed>`_) que se carga
+después que a su vez se encargara de comprobar la firma del núcleo de *Linux*
+finalmente cargado.
+
+Puede también optarse por deshabilitar *Secure Boot* en cuyo caso el cargador de
+arranque no requerirá estar firmado.
+
+.. rubric:: Enlaces de interés
+
+* La wiki de Archlinux tiene un muy completo `artículo sobre UEFI
+  <https://wiki.archlinux.org/index.php/Unified_Extensible_Firmware_Interface_(Espa%C3%B1ol)>`_.
+
+* La entrada `The EFI System Partition and the Default Boot Behavior
+  <https://blog.uncooperative.org/blog/2014/02/06/the-efi-system-partition/>`_,
+  del blog `The Uncoöperative Organization  <https://blog.uncooperative.org/>`_.
 
 .. rubric:: Notas al pie
 
@@ -359,6 +399,9 @@ fabricantes fiables.
    anticuado del dispositivo, podemos obviarlo por completo.
 .. [#] De hecho, con |GRUB| puede arrancarse un sistema |BIOS| y particionado
    |GPT|.
+.. [#] En la implementación |UEFI| que traen algunos *softwares* de
+   virtualización (OVMF_), la |NVRAM| se emula almacenando en el directorio
+   :file:`EFI` un fichero llamado :file:`NvVars`.
 .. [#] En realidad, el código identificativo de esta partición es mucho más
    largo (``C12A7328-F81F-11D2-BA4B-00A0C93EC93B``). ``EF00`` es el código
    simplificado que usa la utilidad :ref:`gdisk <gdisk.i>`. Sin embargo,
@@ -368,9 +411,6 @@ fabricantes fiables.
    cargador de arranque. Lo único necesario. pues, es que el sistema de archivos
    sea comprensible, esto es, que sea |FAT|\ 32.
 
-.. [#] En la implementación |UEFI| que traen algunos *softwares* de
-   virtualización (OVMF_), la |NVRAM| se emula almacenando en el directorio
-   :file:`EFI` un fichero llamado :file:`NvVars`.
 .. [#] Por ejemplo, esta orden añade una nueva entrada::
 
       # efibootmgr --create --disk /dev/sda --part 2 --loader /EFI/so/bootx64.efi \
@@ -396,6 +436,9 @@ fabricantes fiables.
 .. |GPT| replace:: :abbr:`GPT (GUID Partition Table)`
 .. |GUID| replace:: :abbr:`GUID (Globally Unique Identifier)`
 .. |POST| replace:: :abbr:`POST (Power On Self Test)`
+.. |USB| replace:: :abbr:`USB (Universal Serial Bus)`
+.. |PK| replace:: :abbr:`PK (Platform Key)`
+.. |KEK| replace:: :abbr:`KEK (Key Exchange Key)`
 
 .. _OVMF: https://github.com/tianocore/tianocore.github.io/wiki/OVMF
 .. _memtest: https://www.memtest.org/
