@@ -32,25 +32,25 @@ oficialmente como módulo.
 
 Está experimentando un rápido desarrollo y, si se desea contratar un servicio
 externo, son cada vez más `los proveerdores que lo soportan
-<https://greycoder.com/a-list-of-wireguard-supporting-vpns-in-2019/>`_. Es
+<https://vladtalks.tech/vpn/list-wireguard-vpn-providers>`_. Es
 particularmente interesante, además, la lectura de este completo `artículo sobre
 el estado de Wireguard en junio de 2019
 <https://restoreprivacy.com/wireguard/>`_.
 
 .. note:: En caso de que utilicemos *Buster*, no dispondremos aún del *software*
-   en el repositorio, así que tendremos que echar mano de la versión de pruebas.
-   Para ello, podemos añadirla como repositorio::
+   en el repositorio, así que tendremos que echar mano de la rama *backports*::
 
-      # cat > /etc/apt/sources.list.d/bullseye.list
-      deb http://ftp.fr.debian.org/debian/ bullseye main
+      # echo "deb http://ftp.fr.debian.org/debian/ buster-backports main" > /etc/apt/sources.list.d/backports.list
+      # apt update
 
-   y modificar las preferencias para seguir usando como repositorio prinicipal el
-   de la versión estable::
+   Además, el módulo pertinente no forma parte del núcleo por lo que hay que
+   generarlo y para ello se requieren las cabeceras del núcleo que se esté
+   usando y que probablemente no estén instaladas. Si esto es así y se instala
+   antes :program:`wireguard` que las cabeceras el módulo no se generará
+   automáticamente durante la instalación; y habrá, después de haberlas
+   instalado, que generar el módulo a mano::
 
-      # cat > /etc/apt/preferences.d/bullseye
-      Package: *
-      Pin: release a=testing
-      Pin-Priority: 90
+      # dpkg-reconfigure wireguard-dkms
 
 Para acceder al *software*, basta con instalarlo::
 
