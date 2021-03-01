@@ -37,8 +37,9 @@ particularmente interesante, además, la lectura de este completo `artículo sob
 el estado de Wireguard en junio de 2019
 <https://restoreprivacy.com/wireguard/>`_.
 
-.. note:: En caso de que utilicemos *Buster*, no dispondremos aún del *software*
-   en el repositorio, así que tendremos que echar mano de la rama *backports*::
+.. note:: En caso de que utilicemos *Buster*\ [#]_, no dispondremos aún del
+   *software* en el repositorio, así que tendremos que echar mano de la rama
+   *backports*::
 
       # echo "deb http://ftp.fr.debian.org/debian/ buster-backports main" > /etc/apt/sources.list.d/backports.list
       # apt update
@@ -71,6 +72,17 @@ Para acceder al *software*, basta con instalarlo::
 * `Documentación no oficial sobre Wireguard <https://github.com/pirate/wireguard-docs>`_
 * `Tunelizando Wireguard con Websockets
   <https://kirill888.github.io/notes/wireguard-via-websocket/>`_.
+
+.. rubric:: Notas al pie
+
+.. [#] :program:`Wireguard` se implementó como núcleo de *Linux* desde un
+   principio, pero sólo `entró como módulo oficial con la versión 5.6 del kernel
+   <https://www.genbeta.com/linux/wireguard-vpn-open-source-admirado-linus-torvalds-sera-parte-kernel-linux>`_.
+   Por ese motivo, en cualquier diostribución de *Linux* con un núcleo anterior
+   se deberá instalar el módulo de algún modo. Las distribuciones suelen tener
+   un mecanismo medianamente automatizaco en su paquetería para generar módulos
+   basado en `DKMS
+   <https://es.wikipedia.org/wiki/Dynamic_Kernel_Module_Support>`_.
 
 .. |UDP| replace:: :abbr:`UDP (User Datagram Protocol)`
 
