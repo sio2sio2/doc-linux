@@ -140,7 +140,7 @@ Podemos hacer varias clasificaciones atendiendo a distintos criterios:
       .. image:: files/sede-sede.png
 
       Por lo general, el túnel se establece entre los *routers* de frontera u
-      otros disposivos de la zona perimetral, porque esto facilita los
+      otros dispositivos de la zona perimetral, porque esto facilita los
       encaminamientos de los equipos de ambas redes:
 
       .. image:: files/sede-sede-router.png
@@ -151,7 +151,7 @@ Podemos hacer varias clasificaciones atendiendo a distintos criterios:
       objetivo referido en el :ref:`epígrafe anterior <vpn-objetivos>`.
 
    :dfn:`Acceso remoto` o conexión :dfn:`sede-cliente móvil`
-      Es la conexión que se establece entre una red y un dispotiivo remoto
+      Es la conexión que se establece entre una red y un dispositivo remoto
       individual, que en la jerga suele denominarse  :dfn:`road warrior`. En
       esta conexión la red dispone de un servidor |VPN| permanentemente
       accesible desde internet y el equipo remoto se conectará de modo
@@ -169,7 +169,7 @@ Podemos hacer varias clasificaciones atendiendo a distintos criterios:
 
    :dfn:`Acceso remoto compartido`
       Es la conexión establecida entre un servidor sin red corporativa
-      asociada (o al menos irrelevante para la intención de la conexióni |VPN|) y
+      asociada (o al menos irrelevante para la intención de la conexión |VPN|) y
       una red remota.
      
       .. image:: files/acceso-compartido.png
@@ -185,14 +185,14 @@ Podemos hacer varias clasificaciones atendiendo a distintos criterios:
         en interconectar las dos redes privadas, sino en que una red privada
         utilice un servidor remoto para acceso indirecto a internet.
 
-      Es pues un caso mixto y,,en consecuencia, su configuración tomará partes
+      Es pues un caso mixto y, en consecuencia, su configuración tomará partes
       de la configuración de uno y otro caso.
 
 #. Según la capa de implementación:
 
    :dfn:`VPN en capa 2`
       Es aquella que establece el enlace en capa 2, por lo que ambos extremos
-      del túnel se encontrarán en la mismna red lógica.
+      del túnel se encontrarán en la misma red lógica.
 
    :dfn:`VPN en capa 3`
       Es aquella que establece el enlace en capa 3, por lo que cada extremo del
@@ -208,7 +208,7 @@ Podemos hacer varias clasificaciones atendiendo a distintos criterios:
 
    :dfn:`Comercial`
       Es el servicio que, previo pago, ofrece a sus clientes una conexión |VPN|
-      a un servidor o, más comúnmente, a una variadad de servidores respartidos
+      a un servidor o, más comúnmente, a una variedad de servidores repartidos
       por todo el mundo. La finalidad de este servicio suele ser la de
       proporcionar acceso indirecto a Internet.
 
@@ -259,8 +259,8 @@ un cliente a fin de burlar algún tipo de censura u ocultar la identidad, aunque
 el proveedor del servicio |VPN| sí sepa quién somos o, al menos, disponga de
 nuestra |IP| para que se pueda llegar a saber quién somos. `VPNbook
 <https://www.vpnbook.com/>`_, con el que podemos usar :ref:`OpenVPN <openvpn>`,
-ofrece este servicio de forma gratuita; también `ZPN <https://zpn.im/>`, aunque
-limitado a una transferencia de 10GB al mes.
+ofrece este servicio de forma gratuita; también `ZPN <https://zpn.im/>`_,
+aunque limitado a una transferencia de 10GB al mes.
 
 .. rubric:: Notas al pie
 

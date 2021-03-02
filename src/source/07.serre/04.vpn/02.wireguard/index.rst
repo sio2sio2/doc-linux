@@ -31,7 +31,7 @@ oficialmente como módulo.
   `blind_operator_mode <https://git.zx2c4.com/blind-operator-mode/about/>`_.
 
 Está experimentando un rápido desarrollo y, si se desea contratar un servicio
-externo, son cada vez más `los proveerdores que lo soportan
+externo, son cada vez más `los proveedores que lo soportan
 <https://vladtalks.tech/vpn/list-wireguard-vpn-providers>`_. Es
 particularmente interesante, además, la lectura de este completo `artículo sobre
 el estado de Wireguard en junio de 2019
@@ -78,9 +78,9 @@ Para acceder al *software*, basta con instalarlo::
 .. [#] :program:`Wireguard` se implementó como núcleo de *Linux* desde un
    principio, pero sólo `entró como módulo oficial con la versión 5.6 del kernel
    <https://www.genbeta.com/linux/wireguard-vpn-open-source-admirado-linus-torvalds-sera-parte-kernel-linux>`_.
-   Por ese motivo, en cualquier diostribución de *Linux* con un núcleo anterior
+   Por ese motivo, en cualquier distribución de *Linux* con un núcleo anterior
    se deberá instalar el módulo de algún modo. Las distribuciones suelen tener
-   un mecanismo medianamente automatizaco en su paquetería para generar módulos
+   un mecanismo medianamente automatizado en su paquetería para generar módulos
    basado en `DKMS
    <https://es.wikipedia.org/wiki/Dynamic_Kernel_Module_Support>`_.
 
