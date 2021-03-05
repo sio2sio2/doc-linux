@@ -340,15 +340,15 @@ si queremos simular que nuestro |SAI| imaginario cambia su estado:
 
      # echo "TIMER 300" >> /usr/local/share/nut/SPS_One_700VA.dev
 
-  y usar el comando :command:`upsrw` para alterar sobre la marcha los valores::
+   y usar el comando :command:`upsrw` para alterar sobre la marcha los valores::
 
      # upsrw -s ups.load=15 -u admin nosai
 
-  lo cual nos pedirá la contraseña del usuario *admin* que definimos
-  anteriormente con permisos para alterar variables. Durante cinco minutos
-  podremos ir haciendo cambios sin que el *driver* vuelva a recargar los valores
-  originales del fichero. Incluso podemos simular que el |SAI| está en las
-  últimas para que el ordenador tome la determinación de apagarse::
+   lo cual nos pedirá la contraseña del usuario *admin* que definimos
+   anteriormente con permisos para alterar variables. Durante cinco minutos
+   podremos ir haciendo cambios sin que el *driver* vuelva a recargar los
+   valores originales del fichero. Incluso podemos simular que el |SAI| está en
+   las últimas para que el ordenador tome la determinación de apagarse::
 
      # upsrw -s ups.status="OB LB" -u admin nosai
 

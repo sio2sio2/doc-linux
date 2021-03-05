@@ -19,6 +19,10 @@ descifrará el resumen con la clave pública de éste y, por otra parte, podrá
 comprobar si los datos conservan su integridad gracias al propio resumen
 descifrado.
 
+.. _firmdig-concepto:
+
+Concepto
+========
 Conceptualmente, pues, es bastante sencillo y podemos ilustrar los pasos
 anteriores haciendo uso de la :ref:`orden gpg <gnupg.1>`::
 
@@ -77,29 +81,6 @@ integridad del fichero gracias al resumen que contiene esta::
 .. note:: Retenga el adagio de que la clave pública del destinatario se usa para
    cifrar, y la clave privada del emisor para firmar.
 
-Documentos |PDF|
-================
-Según la hemos presentado aquí, la firma de un archivo es otro archivo que
-contiene el resumen cifrado con la clave privada del firmante. De este modo,
-cualquier archivo puede ser firmado. Por supuesto, un |PDF| podría firmarse
-así. Sin embargo, este tipo de archivos dispone de un campo interno en el que
-incluir la firma (o las firmas si hay varios firmantes), lo que permite al
-archivo contener su propia verificación. Este es el modo estándar de firmar
-documentos |PDF| y no el general descrito más arriba. Además, no se usa
-meramente un par de claves, sino un :ref:`certificado digital <cert-digital>`,
-que trataremos más adelante.
-
-.. todo:: Por lo que se `deduce de sus notas de publicación
-   <https://poppler.freedesktop.org/releases.html>`_, la orden :command:`pdfsig`
-   incluida en la suite de manipulación de archivos |PDF|
-   :program:`poppler-utils` incorpora la posibilidad de firmar documentos a
-   partir de la versión **21.01** (la verificación ya la soporta desde hace
-   tiempo).
-
-   Sería recomendable incluir una pequeña guía de cómo se hace la firma y la
-   verificación con esta herramienta (e incluir un ejercicio aprovechando el
-   certificado personal).
-
 Claves |PGP|
 ============
 La firma digital es ampliamente usada en los mensajes de correo electrónico.
@@ -117,7 +98,7 @@ sencillo.
 
 .. note:: También es posible firmar y cifrar mensajes con determinados servicios
    de *webmail* y la extensión adecuada del navegador. Por ejemplo, en
-   :program:`Chrome` existe la extensión Mailenvelope_ que permite el cifrado de
+   Chromium_ existe la extensión Mailenvelope_ que permite el cifrado de
    mensajes para los principales sitios de webmail (Gmail_, Yahoo_, Outlook_,
    etc.).
 
@@ -203,23 +184,6 @@ un plazo determinado, por lo que son sólo válidos entre una fecha inicial
 (normalmente la fecha en que se generan) y una fecha final que varía según el
 tiempo de validez por el que se certifiquen. Ambas fechas se incluyen dentro de
 los datos identificativos.
-
-.. rubric:: Instalar certificados raíz adicionales
-
-Si se necesita instalar certificados raíz en el sistema (los certificados raíz
-de la |FNMT| no han sido reconocidos hasta fechas recientes y un *Linux* antiguo
-no los tendrá), podemos seguir el siguiente procedimiento:
-
-#. Se guarda el certificado público en formato |PEM| (codificado en Base64_)
-   dentro de :file:`/usr/local/share/ca-certificates/` con extensión ``.crt``::
-
-      # cp acraiz.pem /usr/local/share/ca-certificates/acraiz.crt
-
-#. Se ejecuta::
-
-      # update-ca-certificates
-
-   que se encargará de instalarlo convenientemente en :file:`/etc/ssl/certs`.
 
 Certificados personales
 -----------------------
@@ -751,6 +715,158 @@ Empecemos pues:
      solicitud (de ahí que luego necesitemos copiarla al generar el certificado\
      [#]_).
 
+Documentos |PDF|
+----------------
+Según :ref:`se presentó en un principio <firmdig-concepto>`, la firma de un
+archivo es otro archivo que contiene el resumen cifrado con la clave privada
+del firmante. De este modo, cualquier archivo puede ser firmado, lo cual
+incluye archivos |PDF|. Sin embargo, para este tipo de archivos hay un modo
+estándar recogido en la propia especificación del |PDF| que consiste en:
+
++ Incluir la firma (o las firmas si se requiere la firma de varios firmantes)
+  en un campo interno.
++ Utilizar :ref:`certificados digirales <cert-digital>` y no meramente un par
+  de claves.
+
+Las dos características anteriores permiten que un |PDF| firmado contenga las
+propias firmas y que, además, estas se puedan validar sin duda alguna.
+
+.. rubric:: Comprobación
+
+Puede comprobarse la validez de la firma de un |PDF| con :command:`pdfsig`
+(incluido en el paquete `poppler-utils
+<https://packages.debian.org/es/stable/poppler-utils>`_)::
+
+   $ pdfsig -nocert documento.pdf
+
+La orden de arriba, sin embargo, no comprobará la fiabilidad del certificado
+firmante. Para ello, es necesario que el programa disponga de toda la cadena de
+confianza. Lo más probable es que esto no sea así, ya que :command:`pdfsig`, usa
+un almacen |NSS| y los certificados del sistema operativo. Se puede no obstamte
+preparar un catálogo de certificados que contenga la cadena de certificados tal
+como se expone :ref:`al tratar los catálogos NSS <cert-nss>` y hacer entonces la
+comprobación::
+
+   $ pdfsig -nssdir sql:/tmp/nssdb documento.pdf
+
+.. rubric:: Firma
+
+.. todo:: Por lo que se `deduce de sus notas de publicación
+   <https://poppler.freedesktop.org/releases.html>`_, la orden :command:`pdfsig`
+   incluida en la suite de manipulación de archivos |PDF|
+   :program:`poppler-utils` incorpora la posibilidad de firmar documentos a
+   partir de la versión **21.01** (la verificación ya la soporta desde hace
+   tiempo).
+
+Catálogo de certificados
+========================
+Ya se ha afirmado que los certificados raíz son fiables a pesar de estar
+autofirmados, porque el propio sistema operativo (o aplicación particular\ [#]_)
+los avala instalándolos de serie o a través de algún paquete oficial.
+
+Por lo general, las aplicaciones usan dos tipos de catálogos de certificados:
+
++ El de OpenSSL_, que es el que usa *Linux*.
++ Los generados con la librería |NSS|\ 3, originaria de Netscape_ y que suelen
+  usar los navegadores.
+
+.. seealso:: Puede encontrar información adicional en el `artículo sobre
+   certificados de la wiki de Gentoo
+   <https://wiki.gentoo.org/wiki/Certificates>`_.
+
+Catálogo general
+----------------
+El catálogo general del sistema se encuentra en el directorio :file:`/etc/ssl/certs`,
+que contiene cada uno de los certificados confiables (en realidad, enlaces
+simbólicos a donde realmente se encuentran) y un archivo
+:file:`ca-certificates.crt` en formato |PEM| que contiene concatenados todos los
+certificados disponibles.
+
+La orden :command:`update-ca-certificates` se encarga de recolectar los
+certificados que se encuentren en :file:`/usr/share/certificates` y, además,
+repasa el contenido de :file:`/usr/local/share/ca-certificates/` en busca de los
+que deseemos añadir manualmente. Por tanto, si se necesitan añadir certificados
+raíz adicionales basta con:
+
+#. Se guarda el certificado público en formato |PEM| (codificado en Base64_)
+   dentro de :file:`/usr/local/share/ca-certificates/` con extensión ``.crt``::
+
+      # cp acraiz.pem /usr/local/share/ca-certificates/acraiz.crt
+
+#. Se ejecuta::
+
+      # update-ca-certificates
+
+.. _cert-nss:
+
+|NSS|
+-----
+Hay aplicaciones que usan la librería |NSS|\ 3 para la gestión del almacen de
+certificados. Tal es el caso de navegadores como Chromium_, Firefox_ o la
+orden :manpage:`pdfsig` para el soporte de firma en documentos |PDF|. Este
+almacen tiene la forma de una base de datos (modernamente SQLite_). Para la
+gestión de estos almacenes podemos instalar el paquete::
+
+   # apt install libnss3-tools
+
+que trae la orden :command:`certutil`. Si queremos crear un almacen de claves
+*ex-novo* podemos hacer::
+
+   $ cerutil -d sql:/tmp/nssdb -N --empty-password
+
+La opción :kbd:`--empty-password` deja sin cifrar las claves privadas que puedan
+almacenarse. Para ver las claves contenidas::
+
+   $ cerutil -d sql:/tmp/nssdb -L
+
+   Certificate Nickname                                         Trust Attributes
+                                                                SSL,S/MIME,JAR/XPI
+   PERICO_DE_LOS_PALOTES                                        u,u,u
+   AC FNMT Usuarios - FNMT-RCM                                  ,,   
+   AC RAIZ FNMT-RCM - FNMT-RCM                                  C,C,C
+
+En este caso, hay un certificado de usuarios que se reconoce como tal
+(:kbd:`u,u,u`), porque la clave privada está también en la base de datos. Por
+otro lado, la |CA| raíz debe tener los atributos :kbd:`C,C,C`.
+
+Si queremos ver la información de un certificado en particular::
+
+   $ cerutil -d sql:/tmp/nssdb -Ln 'PERICO_DE_LOS_PALOTES'
+
+Si tenemos un archivo |PKCS| #12 con toda la cadena de confianza, podemos
+importarla con::
+
+   $ pk12util  -d sql:/tmp/nssdb -i micert.p12
+
+aunque al certificado raíz habrá que modificarle los atributos para que sea
+confiable::
+
+   $ certutil -d sql:/tmp/nssdb -M -n 'AC RAIZ FNMT-RCM - FNMT-RCM' -t 'C,C,C'
+
+Por último, si se quiere añadir un certificado en particular debe usarse
+:command:`certutil`. Por ejemplo, si el :file:`.p12` no hubiera incluido el
+certificado raíz, podríamos haber añadido este con la orden::
+
+   $ certutil -d sql:/tmp/nssdb -A -n 'AC RAIZ FNMT-RCM - FNMT-RCM' -t 'C,C,C' -i raiz.pem
+
+donde :file:`raiz.pem` está en formato |PEM| con codificación Base64_.
+
+.. note:: Es posible, también, que las aplicaciones que usen este catálogo
+   consulten los certificados del sistema incluidos en :file:`/etc/ssl/certs`.
+   Para ello es necesario tener instalado el paquete `p11-kit-modules
+   <https://packages.debian.org/search?keywords=p11-kit-modules>`_ y rescribir
+   el archivo :file:`pkcs11.txt` dentro del directorio de catálogo del siguiente
+   modo::
+
+
+      $ cat > /tmp/nssdb/pkcs11.txt
+      library=/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-trust.so
+      name=PKCS#11 Trust Module
+      NSS=trustOrder=100
+
+   De este modo, sólo será necesario el certificado intermedio, y no el raíz ya
+   que éste se tomará del catálogo general.
+
 .. rubric:: Notas al pie
 
 .. [#] En principio el :rfc:`3156` sólo protege el cuerpo del mensaje.  Puede
@@ -790,6 +906,10 @@ Empecemos pues:
 .. [#] No hay un modo sencillo de incluir en la línea de la orden de generación
    del certificado los nombres alternativos, que sería lo suyo.
 
+.. [#] Firefox_, por ejemplo, trae su propio catálogo de certificados raiz y no
+   atiende a los que haya instalados en el sistema operativo. Chromium_, en
+   cambio, sí lo hace.
+
 .. |CA| replace:: :abbr:`CA (Certification Authority)`
 .. |CSR| replace:: :abbr:`CSR (Certificate Signing Request)`
 .. |RA| replace:: :abbr:`RA (Registration Authority)`
@@ -806,6 +926,7 @@ Empecemos pues:
 .. |ACME| replace:: :abbr:`ACME (Automated Certificate Management Environment)`
 .. |TLS| replace:: :abbr:`TLS (Transport Layer Security)`
 .. |SSL| replace:: :abbr:`SSL (Secure Socket Layer)`
+.. |NSS| replace:: :abbr:`NSS (Network Secure Services)`
 
 .. _Digital Signature Trust: https://www.identrust.com/
 .. _Let's Encrypt: https://letsencrypt.org/
@@ -816,3 +937,8 @@ Empecemos pues:
 .. _Thunderbird: https://www.thunderbird.net
 .. _Microsoft: https://www.microsoft.com
 .. _Base64: https://es.wikipedia.org/wiki/Base64
+.. _Firefox: https://www.mozilla.org
+.. _Chromium: https://www.chromium.org
+.. _OpenSSL: https://www.openssl.org
+.. _Netscape: https://es.wikipedia.org/wiki/Netscape_Navigator
+.. _SQLite: https://www.sqlite.org

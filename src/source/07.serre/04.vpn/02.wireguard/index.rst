@@ -46,10 +46,13 @@ el estado de Wireguard en junio de 2019
 
    Además, el módulo pertinente no forma parte del núcleo por lo que hay que
    generarlo y para ello se requieren las cabeceras del núcleo que se esté
-   usando y que probablemente no estén instaladas. Si esto es así y se instala
-   antes :program:`wireguard` que las cabeceras el módulo no se generará
-   automáticamente durante la instalación; y habrá, después de haberlas
-   instalado, que generar el módulo a mano::
+   usando y que probablemente no estén instaladas\ [#]_::
+
+      # apt install linux-headers-$(uname -r)
+
+   Si se instala antes :program:`wireguard` que las cabeceras, el módulo
+   :file:`wireguard.ko` no se generará automáticamente durante la instalación y
+   habrá, después de haberlas instalado, que generar el módulo a mano::
 
       # dpkg-reconfigure wireguard-dkms
 
@@ -83,6 +86,10 @@ Para acceder al *software*, basta con instalarlo::
    un mecanismo medianamente automatizado en su paquetería para generar módulos
    basado en `DKMS
    <https://es.wikipedia.org/wiki/Dynamic_Kernel_Module_Support>`_.
+
+.. [#] Si el núcleo es antiguo es posible que las cabeceras para el núcleo
+   presente ya no existan y haya que instalar un nuevo núcleo (y reiniciar para
+   que sea el activo).
 
 .. |UDP| replace:: :abbr:`UDP (User Datagram Protocol)`
 
