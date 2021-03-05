@@ -616,6 +616,8 @@ inadmisible.
    contiene también el propio certificado u obtendrá un :kbd:`Unauthorized
    (6)`. 
 
+.. _cert-gen:
+
 Generación
 ----------
 .. https://fam.tuwien.ac.at/~schamane/_/blog/2019-07-18_selfsigned_subjectaltname.htm
@@ -715,6 +717,8 @@ Empecemos pues:
      solicitud (de ahí que luego necesitemos copiarla al generar el certificado\
      [#]_).
 
+.. _pdfsig:
+
 Documentos |PDF|
 ----------------
 Según :ref:`se presentó en un principio <firmdig-concepto>`, la firma de un
@@ -733,7 +737,7 @@ propias firmas y que, además, estas se puedan validar sin duda alguna.
 
 .. rubric:: Comprobación
 
-Puede comprobarse la validez de la firma de un |PDF| con :command:`pdfsig`
+Puede comprobarse la validez de la firma de un |PDF| con :manpage:`pdfsig`
 (incluido en el paquete `poppler-utils
 <https://packages.debian.org/es/stable/poppler-utils>`_)::
 
@@ -758,16 +762,21 @@ comprobación::
    partir de la versión **21.01** (la verificación ya la soporta desde hace
    tiempo).
 
+.. _catalogo-cert:
+
 Catálogo de certificados
 ========================
 Ya se ha afirmado que los certificados raíz son fiables a pesar de estar
 autofirmados, porque el propio sistema operativo (o aplicación particular\ [#]_)
 los avala instalándolos de serie o a través de algún paquete oficial.
 
-Por lo general, las aplicaciones usan dos tipos de catálogos de certificados:
+Por lo general, las aplicaciones usan dos tipos de catálogos para los
+certificados\ [#]_:
 
-+ El de OpenSSL_, que es el que usa *Linux*.
-+ Los generados con la librería |NSS|\ 3, originaria de Netscape_ y que suelen
++ El de OpenSSL_, que constituye el catálogo general del sistema en *Linux*.
+  Muchas aplicaciones basadas en las librerías de OpenSSL_ lo usan (empezando
+  por la propia orden :command:`openssl`)
++ Los generados con la librería |NSS|\ 3, originaria de Netscape_, que suelen
   usar los navegadores.
 
 .. seealso:: Puede encontrar información adicional en el `artículo sobre
@@ -777,10 +786,12 @@ Por lo general, las aplicaciones usan dos tipos de catálogos de certificados:
 Catálogo general
 ----------------
 El catálogo general del sistema se encuentra en el directorio :file:`/etc/ssl/certs`,
-que contiene cada uno de los certificados confiables (en realidad, enlaces
+el cual contiene cada uno de los certificados confiables (en realidad, enlaces
 simbólicos a donde realmente se encuentran) y un archivo
-:file:`ca-certificates.crt` en formato |PEM| que contiene concatenados todos los
-certificados disponibles.
+:file:`ca-certificates.crt` en formato |PEM| que contiene concatenados todos
+los certificados disponibles. Adicionalmente, hay un archivo
+:file:`/etc/ca-certificates.conf` en que se pueden vetar certificados (échele
+un ojo al archivo para saber más sobre ello).
 
 La orden :command:`update-ca-certificates` se encarga de recolectar los
 certificados que se encuentren en :file:`/usr/share/certificates` y, además,
@@ -797,25 +808,33 @@ raíz adicionales basta con:
 
       # update-ca-certificates
 
+Para eliminar un certificado que previamente hubiéramos añadido basta borrarlo
+de :file:`/usr/local/share/ca-certificates` y ejecutar::
+
+   # update-ca-certificates  --fresh
+
 .. _cert-nss:
 
 |NSS|
 -----
-Hay aplicaciones que usan la librería |NSS|\ 3 para la gestión del almacen de
+Hay aplicaciones que usan la librería |NSS|\ 3 para la gestión del almacén de
 certificados. Tal es el caso de navegadores como Chromium_, Firefox_ o la
-orden :manpage:`pdfsig` para el soporte de firma en documentos |PDF|. Este
-almacen tiene la forma de una base de datos (modernamente SQLite_). Para la
-gestión de estos almacenes podemos instalar el paquete::
+orden :ref:`pdfsig <pdfsig>` para el soporte de firma digital en documentos
+|PDF|. Este almacén tiene la forma de una base de datos (modernamente SQLite_).
+Para la gestión de estos almacenes podemos instalar el paquete::
 
    # apt install libnss3-tools
 
-que trae la orden :command:`certutil`. Si queremos crear un almacen de claves
-*ex-novo* podemos hacer::
+que trae la orden :command:`certutil`. La gestión de un catálogo de certificados
+no es complicada con ella.
+
+Empecemos por crear un almacen de claves *ex-novo*::
 
    $ cerutil -d sql:/tmp/nssdb -N --empty-password
 
-La opción :kbd:`--empty-password` deja sin cifrar las claves privadas que puedan
-almacenarse. Para ver las claves contenidas::
+La opción :kbd:`--empty-password` deja sin cifrar las claves privadas que
+puedan almacenarse. Si el catálogo ya contuviera certificados y claves,
+podríamos listarlos mediante la orden::
 
    $ cerutil -d sql:/tmp/nssdb -L
 
@@ -825,47 +844,64 @@ almacenarse. Para ver las claves contenidas::
    AC FNMT Usuarios - FNMT-RCM                                  ,,   
    AC RAIZ FNMT-RCM - FNMT-RCM                                  C,C,C
 
-En este caso, hay un certificado de usuarios que se reconoce como tal
+En este caso, hay un certificado de usuario que se reconoce como tal
 (:kbd:`u,u,u`), porque la clave privada está también en la base de datos. Por
-otro lado, la |CA| raíz debe tener los atributos :kbd:`C,C,C`.
+otro lado, una |CA| raíz debe tener los atributos :kbd:`C,C,C`.
 
 Si queremos ver la información de un certificado en particular::
 
    $ cerutil -d sql:/tmp/nssdb -Ln 'PERICO_DE_LOS_PALOTES'
 
-Si tenemos un archivo |PKCS| #12 con toda la cadena de confianza, podemos
-importarla con::
+Para importar en el catálogo un archivo |PKCS| #12, podemos hacer::
 
-   $ pk12util  -d sql:/tmp/nssdb -i micert.p12
+   $ pk12util -d sql:/tmp/nssdb -i micert.p12
 
-aunque al certificado raíz habrá que modificarle los atributos para que sea
-confiable::
+que importará no sólo el propio certificado, sino también todos los
+certificados que constituyan la cadena de confianza y que se incluyerán en el
+archivo. Eso sí, el certificado raíz no tendrá los atributos pertinentes, así
+que habrá que añadírselos::
 
-   $ certutil -d sql:/tmp/nssdb -M -n 'AC RAIZ FNMT-RCM - FNMT-RCM' -t 'C,C,C'
+   $ certutil -d sql:/tmp/nssdb -Mn 'AC RAIZ FNMT-RCM - FNMT-RCM' -t 'C,C,C'
 
 Por último, si se quiere añadir un certificado en particular debe usarse
 :command:`certutil`. Por ejemplo, si el :file:`.p12` no hubiera incluido el
 certificado raíz, podríamos haber añadido este con la orden::
 
-   $ certutil -d sql:/tmp/nssdb -A -n 'AC RAIZ FNMT-RCM - FNMT-RCM' -t 'C,C,C' -i raiz.pem
+   $ certutil -d sql:/tmp/nssdb -An 'AC RAIZ FNMT-RCM - FNMT-RCM' -t 'C,C,C' -i raiz.pem
 
-donde :file:`raiz.pem` está en formato |PEM| con codificación Base64_.
+donde :file:`raiz.pem` está en formato |PEM| con codificación Base64_. Es
+también posible eliminar certificados con la opción :kbd:`-D` y el nombre
+del certificado.
 
-.. note:: Es posible, también, que las aplicaciones que usen este catálogo
-   consulten los certificados del sistema incluidos en :file:`/etc/ssl/certs`.
-   Para ello es necesario tener instalado el paquete `p11-kit-modules
+.. note:: Si se desea que las aplicaciones que usen este catálogo |NSS|
+   consulten los certificados del sistema en :file:`/etc/ssl/certs`,
+   será necesario el paquete `p11-kit-modules
    <https://packages.debian.org/search?keywords=p11-kit-modules>`_ y rescribir
    el archivo :file:`pkcs11.txt` dentro del directorio de catálogo del siguiente
    modo::
-
 
       $ cat > /tmp/nssdb/pkcs11.txt
       library=/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-trust.so
       name=PKCS#11 Trust Module
       NSS=trustOrder=100
 
-   De este modo, sólo será necesario el certificado intermedio, y no el raíz ya
-   que éste se tomará del catálogo general.
+   De este modo, en nuestro catálogo de ejemplo será prescindible el certificado
+   "AC RAIZ FNMT-RCM - FNMT-RCM", puesto que este certificado raíz se tomará del
+   catálogo general.
+
+Tanto Firefox_ como Chromium_\ [#]_ usan catálogos de este este tipo en los que
+almacenan los certificados añadidos a través del navegador (p.e. los
+certificados personales). La gestión es bastante sencilla, a través de su
+interfaz gráfica, con lo que se hace innecesario el uso de :command:`certutil`.
+Presentan, no obstante, algunas diferencias:
+
++ Firefox_ trae su propia lista de certificados raíz y no consulta los del
+  sistema. Por otra parte, Cada perfil consulta un almacén distinto que se
+  encuentra en el propio directorio del perfil.
++ Chromium_, en cambio, sí carga los certificados del sistema y a éstos añade
+  los que se hayan instalado en su catálogo |NSS|. Por otra parte, todos los
+  perfiles creados por un mismo usuario comparten este catálogo cuya ruta es
+  :file:`~/pki/nssdb`.
 
 .. rubric:: Notas al pie
 
@@ -909,6 +945,14 @@ donde :file:`raiz.pem` está en formato |PEM| con codificación Base64_.
 .. [#] Firefox_, por ejemplo, trae su propio catálogo de certificados raiz y no
    atiende a los que haya instalados en el sistema operativo. Chromium_, en
    cambio, sí lo hace.
+
+.. [#] *Windows* usa un catálogo que nada tiene que ver con estos dos (véase
+   `esta pregunta en superuser.com
+   <https://superuser.com/questions/411909/where-is-the-certificate-folder-in-windows-7>`_),
+   pero este manual no trata sobre ese sistema operativo.
+
+.. [#] Chromium_ en *Windows* usa directamente el catálogo proporcionado por
+   el sistema e instala y desinstala certificados en él.
 
 .. |CA| replace:: :abbr:`CA (Certification Authority)`
 .. |CSR| replace:: :abbr:`CSR (Certificate Signing Request)`

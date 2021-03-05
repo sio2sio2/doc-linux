@@ -7,7 +7,7 @@ desarrolla en la `Orden de 7 de julio de 2009
 diseñado atendiendo a los siguientes criterios:
 
 * Que cubran todos los |RRAA|, |CCEE| y contenidos básicos relacionados
-  en la :ref:`referida orden <https://www.juntadeandalucia.es/boja/2009/165/1>`.
+  en la `referida orden <https://www.juntadeandalucia.es/boja/2009/165/1>`_.
 * Que una misma unidad sólo incluya |CCEE| de un único |RA|.
 * Que los trimestres académicos incluyan unidades y |RRAA| completos.
 * Las prácticas se desarrollan preferentemente (aunque no exclusivamente) sobre

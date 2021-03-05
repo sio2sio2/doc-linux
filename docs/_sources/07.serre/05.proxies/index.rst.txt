@@ -25,13 +25,13 @@ Citaremos dos clasificaciones:
      dirigidas a los servidores para los que intermedia. La diferencia, pues, entre
      éstos y los normales es que mientras los *proxies* a secas intermedian entre
      un conjunto limitado de clientes (los de la red local) y cualquier servidor
-     web, los *proxies* inversos intemedian entre cualquier cliente y el conjunto
+     web, los *proxies* inversos intermedian entre cualquier cliente y el conjunto
      limitado de servidores web para los que actúa de intermediario.
 
      .. image:: files/proxyinverso.png
 
      .. warning:: El *proxy* inverso no tiene por qué encontrarse en la misma red
-        local del servidor (o los servidores) web como el gráfico da a antender Sí
+        local del servidor (o los servidores) web como el gráfico da a entender Sí
         es la situación habitual cuando el *proxy* es gestionado por la misma
         organización que el servidor *web*, pero no lo es en absoluto si se
         contrata el servicio (p.e. el servicio `cloudflare
@@ -39,7 +39,7 @@ Citaremos dos clasificaciones:
 
 - Atendiendo al efecto de su presencia, los proxies se dividen en :dfn:`proxy
   explícito`, que es aquel que deja notas su presencia, y :dfn:`proxy
-  transparente` es aquel cuyo presencia pasa desapercibida. Ahora bien, un
+  transparente` es aquel cuya presencia pasa desapercibida. Ahora bien, un
   *proxy* puede ser explícito o transparente  para el cliente, para el servidor
   o para ambos. Por lo general:
   
@@ -61,7 +61,7 @@ Citaremos dos clasificaciones:
 :dfn:`Proxy DNS`,
   que es aquel *proxy directo* que se encarga de obtener de un servidor |DNS|
   las resoluciones de nombres solicitadas por sus clientes y cachearlas a fin de
-  acelerar las solicitudes posterioes. :ref:`dnsmasq <dnsmasq-dns>` es un
+  acelerar las solicitudes posteriores. :ref:`dnsmasq <dnsmasq-dns>` es un
   ejemplo de *proxy* de este tipo.
 
 :dfn:`Proxy ARP`
@@ -89,7 +89,7 @@ Citaremos dos clasificaciones:
      Cuando el tráfico es, en cambio, |HTTP|\ s la información es inaccesible y
      en principio, no hay forma de llevar a cabo estas dos tareas. Sin embargo,
      la :ref:`extensión SNI <sni>` de |TLS| envía, al menos, el nombre de
-     dominio sin cifrar durante la fase de negociación, lo cual, posiibilita las
+     dominio sin cifrar durante la fase de negociación, lo cual, posibilita las
      labores de filtrado, siempre que éste se base exclusivamente en el nombre
      del dominio.
 
@@ -102,11 +102,11 @@ Citaremos dos clasificaciones:
        todos ellos.
      - Absorber el tráfico excesivo (p,e, ataques |DoS|).
      - Cachear selectivamente páginas para agilizar las respuestas, lo cual si
-       el tráfico es |HTTP|\ s,implica trasladar el punto extremo de la conexión
+       el tráfico es |HTTP|\ s,  implica trasladar el punto extremo de la conexión
        cifrada al propio *proxy*. Cachean tanto contenido estático (lo cual
-       ahorra ancho de banda al servidor y evita que tenga que atender la pentición)
+       ahorra ancho de banda al servidor y evita que tenga que atender la petición)
        como contenido dinámico, lo cual libera al servidor de tener que
-       regenerar constantemente las mismas páginos. En este último caso, el
+       regenerar constantemente las mismas páginas. En este último caso, el
        cacheo debe ser muy cuidadoso ya que se corre el riesgo de entregar
        información obsoletas.
 
@@ -118,9 +118,9 @@ Citaremos dos clasificaciones:
    predefinida, habilitar una :ref:`calidad de servicio <QoS>` o por mera
    intención estadística. Reciben el nombre |DPI| (inspección profunda de
    paquetes, en castellano), precisamente por esa causa, donde *profunda* o *a
-   fondp* implica el análisis de de metainformación de capa 7 o incluso el
+   fondo* implica el análisis de de metainformación de capa 7 o incluso el
    contenido. En cierta medida, un proxy *web* directo es una herramienta de
-   este tipo, aunque centrada exclusivamente en el protoclo |HTTP|.
+   este tipo, aunque centrada exclusivamente en el protocolo |HTTP|.
 
    Por ejemplo, si la política de una organización es que hacia el puerto **443**
    sólo puede establecerse comunicaciones web cifradas seguras, la herramienta
