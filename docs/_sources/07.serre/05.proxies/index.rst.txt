@@ -108,7 +108,7 @@ Citaremos dos clasificaciones:
        como contenido dinámico, lo cual libera al servidor de tener que
        regenerar constantemente las mismas páginas. En este último caso, el
        cacheo debe ser muy cuidadoso ya que se corre el riesgo de entregar
-       información obsoletas.
+       información obsoleta.
 
 .. _dpi:
 
@@ -118,7 +118,7 @@ Citaremos dos clasificaciones:
    predefinida, habilitar una :ref:`calidad de servicio <QoS>` o por mera
    intención estadística. Reciben el nombre |DPI| (inspección profunda de
    paquetes, en castellano), precisamente por esa causa, donde *profunda* o *a
-   fondo* implica el análisis de de metainformación de capa 7 o incluso el
+   fondo* implica el análisis de metainformación de capa 7 o incluso el
    contenido. En cierta medida, un proxy *web* directo es una herramienta de
    este tipo, aunque centrada exclusivamente en el protocolo |HTTP|.
 

@@ -324,24 +324,32 @@ común en el *software* libre) al resto de formatos y viceversa\ [#]_:
       .. warning:: Si el archivo contiene varias claves públicas, sólo mostrará
          la primera en el archivo. Siga leyendo para saber cómo ver todas.
 
+   #. Generar el *hash* del campo "*Subject*"::
+
+         $ openssl x509 -in CERTIFICADO.pem -hash -noout
+
+      .. note:: Este *hash* es el que se usa para generar el nombre del enlace
+         simbólico en :file:`/etc/ssl/certs`. Véase más adelante :ref:`catálogo
+         de certificados <catalogo-cert>`.
+
    #. Generar un archivo ``.p12`` a partir de los archivos ``.pem`` y ``,key``::
 
          $ openssl pkcs12 -export -in CERTIFICADO.pem -inkey CERTIFICADO.key -out CERTIFICADO.p12
 
-      Si el archivo ``.pem`` contiene ambas partes pública y privada, basta con
-      incluir este único fichero como argumento de :kbd:`-in` y prescindir de
-      :kbd:`-inkey`.  El archivo con la parte pública debe contener al menos la
-      clave pública del certificado, pero también puede contener la de la
-      autoridad de certificación. Si el certificado de la autoridad está en
-      archivo distinto, pero se quiere incluir dentro del resultado puede
-      referirse este tercer archivo mediante la opción :kbd:`-CAfile`.
+      supuesto que tengamos partes pública y privada en distinto archivo. Si
+      están contenidas en el mismo |PEM| basta la opción :kbd:`-in`.
+      El archivo con la parte pública debe contener al menos la clave pública
+      del certificado, pero también puede contener la de la(s) autoridad(es) de
+      certificación. Si el certificado de la autoridad está en archivo
+      distinto, pero se quiere incluir dentro del resultado puede referirse
+      este tercer archivo mediante la opción :kbd:`-CAfile`.
 
-      .. note:: Como se necesita introducir una clave para descifrar el
-         contenido de :file:`CERTIFCADO.key` y otra para cifrar
-         :file:`CERTIFICADO.p12`\ [#]_ se pedirán interactivamente las dos
-         claves.  Si se quieren pasarlas por la línea de órdenes utilice las
-         opciones :kbd:`-passin` y :kbd:`-passout` y consulte la sección "Pass
-         Phrase Options" de :manpage:`openssl(1)`.
+      .. note:: La orden requerirá interactivamente, en principio. dos
+         claves: una para descifrar la clave privada contenida en el |PEM| y
+         otra para cifrar :file:`CERTIFICADO.p12`\ [#]_. 
+         Para pasar por la línea de órdenes las claves (útil en *scripts*)
+         utilice las opciones :kbd:`-passin` y :kbd:`-passout` y consulte la
+         sección "Pass Phrase Options" de :manpage:`openssl(1)`.
 
    #. Transformar el certificado público |PEM| al formato |PKCS| #7::
 
@@ -391,7 +399,7 @@ común en el *software* libre) al resto de formatos y viceversa\ [#]_:
 
    Operaciones habituales:
 
-   #. Convertir el archivo ``.p12`` al formato |PEM| en un sólo archivo::
+   #. Convertir el archivo ``.p12`` al formato |PEM|\ [5]_ en un sólo archivo::
 
          $ openssl pkcs12 -in CERTIFICADO.p12 -out CERTIFICADO.pem
 
@@ -628,10 +636,14 @@ Generación
 .. https://wiki.infn.it/cn/ccr/x509/home/utenti/server/manuale
 
 .. warning:: Para obtener certificados aceptables, ya sean personales o de
-   servidor, debe recurrise a una |CA| reconocida, ya que tanto los unos como
+   servidor, debe recurrirse a una |CA| reconocida, ya que tanto los unos como
    los otros pueden obtenerse de forma sencilla gratuitamente. Este epígrafe
    carece realmente de interés práctico real\ [#]_, pero sirve para conocer cómo
    funciona *por dentro* la solicitud de un certificado.
+
+El propósito del libro es generar un certificado de |CA| raíz, un certificado de
+|CA| intermedia firmado con el anterior y, finalmente, certificados de usuario y
+de servidor firmados con el segundo certificado.
 
 El procedimiento de generación de certificados es siempre el mismo:
 
@@ -650,16 +662,16 @@ Antes, no obstante, crearemos un archivo de configuración :download:`ssl.conf
       copy_extension = copy
 
    Esta directiva implica que las extensiones que añadamos en la solicitud se
-   copiarán en el certificado firmado. ¿Por qué es esto un peligro? Porque las
+   copiarán en el certificado firmado. ¿Por qué es esto un peligro? Porque la
    solicitud, en general, la realiza el interesado y. si nosotros (la CA) las
-   copiamos en el certificado final, éste puede añadir algo indiseable (como
+   copiamos en el certificado final, éste puede añadir algo indeseable (como
    :kbd:`CA:TRUE`) para que el certificado le sirva para validar otros
-   certficados). Pero como en nuestro caso, vamos a hacer nosotros mismos 
+   certificados). Pero como en nuestro caso, vamos a hacer nosotros mismos 
    tanto la solicitud como la expedición, no hay este problema.
 
 El archivo permite simplificar las respuestas al hacer una solicitud y define
-cuáles serán las extensiones que contengan los certificados. Preparemos el
-directorio de trabajo::
+cuáles serán los campos de extensión que deben contener los certificados.
+Preparemos el directorio de trabajo::
 
 $ mkdir -p store/{{new,}certs,crl,keys,csr}
 $ echo 1000 > store/serial
@@ -670,37 +682,59 @@ Empecemos pues:
 **Certificado raíz**
    Tiene la particularidad de que estará autofirmado::
 
-      $ openssl genrsa -out store/ca.key 4096
+      $ openssl genrsa -aes256 -out store/ca.key 4096
       $ openssl req -new -config ssl.conf -key store/ca.key -out store/csr/ca.csr
       $ openssl x509 -req -sha256 -in store/csr/ca.csr -signkey store/ca.key \
           -days 3650 -extfile ssl.conf -extensions e_ca -out store/ca.crt
 
-   Esto nos permote obtener el certificado raíz (:file:`store/ca.crt`) con su
+   Esto nos permite obtener el certificado raíz (:file:`store/ca.crt`) con su
    clave privada (:file:`store/ca.key`), cuyas rutas coinciden con las que hemos
    indicado en el archivo de configuración, lo que nos evitará a partir de ahora
    tener que especificarlas.
 
+   .. note:: En el archivo :download:`ssl.conf <files/ssl.conf>` se incluyen dos
+      secciones para definir los campos de extensión de un certificado de |CA|
+      (:kbd:`[e_ca]` y :kbd:`[e_inter]`). La única diferencia entre ellos es
+      el valor :kbd:`pathlen:0`. Este parámetro determina los niveles de
+      confianza por debajo del certificado que lo contiene que pueden existir en
+      la cadena. Si el valor es **0**, entonces no puede haber ningún nivel
+      inferior y el certificado sólo podrá firmar certificados de usuario y no
+      certificados para una |CA| intermedia subordinada.
+
+**Certificado intermedio**
+   Este certificado debe estar firmado con el certificado anterior::
+
+      $ openssl genrsa -out store/inter.key 4096
+      $ openssl req -new -config ssl.conf -key store/inter.key -out store/csr/inter.csr
+      $ openssl x509 -req -sha256 -in store/csr/inter.csr -CA store/ca.crt -CAkey store/ca.key \
+          -CAcreateserial -days 3650 -extfile ssl.conf -extensions e_inter -out store/inter.crt
+
+   Hay dos diferencias respecto al certificado raíz:
+
+   + La clave privada de este certificado no la cifraremos por comodidad (falta
+     la opción :kbd:`-aes256`), porque será el que usemos para cifrar todos los
+     certificados de usuario.
+   + Cambia el modo en que se genera el certificado (orden tercera) para
+     firmarlo con el certificado raíz.
+
 **Certificado personal**
-   Conceptualmente es hacer lo mismo (generar la clave privada, hacer la
-   solicitud y generar el certificado con ella), aunque con diferencias::
+   Se cifra con el certificado intermedio::
 
       $ openssl genrsa -aes256 -out store/keys/$(cat store/serial).key 2048
-      $ openssl req -new -key store/keys/$(cat store/serial).key -out store/csr/$(cat store/serial).csr \
+      $ openssl req -new -config ssl.conf -key store/keys/$(cat store/serial).key -out store/csr/$(cat store/serial).csr \
          -subj="/C=ES/GN=MI NOMBRE/SN=MIS APELLIDOS/CN=APELLIDOS NOMBRE/emailAddress=midir@ecci.on"
-      $ openssl ca -config ssl.conf -batch -extensions e_personal -infiles store/csr/$(cat store/serial).csr
+      $ openssl ca -config ssl.conf -batch -notext -extensions e_personal -infiles store/csr/$(cat store/serial).csr
 
-   Básicamente el proceso es el mismo, pero:
+   Obsérvese que:
 
-   * La clave privada, puesto que es un certificado personal, la ciframos
-     (:kbd:`-aes256`).
    * En vez de introducir de forma interactiva los datos para generar el
      "Subject", lo incluimos como parámetro en la orden que genera la solicitud.
-   * Aunque podemos usar la suborden :command:`x509` para firmar el
-     certificado a partir de la solicitud\ [#]_, utilizamos la suborden
-     :command:`ca` que organiza mejor la actividad de nuestra |CA|, pues modifica
-     el número de serie según vamos creando los certificados y crea un
-     registro con todos los certificados que hemos ido generando (en
-     :file:`store/index.txt`).
+   * Utilizamos la suborden :command:`ca`, en vez de :command:`x509`, porque
+     el archivo de configuración está preparado para utilizar el certificado
+     intermedio como firmante y con él se irá incrementando automáticamente el
+     número de serie (:file:`store/serial`) según se vayan creando nuevos certificados
+     y, además, se creará un índice que lista todos los certificados creados
+     (:file:`store/index.txt`).
 
 **Certificado de servidor**
    La generación es semejante al de un certificado personal::
@@ -708,7 +742,7 @@ Empecemos pues:
       $ openssl genrsa -out store/keys/$(cat store/serial).key 2048
       $ openssl req -new -key store/keys/$(cat store/serial).key -out store/csr/$(cat store/serial).csr \
          -subj="/CN=www.example.net" -addext "subjectAltName=DNS:www.example.net,DNS:alt.example.net"
-      $ openssl ca -config ssl.conf -batch -extensions e_server -infiles store/csr/$(cat store/serial).csr
+      $ openssl ca -config ssl.conf -batch -notext -extensions e_server -infiles store/csr/$(cat store/serial).csr
 
    aunque:
 
@@ -729,7 +763,7 @@ estándar recogido en la propia especificación del |PDF| que consiste en:
 
 + Incluir la firma (o las firmas si se requiere la firma de varios firmantes)
   en un campo interno.
-+ Utilizar :ref:`certificados digirales <cert-digital>` y no meramente un par
++ Utilizar :ref:`certificados digitales <cert-digital>` y no meramente un par
   de claves.
 
 Las dos características anteriores permiten que un |PDF| firmado contenga las
@@ -746,10 +780,10 @@ Puede comprobarse la validez de la firma de un |PDF| con :manpage:`pdfsig`
 La orden de arriba, sin embargo, no comprobará la fiabilidad del certificado
 firmante. Para ello, es necesario que el programa disponga de toda la cadena de
 confianza. Lo más probable es que esto no sea así, ya que :command:`pdfsig`, usa
-un almacen |NSS| y los certificados del sistema operativo. Se puede no obstamte
-preparar un catálogo de certificados que contenga la cadena de certificados tal
-como se expone :ref:`al tratar los catálogos NSS <cert-nss>` y hacer entonces la
-comprobación::
+un almacén |NSS| y los certificados del sistema operativo. Se puede, no
+obstante, preparar un catálogo de certificados que contenga la cadena de
+certificados tal como se expone :ref:`al tratar los catálogos NSS <cert-nss>` y
+hacer entonces la comprobación::
 
    $ pdfsig -nssdir sql:/tmp/nssdb documento.pdf
 
@@ -828,7 +862,7 @@ Para la gestión de estos almacenes podemos instalar el paquete::
 que trae la orden :command:`certutil`. La gestión de un catálogo de certificados
 no es complicada con ella.
 
-Empecemos por crear un almacen de claves *ex-novo*::
+Empecemos por crear un almacén de claves *ex-novo*::
 
    $ cerutil -d sql:/tmp/nssdb -N --empty-password
 
@@ -921,7 +955,7 @@ Presentan, no obstante, algunas diferencias:
               base64 -w64 CERTIFICADO.cer
               echo '-----END CERTIFICATE-----'; } > CERTFICADO.pem
 
-.. [#] La opción :kbd:`-nodes` deja la clave privada sin cifrar, pero
+.. [#] Añadir la opción :kbd:`-nodes` deja la clave privada sin cifrar, pero
        posiblemente no sea una buena idea.
 .. [#] En un certificado autofirmado ``Subject`` e ``Issuer`` coincidirán.
 .. [#] Basta con hacer un :ref:`cat <cat>` y ver si hay uno o dos certificados
@@ -932,12 +966,6 @@ Presentan, no obstante, algunas diferencias:
    raíz para generar el certificado del servidor y los clientes. Eso sí, está
    ya todo preparado para que no haya que pelearse directamente con
    :program:`openssl`.
-
-.. [#] En la orden habría que añadir cuál es el certificado de la |CA|. Algo
-   así::
-
-      $ openssl x509 -req -sha256 -in store/csr/personal.csr -CA store/ca.crt -CAkey store/ca.key \
-          -CAcreateserial -days 365 -extfile ssl.conf -extensions personal -out personal.crt
 
 .. [#] No hay un modo sencillo de incluir en la línea de la orden de generación
    del certificado los nombres alternativos, que sería lo suyo.

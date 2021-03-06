@@ -164,7 +164,7 @@ sí se firmó con un certiticado raíz (*AC RAIZ FNMT-RCM*)\ [#]_.
 Lo habitual es que nuestro certificado se encuentre en formado |PKCS| #12,
 quizás exportado desde el navegador. Existen varias posibilidades:
 
-+ Que el archivo ``.p12`` se limite a recoger nuestro certficado.
++ Que el archivo ``.p12`` se limite a recoger nuestro certificado.
 + Que incluya también el certificado intermedio.
 + Que incluya, además, el certificado raíz.
  
