@@ -31,8 +31,8 @@ Citaremos dos clasificaciones:
      .. image:: files/proxyinverso.png
 
      .. warning:: El *proxy* inverso no tiene por qué encontrarse en la misma red
-        local del servidor (o los servidores) web como el gráfico da a entender Sí
-        es la situación habitual cuando el *proxy* es gestionado por la misma
+        local del servidor (o los servidores) web como el gráfico da a entender.
+        Sí es la situación habitual cuando el *proxy* es gestionado por la misma
         organización que el servidor *web*, pero no lo es en absoluto si se
         contrata el servicio (p.e. el servicio `cloudflare
         <https://www.cloudflare.com/>`).
