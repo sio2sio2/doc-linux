@@ -3,18 +3,22 @@
 ***********************
 Técnicas criptográficas
 ***********************
-Estudiaremos bajo este epígrafe dos aspectos relacionados con la criptografía:
+Estudiaremos bajo este epígrafe tres actividades propies de la criptografía:
 
-- Las funciones de resumen o funciones *hash*.
-- El cifrado en sí y cuáles son los algoritmos que se usan para ello.
+- Resumen criptográfico, gracias a las funciones *hash*.
+- El cifrado y cuáles son los algoritmos que se usan para ello.
+- La firma digital.
+
+Remataremos con un apéndice práctico que indique cómo llevar a cabo estas tareas
+en un sistema *Linux*.
 
 .. _hash:
 
-Funciones *hash*
-****************
+Resumen critográfico
+********************
 Las :dfn:`funciones hash` o :dfn:`funciones digest` o :dfn:`funciones resumen`
 son funciones que dada una entrada generan siempre una salida de la misma
-longitud. Se caracterizan por:
+longitud (el llamado :dfn:`resumen`). Se caracterizan por:
 
 + ser *deterministas*, esto es, para una misma entrada siempre generar la
   misma salida.
@@ -24,8 +28,13 @@ longitud. Se caracterizan por:
 
 + generar, sea cual sea la entrada, resúmenes del mismo tamaño. cuya
   consecuencia inmediata es que operan en un solo sentido, esto es, a partir del
-  ori9ginal obtenemos su resumen, pero a partir del resumen es imposible
+  original obtenemos su resumen, pero a partir del resumen es imposible
   averiguar cuál era la información de partida.
+
+La actividad de resumir criptográficamente la información está relacionada con
+el :ref:`objetivo de la integridad <crypto-objetivos>`, ya que dadas las
+propiedades de las funciones *hash*, es extremadamente improbable que un
+contenido que no ha cambiado su resumen, haya cambiado.
 
 Entre las funciones de *hash* más conocidas se encuentran:
 
@@ -45,8 +54,19 @@ Entre las funciones de *hash* más conocidas se encuentran:
    parte, cambia internamente los algoritmos, pero está pensada para generar
    resúmenes de la misma longitud que |SHA|\ -2.
 
-Algoritmos de cifrado
-*********************
+.. seealso:: Más adelante, puede consultar :ref:`cómo hacer resúmenes
+   criptográficos en Linux <md5sum>`.
+
+Cifrado
+*******
+Por :dfn:`cifrado` nos referimos particularmente a la acción de ofuscar cierta
+información con el objeto de que pueda ser posteriormente desofuscada.
+Si deshacer la ofuscación no puede hacerla un tercero no autorizado, entonces
+el cifrado se encamina a la *privacidad* y tenemos propiamente aquello que se
+refiere como *cifrado*. En cambio, si cualquier tercero puede desofuscar, el
+propósito no es la privacidad, sino la *autenticidad*, y entraríamos en el
+terreno de la :ref:`firma digital <firma-digital>`, que trataremos más adelante.
+
 Ya se ha comentado que los algoritmos modernos de cifrado se basan en el
 secreto de la clave y no en el secreto del propio algoritmo, por lo que nos
 centraremos en los algoritmos basados en clave. Atendiendo a ella hay dos tipos
@@ -171,8 +191,107 @@ forma segura, que se denomina :dfn:`clave de sesión`. Una vez que la clave se
 encuentra en ambos extremos se pasa a realizar un cifrado simétrico usando esta
 clave de sesión.
 
-Herramientas prácticas
-**********************
+Conclusiones
+============
+Lo adecuado al cifrar es usar:
+
+a. Cifrado **simétrico** sobre:
+
+   + Información que no se requiere transmitir (p.e. cifrado de disco).
+   + Información que se transmite siempre que la clave simétrica se transmita
+     cifrada asimétricamente, lo cual ya hemos definido como cifrado **híbrido**.
+
+b. Cifrado **asimétrico** sobre:
+
+   + Una clave simétrica que se desea transmitir, que es el complemento del
+     cifrado *híbrido* que se acaba de citar. Para cifrar la clave simétrica
+     se utiliza la clave pública de aquel a quien se desea transmitirla, puesto
+     que sólo él será capaz de descifrarla.
+   + Un resumen generado con una función *hash*. Este acción de cifrado, sin
+     embargo, es parte de la *firma digital*.
+
+.. _firma-digital:
+
+Firma digital
+*************
+Una :dfn:`firma digital` es al mundo digital lo que la firma manuscrita al
+papel, esto es, algo que certifica que los términos expresados en un texto
+son ratificados por la persona firmante.
+
+La *firma digital* no es un acción atómica como las dos anteriores (resumir y
+cifrar), sino un conjunto de acciones de resumen y cifrado que permiten
+asegurar la identidad del emisor y la integridad del mensaje. Esquemáticamente,
+firmar consiste en:
+
++ Obtener :ref:`un resumen <hash>` de los datos mediante una función *hash*.
++ Cifrar tal resumen con la clave privada del firmante.
++ Transmitir los datos (o almacenarlos) junto al resumen cifrado (la firma).
+
+Ante esto, un tercero (por ejemplo, el destinatario de un mensaje de correo
+firmado), es capaz de certificar que el origen es quien dice ser, ya que
+descifrará el resumen con la clave pública de éste y, por otra parte, podrá
+comprobar si los datos conservan su integridad gracias al propio resumen
+descifrado.
+
+.. note:: Aunque conceptualmente una firma no es más que un resumen cifrado con
+   clave privada, en la práctica es necesario añadir metainformación sobre quién
+   firmó o cuándo lo hizo.
+
+Apéndice práctico
+*****************
+Trataremos bajo este epúgrafe algunas herramientas criptográficas muy
+habituales en sistemas *Linux* que implementan los conceptos tratados hasta
+ahora: |GnuPG|, más enfocado a implementar el estándar `OpenPGP
+<https://www.openpgp.org/>`_\ [#]_, y Open\ |SSL|. La segunda herramienta
+(incluida en el paquete homónimo) es más que probable que ya se encuentre
+instalada en el sistema. Para la primera, en cambio, sí conviene hacer
+precisiones.
+
+.. note:: En caso de que hagamos pruebas en una máquina virtual es conveniente
+   aumentar la entropía del sistema para mejorar y acelerar la creación de
+   claves asimétricas. Para lograrlo puede obrarse del siguiente\ [#]_ modo::
+
+      $ cat /proc/sys/kernel/random/entropy_avail  # Entropía inicial
+      234
+      # apt install rng-tools
+      # echo 'HRNGDEVICE=/dev/urandom' >> /etc/default/rng-tools
+      # echo 'RNGDOPTIONS="--fill-watermark=90%"' >> /etc/default/rng-tools
+      # invoke-rc.d rng-tools start
+      # cat /proc/sys/kernel/random/entropy_avail
+      2159
+
+.. _gnupg.1:
+
+.. rubric:: Instaslación de |GnuPG|
+
+La instalación es sumamente sencilla::
+
+   # apt install gnupg
+
+Como configuración podemos usar la siguiente::
+
+   $ mkdir -m 700 ~/.gnupg
+   $ cat > ~/.gnupg/gpg.conf
+   #keyserver hkps://sks-keyservers.net:443
+   keyserver hkp://pool.sks-keyservers.net
+   no-greeting
+   armor
+
+   personal-digest-preferences SHA512
+   cert-digest-algo SHA512
+   default-preference-list SHA512 SHA384 SHA256 SHA224 AES256 AES192 AES CAST5 ZLIB BZIP2 ZIP Uncompressed
+   personal-cipher-preferences AES256 TWOFISH CAMELLIA256 3DES
+
+Con la que seleccionamos cuáles son nuestros algoritmos de cifrado y *hash*
+preferidos. Además, con :kbd:`armor` guardamos el texto cifrado como caracteres
+imprimibles.
+
+Si ejecutamos la orden::
+
+   $ gpg --version
+
+podremos consultar cuáles son los algoritmos de cifrado, *hash* y compresión que
+usa el programa.
 
 .. index:: md5sum
 .. index:: shasum, sha256sum, sha384sum, sha512sum
@@ -180,13 +299,14 @@ Herramientas prácticas
 .. _md5sum:
 .. _shasum:
 
-Generación de resúmenes
-=======================
+Resúmenes
+=========
 Para la generación de resúmenes *hash* de ficheros y flujos de texto, existen
 dos órdenes fundamentales: :command:`md5sum` y la familia de comandos
 :program:`shasum` (:command:`sha256sum`, :command:`sha384sum`,
 :command:`sha512sum`), que comparten una misma interfaz, con lo que es
-indiferente ilustrar el uso de una u otra orden.
+indiferente ilustrar el uso de una u otra orden. Suelen encontrarse todas
+instaldas en el sistema.
 
 La generación del resumen puede hacerse del siguiente modo::
 
@@ -221,69 +341,146 @@ Con posterioridad, podrá comprobarse la integridad del siguiente modo\ [#]_::
       $ echo "Hola, caracola" | LC_ALL=C md5sum -c flujo.md5
       -: OK
 
-.. _gnupg.1:
+También es posible utilizar para este fin (aunque no es lo habitual) las
+herramientas que usaremos después para ilustrar el cifrado y la firma digital:
 
-Generación de claves: |GnuPG|
-=============================
-GnuPG_ es una aplicación que implementa el estándar `OpenPGP
-<https://www.openpgp.org/>`_ y que, en consecuencia, muy comúnmente se usa como
-*plugin* de clientes de correo para el cifrado o la firma de mensajes. Por
-ahora, sin embargo, usaremos el ejecutable que proporciona, :command:`gpg`, para
-probar la generación de claves.
+* :ref:`GnuPG <gnupg.1>`::
 
-.. note:: En caso de que hagamos pruebas en una máquina virtual es conveniente
-   aumentar la entropía del sistema para mejorar y acelerar la creación de
-   claves asimétricas. Para lograrlo puede hacerse lo siguiente\ [#]_::
+      $ gpg --print-md sha512 fichero.txt
 
-      $ cat /proc/sys/kernel/random/entropy_avail  # Entropía inicial
-      234
-      # apt install rng-tools
-      # echo 'HRNGDEVICE=/dev/urandom' >> /etc/default/rng-tools
-      # echo 'RNGDOPTIONS="--fill-watermark=90%"' >> /etc/default/rng-tools
-      # invoke-rc.d rng-tools start
-      # cat /proc/sys/kernel/random/entropy_avail
-      2159
+  e incluso hay una opción que calcula los resúmenes según todos los algoritmos
+  disponibles::
 
-Instalación
------------
-Basta con instalar el paquete::
+      $ gpg --print-mds fichero.txt
 
-   # apt install gnupg
+* :ref:`OpenSSL <openssl>`::
 
-Como configuración podemos usar la siguiente::
+      $ openssl dgst -sha512 fichero.txt
 
-   $ mkdir -m 700 ~/.gnupg
-   $ cat > ~/.gnupg/gpg.conf
-   #keyserver hkps://sks-keyservers.net:443
-   keyserver hkp://pool.sks-keyservers.net
-   no-greeting
-   armor
+.. _openssl:
 
-   personal-digest-preferences SHA512
-   cert-digest-algo SHA512
-   default-preference-list SHA512 SHA384 SHA256 SHA224 AES256 AES192 AES CAST5 ZLIB BZIP2 ZIP Uncompressed
-   personal-cipher-preferences AES256 TWOFISH CAMELLIA256 3DES
+Open\ |SSL|
+===========
+Open\ |SSL| es la herramienta de cifrado por antonomasia en sistemas *Linux*.
 
-Con la que seleccionamos cuáles son nuestros algoritmos de cifrado y *hash*
-preferidos. Además, con ``armor`` guardamos el texto cifrado como caracteres
-imprimibles.
-
-Si ejecutamos la orden::
-
-   $ gpg --version
-
-podremos consultar cuáles son los algoritmos de cifrado, *hash* y compresión que
-usa el programa.
+.. note:: Volveremos sobre esta herramienta al introducir los :ref:`certificados
+   digitales <cert-digital>`.
 
 Cifrado simétrico
 -----------------
-El cifrado simétrico es muy apropiado para el cifrado de ficheros. Para cifrar
-el texto, basta con lo siguiente::
+Una forma de llevarlo a cabo es esta::
+
+   # openssl enc -aes256 -pbkdf2 -a -in fichero.txt -out fichero.txt.enc
+
+que utiliza |AES|\ -256 para el proceso y genera un cifrado en `base64
+<https://es.wikipedia.org/wiki/Base64>`_ gracias a la opción `-a`. Para
+descifrar basta con añadir la opción :kbd:`-d` y, obviamente, utilizar como
+entrada el texto cifrado::
+
+   # openssl enc -aes256 -a -d -in fichero.txt.enc -out fichero-recuperado.txt
+
+.. note:: Tanto :kbd:`-in` como :kbd:`-out` son opcionales y, si no se
+   especifican, se entenderá que la entrada es la entrada estándar y la salida
+   la salida estándar.
+
+.. note:: La clave simétrica para el cifrado/descifrado se pide de forma
+   interactiva. Puede proporcionarse en la propia orden incluyendo la opción
+   :kbd:`-pass`::
+
+      # openssl enc -aes256 -pbkdf2 -a -pass pass:clave-secreta -in fichero.txt -out fichero.txt.enc
+      
+Cifrado asimétrico
+------------------
+Llevarlo a cabo requiere generar un par de claves (|RSA| en concreto)::
+
+   # openssl genrsa -aes128 -out privkey.pem 4096
+   # openssl rsa -in privkey.pem -pubout -out pubkey.pem
+
+Las órdenes generan un par de claves |RSA| (:file:`privkey.pem` y
+:file:`pubkey.pem`) de 4096 *bits*. Para proteger la clave privada con una
+contraseña (esto es, con una clave simétrica) hemos usado la opción
+:kbd:`-aes128`. Esto último es un simple mecanismo de seguridad para que sea
+imposible usar la clave privada sin conocer esta contraseña. Así, en caso de
+robo, el ladrón aún deberá averiguar la contraseña.
+
+.. note:: Las claves que se piden interactivamente pueden pasarse a través de
+   las opciones :kbd:`-passin` o :kbd:`-passout` (vease :manpage:`openssl(1ssl)`
+   para más información)
+
+Con ellas podemos cifrar y descifrar pequeños ficheros. Usando la clave pública
+para cifrar y la privada para descifrar::
+
+   # echo "Hola" > saludo.txt
+   # openssl rsautl -encrypt -inkey pubkey.pem -pubin -in saludo.txt -out saludo.enc
+   # openssl rsautl -decrypt -inkey privkey.pem -in saludo.enc
+   Hola
+
+¿Podemos cifrar con la privada y descifrar con la pública? Teóricamente sí,
+aunque tal como lo hacemos ahora no tenga mucho sentido (porque obrar así es
+propio del acto de firmar)::
+
+   # openssl rsautl -sign -inkey privkey.pem -in saludo.txt -out saludo.enc
+   # openssl rsautl -verify -inkey pubkey.pem -pubin -in saludo.enc
+   Hola
+
+.. note:: Si en vez de un un simple par de claves, tenemos un :ref:`certificado
+   digital <cert-digital>`, aún podremos realizar estas operaciones sustituyendo
+   :kbd:`-pubin` por :kbd:`-certin`
+
+Firma digital
+-------------
+Partiendo de las claves |RSA| ya generadas en el apartado anterior
+(:file:`privkey.pem`, :file:`pubkey.pem`), podemos hacer una primera
+aproximación tomando la :ref:`descripción de lo que es la firma digital
+<firma-digital>`::
+
+   $ echo "Este es el contenido del fichero que firmo" > fichero.txt
+   $ sha256sum fichero.txt | tee /dev/tty | openssl rsautl -sign -inkey privkey.pem -out fichero.sign
+   47ebcc00b179c0f1fc8f45fec4a3e6a55fbb1aeddd8a5bb6ee52c5d7f57d1d3a  fichero.txt
+
+Ya tenemos el archivo original (:file:`fichero.txt`) y la firma
+(:file:`fichero.sign`) generada con la clave privada. Con ellos dos y la clave
+publica correspondiente, podemos comprobar integridad e identidad::
+
+   $ sha256sum fichero.txt
+   47ebcc00b179c0f1fc8f45fec4a3e6a55fbb1aeddd8a5bb6ee52c5d7f57d1d3a  fichero.txt
+   $ openssl rsautl -verify -inkey pubkey.pem -pubin -in fichero.sign
+   47ebcc00b179c0f1fc8f45fec4a3e6a55fbb1aeddd8a5bb6ee52c5d7f57d1d3a  fichero.txt
+
+Dado que coincide el resumen del archivo con la firma descifrada con la clave
+pública, podemos concluir que el archivo no ha cambiado y que lo certificó el
+propietario de la clave.
+
+En realidad, para firmar con más comodidad aunque nos abstraigamos del
+concepto::
+
+   $ openssl dgst -sha256 -sign privkey.pem -out fichero.sign fichero.txt
+
+Y para verificar la firma::
+
+   $ openssl dgst -sha256 -verify pubkey.pem -signature fichero.sign fichero.txt 
+   Verified OK
+
+.. note:: Cuando lo que se tiene no es un simple par de claves, sino un
+   :ref:`certificado digital <cert-digital>` aún puede hacerse este proceso
+   extrayendo previamente la clave pública del certificaddo::
+
+      $ openssl x509 -in micert.pem -pubkey -nooout > pubkey.pem
+
+|GnuPG|
+=======
+Aunque el próposito final del programa es la implementación del estándar
+Open\ |PGP|, podemos utilizarlo para ilustrar los conceptos anteriores.
+
+Cifrado simétrico
+-----------------
+Podemos utilizarlos para cifrar un archivo determinado::
 
    $ echo 'Hola, caracola!!!' > /tmp/saludo.txt
    $ gpg -c /tmp/saludo.txt
 
-La orden genera el fichero cifrado :file:`/tmp/saludo.txt.asc` con esta pinta::
+La orden genera el fichero cifrado :file:`/tmp/saludo.txt.asc` con esta pinta\
+[#]_::
 
    -----BEGIN PGP MESSAGE-----
 
@@ -341,22 +538,24 @@ claves. Si por alguna razón se desea pararlo, puede hacerse::
 
 Cifrado asimétrico
 ------------------
-Para la generación de una pareja de claves basta hacer::
+La implementación de este tipo de cifrado está determinado por el propósito de
+la orden (el estádar Open\ |PGP|), por lo que hay muchos aspectos que vienen
+determinados por ello. Sea como sea, cifrar asimétricamente requiere previamente
+generar una pareja de claves::
 
    $ gpg --gen-key --default-new-key-algo rsa3072
 
 que nos pedirá el nombre de su propietario y la dirección de correo electrónico,
-ya que, al estar este *software* orientado a la firma de mensajes de correo, esta
-dirección se usará como identificador para las claves generadas. Además, se nos
-pedirá una clave simétrica con la que cifrar la clave privada. Esta contraseña
-deberá consignarse cada vez que la clave privada tenga que usarse y es una
-simple medida de seguridad para evitar que, si la clave privada cae en manos
-ajenas, el ladrón tenga fácil usurpar la identidad del legítimo propietario. Se
-han añadido, además, dos datos relevantes: el tiempo de vigencia de la clave (un
+que se usará como identificador para las claves generadas. Además, se nos pedirá
+una clave simétrica con la que cifrar la clave privada. Esta contraseña deberá
+consignarse cada vez que la clave privada tenga que usarse y es una simple
+medida de seguridad para evitar que, si la clave privada cae en manos ajenas, el
+ladrón tenga fácil usurpar la identidad del legítimo propietario. Se han
+añadido, además, dos datos relevantes: el tiempo de vigencia de la clave (un
 año), que de forma predeterminada es eterno, y el tipo de algoritmo\ [#]_. La
-orden no sólo genera las claves, sino que las almacena en el anillo de
-claves (todo dentro de :file:`~/.gnupg`), con lo que podremos consultar su
-existencia listando cuáles son las claves públicas almacenadas::
+orden no sólo genera las claves, sino que las almacena en el anillo de claves
+(todo dentro de :file:`~/.gnupg`), con lo que podremos consultar su existencia
+listando cuáles son las claves públicas almacenadas::
 
    $ gpg --list-keys --keyid-format short
    /home/usuario/.gnupg/pubring.kbx
@@ -486,111 +685,63 @@ correspondiente a la pública con la que se firmó, basta con::
    $ gpg -qd secreto.asc
    Esto es un secreto
 
-Resúmenes
----------
-Aunque no está pensado para ello, también pueden obtenerse el resumen de un
-fichero::
+Firma digital
+-------------
+|GnuPG| lleva a cabo la firma de archivos mediante el estándar Open\ |PGP|::
 
-   $ gpg --print-md sha512 fichero,txt
+   $ echo "Este es el contenido del fichero que firmo" > fichero.txt
+   $ gpg --detach-sign --default-key mi_cuenta@example.com -o fichero.sig fichero.txt
 
-e incluso hay una opción que calcula los resúmenes según todos los algoritmos
-disponibles::
+De esta manera tenemos un fichero original (:file:`fichero.txt`) y su resumen
+cifrado digitalmente con nuestra clave privada en :file:`fichero.sign`. Si
+analizamos el fichero de firma::
 
-   $ gpg --print-mds fichero,txt
+   $ gpg --list-packets fichero.sign
+   :signature packet: algo 1, keyid 53175AA29C972B7B
+           version 4, created 1543050622, md5len 0, sigclass 0x00
+           digest algo 10, begin of digest 04 9e
+           hashed subpkt 33 len 21 (issuer fpr v4 040968BBC05C39A4DD2A43BD53175AA29C972B7B)                                                  
+           hashed subpkt 2 len 4 (sig created 2018-11-24)
+           hashed subpkt 28 len 23 (signer's user ID)
+           subpkt 16 len 8 (issuer key ID 53175AA29C972B7B)
+           data: [3071 bits]
+
+veremos algunas características de la firma, como:
+
+* qué algoritmo de clave asimétrica se usó, el **1**, que se corresponde con una
+  clave asimétrica |RSA|, válida tanto para firma como para cifrado. El
+  significado de los códigos puede encontrarse en el :rfc:`4880`, y en concreto
+  en la `sección 9.1 <https://tools.ietf.org/html/rfc4880#section-9.1>`_.
+
+* qué clave se usó: la *53175AA29C972B7B*, que efectivamente es la nuestra:
+
+  .. code-block:: console
+     :emphasize-lines: 4
+
+     $ gpg --keyid-format long -list-keys
+     /home/usuario/.gnupg/pubring.kbx
+     --------------------------------
+     pub   rsa3072/53175AA29C972B7B 2018-11-21 [SC] [expires: 2020-11-20]
+           040968BBC05C39A4DD2A43BD53175AA29C972B7B
+     uid                 [ unknown] Soy el que soy <mi_cuenta@example.com>
+           sub   rsa3072/4B1F09C9B84F038E 2018-11-21 [E] [expires: 2020-11-20]
+
+* con qué algoritmo se resumió el fichero, el **10**, que es *SHA512* según 
+  `la sección 9.4 <https://tools.ietf.org/html/rfc4880#section-9.4>`_ del
+  :rfc:`4880`.
+
+Si hacemos llegar **ambos** archivos a un tercero, y éste posee nuestra clave
+pública, podrá verificar nuestra identidad gracias a descifrar la firma y la
+integridad del fichero gracias al resumen que contiene esta::
+
+   $ gpg --verify fichero.sign fichero.txt
+   [...]
+   Primary key fingerprint: 0409 68BB C05C 39A4 DD2A  43BD 5317 5AA2 9C97 2B7B
+   $ echo $?
+   0
 
 .. seealso:: Hay un extenso tutorial del uso de GnuPG_ en la `wiki de Archlinux
    <https://wiki.archlinux.org/index.php/GnuPG_(Espa%C3%B1ol)>`_.
-
-.. _gen-cla-openssl:
-
-Generación de claves: Open\ |SSL|
-=================================
-Open\ |SSL| es otra herramienta que permite generar y utilizar claves.
-
-.. warning:: La utilidad de tratar esta herramienta, más que en la de las claves
-   en sí para lo cual nos basta la anterior, está en que puede manejar
-   :ref:`certificados digitales <cert-digital>`. incluidos los emitidos por la
-   |FNMT|, y, en consecuencia, obtener de ellos las claves pública y privada que
-   contienen.
-
-Cifrado simétrico
------------------
-Una forma de llevarlo a cabo es esta::
-
-   # openssl enc -aes256 -pbkdf2 -a -in fichero.txt -out fichero.txt.enc
-
-que utiliza |AES|\ -256 para el proceso y genera un cifrado en `base64
-<https://es.wikipedia.org/wiki/Base64>`_ gracias a la opción `-a` (equivalente a
-:kbd:`armor` en :ref:`gpg <gpg-pgp>`). Para descifrar basta con añadir la opción
-:kbd:`-d` y, obviamente, utilizar como entrada el texto cifrado::
-
-   # openssl enc -aes256 -a -d -in fichero.txt.enc -out fichero-recuperado.txt
-
-.. note:: Tanto :kbd:`-in` como :kbd:`-out` son opcionales y, si no se
-   especifican, se entenderá que la entrada es la entrada estándar y la salida
-   la salida estándar.
-
-.. note:: La clave simétrica para el cifrado/descifrado se pide de forma
-   interactiva. Puede proporcionarse en la propia orden incluyendo la opción
-   :kbd:`-pass`::
-
-      # openssl enc -aes256 -pbkdf2 -a -pass pass:clave-secreta -in fichero.txt -out fichero.txt.enc
-      
-Cifrado asimétrico
-------------------
-Es obvio que para poder llevarlo es necesario previamente generar un par de
-claves::
-
-   # openssl genrsa -aes128 -passout pass:clave-secreta -out privkey.pem 4096
-   # openssl rsa -in private.pem -passin pass:clave-secreta -pubout -out pubkey.pem
-
-Las órdenes generan un par de claves |RSA| (:file:`privkey.pem` y
-:file:`pubkey.pem`) de 4096 *bits*. Para cifrar la clave privada se usa |AES|
-128.
-
-Con ellas podemos cifrar y descifrar pequeños ficheros::
-
-   # echo "Hola" > saludo.txt
-   # openssl rsautl -encrypt -inkey public.pem -pubin -in saludo.txt -out saludo.enc
-   # openssl rsautl -decrypt -inkey private.pem -passin pass:clave-secreta -in texto.enc
-   Hola
-
-En realidad, las variantes más interesantes son cuando se tiene un
-:ref:`certificado digital <cert-digital>`, cuyo concepto trataremos más
-adelante, y se pretende :ref:`firmar un documento <firma-digital>`, que también
-trataremos.
-
-Para esto supongamos que disponemos de un certificado en formato |PKCS|\ 12 llamado
-:file:`cert.p12`, el cual traducimos a un formato manipulable por
-:program:`openssl`::
-
-   # openssl pkcs12 -in cert.p12 -nocerts -out cert.key
-   # openssl pkcs12 -in cert.p12 -clcerts -nokeys -out cert.pem
-
-El fichero |PKCS|\ 12 debe estar cifrando con una clave simétrica por lo que en
-ambos casos se requerirá tal. Además, la primera orden extrae la clave privada,
-por lo que se requerirá una clave para su cifrado (véase en la página de
-:manpage:`openssl-pkcs12` las opciones :kbd:`-passin` y :kbd:`-passout` para
-proporcionarlas en la propia orden). Con estos ficheros ya tenemos separadas
-las clave pública y privada, pero con la salvedad de que hay en ellos datos del
-certificado por lo que las órdenes son ligeramente distintas::
-
-   # echo "Hola" > saludo.txt
-   # openssl rsautl -encrypt -inkey cert.pem -certin -in saludo.txt -out saludo.enc
-   # openssl rsautl -decrypt -inkey cert.key -passin pass:clave-secreta -in texto.enc
-   Hola
-
-En concreto, la opción :kbd:`-certin`, que sustituye a :kbd:`-pubin`.
-
-.. note:: Para firmar un fichero, puede consultarse `esta respuesta de
-   stackoverflow <https://stackoverflow.com/a/18359743>`_.
-
-Resúmenes
----------
-Es posible también utilizar funciones de *hash*::
-
-   # openssl dgst -sha256 fichero.txt
-   SHA256(fichero.txt)= d42650b1b27a8da408495394242e10d06f6238d15ec1c76f8f942bbdf26d419d
 
 .. rubric:: Notas al pie
 
@@ -600,11 +751,14 @@ Es posible también utilizar funciones de *hash*::
 .. [#] Se fuerza a que la orden se ejecute en inglés, para que el resultado se
    exprese como *OK* o *FAILED*. En castellano, la leyenda se expresa de forma
    muy farragosa.
+.. [#] Trataremos este estándar al hablar sobre :ref:`correo electronico <email-seguro>`.
 .. [#] Usar, sin embargo, el propio kernel para la generación de la
    entropía no es muy recomendable. Debería usarse el dispositivo
    hardware (/dev/hwrng), pero en la máquina virtual es posible que
    no esté. Para :program:`qemu` véase
    `su wiki <https://wiki.qemu.org/Features/VirtIORNG>`_.
+.. [#] El archivo cifrado es imprimible gracias a que incluimos :kbd:`armor` en
+   el archivo de configuración.
 .. [#] El algoritmo elegido utiliza una clave |RSA| de 2048 *bits* tanto para
    cifrado como para firmado. Otro posible algoritmo es *ed25519*.
 .. [#] En nuestro caso, sería una clave pública y su correspondiente privada.

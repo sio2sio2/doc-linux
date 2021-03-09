@@ -1,139 +1,14 @@
-.. _firma-digital:
-
-Firma digital
-*************
-Una :dfn:`firma digital` es al mundo digital lo que la firma manuscrita al
-papel, esto es, algo que certifica que los términos expresados en un texto
-son ratificados por la persona firmante.
-
-Para llevar a cabo la *firma digital* de unos datos (un fichero o un mensaje de
-correo, por ejemplo) se obra del siguiente modo:
-
-+ Se obtiene :ref:`un resumen <hash>` de los datos mediante una función *hash*.
-+ Se cifra tal resumen con la clave privada del firmante.
-+ Se transmiten los datos (o se almacenan) junto al resumen cifrado (la firma).
-
-Ante esto, un tercero (por ejemplo, el destinatario de un mensaje de correo
-firmado), es capaz de certificar que el origen es quien dice ser, ya que
-descifrará el resumen con la clave pública de éste y, por otra parte, podrá
-comprobar si los datos conservan su integridad gracias al propio resumen
-descifrado.
-
-.. note:: Aunque conceptualmente una firma sea un resumen cifrado con clave
-   privada, en la práctica es necesario añadir metainformación. Téngase presente
-   que se requerirá conocer quién lo ha firmado o cuándo se firmó.
-  
-.. _firmdig-concepto:
-
-Firmemos haciendo uso de :ref:`openssl <openssl>`. Partamos para ello de que ya
-hemos generado un par de claves |RSA| (:file:`privkey.pem`, :file:`pubkey.pem`)
-según :ref:`lo descrito en el epígrafe anterior <gen-cla-openssl>` y firmemos::
-
-   $ echo "Este es el contenido del fichero que firmo" > fichero.txt
-   $ openssl dgst -sha256 -sign privkey.pem -out fichero.sign fichero.txt
-
-Podremos comprobar la veracidad de la firma usando la clave pública, la firma y
-el archivo::
-
-   $ openssl dgst -sha256 -verify pubkey.pem -signature fichero.sign fichero.txt 
-   Verified OK
-
-.. note:: Cuando lo que se tiene no es un simple par de claves, sino un
-   :ref:`certificado digital <cert-digital>` aún puede hacerse este proceso
-   manuual extrayendo la clave pública del certificaddo::
-
-      $ openssl x509 -in micert.pem -pubkey -nooout > pubkey.pem
-
-Claves |PGP|
-============
-La firma digital es ampliamente usada en los mensajes de correo electrónico.
-En estos se firma tanto un conjunto de cabeceras escogidas\ [#]_ como el cuerpo
-del mensaje y los adjuntos. Creada la firma, se incorpora como un adjunto
-adicional al mensaje.
-
-Lo habitual es que se usen claves |PGP|, un estándar desarrollado para el
-cifrado y firma de mensajes de correos electrónicos, cuya generación,
-importación y exportación de claves :ref:`practicamos al tratar el cifrado
-asimétrico <gpg-pgp>`. Lo habitual es que los agentes de correo (|MUA|), como
-:ref:`mutt <mutt>` o Thunderbird_, implementen la funcionalidad, aunque también
-es posible firmar y cifrar mensajes con determinados servicios de *webmail* y
-la extensión adecuada del navegador. Por ejemplo, en Chromium_ existe la
-extensión Mailenvelope_ que permite el cifrado de mensajes para los principales
-sitios de webmail (Gmail_, Yahoo_, Outlook_, etc.).
-
-.. rubric:: Firma manual
-
-Aunque, ya sea mediante |MUA| o ya sea mediante *webmail*, el acto de firmar es
-relativamente sencillo, aprovechemos que en el epígrafe anterior
-:ref:`generamos un par de claves PGP <gnupg.1>` para ilustrar cómo se firma con
-ellas un archivo::
-
-   $ echo "Este es el contenido del fichero que firmo" > fichero.txt
-   $ gpg --detach-sign --default-key mi_cuenta@example.com -o fichero.sig fichero.txt
-
-De esta manera tenemos un fichero original (:file:`fichero.txt`) y su resumen
-cifrado digitalmente con nuestra clave privada en :file:`fichero.sign`. Si
-analizamos el fichero de firma::
-
-   $ gpg --list-packets fichero.sign
-   :signature packet: algo 1, keyid 53175AA29C972B7B
-           version 4, created 1543050622, md5len 0, sigclass 0x00
-           digest algo 10, begin of digest 04 9e
-           hashed subpkt 33 len 21 (issuer fpr v4 040968BBC05C39A4DD2A43BD53175AA29C972B7B)                                                  
-           hashed subpkt 2 len 4 (sig created 2018-11-24)
-           hashed subpkt 28 len 23 (signer's user ID)
-           subpkt 16 len 8 (issuer key ID 53175AA29C972B7B)
-           data: [3071 bits]
-
-veremos algunas características de la firma, como:
-
-* qué algoritmo de clave asimétrica se usó, el **1**, que se corresponde con una
-  clave asimétrica |RSA|, válida tanto para firma como para cifrado. El
-  significado de los códigos puede encontrarse en el :rfc:`4880`, y en concreto
-  en la `sección 9.1 <https://tools.ietf.org/html/rfc4880#section-9.1>`_.
-
-* qué clave se usó: la *53175AA29C972B7B*, que efectivamente es la nuestra:
-
-  .. code-block:: console
-     :emphasize-lines: 4
-
-     $ gpg --keyid-format long -list-keys
-     /home/usuario/.gnupg/pubring.kbx
-     --------------------------------
-     pub   rsa3072/53175AA29C972B7B 2018-11-21 [SC] [expires: 2020-11-20]
-           040968BBC05C39A4DD2A43BD53175AA29C972B7B
-     uid                 [ unknown] Soy el que soy <mi_cuenta@example.com>
-           sub   rsa3072/4B1F09C9B84F038E 2018-11-21 [E] [expires: 2020-11-20]
-
-* con qué algoritmo se resumió el fichero, el **10**, que es *SHA512* según 
-  `la sección 9.4 <https://tools.ietf.org/html/rfc4880#section-9.4>`_ del
-  :rfc:`4880`.
-
-Si hacemos llegar **ambos** archivos a un tercero, y éste posee nuestra clave
-pública, podrá verificar nuestra identidad gracias a descifrar la firma y la
-integridad del fichero gracias al resumen que contiene esta::
-
-   $ gpg --verify fichero.sign fichero.txt
-   [...]
-   Primary key fingerprint: 0409 68BB C05C 39A4 DD2A  43BD 5317 5AA2 9C97 2B7B
-   $ echo $?
-   0
-
-
-.. seealso:: Aunque menos frecuente, también es posible firmar mensajes con
-   :ref:`certificados X.509 <cert-digital>`. En :ref:`este epígrafe
-   <mutt-fnmt>`, puede consultar cómo firmar mensajes de correo en :ref:`mutt
-   <mutt>` con el certificado personal emitido por la |FNMT|.
-
 .. _cert-digital:
 
 Certificado digital
-===================
+*******************
 .. note:: Tratamos los *certificados digitales de clave pública*, por lo que a
    partir de ahora hablaremos, simplemente, de *certificados digitales*.
 
-A pesar de qué la suplantación de identidad parece resuelta, puesto que poder
-descifrar una firma con una clave pública supone que el firmante sea el
+Antes de pasar a las aplicaciones prácticas propiamente dichas, nos detendremos
+en un concepto que usarán comúnmente tales aplicaciones. Téngase presente que a
+pesar de qué la suplantación de identidad parece resuelta gracias al cifrado
+asimétrico, puesto que poder descifrar una firma  supone que el firmante sea el
 propietario de tal clave pública, hay aún una debilidad: ¿cómo puede el
 verificador estar seguro de que tal clave pública pertenece a quien parece
 pertenecer? A fin de cuentas, la suplantación ha podido producirse en el momento
@@ -204,7 +79,7 @@ tiempo de validez por el que se certifiquen. Ambas fechas se incluyen dentro de
 los datos identificativos.
 
 Certificados personales
------------------------
+=======================
 El proceso típico de emisión de un certificado personal es el siguiente:
 
 #. El interesado realiza una solicitud a la |CA|, por lo general a través de
@@ -247,7 +122,7 @@ revocaciones. Por ejemplo, la |FNMT| ofrece este servicio de forma gratuita\
    :command:`openssl`.
 
 Certificados de servidor
-------------------------
+========================
 Estos certificados avalan la identidad de una máquina, esto es, que una máquina
 (o un conjunto de máquinas, si estamos ante un servicio distribuido) responde a
 un determinado nombre |DNS|. Así, por ejemplo, cuando conectamos a la `página
@@ -283,7 +158,7 @@ protocolo |ACME|, descrito en :ref:`este epígrafe sobre nginx
    seguro basado en |SSL|/|TLS|.
 
 Formatos de certificados X.509
-------------------------------
+==============================
 Los certificados digitales se presentan en distintos formatos de archivo que
 conviene conocer, porque en ocasiones para hacer una determinada operación o
 utilizarlo con cierta aplicación lo necesitaremos en uno concreto. Además, de la
@@ -485,7 +360,7 @@ común en el *software* libre) al resto de formatos y viceversa\ [#]_:
 .. _info-cert:
 
 Destripando certificados
-------------------------
+========================
 Ya se ha establecido que un certificado consta de:
 
 + Una **parte pública** compuesta por unos datos identificativos y una clave pública
@@ -572,7 +447,7 @@ el servicio |OCSP|::
 .. _verif-cert:
 
 Verificación
-------------
+============
 :command:`openssl` proporciona la suborden ``verify`` para verificar la validez
 de un certificado en lo referente a las fechas y a la firma de la |CA|. Aún, sin
 embargo, faltaría comprobar si el certificado está revocado para lo cual hay que
@@ -656,7 +531,7 @@ inadmisible.
 .. _cert-gen:
 
 Generación
-----------
+==========
 .. https://fam.tuwien.ac.at/~schamane/_/blog/2019-07-18_selfsigned_subjectaltname.htm
 .. https://deliciousbrains.com/ssl-certificate-authority-for-local-https-development/
 .. https://gist.github.com/Soarez/9688998
@@ -779,51 +654,6 @@ Empecemos pues:
    * Incluimos los nombres alternativos para el certificado en la orden de
      solicitud (de ahí que luego necesitemos copiarla al generar el certificado\
      [#]_).
-
-.. _pdfsig:
-
-Documentos |PDF|
-----------------
-Según :ref:`se presentó en un principio <firmdig-concepto>`, la firma de un
-archivo es otro archivo que contiene el resumen cifrado con la clave privada
-del firmante. De este modo, cualquier archivo puede ser firmado, lo cual
-incluye archivos |PDF|. Sin embargo, para este tipo de archivos hay un modo
-estándar recogido en la propia especificación del |PDF| que consiste en:
-
-+ Incluir la firma (o las firmas si se requiere la firma de varios firmantes)
-  en un campo interno.
-+ Utilizar :ref:`certificados digitales <cert-digital>` y no meramente un par
-  de claves.
-
-Las dos características anteriores permiten que un |PDF| firmado contenga las
-propias firmas y que, además, estas se puedan validar sin duda alguna.
-
-.. rubric:: Comprobación
-
-Puede comprobarse la validez de la firma de un |PDF| con :manpage:`pdfsig`
-(incluido en el paquete `poppler-utils
-<https://packages.debian.org/es/stable/poppler-utils>`_)::
-
-   $ pdfsig -nocert documento.pdf
-
-La orden de arriba, sin embargo, no comprobará la fiabilidad del certificado
-firmante. Para ello, es necesario que el programa disponga de toda la cadena de
-confianza. Lo más probable es que esto no sea así, ya que :command:`pdfsig`, usa
-un almacén |NSS| y no los certificados del sistema operativo. Se puede, no
-obstante, preparar un catálogo que contenga la cadena de certificados tal como
-se expone :ref:`al tratar los catálogos NSS <cert-nss>` y hacer entonces la
-comprobación::
-
-   $ pdfsig -nssdir sql:/tmp/nssdb documento.pdf
-
-.. rubric:: Firma
-
-.. todo:: Por lo que se `deduce de sus notas de publicación
-   <https://poppler.freedesktop.org/releases.html>`_, la orden :command:`pdfsig`
-   incluida en la suite de manipulación de archivos |PDF|
-   :program:`poppler-utils` incorpora la posibilidad de firmar documentos a
-   partir de la versión **21.01** (la verificación ya la soporta desde hace
-   tiempo).
 
 .. _catalogo-cert:
 
@@ -968,10 +798,6 @@ Presentan, no obstante, algunas diferencias:
 
 .. rubric:: Notas al pie
 
-.. [#] En principio el :rfc:`3156` sólo protege el cuerpo del mensaje.  Puede
-       echarle una lectura a `Protected Headers for Cryptographic E-mail
-       <https://tools.ietf.org/id/draft-autocrypt-lamps-protected-headers-01.html>`_.
-
 .. [#] Gratuito actualmente. Durante mucho el servicio fue de pago y
        restringido.
 .. [#] Las órdenes sólo exponen cómo hacer conversiones entre formatos y ver los
@@ -1017,7 +843,6 @@ Presentan, no obstante, algunas diferencias:
 .. |RA| replace:: :abbr:`RA (Registration Authority)`
 .. |FNMT| replace:: :abbr:`FNMT (Fábrica Nacional de Moneda y Timbre)`
 .. |RSA| replace:: :abbr:`RSA (Rivest, Shamir y Adleman)`
-.. |PGP| replace:: :abbr:`PGP (Pretty Good Privacy)`
 .. |PKCS| replace:: :abbr:`PKCS (Public-Key Cryptography Standards)`
 .. |PEM| replace:: :abbr:`PEM (Private Enhanced Mail)`
 .. |DER| replace:: :abbr:`DER (Distinguished Encoding Rules)`
@@ -1030,15 +855,9 @@ Presentan, no obstante, algunas diferencias:
 .. |SSL| replace:: :abbr:`SSL (Secure Socket Layer)`
 .. |NSS| replace:: :abbr:`NSS (Network Secure Services)`
 .. |GnuPG| replace:: :abbr:`GnuPG (GNU Provacy Guard)`
-.. |MUA| replace:: :abbr:`MUA (Mail User Agent)`
 
 .. _Digital Signature Trust: https://www.identrust.com/
 .. _Let's Encrypt: https://letsencrypt.org/
-.. _Mailenvelope: https://www.mailvelope.com/en
-.. _Gmail: https://gmail.google.com
-.. _Outlook: https://www.outlook.com
-.. _Yahoo: https://mail.yahoo.com
-.. _Thunderbird: https://www.thunderbird.net
 .. _Microsoft: https://www.microsoft.com
 .. _Base64: https://es.wikipedia.org/wiki/Base64
 .. _Firefox: https://www.mozilla.org
