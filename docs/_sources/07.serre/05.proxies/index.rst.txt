@@ -71,6 +71,11 @@ Citaremos dos clasificaciones:
 
   .. image:: files/proxyarp.png
 
+  En la figura la máquina *192.168.0.200/23* entiende que la subred
+  *192.168.1.0/24* forma parte de su red, así que al intentar conectar con una
+  máquina de esa subred enviará un petición |ARP|, no el paquete directamente a
+  una puerta de enlace.
+
 :dfn:`Proxy web`
    Es aquel *proxy* especializado en la intermediación de peticiones |HTTP| y
    |HTTP|\ s. Dependiendo de si actúa como *proxy directo* o *proxy inverso*,
