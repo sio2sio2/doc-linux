@@ -54,9 +54,6 @@ Entre las funciones de *hash* más conocidas se encuentran:
    parte, cambia internamente los algoritmos, pero está pensada para generar
    resúmenes de la misma longitud que |SHA|\ -2.
 
-.. seealso:: Más adelante, puede consultar :ref:`cómo hacer resúmenes
-   criptográficos en Linux <md5sum>`.
-
 Cifrado
 *******
 Por :dfn:`cifrado` nos referimos particularmente a la acción de ofuscar cierta
@@ -83,18 +80,18 @@ de algoritmos.
 
 Es común, además, que las técnicas de cifrado usen una combinación de un
 algoritmo de clave simétrica y otro de clave asimétrica, lo cual se conoce como
-:ref:`cifrado híbrido <híbrido>`.
+:ref:`cifrado híbrido <hibrido>`.
 
 Cifrado simétrico
 =================
 En este tipo de cifrado se usa la misma clave tanto para cifrar como para
 descifrar. Cuando las dos partes se encuentran alejadas, ese, precisamente, es
 su punto débil, ya que exige que la clave se encuentre en ambos extremos con
-anterioridad a la comunicación, lo cual sólo puede lograrse:
+anterioridad a la comunicación, lo cual puede lograrse:
 
 - Encontrándose físicamente las ambas partes para intercambiar en mano la clave.
-- Transmitiendo la clave en claro, lo cual puede provocar que se intercepte y
-  sea inútil el cifrado posterior.
+- Transmitiendo previamente la clave en claro, lo cual puede provocar que se
+  intercepte y sea inútil el cifrado posterior.
 
 Obviando lo anterior, el factor decisivo en la robustez de la clave es su
 longitud: cuanto más larga sea, más difícil es averiguarla por fuerza bruta.
@@ -124,14 +121,13 @@ o `Blowfish <https://es.wikipedia.org/wiki/Blowfish>`_.
 Cifrado asimétrico
 ==================
 Se basa en el uso de una pareja de claves relacionadas entre sí, de modo que lo
-que se haya cifrado con una es posible descifrarlo con la otra, pero no con
-ella misma. Los algoritmos están diseñados para que el interesado genere una de
-estas parejas de claves, de manera que cada una de ellas realice un papel
-diferente:
+que se haya cifrado con una es posible descifrarlo con la otra\ [#]_. Los
+algoritmos están diseñados para que el interesado genere una de estas parejas de
+claves, de manera que cada una de ellas realice un papel diferente:
 
 + Una es la clave **privada** que debe mantenerla en secreto su propietario.
-+ Otra es la clave **pública**, pensada para que el propietario la comunique
-  a los demás.
++ Otra es la clave **pública** correspondiente a la anterior, pensada para que
+  el propietario la comunique a los demás.
 
 De este modo, cuando se desea enviar un mensaje secreto a un destinatario, lo
 que se hace es usar la clave *pública* de éste, ya que tal mensaje sólo podrá
@@ -173,7 +169,7 @@ La desventaja fundamental del cifrado asimétrico frente al simétrico es su cos
 computacional: para un mismo nivel de seguridad requiere claves más largas y,
 además, para una misma longitud de clave es más costoso en tiempo.
 
-.. _híbrido:
+.. _hibrido:
 
 Cifrado híbrido
 ===============
@@ -182,18 +178,27 @@ asimétrico para sortear:
 
 + La debilidad intrínseca de tener que la clave simétrica en ambos extremos de
   la comunicación.
-
 + El mayor costo computacional del cifrado asimétrico.
 
-Para ello realiza una primera fase de la comunicación utilizando cifrado
-asimétrico que sirve estrictamente para intercambiar una clave simétrica de
-forma segura, que se denomina :dfn:`clave de sesión`. Una vez que la clave se
-encuentra en ambos extremos se pasa a realizar un cifrado simétrico usando esta
-clave de sesión.
+Básicamente, consiste en utilizar el cifrado asimétrico exclusivamente sobre una
+clave simétrica, la cual se utiliza para cifrar la información que queremos
+ocultar. De este modo, por ejemplo:
+
++ Si queremos intercambiar un archivo, generamos primero una clave simétrica con
+  la que ciframos el archivo y luego ciframos tal clave con la clave pública de
+  aquel al que queremos enviar el archivo. Hecho esto, remitimos el conjunto
+  archivo y clave simétrica cifradas.
+
++ En un comunicación, utilizamos en una primera fase cifrado asimétrico para
+  establecer un canal seguro para poder transmitir al otro extremo una clave
+  simétrica, denominada :dfn:`clave de sesión`. Una vez que esta clave esté en
+  ambos extremos, podemos proseguir la comunicación utilizando cifrado
+  simétrico. Esta es la base de todos los :ref:`protocolos seguros de red
+  <proto-seguro>`.
 
 Conclusiones
 ============
-Lo adecuado al cifrar es usar:
+En visto de todo lo ya expuesto, lo adecuado al cifrar es usar:
 
 a. Cifrado **simétrico** sobre:
 
@@ -208,7 +213,7 @@ b. Cifrado **asimétrico** sobre:
      se utiliza la clave pública de aquel a quien se desea transmitirla, puesto
      que sólo él será capaz de descifrarla.
    + Un resumen generado con una función *hash*. Este acción de cifrado, sin
-     embargo, es parte de la *firma digital*.
+     embargo, es propia de la *firma digital*; y la entederemos a continuación.
 
 .. _firma-digital:
 
@@ -239,17 +244,18 @@ descifrado.
 
 Apéndice práctico
 *****************
-Trataremos bajo este epúgrafe algunas herramientas criptográficas muy
-habituales en sistemas *Linux* que implementan los conceptos tratados hasta
-ahora: |GnuPG|, más enfocado a implementar el estándar `OpenPGP
-<https://www.openpgp.org/>`_\ [#]_, y Open\ |SSL|. La segunda herramienta
-(incluida en el paquete homónimo) es más que probable que ya se encuentre
-instalada en el sistema. Para la primera, en cambio, sí conviene hacer
-precisiones.
+Para poner en práctica los conceptos anteriores utilizaremos fundamentalmente
+Open\ |SSL|. También podríamos usar |GnuPG|, que implementa el estándar `OpenPGP
+<https://www.openpgp.org/>`_; pero, dado que este estándar se usa
+fundamentalmente en el correo electrónico, introduciremos la orden en el
+:ref:`epígrafe correspondiente <email-seguro>`.
 
-.. note:: En caso de que hagamos pruebas en una máquina virtual es conveniente
-   aumentar la entropía del sistema para mejorar y acelerar la creación de
-   claves asimétricas. Para lograrlo puede obrarse del siguiente\ [#]_ modo::
+.. _entropia:
+
+.. note:: En caso de que hagamos pruebas en una máquina virtual puede que sea
+   conveniente aumentar la entropía del sistema para mejorar y acelerar la
+   creación de claves asimétricas. Para lograrlo puede obrarse del siguiente
+   modo\ [#]_::
 
       $ cat /proc/sys/kernel/random/entropy_avail  # Entropía inicial
       234
@@ -259,39 +265,6 @@ precisiones.
       # invoke-rc.d rng-tools start
       # cat /proc/sys/kernel/random/entropy_avail
       2159
-
-.. _gnupg.1:
-
-.. rubric:: Instaslación de |GnuPG|
-
-La instalación es sumamente sencilla::
-
-   # apt install gnupg
-
-Como configuración podemos usar la siguiente::
-
-   $ mkdir -m 700 ~/.gnupg
-   $ cat > ~/.gnupg/gpg.conf
-   #keyserver hkps://sks-keyservers.net:443
-   keyserver hkp://pool.sks-keyservers.net
-   no-greeting
-   armor
-
-   personal-digest-preferences SHA512
-   cert-digest-algo SHA512
-   default-preference-list SHA512 SHA384 SHA256 SHA224 AES256 AES192 AES CAST5 ZLIB BZIP2 ZIP Uncompressed
-   personal-cipher-preferences AES256 TWOFISH CAMELLIA256 3DES
-
-Con la que seleccionamos cuáles son nuestros algoritmos de cifrado y *hash*
-preferidos. Además, con :kbd:`armor` guardamos el texto cifrado como caracteres
-imprimibles.
-
-Si ejecutamos la orden::
-
-   $ gpg --version
-
-podremos consultar cuáles son los algoritmos de cifrado, *hash* y compresión que
-usa el programa.
 
 .. index:: md5sum
 .. index:: shasum, sha256sum, sha384sum, sha512sum
@@ -344,7 +317,7 @@ Con posterioridad, podrá comprobarse la integridad del siguiente modo\ [#]_::
 También es posible utilizar para este fin (aunque no es lo habitual) las
 herramientas que usaremos después para ilustrar el cifrado y la firma digital:
 
-* :ref:`GnuPG <gnupg.1>`::
+* :ref:`GnuPG <gnupg>`::
 
       $ gpg --print-md sha512 fichero.txt
 
@@ -359,25 +332,18 @@ herramientas que usaremos después para ilustrar el cifrado y la firma digital:
 
 .. _openssl:
 
-Open\ |SSL|
-===========
-Open\ |SSL| es la herramienta de cifrado por antonomasia en sistemas *Linux*.
-
-.. note:: Volveremos sobre esta herramienta al introducir los :ref:`certificados
-   digitales <cert-digital>`.
-
 Cifrado simétrico
 -----------------
 Una forma de llevarlo a cabo es esta::
 
-   # openssl enc -aes256 -pbkdf2 -a -in fichero.txt -out fichero.txt.enc
+   $ openssl enc -aes256 -pbkdf2 -a -in fichero.txt -out fichero.txt.enc
 
 que utiliza |AES|\ -256 para el proceso y genera un cifrado en `base64
 <https://es.wikipedia.org/wiki/Base64>`_ gracias a la opción `-a`. Para
 descifrar basta con añadir la opción :kbd:`-d` y, obviamente, utilizar como
 entrada el texto cifrado::
 
-   # openssl enc -aes256 -a -d -in fichero.txt.enc -out fichero-recuperado.txt
+   $ openssl enc -aes256 -a -d -in fichero.txt.enc -out fichero-recuperado.txt
 
 .. note:: Tanto :kbd:`-in` como :kbd:`-out` son opcionales y, si no se
    especifican, se entenderá que la entrada es la entrada estándar y la salida
@@ -387,8 +353,10 @@ entrada el texto cifrado::
    interactiva. Puede proporcionarse en la propia orden incluyendo la opción
    :kbd:`-pass`::
 
-      # openssl enc -aes256 -pbkdf2 -a -pass pass:clave-secreta -in fichero.txt -out fichero.txt.enc
-      
+      $ openssl enc -aes256 -pbkdf2 -a -pass pass:clave-secreta -in fichero.txt -out fichero.txt.enc
+
+.. _openssl-asi:
+
 Cifrado asimétrico
 ------------------
 Llevarlo a cabo requiere generar un par de claves (|RSA| en concreto)::
@@ -401,7 +369,7 @@ Las órdenes generan un par de claves |RSA| (:file:`privkey.pem` y
 contraseña (esto es, con una clave simétrica) hemos usado la opción
 :kbd:`-aes128`. Esto último es un simple mecanismo de seguridad para que sea
 imposible usar la clave privada sin conocer esta contraseña. Así, en caso de
-robo, el ladrón aún deberá averiguar la contraseña.
+robo, el ladrón aún deberá averiguarla.
 
 .. note:: Las claves que se piden interactivamente pueden pasarse a través de
    las opciones :kbd:`-passin` o :kbd:`-passout` (vease :manpage:`openssl(1ssl)`
@@ -451,7 +419,7 @@ Dado que coincide el resumen del archivo con la firma descifrada con la clave
 pública, podemos concluir que el archivo no ha cambiado y que lo certificó el
 propietario de la clave.
 
-En realidad, para firmar con más comodidad aunque nos abstraigamos del
+En realidad, para firmar con más comodidad, aunque nos abstraigamos del
 concepto::
 
    $ openssl dgst -sha256 -sign privkey.pem -out fichero.sign fichero.txt
@@ -467,301 +435,23 @@ Y para verificar la firma::
 
       $ openssl x509 -in micert.pem -pubkey -nooout > pubkey.pem
 
-|GnuPG|
-=======
-Aunque el próposito final del programa es la implementación del estándar
-Open\ |PGP|, podemos utilizarlo para ilustrar los conceptos anteriores.
-
-Cifrado simétrico
------------------
-Podemos utilizarlos para cifrar un archivo determinado::
-
-   $ echo 'Hola, caracola!!!' > /tmp/saludo.txt
-   $ gpg -c /tmp/saludo.txt
-
-La orden genera el fichero cifrado :file:`/tmp/saludo.txt.asc` con esta pinta\
-[#]_::
-
-   -----BEGIN PGP MESSAGE-----
-
-   jA0ECQMCgmqtVcUnh0H80lAB2H6YjrKdXR2P2I9a0JRDKpoQhEJc//dnzA550ged
-   Q2DYgVpYgaL3Se26CAwii54xhZfUijWnGg7pPSKc7Zd81TLvQm75MA6IbsDPGHEN
-   eQ==
-   =5YjK
-   -----END PGP MESSAGE-----
-
-El fichero podría haberse enviado a otro fichero usando la opción ``--output``::
-
-   $ gpg -c -o /tmp/otrofichero.asc /tmp/saludo.txt
-
-.. note:: Si se usa como nombre de fichero :kbd:`-`, la salida será la estándar.
-
-.. note:: El formato del fichero cifrado, sigue el estándar marcado por
-   *OpenPGP*, pero también podríamos haber generado un fichero cifrado que use
-   caracteres no imprimibles habiendo añadido ``--no-armor``. En este caso, la
-   extensión añadida es ``.gpg`` en vez de ``.asc``.
-
-Si hemos ejecutado las ordenes anteriores, habremos comprobado que se pide de
-forma interactiva la clave simétrica de cifrado. Si queremos ejecutar la orden
-de forma no interactiva podemos hacer lo siguiente::
-
-   $ gpg --batch --passphrase 'contraseñadificil' -c /tmp/saludo.txt
-
-o bien::
-
-   $ printf 'contraseñadificil' | gpg --batch --passphrase-fd 0 -c /tmp/saludo.txt
-
-.. warning:: Aunque recordemos que eso guardará en el historial la contraseña y
-   es muy discutible su seguridad, por lo que al menos deberíamos asegurarnos de
-   que tal cosa no sucede.
-
-Para descifrar, podemos no usar la opción :kbd:`-d`::
-
-   $ gpg -qd /tmp/saludo.txt.asc
-   Hola, caracola!!!
-
-.. note:: La opción ``-q`` ejecuta la orden en modo silencioso.
-
-Hay algo, sin embargo, extraño: ¿por qué no se nos pide la clave anteriormente
-suministrada durante la operación de cifrado para descifrar?  La razón es que
-:command:`gpg` levanta automáticamente un demonio que se encarga de recordar
-claves. Si por alguna razón se desea pararlo, puede hacerse::
-
-   $ gpgconf --kill gpg-agent
-
-.. note:: Si nuestra intención es consultar cuáles es el cifrado sin descifrar
-   en absoluto, podemos hacer::
-
-      $ gpg --list-only -d saludo.txt.asc
-
-.. _gpg-pgp:
-
-Cifrado asimétrico
-------------------
-La implementación de este tipo de cifrado está determinado por el propósito de
-la orden (el estádar Open\ |PGP|), por lo que hay muchos aspectos que vienen
-determinados por ello. Sea como sea, cifrar asimétricamente requiere previamente
-generar una pareja de claves::
-
-   $ gpg --gen-key --default-new-key-algo rsa3072
-
-que nos pedirá el nombre de su propietario y la dirección de correo electrónico,
-que se usará como identificador para las claves generadas. Además, se nos pedirá
-una clave simétrica con la que cifrar la clave privada. Esta contraseña deberá
-consignarse cada vez que la clave privada tenga que usarse y es una simple
-medida de seguridad para evitar que, si la clave privada cae en manos ajenas, el
-ladrón tenga fácil usurpar la identidad del legítimo propietario. Se han
-añadido, además, dos datos relevantes: el tiempo de vigencia de la clave (un
-año), que de forma predeterminada es eterno, y el tipo de algoritmo\ [#]_. La
-orden no sólo genera las claves, sino que las almacena en el anillo de claves
-(todo dentro de :file:`~/.gnupg`), con lo que podremos consultar su existencia
-listando cuáles son las claves públicas almacenadas::
-
-   $ gpg --list-keys --keyid-format short
-   /home/usuario/.gnupg/pubring.kbx
-   --------------------------------
-   pub   rsa3072/B0B83042 2019-11-08 [SC] [caduca: 2021-11-07]
-         F08A6107385FE48775100943E3DCBB0AB0B83042
-   uid      [  absoluta ] Licenciado Cebadilla (cuenta de pruebas) <xxxx@gmail.com>
-
-.. note:: Obsérvese que la clave, tal como se ha generado, sólo sirve para
-   firmar y no para cifrar (no aparece :kbd:`E` dentro de los corchetes). Si
-   nuestra intención es usarla :ref:`también para cifrar <gnupg-cif-asi>`
-   entonces deberemos añadir una subclave para cifrado::
-
-      $ gpg  --quick-add-key F08A6107385FE48775100943E3DCBB0AB0B83042
-   
-También podemos comprobar las claves privadas::
-
-   $ gpg --list-secret-keys
-
-Por ahora sólo veremos una y una respectivamente. Lo habitual es que
-dispongamos de una única clave privada y muchas públicas, ya que podemos importar
-a nuestro repositorio claves públicas ajenas.
-
-En versiones modernas  de :command:`gpg` existe la opción :kbd:`--full-gen-key` que
-pregunta interactivamente otras opciones como el propio algoritmo o el tiempo de
-vigencia. En cualquier caso, si se quiere alterar algún parámetro, como el
-tiempo de vigencia, puede usarse la opción :kbd:`--edit-key`::
-
-   $ gpg --edit-key xxxx@gmail.com
-
-.. rubric:: Importación/exportación local de claves
-
-Como debemos compartir nuestra clave pública con el resto de usuarios y, a su
-vez, recibir de éstos sendas claves públicas, GnuPG_ provee de mecanismos para
-la importación y exportación de claves.
-
-Para exportar una clave pública del repositorio, podemos hacer::
-
-   $ gpg --export xxxx@gmail.com > clave.asc
-
-.. note:: La selección de la clave puede hacerse con cualquier parte
-   de la identificación que se usó al crear la clave (el correo electrónico
-   es una de ellas). Si no especificamos ninguna clave en concreto, se
-   exportarán todas.
-
-Si, además, queremos exportar la clave privada, podemos añadirla al fichero
-anterior::
-
-   $ gpg --export-secret-keys xxxx@gmail.com >> clave.asc
-   
-El proceso inverso de importar claves es también sencillo::
-
-   $ gpg --import clave.asc
-
-orden que importará todas las claves contenidas en el fichero\ [#]_.
-
-.. note:: Si la importación se hace del siguiente modo::
-
-      $ gpg --import --import-options import-show --dry-run clave.asc
-
-   se muestran los datos de la clave o claves que se importarán, pero
-   al incluir también ``-dry-run`` no se hará efectiva la importación,
-   con lo que el resultado es que tenemos un método para consultar las
-   claves contenidas en un fichero.
-
-.. rubric:: Importación/Exportación remota de claves
-
-Hasta ahora, hemos importado y exportado claves a o desde ficheros. Ahora bien,
-existen **servidores** |PGP| que almacenan claves públicas y que permiten
-importarlas lo que facilita el intercambio de claves. Dependiendo de cuál sea
-el servidor Puede accederse a través de distintos protocolos. El fichero de
-configuración de configuración define un servidor que soporta un protocolo
-seguro por el puerto **443** (lo que puede ayudarnos si estamos dentro de una
-red que restringe el acceso a internet)::
-
-   $ gpg --send-keys B0B83042
-
-.. warning:: En versiones modernas, para poder hacer esta exportación remota es
-   necesario que se encuentre instalado el paquete *dirmngr*.
-
-La importación de claves, por su parte, puede hacerse así::
-
-   $ gpg --recv-keys 00188366
-
-si se conoce el **ID** y, si no es así. es posible buscar la clave usando alguna
-porción de la cadena de identificación (p.e. el correo electrónico)::
-
-   $ gpg --search-keys xxxx@gmail.com
-
-.. rubric:: Revocación
-
-Es posible que deseemos anular una clave antes de que esta expire por algún
-motivo. Para ello debemos generar una revocación e importarla a nuestro
-anillo de claves::
-
-   $ gpg --gen-revoke xxxx@gmail.com | gpg --import
-   
-   [...]
-
-Para revocar también esta clave en el servidor público al que exportamos esta
-clave con anterioridad, basta con exportar la clave ahora revocada de nuevo::
-
-   $ gpg --send-keys B0B83042
-
-.. _gnupg-cif-asi:
-
-.. rubric:: Cifrado
-
-Para cifrar un mensaje con la clave pública de alguien a fin de que sólo éste
-sea capaz de descifrarlo puede hacerse::
-
-   $ gpg -er su_correo@dominio.com -o - fichero.txt > fichero.txt.asc
-
-o bien, si se desea codificar lo remitido por la entrada estándar::
-
-   $ echo "Esto es un secreto" | gpg -er su_correo@dominio.com > secreto.asc
-
-.. note:: :code:`-o -` permite que la salida cifrada vaya a la salida estándar,
-   ya que de lo contrario se escribirá en un fichero que se llamará igual que el
-   original adjuntando el prefijo ``.asc`` (o ``.gpg`` si se usa la opción
-   ``--no-armor``). Si el mensaje original procedía de la entrada estándar, se
-   dirige directamente a la salida estándar y, en consecuencia, no es necesario.
-
-Para descifrar la clave en un sistema que tenga disponible la clave privada
-correspondiente a la pública con la que se firmó, basta con::
-
-   $ gpg -qd secreto.asc
-   Esto es un secreto
-
-Firma digital
--------------
-|GnuPG| lleva a cabo la firma de archivos mediante el estándar Open\ |PGP|::
-
-   $ echo "Este es el contenido del fichero que firmo" > fichero.txt
-   $ gpg --detach-sign --default-key mi_cuenta@example.com -o fichero.sig fichero.txt
-
-De esta manera tenemos un fichero original (:file:`fichero.txt`) y su resumen
-cifrado digitalmente con nuestra clave privada en :file:`fichero.sign`. Si
-analizamos el fichero de firma::
-
-   $ gpg --list-packets fichero.sign
-   :signature packet: algo 1, keyid 53175AA29C972B7B
-           version 4, created 1543050622, md5len 0, sigclass 0x00
-           digest algo 10, begin of digest 04 9e
-           hashed subpkt 33 len 21 (issuer fpr v4 040968BBC05C39A4DD2A43BD53175AA29C972B7B)                                                  
-           hashed subpkt 2 len 4 (sig created 2018-11-24)
-           hashed subpkt 28 len 23 (signer's user ID)
-           subpkt 16 len 8 (issuer key ID 53175AA29C972B7B)
-           data: [3071 bits]
-
-veremos algunas características de la firma, como:
-
-* qué algoritmo de clave asimétrica se usó, el **1**, que se corresponde con una
-  clave asimétrica |RSA|, válida tanto para firma como para cifrado. El
-  significado de los códigos puede encontrarse en el :rfc:`4880`, y en concreto
-  en la `sección 9.1 <https://tools.ietf.org/html/rfc4880#section-9.1>`_.
-
-* qué clave se usó: la *53175AA29C972B7B*, que efectivamente es la nuestra:
-
-  .. code-block:: console
-     :emphasize-lines: 4
-
-     $ gpg --keyid-format long -list-keys
-     /home/usuario/.gnupg/pubring.kbx
-     --------------------------------
-     pub   rsa3072/53175AA29C972B7B 2018-11-21 [SC] [expires: 2020-11-20]
-           040968BBC05C39A4DD2A43BD53175AA29C972B7B
-     uid                 [ unknown] Soy el que soy <mi_cuenta@example.com>
-           sub   rsa3072/4B1F09C9B84F038E 2018-11-21 [E] [expires: 2020-11-20]
-
-* con qué algoritmo se resumió el fichero, el **10**, que es *SHA512* según 
-  `la sección 9.4 <https://tools.ietf.org/html/rfc4880#section-9.4>`_ del
-  :rfc:`4880`.
-
-Si hacemos llegar **ambos** archivos a un tercero, y éste posee nuestra clave
-pública, podrá verificar nuestra identidad gracias a descifrar la firma y la
-integridad del fichero gracias al resumen que contiene esta::
-
-   $ gpg --verify fichero.sign fichero.txt
-   [...]
-   Primary key fingerprint: 0409 68BB C05C 39A4 DD2A  43BD 5317 5AA2 9C97 2B7B
-   $ echo $?
-   0
-
-.. seealso:: Hay un extenso tutorial del uso de GnuPG_ en la `wiki de Archlinux
-   <https://wiki.archlinux.org/index.php/GnuPG_(Espa%C3%B1ol)>`_.
-
 .. rubric:: Notas al pie
 
+.. [#] Lo que se cifra con la clave pública sólo puede descrifrarse con la clave
+   privada. En cambio, la clave pública se obtiene a partir de la privada, por
+   lo que algo cifrado con la clave privada podremos descifrarlo usando sólo la
+   privada.
 .. [#] De hecho, `OpenSSH <https://www.openssh.com/>`_, para su versión 7,
    `deshabilitó el uso de DSA
    <https://www.gentoo.org/support/news-items/2015-08-13-openssh-weak-keys.html>`_.
-.. [#] Se fuerza a que la orden se ejecute en inglés, para que el resultado se
-   exprese como *OK* o *FAILED*. En castellano, la leyenda se expresa de forma
-   muy farragosa.
-.. [#] Trataremos este estándar al hablar sobre :ref:`correo electronico <email-seguro>`.
 .. [#] Usar, sin embargo, el propio kernel para la generación de la
    entropía no es muy recomendable. Debería usarse el dispositivo
    hardware (/dev/hwrng), pero en la máquina virtual es posible que
    no esté. Para :program:`qemu` véase
    `su wiki <https://wiki.qemu.org/Features/VirtIORNG>`_.
-.. [#] El archivo cifrado es imprimible gracias a que incluimos :kbd:`armor` en
-   el archivo de configuración.
-.. [#] El algoritmo elegido utiliza una clave |RSA| de 2048 *bits* tanto para
-   cifrado como para firmado. Otro posible algoritmo es *ed25519*.
-.. [#] En nuestro caso, sería una clave pública y su correspondiente privada.
+.. [#] Se fuerza a que la orden se ejecute en inglés, para que el resultado se
+   exprese como *OK* o *FAILED*. En castellano, la leyenda se expresa de forma
+   muy farragosa.
 
 .. |DES| replace:: :abbr:`DES (Data Encryption Standard)`
 .. |AES| replace:: :abbr:`AES (Advanced Encryption Standard)`

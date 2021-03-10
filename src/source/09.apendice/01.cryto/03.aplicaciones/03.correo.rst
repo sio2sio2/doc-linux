@@ -2,39 +2,476 @@
 
 Correo electrónico
 ******************
+Los mecanimos de cifrado y firma electrónica se implementan en los mensajes de
+correo electrónico a través de dos estándares, cuya principal diferencia es la
+infraestructura sobre la que se sustenta la confianza en las claves de cifrado: 
 
-.. todo:: Corregir la seguridad en el correo electrónico:
+* Open\ |PGP| (:rfc:`3156`), en el que cada usuario genera sus propias claves y
+  se establece una :dfn:`red de confianza` totalmente descentralizada. En ella
+  la veracidad de las claves de un usuario viene dada, porque otro que tiene
+  contacto directo con él lo certifica firmándolo con su clave privada.
+* |S/MIME| (:rfc:`8551`), en el que se usa la estructura jerárquica de
+  certificados X.509, que se explicó al hablar del :ref:`certificado digital
+  <cert-digital>`.
 
-   * En la introducción decir que hay dos estándares Open\ |PGP| y S/MIME.
-   * Traer |GnuPG| dentro del epígrafe sobre Open\ |PGP|.
-   * Añadir un epígrase sobre S/MIME.
+En lo restante, los estándares son similares en el mecanismo que usan para
+firmar o cifrar el cuerpo del mensaje (no los campos de cabecera\ [#]_):
+
+**Firma**
+   Al firmar un mensaje se añade un campo |MIME| :kbd:`multipart/signed` a la
+   cabecera:
+
+   .. code:: email
+
+      Content-Type: multipart/signed; protocol="application/x-pkcs7-signature";
+          micalg=sha-256; boundary="XXXXX"
+
+   donde:
+
+   * :kbd:`protocol` especifica qué estándar se usa (en este caso, |S/MIME|).
+   * :kbd:`micalg`, el :ref:`algoritmo de resumen <hash>` utilizado.
+   * :kbd:`boundary`, como en cualquier otro |MIME|, permite identificar las distintas partes.
+
+   Y el cuerpo del mensaje se estructuráo en dos partes:
+
+   #. La primera contiene el mensaje original, el cual puede a su vez estar
+      constituido por múltiples partes |MIME| (p.e. porque el mensaje
+      contuviera adjuntos).
+   #. La segunda constituye la firma sobre la parte anterior:
+
+   .. code:: email
+
+      From: yo@micasa.com
+      To: tu@tucasa.com
+      Content-Type: multipart/signed; protocol="application/x-pkcs7-signature";
+          micalg=sha-256; boundary="XXXXX"
+      Subject: Un mensaje firmado
+
+      --XXXXX
+      Content-Type: text/plain; charset=utf-8
+      Content-Disposition: inline
+      Content-Transfer-Encoding: quoted-printable
+
+      Este es el texto del mensaje que se firma...
+      ...
+      ... Mucho más texto ...
+      ...
+
+      --XXXXX
+      Content-Type: application/x-pkcs7-signature
+      Content-Disposition: attachment; filename="smime.p7s"
+      Content-Transfer-Encoding: base64
+
+      LA.FIRMA.EN.SI.TAL.VEZ.LA.CLAVE
+
+      --XXXXX
+   
+   La firma se construye resumiendo la primera parte con una función de *hash* (|SHA|\ -256
+   en nuestro ejemplo) y cifrándola con la clave privada del emisor. El
+   contenido de esta segunda parte, sin embargo, puede contener, además de la
+   propia firma, el certificado público del emisor.
+
+.. https://www.oreilly.com/library/view/programming-internet-email/9780596802585/ch05s03s01.html
+.. https://stackoverflow.com/questions/5678124/extract-public-certificate-from-smime-message-pkcs7-signature-with-openssl
+
+**Cifrado**
+   El cifrado de un mensaje consiste en cifrar el cuerpo del mensaje del siguiente
+   modo:
+
+   + Muy comúnmente se comprime el cuerpo lo que reduce su tamaño y, además,
+     disminuye la existencia de patrones que hagan menos seguro el cifrado.
+   + Se genera una clave simétrica (p.e. |AES|) y se cifra el cuerpo con ella.
+   + Se cifra la clave anterior con la clave pública del destinatario a fin de
+     que sólo el destinario tenga acceso a ella y por tanto a descifrar el
+     mensaje.
+
+|S/MIME|
+========
+Open\ |SSL| tiene una suborden (:kbd:`smime`) que implementa este estándar y nos
+sirve para hacer pruebas con él.
+
+.. todo:: smime con openssl.
+
+.. https://stackoverflow.com/questions/5678124/extract-public-certificate-from-smime-message-pkcs7-signature-with-openssl
+   http://enricorossi.org/blog/2016/view_p7m_file_with_openssl/
+.. openssl smime -decrypt -in smime.p7m -inkey ~/.smime/keys/f8ecef67.0
+
+.. _openpgp:
+.. _gnupg:
 
 Open\ |PGP|
 ===========
-La firma digital es ampliamente usada en los mensajes de correo electrónico.
-En estos se firma tanto un conjunto de cabeceras escogidas\ [#]_ como el cuerpo
-del mensaje y los adjuntos. Creada la firma, se incorpora como un adjunto
-adicional al mensaje.
+.. `GPGforWin <https://www.gpg4win.org/download.html>`_ en *Windows*
 
-Lo habitual es que se usen claves |PGP|, un estándar desarrollado para el
-cifrado y firma de mensajes de correos electrónicos, cuya generación,
-importación y exportación de claves :ref:`practicamos al tratar el cifrado
-asimétrico <gpg-pgp>`. Lo habitual es que los agentes de correo (|MUA|), como
-:ref:`mutt <mutt>` o Thunderbird_, implementen la funcionalidad, aunque también
-es posible firmar y cifrar mensajes con determinados servicios de *webmail* y
-la extensión adecuada del navegador. Por ejemplo, en Chromium_ existe la
-extensión Mailenvelope_ que permite el cifrado de mensajes para los principales
-sitios de webmail (Gmail_, Yahoo_, Outlook_, etc.).
+.. https://www.agenciatributaria.es/AEAT.internet/Inicio/Ayuda/_comp_Consultas_informaticas/Categorias/Firma_digital__certificado_o_DNIe__y_sistema_Cl_ve_PIN/Certificados_electronicos/Informacion_sobre_certificados_de_persona_fisica_de_la_FNMT/Informacion_sobre_certificados_de_persona_fisica_de_la_FNMT.shtml
+
+Para ilustrar este estándar usaremos |GnuPG|, aunque lo habitual es que loas
+agentes de correo (|MUA|) como :ref:`mutt <mutt>` o Thunderbird_, hagan uso del
+estándar de manera sencilla, o incluso podemos llegar a usarlo con determinados
+servicios de *webmail* y la extensión adecuada del navegador.  Por ejemplo, en
+Chromium_ existe la extensión Mailenvelope_ que permite el cifrado de mensajes
+para los principales sitios de webmail (Gmail_, Yahoo_, Outlook_, etc.).
+
+Instalación
+-----------
+La instalación es sumamente sencilla::
+
+   # apt install gnupg
+
+Como configuración podemos usar la siguiente::
+
+   $ mkdir -m 700 ~/.gnupg
+   $ cat > ~/.gnupg/gpg.conf
+   #keyserver hkps://sks-keyservers.net:443
+   keyserver hkp://pool.sks-keyservers.net
+   no-greeting
+   armor
+
+   personal-digest-preferences SHA512
+   cert-digest-algo SHA512
+   default-preference-list SHA512 SHA384 SHA256 SHA224 AES256 AES192 AES CAST5 ZLIB BZIP2 ZIP Uncompressed
+   personal-cipher-preferences AES256 TWOFISH CAMELLIA256 3DES
+
+Con la que seleccionamos cuáles son nuestros algoritmos de cifrado y *hash*
+preferidos. Además, con :kbd:`armor` guardamos el texto cifrado como caracteres
+imprimibles.
+
+Si ejecutamos la orden::
+
+   $ gpg --version
+
+podremos consultar cuáles son los algoritmos de cifrado, *hash* y compresión que
+usa el programa.
+
+Cifrado simétrico
+-----------------
+Antes de entrar realmente en harina, podemos usar |GnuPG| para hacer cifrado
+simétrico::
+
+   $ echo 'Hola, caracola!!!' > /tmp/saludo.txt
+   $ gpg -c /tmp/saludo.txt
+
+La orden genera el fichero cifrado :file:`/tmp/saludo.txt.asc` con esta pinta\
+[#]_::
+
+   -----BEGIN PGP MESSAGE-----
+
+   jA0ECQMCgmqtVcUnh0H80lAB2H6YjrKdXR2P2I9a0JRDKpoQhEJc//dnzA550ged
+   Q2DYgVpYgaL3Se26CAwii54xhZfUijWnGg7pPSKc7Zd81TLvQm75MA6IbsDPGHEN
+   eQ==
+   =5YjK
+   -----END PGP MESSAGE-----
+
+El fichero podría haberse enviado a otro fichero usando la opción ``--output``::
+
+   $ gpg -c -o /tmp/otrofichero.asc /tmp/saludo.txt
+
+.. note:: Si se usa como nombre de fichero :kbd:`-`, la salida será la estándar.
+
+.. note:: El formato del fichero cifrado, sigue el estándar marcado por
+   Open\ |PGP|, pero también podríamos haber generado un fichero cifrado que use
+   caracteres no imprimibles habiendo añadido ``--no-armor``. En este caso, la
+   extensión añadida es ``.gpg`` en vez de ``.asc``.
+
+Si hemos ejecutado las ordenes anteriores, habremos comprobado que se pide de
+forma interactiva la clave simétrica de cifrado. Si queremos ejecutar la orden
+de forma no interactiva podemos hacer lo siguiente::
+
+   $ gpg --batch --passphrase 'contraseñadificil' -c /tmp/saludo.txt
+
+o bien::
+
+   $ printf 'contraseñadificil' | gpg --batch --passphrase-fd 0 -c /tmp/saludo.txt
+
+.. warning:: Aunque recordemos que eso guardará en el historial la contraseña y
+   es muy discutible su seguridad, por lo que al menos deberíamos asegurarnos de
+   que tal cosa no sucede.
+
+Para descifrar, podemos usar la opción :kbd:`-d`::
+
+   $ gpg -qd /tmp/saludo.txt.asc
+   Hola, caracola!!!
+
+.. note:: La opción ``-q`` ejecuta la orden en modo silencioso.
+
+Hay algo, sin embargo, extraño: ¿por qué no se nos pide la clave anteriormente
+suministrada durante la operación de cifrado para descifrar?  La razón es que
+:command:`gpg` levanta automáticamente un demonio que se encarga de recordar
+claves. Si por alguna razón se desea pararlo, puede hacerse::
+
+   $ gpgconf --kill gpg-agent
+
+.. note:: Si nuestra intención es consultar cuáles es el cifrado sin descifrar
+   en absoluto, podemos hacer::
+
+      $ gpg --list-only -d saludo.txt.asc
+
+.. _gpg-pgp:
+
+Gestión de claves
+-----------------
+La aplicación utiliza un repositorio donde va almacenando las claves públicas y
+privadas que se necesiten. Por ejemplo, nuestro propio par de claves (pública y
+privada) y las claves públicas de todos aquellos con los que intercambiemos
+información de forma segura. El objetivo de este epígrafe es cómo saber generar
+nuestra clave (recordemos que en |PGP| cada usuario genera sus claves), cómo
+exportar e importar claves, y cómo borrar claves que no deseemos almacenar más.
+
+.. rubric:: Generacuón
+
+Para generar un par de claves podemos hacer::
+
+   $ gpg --gen-key --default-new-key-algo rsa3072
+
+que nos pedirá el nombre de su propietario y la dirección de correo electrónico,
+que se usará como identificador para las claves generadas. Además, se nos pedirá
+una clave simétrica con la que cifrar la clave privada. Esta contraseña deberá
+consignarse cada vez que la clave privada tenga que usarse y es una simple
+medida de seguridad para evitar que, si la clave privada cae en manos ajenas, el
+ladrón tenga fácil usurpar la identidad del legítimo propietario. Se han
+añadido, además, dos datos relevantes: el tiempo de vigencia de la clave (un
+año), que de forma predeterminada es eterno, y el tipo de algoritmo\ [#]_. La
+orden no sólo genera las claves, sino que las almacena en el anillo de claves
+(todo dentro de :file:`~/.gnupg`), con lo que podremos consultar su existencia
+listando cuáles son las claves públicas almacenadas::
+
+   $ gpg --list-keys --keyid-format short
+   /home/usuario/.gnupg/pubring.kbx
+   --------------------------------
+   pub   rsa3072/B0B83042 2019-11-08 [SC] [caduca: 2021-11-07]
+         F08A6107385FE48775100943E3DCBB0AB0B83042
+   uid      [  absoluta ] Licenciado Cebadilla (cuenta de pruebas) <xxxx@gmail.com>
+
+.. note:: Obsérvese que la clave, tal como se ha generado, sólo sirve para
+   firmar y no para cifrar (no aparece :kbd:`E` dentro de los corchetes). Si
+   nuestra intención es usarla :ref:`también para cifrar <gnupg-cif-asi>`
+   entonces deberemos añadir una subclave para cifrado::
+
+      $ gpg  --quick-add-key F08A6107385FE48775100943E3DCBB0AB0B83042
+   
+También podemos comprobar las claves privadas::
+
+   $ gpg --list-secret-keys
+
+Por ahora sólo veremos una y una respectivamente. Lo habitual es que
+dispongamos de una única clave privada y muchas públicas, ya que podemos importar
+a nuestro repositorio claves públicas ajenas.
+
+En versiones modernas  de :command:`gpg` existe la opción :kbd:`--full-gen-key` que
+pregunta interactivamente otras opciones como el propio algoritmo o el tiempo de
+vigencia. En cualquier caso, si se quiere alterar algún parámetro, como el
+tiempo de vigencia, puede usarse la opción :kbd:`--edit-key`::
+
+   $ gpg --edit-key xxxx@gmail.com
+
+.. rubric:: Importación/exportación local de claves
+
+Como debemos compartir nuestra clave pública con el resto de usuarios y, a su
+vez, recibir de éstos sendas claves públicas, GnuPG_ provee de mecanismos para
+la importación y exportación de claves.
+
+Para exportar una clave pública del repositorio, podemos hacer::
+
+   $ gpg --export xxxx@gmail.com > clave.asc
+
+.. note:: La selección de la clave puede hacerse con cualquier parte
+   de la identificación que se usó al crear la clave (el correo electrónico
+   incluso sin llegar a estar completo, es una de ellas). Si no especificamos
+   ninguna clave en concreto, se exportarán todas.
+
+Si, además, queremos exportar la clave privada, podemos añadirla al fichero
+anterior::
+
+   $ gpg --export-secret-keys xxxx@gmail.com >> clave.asc
+   
+El proceso inverso de importar claves es también sencillo::
+
+   $ gpg --import clave.asc
+
+orden que importará todas las claves contenidas en el fichero\ [#]_.
+
+.. note:: Si la importación se hace del siguiente modo::
+
+      $ gpg --import --import-options import-show --dry-run clave.asc
+
+   se muestran los datos de la clave o claves que se importarán, pero
+   al incluir también ``--dry-run`` no se hará efectiva la importación,
+   con lo que el resultado es que tenemos un método para consultar las
+   claves contenidas en un fichero.
+
+.. rubric:: Importación/Exportación remota de claves
+
+Hasta ahora, hemos importado y exportado claves a o desde ficheros. Ahora bien,
+existen **servidores** |PGP| que almacenan claves públicas y que permiten
+importarlas lo que facilita el intercambio de claves. Dependiendo de cuál sea
+el servidor Puede accederse a través de distintos protocolos. El fichero de
+configuración de configuración define un servidor que soporta un protocolo
+seguro por el puerto **443** (lo que puede ayudarnos si estamos dentro de una
+red que restringe el acceso a internet)::
+
+   $ gpg --send-keys B0B83042
+
+.. warning:: En versiones modernas, para poder hacer esta exportación remota es
+   necesario que se encuentre instalado el paquete *dirmngr*.
+
+La importación de claves, por su parte, puede hacerse así::
+
+   $ gpg --recv-keys 00188366
+
+si se conoce el **ID** y, si no es así. es posible buscar la clave usando alguna
+porción de la cadena de identificación (p.e. el correo electrónico)::
+
+   $ gpg --search-keys xxxx@gmail.com
+
+.. rubric:: Revocación
+
+Es posible que deseemos anular una clave antes de que esta expire por algún
+motivo. Para ello debemos generar una revocación e importarla a nuestro
+anillo de claves::
+
+   $ gpg --gen-revoke xxxx@gmail.com | gpg --import
+   
+   [...]
+
+Para revocar también esta clave en el servidor público al que exportamos esta
+clave con anterioridad, basta con exportar la clave ahora revocada de nuevo::
+
+   $ gpg --send-keys B0B83042
+
+.. rubric:: Eliminación de claves
+
+Para borrar una clave del repositorio basta con utilizar las opciones
+:kbd:`--delete-keys`, :kbd:`--delete-secret-keys` o
+:kbd:`--delete-secret-and-public-keys`, dependiendo de si queremos borrar una
+clave pública o una clave privada. Por ejemplo::
+
+   $ gpg --delete-keys yanoloquiero@example.net
+
+.. rubric:: Validación de claves
+
+.. todo:: Firmar una clave *desconocida*.
+
+.. _gnupg-cif-asi:
+
+Cifrado asimétrico
+------------------
+Para cifrar un mensaje con la clave pública de alguien a fin de que sólo éste
+sea capaz de descifrarlo puede hacerse::
+
+   $ gpg -er su_correo@dominio.com -o - fichero.txt > fichero.txt.asc
+
+o bien, si se desea codificar lo remitido por la entrada estándar::
+
+   $ echo "Esto es un secreto" | gpg -er su_correo@dominio.com > secreto.asc
+
+.. note:: :code:`-o -` permite que la salida cifrada vaya a la salida estándar,
+   ya que de lo contrario se escribirá en un fichero que se llamará igual que el
+   original adjuntando el prefijo ``.asc`` (o ``.gpg`` si se usa la opción
+   ``--no-armor``). Si el mensaje original procedía de la entrada estándar, se
+   dirige directamente a la salida estándar y, en consecuencia, no es necesario.
+
+Para descifrar la clave en un sistema que tenga disponible la clave privada
+correspondiente a la pública con la que se firmó, basta con::
+
+   $ gpg -qd secreto.asc
+   Esto es un secreto
+
+En realidad, esto acciíon que hemos presentado como cifrado *asimétrico* no es
+tal, sino que |GnuPG| practica un :ref:`cifrado híbrido <hibrido>`: se genera
+una clave simétrica *ad hoc* para cifrar el archivo y es la clave simétrica la
+que se cifra con la clave pública proporcionada con la opción :kbd:`-r`. El
+archivo resultante contiene el archivo cifrado y la clave cifrada. De hecho, es posible
+repetir la opción :kbd:`-r` para que el archivo pueda ser descifrado por
+vartios::
+
+   $ gpg -er su_correo@dominio.com -r otro@example.net -o - fichero.txt > fichero.txt.asc
+
+En este caso, la clave simétrica se cifra dos veces con sendas claves públicas y
+las dos versiones cifradas se adjuntan al archivo cifrado.
+
+Firma digital
+-------------
+Para firmar un archivo basta con::
+
+   $ echo "Este es el contenido del fichero que firmo" > fichero.txt
+   $ gpg --detach-sign --default-key mi_cuenta@example.com -o fichero.sig fichero.txt
+
+De esta manera tenemos un fichero original (:file:`fichero.txt`) y su resumen
+cifrado digitalmente con nuestra clave privada en :file:`fichero.sign`. Si
+analizamos el fichero de firma::
+
+   $ gpg --list-packets fichero.sign
+   :signature packet: algo 1, keyid 53175AA29C972B7B
+           version 4, created 1543050622, md5len 0, sigclass 0x00
+           digest algo 10, begin of digest 04 9e
+           hashed subpkt 33 len 21 (issuer fpr v4 040968BBC05C39A4DD2A43BD53175AA29C972B7B)                                                  
+           hashed subpkt 2 len 4 (sig created 2018-11-24)
+           hashed subpkt 28 len 23 (signer's user ID)
+           subpkt 16 len 8 (issuer key ID 53175AA29C972B7B)
+           data: [3071 bits]
+
+veremos algunas características de la firma, como:
+
+* qué algoritmo de clave asimétrica se usó, el **1**, que se corresponde con una
+  clave asimétrica |RSA|, válida tanto para firma como para cifrado. El
+  significado de los códigos puede encontrarse en el :rfc:`4880`, y en concreto
+  en la `sección 9.1 <https://tools.ietf.org/html/rfc4880#section-9.1>`_.
+
+* qué clave se usó: la *53175AA29C972B7B*, que efectivamente es la nuestra:
+
+  .. code-block:: console
+     :emphasize-lines: 4
+
+     $ gpg --keyid-format long -list-keys
+     /home/usuario/.gnupg/pubring.kbx
+     --------------------------------
+     pub   rsa3072/53175AA29C972B7B 2018-11-21 [SC] [expires: 2020-11-20]
+           040968BBC05C39A4DD2A43BD53175AA29C972B7B
+     uid                 [ unknown] Soy el que soy <mi_cuenta@example.com>
+           sub   rsa3072/4B1F09C9B84F038E 2018-11-21 [E] [expires: 2020-11-20]
+
+* con qué algoritmo se resumió el fichero, el **10**, que es *SHA512* según 
+  `la sección 9.4 <https://tools.ietf.org/html/rfc4880#section-9.4>`_ del
+  :rfc:`4880`.
+
+Si hacemos llegar **ambos** archivos a un tercero, y éste posee nuestra clave
+pública, podrá verificar nuestra identidad gracias a descifrar la firma y la
+integridad del fichero gracias al resumen que contiene esta::
+
+   $ gpg --verify fichero.sign fichero.txt
+   [...]
+   Primary key fingerprint: 0409 68BB C05C 39A4 DD2A  43BD 5317 5AA2 9C97 2B7B
+   $ echo $?
+   0
+
+.. seealso:: Hay un extenso tutorial del uso de GnuPG_ en la `wiki de Archlinux
+   <https://wiki.archlinux.org/index.php/GnuPG_(Espa%C3%B1ol)>`_.
 
 .. rubric:: Notas al pie
 
-.. [#] En principio el :rfc:`3156` sólo protege el cuerpo del mensaje.  Puede
-       echarle una lectura a `Protected Headers for Cryptographic E-mail
-       <https://tools.ietf.org/id/draft-autocrypt-lamps-protected-headers-01.html>`_.
+.. [#] Hay sin embargo, propuesta en ambos estándares para incorporar algunas
+       cabeceras escogidas: para Open\ |PGP|, el borrador
+       `Protected Headers for Cryptographic E-mail
+       <https://tools.ietf.org/id/draft-autocrypt-lamps-protected-headers-01.html>`_
+       y para |S/MIME| el :rfc:`7508`.
+
+.. [#] El archivo cifrado es imprimible gracias a que incluimos :kbd:`armor` en
+   el archivo de configuración.
+
+.. [#] El algoritmo elegido utiliza una clave |RSA| de 2048 *bits* tanto para
+   cifrado como para firmado. Otro posible algoritmo es *ed25519*.
+
+.. [#] En nuestro caso, sería una clave pública y su correspondiente privada.
 
 .. |PGP| replace:: :abbr:`PGP (Pretty Good Privacy)`
 .. |MUA| replace:: :abbr:`MUA (Mail User Agent)`
 .. |GnuPG| replace:: :abbr:`GnuPG (GNU Provacy Guard)`
+.. |S/MIME| replace:: :abbr:`S/MIME (Secure/Multipurpose Internet Mail Extensions)`
+.. |MIME| replace:: :abbr:`MIME (Multipurpose Internet Mail Extensions)`
+.. |SHA| replace:: :abbr:`SHA (sechure Hash Algorithm)`
+.. |RSA| replace:: :abbr:`RSA (Rivest, Shamir y Adleman)`
+.. |AES| replace:: :abbr:`AES (Advanced Encryption Standard)`
+.. |SSL| replace:: :abbr:`SSL (Secure Socket Layer)`
 
 .. _Chromium: https://www.chromium.org
 .. _Thunderbird: https://www.thunderbird.net
