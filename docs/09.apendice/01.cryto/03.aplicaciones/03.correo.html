@@ -110,42 +110,170 @@ contuviera adjuntos).</p></li>
 <span class="dl">--XXXXX</span>
 </pre></div>
 </div>
-<p>La firma se construye resumiendo la primera parte con una función de <em>hash</em> (<abbr title="sechure Hash Algorithm">SHA</abbr>-256
-en nuestro ejemplo) y cifrándola con la clave privada del emisor. El
-contenido de esta segunda parte, sin embargo, puede contener, además de la
-propia firma, el certificado público del emisor.</p>
+<p>La firma se construye resumiendo la primera parte con una función de <em>hash</em>
+(<abbr title="sechure Hash Algorithm">SHA</abbr>-256 en nuestro ejemplo) y cifrándola con la clave privada del
+emisor. El contenido de esta segunda parte, sin embargo, puede contener,
+además de la propia firma, el certificado público del emisor.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>La primera parte es <em>inline</em> mientras que la segunda parte adopta
+la forma de un adjunto de nombre <code class="file docutils literal notranslate"><span class="pre">smime.p7s</span></code>. Esto implica que un
+cliente que no entienda la firma, muestre el texto del mensaje normalmente
+y presente la firma como un adjunto a descargar.</p>
+</div>
 </dd>
-</dl>
-<dl class="simple">
-<dt><strong>Cifrado</strong></dt><dd><p>El cifrado de un mensaje consiste en cifrar el cuerpo del mensaje del siguiente
-modo:</p>
+<dt><strong>Cifrado</strong></dt><dd><p>El cifrado de un mensaje consiste en cifrar el cuerpo del mensaje del
+siguiente modo:</p>
 <ul class="simple">
 <li><p>Muy comúnmente se comprime el cuerpo lo que reduce su tamaño y, además,
 disminuye la existencia de patrones que hagan menos seguro el cifrado.</p></li>
 <li><p>Se genera una clave simétrica (p.e. <abbr title="Advanced Encryption Standard">AES</abbr>) y se cifra el cuerpo con ella.</p></li>
 <li><p>Se cifra la clave anterior con la clave pública del destinatario a fin de
 que sólo el destinario tenga acceso a ella y por tanto a descifrar el
-mensaje.</p></li>
+mensaje. Si hay varios destinatarios, se adjutan copias de la clave
+simétrica cifradas con sendas claves públicas.</p></li>
 </ul>
 </dd>
 </dl>
+<p>Los mensajes de correo pueden estar cifrados y firmados lo cual implica hacer
+primero una acción y luego la otra. Lo habitual es que los <abbr title="Mail User Agent">MUA</abbr> firmen primero
+y cifran después el mensaje firmado.</p>
 <div class="section" id="s-mime">
 <h2><span class="section-number">9.1.3.3.1. </span><abbr title="Secure/Multipurpose Internet Mail Extensions">S/MIME</abbr><a class="headerlink" href="#s-mime" title="Enlazar permanentemente con este título">¶</a></h2>
 <p>Open<abbr title="Secure Socket Layer">SSL</abbr> tiene una suborden (<kbd class="kbd docutils literal notranslate">smime</kbd>) que implementa este estándar y nos
-sirve para hacer pruebas con él.</p>
-<div class="admonition-todo admonition" id="id2">
-<p class="admonition-title">Por hacer</p>
-<p>smime con openssl.</p>
+sirve para probar cómo funciona. Incluye además otra (<kbd class="kbd docutils literal notranslate">cms</kbd>) que proporciona
+más opciones que la anterior, pero sirve para el mismo fin.</p>
+<p class="rubric">Firma</p>
+<p>Ya hemos visto que <strong>firmar</strong> un mensaje de correo consiste en firmar el
+contenido de la primera parte del <kbd class="kbd docutils literal notranslate">multipart/signed</kbd> (lo que antes de
+haberse firmado el correo constituía el cuerpo del mensaje) y añadirlo como
+contenido de la segunda parte en forma de adjunto (cuyo nombre en el ejemplo es
+<code class="file docutils literal notranslate"><span class="pre">smime.p7s</span></code>). Podemos emular estas acciones con <a class="reference internal" href="../02.algo.html#openssl"><span class="std std-ref">openssl</span></a>
+tomando un archivo (que hará el papel de primera parte):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl smime -sign -in fichero.txt -signer micert.pem -out fichero.eml
+</pre></div>
+</div>
+<p>done <code class="file docutils literal notranslate"><span class="pre">micert.pem</span></code> es un archivo <abbr title="Private Enhanced Mail">PEM</abbr> con el certificado y la clave
+privada del firmante<a class="footnote-reference brackets" href="#id9" id="id2">2</a>. El archivo resultante <code class="file docutils literal notranslate"><span class="pre">fichero.eml</span></code> adopta el
+aspecto de un correo electrónico <kbd class="kbd docutils literal notranslate">multipart/signed</kbd> como el mostrado más
+arriba. Si quisiéramos obtener exclusivamente la firma, y no todo el mensaje,
+podríamos hacer con la salida anterior:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl smime -pk7out -in fichero.eml -out smime.p7s
+</pre></div>
+</div>
+<p>o bien haber cambiando el formato de salida de la primera orden (que por
+defecto es <kbd class="kbd docutils literal notranslate">SMIME</kbd>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl smime -sign -in fichero.txt -signer micert.pem -outform pem -out smime.p7s
+</pre></div>
+</div>
+<p>La firma, generada así, contiene, además del <em>resumen</em> y la clave simétrica
+cifrados (recuérdense los <a class="reference internal" href="../02.algo.html#firma-digital"><span class="std std-ref">conceptos sobre firma digital</span></a>), el certificado del firmante, por si el destinatario
+careciera de ella. No contendrá, no osbtante, certificados intermedios aunque
+<code class="file docutils literal notranslate"><span class="pre">micert.pem</span></code> los incluyera<a class="footnote-reference brackets" href="#id10" id="id3">3</a>.</p>
+<p>Obtenida la firma podemos verificarla:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl smime -verify -in fichero.eml
+</pre></div>
+</div>
+<p>aunque la verificación fallará si falta algún certificado intermedio. Para
+subsanarlo puede añadirse a la orden anterior la opción <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">noverify</kbd></kbd>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl smime -verify -in fichero.eml -noverify
+</pre></div>
+</div>
+<p>o incluir los certificados intermedios en un archivo y referirlo con <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">CAfile</kbd></kbd>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl smime -verify -in fichero.eml -CAfile ca-certs.pem
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Si se intenta verificar la firma usando <code class="file docutils literal notranslate"><span class="pre">smime.p7s</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl smime -verify -in smime.p7s -inform pem -noverify -content fichero.txt
+</pre></div>
+</div>
+<p>la verificación fallará como consecuencia de que el estándar <abbr title="Secure/Multipurpose Internet Mail Extensions">S/MIME</abbr> antes de calcular
+el resumen modifica los cambios de línea (en <em>UNIX</em> habitualmente “:kbd:n:”) a la forma
+canónica “rn”. Podemos solucionarlo o incluyendo la opción <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">binary</kbd></kbd> al generar
+la firma para evitar la modificación:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl smime -sign -binary -in fichero.txt -signer micert.pem -outform pem -out smime.p7s
+</pre></div>
+</div>
+<p>o modificando al vuelo <code class="file docutils literal notranslate"><span class="pre">fichero.txt</span></code> para que presente tales cambios de línea al hacer la verificación:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl smime -verify -in smime.p7s -inform pem -noverify -content &lt;<span class="o">(</span>sed <span class="s1">&#39;s:$:^M:&#39;</span> fichero.txt<span class="o">)</span>
+</pre></div>
+</div>
+</div>
+<p>Otra acción útil que puede hacerse sobre <code class="file docutils literal notranslate"><span class="pre">smime.p7s</span></code> es rescatar los certificados de usuario
+que contenga:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl pkcs7 -in smime.p7s -print_certs -out certs.pem
+</pre></div>
+</div>
+<p class="rubric">Cifrado</p>
+<p>Para cifrar un archivo (en un mensaje de correo se cifraría el cuerpo del
+mensaje) la orden es esta:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl smime -encrypt -in fichero.txt -aes256 -out fichero.eml pubkey.pem
+</pre></div>
+</div>
+<p>donde <code class="file docutils literal notranslate"><span class="pre">cert.pem</span></code> contiene la clave pública del destinatario del archivo
+cifrado. Si se quiere cifrar para más destinatarios habrä que añadir archivos
+<abbr title="Private Enhanced Mail">PEM</abbr> adicionales a la orden, ya que es inútil añadirlos dentro de un mismo
+archivo <abbr title="Private Enhanced Mail">PEM</abbr>. Onsérvese, además, que se incluye la opción <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">aes256</kbd></kbd> para
+indicar que se use cifrado <abbr title="Advanced Encryption Standard">AES</abbr>. Este cifrado es simétrico, porque, como ya se
+ha explicado al explicar el cifrado de mensajes de correo, el archivo se cifra
+con una clave simétrica generada <em>ad hoc</em> y es esta clave simétrica la que se
+cifra con las claves públicas de los destinatarios.</p>
+<p>El archivo resultante de esta orden tiene forma de mensaje de correo:</p>
+<div class="highlight-email notranslate"><div class="highlight"><pre><span></span>MIME-Version: 1.0
+Content-Disposition: attachment; filename=&quot;smime.p7m&quot;
+Content-Type: application/x-pkcs7-mime; smime-type=enveloped-data;
+name=&quot;smime.p7m&quot;
+Content-Transfer-Encoding: base64
+
+MENSAJE.CIFRADO.CODIFICADO.EN.BASE64
+</pre></div>
+</div>
+<p>y, de hecho, si añadiera sus campos de cabecera típicos (<kbd class="kbd docutils literal notranslate">Subject</kbd>,
+<kbd class="kbd docutils literal notranslate">From</kbd>, etc.) sería un mensaje válido para ser enviado mediante <abbr title="Simple Mail Transfer Protocol">SMTP</abbr>. Por
+esta razón, si el mensaje se consulta a través de un <abbr title="Mail User Agent">MUA</abbr> sin soporte para
+mensajes cifrados, se observará un mensaje sin contenido visible, pero con un
+adjunto llamado <code class="file docutils literal notranslate"><span class="pre">smime.p7m</span></code>.</p>
+<p>Para obtener este adjunto directamente, prescindiendo del formato <em>SMIME</em>,
+podríamos haber hecho:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl smime -encrypt -in fichero.txt -aes256 -out smime.p7m -outform pem pubkey.pem
+</pre></div>
+</div>
+<p>De este archivo de salida (o el <code class="file docutils literal notranslate"><span class="pre">.eml</span></code>) se puede extraer el contenido
+original descifrando con el certificado completo (incluyendo la clave privada)
+del destinatario:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl smime -decrypt -in smime.p7m -inform pem -recip cert.pem
+<span class="go">El contenido original perfectamente descifrado</span>
+</pre></div>
+</div>
+<p>aunque, si se tienen por separado certificado y clave privada, puede indicarse
+ésta mediante la opción <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">inkey</kbd></kbd>.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Los archivos <abbr title="Public-Key Cryptography Standards">PKCS</abbr> #7 generados con las órdenes de este epígrafe
+pueden bichearse con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl cms -cmsout -print -in smime.p7m -inform pem
+</pre></div>
+</div>
 </div>
 </div>
 <div class="section" id="gnupg">
-<span id="openpgp"></span><span id="id3"></span><h2><span class="section-number">9.1.3.3.2. </span>Open<abbr title="Pretty Good Privacy">PGP</abbr><a class="headerlink" href="#gnupg" title="Enlazar permanentemente con este título">¶</a></h2>
+<span id="openpgp"></span><span id="id4"></span><h2><span class="section-number">9.1.3.3.2. </span>Open<abbr title="Pretty Good Privacy">PGP</abbr><a class="headerlink" href="#gnupg" title="Enlazar permanentemente con este título">¶</a></h2>
 <p>Para ilustrar este estándar usaremos <abbr title="GNU Provacy Guard">GnuPG</abbr>, aunque lo habitual es que loas
 agentes de correo (<abbr title="Mail User Agent">MUA</abbr>) como <a class="reference internal" href="../../../07.serre/03.mail/04-misc/02-cliente/05-mua.html#mutt"><span class="std std-ref">mutt</span></a> o <a class="reference external" href="https://www.thunderbird.net">Thunderbird</a>, hagan uso del
 estándar de manera sencilla, o incluso podemos llegar a usarlo con determinados
 servicios de <em>webmail</em> y la extensión adecuada del navegador.  Por ejemplo, en
 <a class="reference external" href="https://www.chromium.org">Chromium</a> existe la extensión <a class="reference external" href="https://www.mailvelope.com/en">Mailenvelope</a> que permite el cifrado de mensajes
 para los principales sitios de webmail (<a class="reference external" href="https://gmail.google.com">Gmail</a>, <a class="reference external" href="https://mail.yahoo.com">Yahoo</a>, <a class="reference external" href="https://www.outlook.com">Outlook</a>, etc.).</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>En <em>Windows</em> <a class="reference external" href="https://www.gpg4win.org/">GPG4Win</a> permite hacer gráficamente las operaciones que
+aquí mostraremos para <em>Linux</em>, añade <em>plugins</em> para algunas aplicaciones
+como <strong class="program">Outlook</strong> y <strong class="program">Explorer</strong> e incluye además un gestor de
+certificados X.509 (aunque es este el tipo de certificados que soporta el
+gestor nativo de <em>Windows</em>).</p>
+</div>
 <div class="section" id="instalacion">
 <h3><span class="section-number">9.1.3.3.2.1. </span>Instalación<a class="headerlink" href="#instalacion" title="Enlazar permanentemente con este título">¶</a></h3>
 <p>La instalación es sumamente sencilla:</p>
@@ -184,7 +312,7 @@ simétrico:</p>
 <span class="gp">$</span> gpg -c /tmp/saludo.txt
 </pre></div>
 </div>
-<p>La orden genera el fichero cifrado <code class="file docutils literal notranslate"><span class="pre">/tmp/saludo.txt.asc</span></code> con esta pinta<a class="footnote-reference brackets" href="#id9" id="id4">2</a>:</p>
+<p>La orden genera el fichero cifrado <code class="file docutils literal notranslate"><span class="pre">/tmp/saludo.txt.asc</span></code> con esta pinta<a class="footnote-reference brackets" href="#id11" id="id5">4</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">-----BEGIN PGP MESSAGE-----</span>
 
 <span class="go">jA0ECQMCgmqtVcUnh0H80lAB2H6YjrKdXR2P2I9a0JRDKpoQhEJc//dnzA550ged</span>
@@ -270,11 +398,11 @@ consignarse cada vez que la clave privada tenga que usarse y es una simple
 medida de seguridad para evitar que, si la clave privada cae en manos ajenas, el
 ladrón tenga fácil usurpar la identidad del legítimo propietario. Se han
 añadido, además, dos datos relevantes: el tiempo de vigencia de la clave (un
-año), que de forma predeterminada es eterno, y el tipo de algoritmo<a class="footnote-reference brackets" href="#id10" id="id5">3</a>. La
+año), que de forma predeterminada es eterno, y el tipo de algoritmo<a class="footnote-reference brackets" href="#id12" id="id6">5</a>. La
 orden no sólo genera las claves, sino que las almacena en el anillo de claves
 (todo dentro de <code class="file docutils literal notranslate"><span class="pre">~/.gnupg</span></code>), con lo que podremos consultar su existencia
 listando cuáles son las claves públicas almacenadas:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> gpg --list-keys --keyid-format short
+<div class="highlight-console notranslate" id="gpg-list-keys"><div class="highlight"><pre><span></span><span class="gp">$</span> gpg --list-keys --keyid-format short
 <span class="go">/home/usuario/.gnupg/pubring.kbx</span>
 <span class="go">--------------------------------</span>
 <span class="go">pub   rsa3072/B0B83042 2019-11-08 [SC] [caduca: 2021-11-07]</span>
@@ -330,7 +458,7 @@ anterior:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> gpg --import clave.asc
 </pre></div>
 </div>
-<p>orden que importará todas las claves contenidas en el fichero<a class="footnote-reference brackets" href="#id11" id="id6">4</a>.</p>
+<p>orden que importará todas las claves contenidas en el fichero<a class="footnote-reference brackets" href="#id13" id="id7">6</a>.</p>
 <div class="admonition note">
 <p class="admonition-title">Nota</p>
 <p>Si la importación se hace del siguiente modo:</p>
@@ -389,11 +517,46 @@ clave pública o una clave privada. Por ejemplo:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> gpg --delete-keys yanoloquiero@example.net
 </pre></div>
 </div>
-<p class="rubric">Validación de claves</p>
-<div class="admonition-todo admonition" id="id7">
-<p class="admonition-title">Por hacer</p>
-<p>Firmar una clave <em>desconocida</em>.</p>
+<p class="rubric">Confianza en las claves</p>
+<p>Ya se ha explicado que las claves <abbr title="Pretty Good Privacy">PGP</abbr> no presentan una estructura jerarquizada
+de confianza, sino que son los propios usuarios los que otorgan confianza a una
+clave ajena firmándola. Al <a class="reference internal" href="#gpg-list-keys"><span class="std std-ref">listar claves</span></a>, nos encontramos
+entre corchetes la confianza que nos inspira la clave. <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate">[</kbd> <kbd class="kbd docutils literal notranslate">absoluta</kbd> <kbd class="kbd docutils literal notranslate">]</kbd></kbd>
+implica confianza ciega y se fija automaticamente si nosotros mismos somos los
+que hemos generado la clave.</p>
+<p>Supongamos que hemos importado una clave de un conocido:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> gpg --import pubkey-conocido.asc
+<span class="gp">$</span> gpg --list-keys --keyid-format short
+<span class="go">[...]</span>
+
+<span class="go">pub   rsa3072/079F9ECF 2021-03-11 [SC] [caduca: 2023-03-11]</span>
+<span class="go">      CF7DAB0C27CFF10B842B0DED1A54391B079F9ECF</span>
+<span class="go">uid      [desconocida] Mi mejor amigo &lt;amigo@gmail.com&gt;</span>
+</pre></div>
 </div>
+<p>La clave aparece con una confianza desconocida. Si hubieramos obtenido la clave
+por un canal seguro (p.e. el amigo nos la ha facilitado personalmente),
+podríamos entonces firmarla:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> gpg --sign-key amigo
+<span class="gp">$</span> gpg --list-signatures
+<span class="go">[...]</span>
+
+<span class="go">pub   rsa3072 2021-03-11 [SC] [caduca: 2023-03-11]</span>
+<span class="go">      CF7DAB0C27CFF10B842B0DED1A54391B079F9ECF</span>
+<span class="go">uid        [   total   ] Mi mejor amigo &lt;amigo@gmail.com&gt;</span>
+<span class="go">sig 3        1A54391B079F9ECF 2021-03-11  Mi mejor amigo &lt;amigo@gmail.com&gt;</span>
+<span class="go">sig          A2123969EB13CB39 2021-03-11  Licenciado Cebadilla (cuenta de pruebas) &lt;xxxx@gmail.com&gt;</span>
+</pre></div>
+</div>
+<p>De esta forma la confianza cambiaría (ahora es <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate">[</kbd> <kbd class="kbd docutils literal notranslate">total</kbd> <kbd class="kbd docutils literal notranslate">]</kbd></kbd>) y la clave de
+nuestro conocido pasaría a incluir nuestra firma, que acredita que le hemos dado
+nuestra confianza. Esta confianza se incorpora a la clave, de modo que si la
+exportamos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> gpg --export amigo &gt; pubkey-conocido-firmada.asc
+</pre></div>
+</div>
+<p>La clave incorporará nuestra firma y si la subimos a un servidor de claves
+también lo hará.</p>
 </div>
 <div class="section" id="cifrado-asimetrico">
 <span id="gnupg-cif-asi"></span><h3><span class="section-number">9.1.3.3.2.4. </span>Cifrado asimétrico<a class="headerlink" href="#cifrado-asimetrico" title="Enlazar permanentemente con este título">¶</a></h3>
@@ -497,15 +660,25 @@ cabeceras escogidas: para Open<abbr title="Pretty Good Privacy">PGP</abbr>, el b
 <a class="reference external" href="https://tools.ietf.org/id/draft-autocrypt-lamps-protected-headers-01.html">Protected Headers for Cryptographic E-mail</a>
 y para <abbr title="Secure/Multipurpose Internet Mail Extensions">S/MIME</abbr> el <span class="target" id="index-4"></span><a class="rfc reference external" href="https://tools.ietf.org/html/rfc7508.html"><strong>RFC 7508</strong></a>.</p>
 </dd>
-<dt class="label" id="id9"><span class="brackets"><a class="fn-backref" href="#id4">2</a></span></dt>
+<dt class="label" id="id9"><span class="brackets"><a class="fn-backref" href="#id2">2</a></span></dt>
+<dd><p>Si la clave está en archivo aparte puede usarse la opción <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">inkey</kbd></kbd>.</p>
+</dd>
+<dt class="label" id="id10"><span class="brackets"><a class="fn-backref" href="#id3">3</a></span></dt>
+<dd><p>Para incluir certificados intermedios puede añadirse la opción <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">certfile</kbd></kbd>
+que refiera el archivo con los certificados intermedios (pero no el archivo firmante):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl smime -sign -in fichero.txt -signer micert.pem -certfile ca-certs.pem -outform pem -out smime.p7s
+</pre></div>
+</div>
+</dd>
+<dt class="label" id="id11"><span class="brackets"><a class="fn-backref" href="#id5">4</a></span></dt>
 <dd><p>El archivo cifrado es imprimible gracias a que incluimos <kbd class="kbd docutils literal notranslate">armor</kbd> en
 el archivo de configuración.</p>
 </dd>
-<dt class="label" id="id10"><span class="brackets"><a class="fn-backref" href="#id5">3</a></span></dt>
+<dt class="label" id="id12"><span class="brackets"><a class="fn-backref" href="#id6">5</a></span></dt>
 <dd><p>El algoritmo elegido utiliza una clave <abbr title="Rivest, Shamir y Adleman">RSA</abbr> de 2048 <em>bits</em> tanto para
 cifrado como para firmado. Otro posible algoritmo es <em>ed25519</em>.</p>
 </dd>
-<dt class="label" id="id11"><span class="brackets"><a class="fn-backref" href="#id6">4</a></span></dt>
+<dt class="label" id="id13"><span class="brackets"><a class="fn-backref" href="#id7">6</a></span></dt>
 <dd><p>En nuestro caso, sería una clave pública y su correspondiente privada.</p>
 </dd>
 </dl>

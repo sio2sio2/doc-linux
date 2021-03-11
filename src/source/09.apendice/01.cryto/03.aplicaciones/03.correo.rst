@@ -66,43 +66,160 @@ firmar o cifrar el cuerpo del mensaje (no los campos de cabecera\ [#]_):
 
       --XXXXX
    
-   La firma se construye resumiendo la primera parte con una función de *hash* (|SHA|\ -256
-   en nuestro ejemplo) y cifrándola con la clave privada del emisor. El
-   contenido de esta segunda parte, sin embargo, puede contener, además de la
-   propia firma, el certificado público del emisor.
+   La firma se construye resumiendo la primera parte con una función de *hash*
+   (|SHA|\ -256 en nuestro ejemplo) y cifrándola con la clave privada del
+   emisor. El contenido de esta segunda parte, sin embargo, puede contener,
+   además de la propia firma, el certificado público del emisor.
 
-.. https://www.oreilly.com/library/view/programming-internet-email/9780596802585/ch05s03s01.html
-.. https://stackoverflow.com/questions/5678124/extract-public-certificate-from-smime-message-pkcs7-signature-with-openssl
+   .. note:: La primera parte es *inline* mientras que la segunda parte adopta
+      la forma de un adjunto de nombre :file:`smime.p7s`. Esto implica que un
+      cliente que no entienda la firma, muestre el texto del mensaje normalmente
+      y presente la firma como un adjunto a descargar.
 
 **Cifrado**
-   El cifrado de un mensaje consiste en cifrar el cuerpo del mensaje del siguiente
-   modo:
+   El cifrado de un mensaje consiste en cifrar el cuerpo del mensaje del
+   siguiente modo:
 
    + Muy comúnmente se comprime el cuerpo lo que reduce su tamaño y, además,
      disminuye la existencia de patrones que hagan menos seguro el cifrado.
    + Se genera una clave simétrica (p.e. |AES|) y se cifra el cuerpo con ella.
    + Se cifra la clave anterior con la clave pública del destinatario a fin de
      que sólo el destinario tenga acceso a ella y por tanto a descifrar el
-     mensaje.
+     mensaje. Si hay varios destinatarios, se adjutan copias de la clave
+     simétrica cifradas con sendas claves públicas.
+
+Los mensajes de correo pueden estar cifrados y firmados lo cual implica hacer
+primero una acción y luego la otra. Lo habitual es que los |MUA| firmen primero
+y cifran después el mensaje firmado.
 
 |S/MIME|
 ========
 Open\ |SSL| tiene una suborden (:kbd:`smime`) que implementa este estándar y nos
-sirve para hacer pruebas con él.
+sirve para probar cómo funciona. Incluye además otra (:kbd:`cms`) que proporciona
+más opciones que la anterior, pero sirve para el mismo fin.
 
-.. todo:: smime con openssl.
+.. rubric:: Firma
 
-.. https://stackoverflow.com/questions/5678124/extract-public-certificate-from-smime-message-pkcs7-signature-with-openssl
-   http://enricorossi.org/blog/2016/view_p7m_file_with_openssl/
-.. openssl smime -decrypt -in smime.p7m -inkey ~/.smime/keys/f8ecef67.0
+Ya hemos visto que **firmar** un mensaje de correo consiste en firmar el
+contenido de la primera parte del :kbd:`multipart/signed` (lo que antes de
+haberse firmado el correo constituía el cuerpo del mensaje) y añadirlo como
+contenido de la segunda parte en forma de adjunto (cuyo nombre en el ejemplo es
+:file:`smime.p7s`). Podemos emular estas acciones con :ref:`openssl <openssl>`
+tomando un archivo (que hará el papel de primera parte)::
+
+   $ openssl smime -sign -in fichero.txt -signer micert.pem -out fichero.eml
+
+done :file:`micert.pem` es un archivo |PEM| con el certificado y la clave
+privada del firmante\ [#]_. El archivo resultante :file:`fichero.eml` adopta el
+aspecto de un correo electrónico :kbd:`multipart/signed` como el mostrado más
+arriba. Si quisiéramos obtener exclusivamente la firma, y no todo el mensaje,
+podríamos hacer con la salida anterior::
+
+   $ openssl smime -pk7out -in fichero.eml -out smime.p7s
+
+o bien haber cambiando el formato de salida de la primera orden (que por
+defecto es :kbd:`SMIME`)::
+
+   $ openssl smime -sign -in fichero.txt -signer micert.pem -outform pem -out smime.p7s
+
+La firma, generada así, contiene, además del *resumen* y la clave simétrica
+cifrados (recuérdense los :ref:`conceptos sobre firma digital
+<firma-digital>`), el certificado del firmante, por si el destinatario
+careciera de ella. No contendrá, no osbtante, certificados intermedios aunque
+:file:`micert.pem` los incluyera\ [#]_.
+
+Obtenida la firma podemos verificarla::
+
+   $ openssl smime -verify -in fichero.eml 
+
+aunque la verificación fallará si falta algún certificado intermedio. Para
+subsanarlo puede añadirse a la orden anterior la opción :kbd:`-noverify`::
+
+   $ openssl smime -verify -in fichero.eml -noverify
+
+o incluir los certificados intermedios en un archivo y referirlo con :kbd:`-CAfile`::
+
+   $ openssl smime -verify -in fichero.eml -CAfile ca-certs.pem
+
+.. warning:: Si se intenta verificar la firma usando :file:`smime.p7s`::
+
+      $ openssl smime -verify -in smime.p7s -inform pem -noverify -content fichero.txt
+
+   la verificación fallará como consecuencia de que el estándar |S/MIME| antes de calcular
+   el resumen modifica los cambios de línea (en *UNIX* habitualmente ':kbd:\n:') a la forma
+   canónica '\r\n'. Podemos solucionarlo o incluyendo la opción :kbd:`-binary` al generar
+   la firma para evitar la modificación::
+
+      $ openssl smime -sign -binary -in fichero.txt -signer micert.pem -outform pem -out smime.p7s
+
+   o modificando al vuelo :file:`fichero.txt` para que presente tales cambios de línea al hacer la verificación::
+
+      $ openssl smime -verify -in smime.p7s -inform pem -noverify -content <(sed 's:$:^M:' fichero.txt)
+
+Otra acción útil que puede hacerse sobre :file:`smime.p7s` es rescatar los certificados de usuario
+que contenga::
+
+   $ openssl pkcs7 -in smime.p7s -print_certs -out certs.pem
+
+.. rubric:: Cifrado
+
+Para cifrar un archivo (en un mensaje de correo se cifraría el cuerpo del
+mensaje) la orden es esta::
+
+   $ openssl smime -encrypt -in fichero.txt -aes256 -out fichero.eml pubkey.pem
+
+donde :file:`cert.pem` contiene la clave pública del destinatario del archivo
+cifrado. Si se quiere cifrar para más destinatarios habrä que añadir archivos
+|PEM| adicionales a la orden, ya que es inútil añadirlos dentro de un mismo
+archivo |PEM|. Onsérvese, además, que se incluye la opción :kbd:`-aes256` para
+indicar que se use cifrado |AES|. Este cifrado es simétrico, porque, como ya se
+ha explicado al explicar el cifrado de mensajes de correo, el archivo se cifra
+con una clave simétrica generada *ad hoc* y es esta clave simétrica la que se
+cifra con las claves públicas de los destinatarios.
+
+El archivo resultante de esta orden tiene forma de mensaje de correo:
+
+.. code:: email
+
+   MIME-Version: 1.0
+   Content-Disposition: attachment; filename="smime.p7m"
+   Content-Type: application/x-pkcs7-mime; smime-type=enveloped-data;
+   name="smime.p7m"
+   Content-Transfer-Encoding: base64
+
+   MENSAJE.CIFRADO.CODIFICADO.EN.BASE64
+
+y, de hecho, si añadiera sus campos de cabecera típicos (:kbd:`Subject`,
+:kbd:`From`, etc.) sería un mensaje válido para ser enviado mediante |SMTP|. Por
+esta razón, si el mensaje se consulta a través de un |MUA| sin soporte para
+mensajes cifrados, se observará un mensaje sin contenido visible, pero con un
+adjunto llamado :file:`smime.p7m`.
+
+Para obtener este adjunto directamente, prescindiendo del formato *SMIME*,
+podríamos haber hecho::
+
+   $ openssl smime -encrypt -in fichero.txt -aes256 -out smime.p7m -outform pem pubkey.pem 
+
+De este archivo de salida (o el :file:`.eml`) se puede extraer el contenido
+original descifrando con el certificado completo (incluyendo la clave privada)
+del destinatario::
+
+   $ openssl smime -decrypt -in smime.p7m -inform pem -recip cert.pem
+   El contenido original perfectamente descifrado
+
+aunque, si se tienen por separado certificado y clave privada, puede indicarse
+ésta mediante la opción :kbd:`-inkey`.
+
+.. note:: Los archivos |PKCS| #7 generados con las órdenes de este epígrafe
+   pueden bichearse con::
+
+      $ openssl cms -cmsout -print -in smime.p7m -inform pem
 
 .. _openpgp:
 .. _gnupg:
 
 Open\ |PGP|
 ===========
-.. `GPGforWin <https://www.gpg4win.org/download.html>`_ en *Windows*
-
 .. https://www.agenciatributaria.es/AEAT.internet/Inicio/Ayuda/_comp_Consultas_informaticas/Categorias/Firma_digital__certificado_o_DNIe__y_sistema_Cl_ve_PIN/Certificados_electronicos/Informacion_sobre_certificados_de_persona_fisica_de_la_FNMT/Informacion_sobre_certificados_de_persona_fisica_de_la_FNMT.shtml
 
 Para ilustrar este estándar usaremos |GnuPG|, aunque lo habitual es que loas
@@ -111,6 +228,12 @@ estándar de manera sencilla, o incluso podemos llegar a usarlo con determinados
 servicios de *webmail* y la extensión adecuada del navegador.  Por ejemplo, en
 Chromium_ existe la extensión Mailenvelope_ que permite el cifrado de mensajes
 para los principales sitios de webmail (Gmail_, Yahoo_, Outlook_, etc.).
+
+.. note:: En *Windows* GPG4Win_ permite hacer gráficamente las operaciones que
+   aquí mostraremos para *Linux*, añade *plugins* para algunas aplicaciones
+   como :program:`Outlook` y :program:`Explorer` e incluye además un gestor de
+   certificados X.509 (aunque es este el tipo de certificados que soporta el
+   gestor nativo de *Windows*).
 
 Instalación
 -----------
@@ -233,7 +356,11 @@ añadido, además, dos datos relevantes: el tiempo de vigencia de la clave (un
 año), que de forma predeterminada es eterno, y el tipo de algoritmo\ [#]_. La
 orden no sólo genera las claves, sino que las almacena en el anillo de claves
 (todo dentro de :file:`~/.gnupg`), con lo que podremos consultar su existencia
-listando cuáles son las claves públicas almacenadas::
+listando cuáles son las claves públicas almacenadas:
+
+.. _gpg-list-keys:
+
+::
 
    $ gpg --list-keys --keyid-format short
    /home/usuario/.gnupg/pubring.kbx
@@ -347,9 +474,53 @@ clave pública o una clave privada. Por ejemplo::
 
    $ gpg --delete-keys yanoloquiero@example.net
 
-.. rubric:: Validación de claves
+.. rubric:: Confianza en las claves
 
-.. todo:: Firmar una clave *desconocida*.
+Ya se ha explicado que las claves |PGP| no presentan una estructura jerarquizada
+de confianza, sino que son los propios usuarios los que otorgan confianza a una
+clave ajena firmándola. Al :ref:`listar claves <gpg-list-keys>`, nos encontramos
+entre corchetes la confianza que nos inspira la clave. :kbd:`[ absoluta ]`
+implica confianza ciega y se fija automaticamente si nosotros mismos somos los
+que hemos generado la clave.
+
+Supongamos que hemos importado una clave de un conocido::
+
+   $ gpg --import pubkey-conocido.asc
+   $ gpg --list-keys --keyid-format short
+   [...]
+
+   pub   rsa3072/079F9ECF 2021-03-11 [SC] [caduca: 2023-03-11]
+         CF7DAB0C27CFF10B842B0DED1A54391B079F9ECF
+   uid      [desconocida] Mi mejor amigo <amigo@gmail.com>
+
+La clave aparece con una confianza desconocida. Si hubieramos obtenido la clave
+por un canal seguro (p.e. el amigo nos la ha facilitado personalmente),
+podríamos entonces firmarla::
+
+   $ gpg --sign-key amigo
+   $ gpg --list-signatures
+   [...]
+
+   pub   rsa3072 2021-03-11 [SC] [caduca: 2023-03-11]
+         CF7DAB0C27CFF10B842B0DED1A54391B079F9ECF
+   uid        [   total   ] Mi mejor amigo <amigo@gmail.com>
+   sig 3        1A54391B079F9ECF 2021-03-11  Mi mejor amigo <amigo@gmail.com>
+   sig          A2123969EB13CB39 2021-03-11  Licenciado Cebadilla (cuenta de pruebas) <xxxx@gmail.com>
+
+De esta forma la confianza cambiaría (ahora es :kbd:`[ total ]`) y la clave de
+nuestro conocido pasaría a incluir nuestra firma, que acredita que le hemos dado
+nuestra confianza. Esta confianza se incorpora a la clave, de modo que si la
+exportamos::
+
+   $ gpg --export amigo > pubkey-conocido-firmada.asc
+
+La clave incorporará nuestra firma y si la subimos a un servidor de claves
+también lo hará.
+
+.. todo: Continuar la exposición sobre confianza de claves |PGP|.
+
+.. https://gist.github.com/F21/b0e8c62c49dfab267ff1d0c6af39ab84
+.. https://security.stackexchange.com/questions/120891/verify-a-key-was-signed-by-another-key
 
 .. _gnupg-cif-asi:
 
@@ -455,6 +626,13 @@ integridad del fichero gracias al resumen que contiene esta::
        <https://tools.ietf.org/id/draft-autocrypt-lamps-protected-headers-01.html>`_
        y para |S/MIME| el :rfc:`7508`.
 
+.. [#] Si la clave está en archivo aparte puede usarse la opción :kbd:`-inkey`.
+
+.. [#] Para incluir certificados intermedios puede añadirse la opción :kbd:`-certfile`
+   que refiera el archivo con los certificados intermedios (pero no el archivo firmante)::
+
+      $ openssl smime -sign -in fichero.txt -signer micert.pem -certfile ca-certs.pem -outform pem -out smime.p7s
+
 .. [#] El archivo cifrado es imprimible gracias a que incluimos :kbd:`armor` en
    el archivo de configuración.
 
@@ -472,6 +650,8 @@ integridad del fichero gracias al resumen que contiene esta::
 .. |RSA| replace:: :abbr:`RSA (Rivest, Shamir y Adleman)`
 .. |AES| replace:: :abbr:`AES (Advanced Encryption Standard)`
 .. |SSL| replace:: :abbr:`SSL (Secure Socket Layer)`
+.. |PKCS| replace:: :abbr:`PKCS (Public-Key Cryptography Standards)`
+.. |PEM| replace:: :abbr:`PEM (Private Enhanced Mail)`
 
 .. _Chromium: https://www.chromium.org
 .. _Thunderbird: https://www.thunderbird.net
@@ -479,3 +659,4 @@ integridad del fichero gracias al resumen que contiene esta::
 .. _Yahoo: https://mail.yahoo.com
 .. _Gmail: https://gmail.google.com
 .. _Mailenvelope: https://www.mailvelope.com/en
+.. _GPG4Win: https://www.gpg4win.org/
