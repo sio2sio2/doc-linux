@@ -3,10 +3,10 @@
 ************
 Criptografía
 ************
-
-Bajo el epígrafe se exponen algunos conceptos generales sobre criptografía y se
-ilutra el uso de algunas herramientas de *software* libre que la usa como
-GnuPG_.
+La criptografía es uno de los pilares sobre los que se asienta gran parte de la
+seguridad de la transmisión, del almacenamiento o de la autenticación. Es por
+ello que se dedica una unidad completa a describir sus fundamentos y sus
+aplicaciones más inmediatas.
 
 .. toctree:: 
    :glob:

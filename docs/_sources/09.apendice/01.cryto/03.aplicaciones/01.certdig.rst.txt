@@ -16,28 +16,50 @@ de la entrega de la clave pública y, si ha sido así, todo el proceso de
 verificación de la identidad estará viciado. Para subsanar este último escollo
 existen los *certificados digitales*.
 
-Un :dfn:`certificado digital` es un documento compuesto por unos datos
-identificativos y una clave pública, y firmado digitalmente por una
-:dfn:`autoridad de certificación` (|CA|), que acredita que la clave pertenece a
-quien los datos identificativos refieren. Si esta |CA| es de absoluta confianza,
-entonces no habrá duda de quién es el propietario de la clave pública y
-desaparecerá el riesgo de suplantación. Los certificados suelen basarse en el
-`estándar X.509 <https://www.ssl.com/faqs/what-is-an-x-509-certificate/>`_
-definido en el :rfc:`5280`.
+Un :dfn:`certificado digital` es un documento compuesto por una clave pública
+(asociada a una clave privada) y unos datos que identifican al propietario de
+tales claves, todo él firmado por un tercero que avala la veracidad de tal
+identificación.
 
 .. image:: files/certificado.png
 
-Esquematizando, pues, un *certificado digital* se compone:
+De esta forma, el propietario no cede a los demás una simple clave pública, sino
+la parte pública del certificado y así queda acreditada su identidad, No
+obstante, como el certificado pretende solventar el problema de la
+*suplantación*, es fundamental cuál es la estrategia para que el tercero firmante
+sea digno de **confianza**. Hay dos estrategias:
+
+* Una **red de confianza** totalmente descentralizada en que las relacionaes de
+  confianza entre los propietarios de las claves se establecen de igual a igual.
+  Así, si dos propietarios "A" y "B" están seguros de la veracidad del
+  certificado del otro (por ejemplo, por un encuentro físico), podrán firmarse
+  los certificados y establecer una relación de confianza directa. Un tercer
+  propietario "C", que no haya entrado en contaco con "A", pero si con "B",
+  tendrá una relación de confianza directa con "B" y, en consecuencia,
+  también podrá confiar en la veracidad del certificado de "A", puesto que "B"
+  lo avala y él confía en "B" (relación de confianza indirecta). Los
+  :ref:`certificados PGP <openpgp>`, de los que discutiremos al tratar el
+  :ref:`correo electrónico <email-seguro>`, fundamentan su confiabialidad así.
+
+* Una infraestructura |PKI|, que es una estructura jerárquica de confianza. En
+  ella el tercero que acredita la identidad del propietario deil certificado es
+  una :dfn:`autoridad de certificación` (|CA|). Esta |CA| a su veces gozará de
+  confianza, porque otra |CA| de nivel superior la haya acreditado firmándole el
+  certificado. Los `certificados X.509
+  <https://www.ssl.com/faqs/what-is-an-x-509-certificate/>`_, definidos en el
+  :rfc:`5280`, basa su confianza en |PKI|. A ellos dedicaremos el resto de este
+  epígrafe, ya que, fuera del correo electrónico en que comparten protagonismo
+  con |PGP|, son los que habitualmente se usan.
+
+Infraestructura |PKI|
+=====================
+Retomando lo expuesto hasta ahora, un *certificado digital* se compone de:
 
 * Una pareja de claves.
 * La identidad del propietario de dichas claves.
-* La firma digital de una autoridad de certificación sobre la clave pública y
-  los datos identificativos.
-
-Así pues, cuando se firma con un certificado digital el receptor del mensaje
-puede, además de comprobar la integridad del mensaje saber con total seguridad
-que la clave publica que ha usado para tal comprobación pertenece a quien parece
-pertenecer.
+* La firma digital de una *autoridad de certificación* sobre la clave pública y
+  los datos identificativos, que avala la relación entre las claves y la
+  identidad de su propietario.
 
 Ahora bien, ¿quién es esta *autoridad de certificación* y por qué es digna de
 confianza? Una :dfn:`autoridad de certificación` (a partir de ahora, |CA|) es
@@ -51,7 +73,7 @@ unas |CA| raíz cuyos certificados son autofirmados, esto es, son certificados a
 que los que nadie ha avalado digitalmente. La confianza en los certificados raíz
 se debe a que los propios sistemas operativos y navegadores web los incorporan
 de serie, porque de algún modo los fabricantes de este tipo de *software* habrán
-efectuado la verificación.  Así, *Debian* incluye el paquete `ca-certificates
+efectuado la verificación. Así, *Debian* incluye el paquete `ca-certificates
 <https://packages.debian.org/search?keywords=ca-certificates>`_ con certificados
 raíz que reconoce como confiables.
 
@@ -65,12 +87,17 @@ Signature Trust`_ (la cual sí es una |CA| raíz)::
    subject=C = US, O = Let's Encrypt, CN = R3
    issuer=O = Digital Signature Trust Co., CN = DST Root CA X3
 
-Sea como sea, las |CA| generan certificados finales:
+Sea como sea, las |CA| generan certificados:
 
 + Para otra |CA| subordinada.
-+ Para una persona física.
++ Para una persona física o jurídica.
 + Para una aplicación de *software*
 + Para un servidor.
+
+Además, no sólo certifican la identidad sino también la finalidad del propio
+certificado, por lo que los datos identificativos incluidos en la firma también
+contendrán la finalidad de uso. Por ejemplo, un certificado puede o no estar
+habilitado para su uso en el correo electrónico 
 
 Los certificados, no obstante, no son eternos, sino que la |CA| los acredita por
 un plazo determinado, por lo que son sólo válidos entre una fecha inicial
@@ -558,8 +585,8 @@ inadmisible.
 
 .. _cert-gen:
 
-Generación
-==========
+Creación de una |PKI|
+=====================
 .. https://fam.tuwien.ac.at/~schamane/_/blog/2019-07-18_selfsigned_subjectaltname.htm
 .. https://deliciousbrains.com/ssl-certificate-authority-for-local-https-development/
 .. https://gist.github.com/Soarez/9688998
@@ -573,9 +600,9 @@ Generación
    carece realmente de interés práctico real\ [#]_, pero sirve para conocer cómo
    funciona *por dentro* la solicitud de un certificado.
 
-El propósito del libro es generar un certificado de |CA| raíz, un certificado de
-|CA| intermedia firmado con el anterior y, finalmente, certificados de usuario y
-de servidor firmados con el segundo certificado.
+El propósito del epígrafe es generar un certificado de |CA| raíz, un certificado
+de |CA| intermedia firmado con el anterior y, finalmente, certificados de
+usuario y de servidor firmados con el segundo certificado.
 
 El procedimiento de generación de certificados es siempre el mismo:
 
@@ -883,6 +910,8 @@ Presentan, no obstante, algunas diferencias:
 .. |SSL| replace:: :abbr:`SSL (Secure Socket Layer)`
 .. |NSS| replace:: :abbr:`NSS (Network Secure Services)`
 .. |GnuPG| replace:: :abbr:`GnuPG (GNU Provacy Guard)`
+.. |PKI| replace:: :abbr:`PKI (Public Key Infraestructure)`
+.. |PGP| replace:: :abbr:`PGP (Pretty Good Privacy)`
 
 .. _Digital Signature Trust: https://www.identrust.com/
 .. _Let's Encrypt: https://letsencrypt.org/
