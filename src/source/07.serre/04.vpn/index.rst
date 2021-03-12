@@ -34,7 +34,7 @@ el protocolo de éste.
 
 IPSec |VPN|
    Estos protocolos utilizan IPSec (o sea, un cifrado en la capa de red) para
-   asegurar el tráfico. Un protocolo muy usando dentro de está familia es `IKE
+   asegurar el tráfico. Un protocolo muy usado dentro de esta familia es `IKE
    v2
    <https://www.vpnunlimitedapp.com/en/info/more-about-vpn/vpn-protocols/ike-protocol>`_.
    
@@ -163,7 +163,7 @@ Podemos hacer varias clasificaciones atendiendo a distintos criterios:
       .. image:: files/roadwarrior-sede.png
 
       Pero también que sea la de lograr acceso indirecto a internet (segundo
-      objetivos):
+      objetivo):
 
       .. image:: files/roadwarrior-acceso.png
 
@@ -235,7 +235,7 @@ cliente si el servidor está *ahí* basta con hacer::
 Es obvio también que, si el cliente quiere alcanzar equipos de la red local al
 servidor, lo tiene que hacer a través de la |IP| *10.8.0.1* del servidor y que
 si quiere que su comunicación con internet se haga a través del túnel |VPN| su
-puerta de enlace será directamente la *10.8.0.1*\ [#]_. Por tanto las tablas de
+puerta de enlace será directamente la *10.8.0.1*\ [#]_. Por tanto, las tablas de
 encaminamiento del cliente deben variar al establecer el túnel.
 
 La entrada para la red del túnel |VPN| (la *10.8.0.0/24* en el ejemplo) se

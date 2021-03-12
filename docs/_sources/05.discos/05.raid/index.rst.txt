@@ -63,7 +63,7 @@ Antes de pasar a describir los más comunes, es preciso fijar la siguiente
    discos que, aunque no lo son, suelen ser permitidas por las soluciones para
    crear |RAID|\ s.
 
-   Por una parte suele usarse el término |JBOD| (acrónimo en inglés de *un mero
+   Por una parte, suele usarse el término |JBOD| (acrónimo en inglés de *un mero
    puñado de discos*) para identificar a un conjunto de discos del que se
    preserva la independencia de cada uno. En cambio, cuando estos discos definen
    un único disco virtual que es la concatenación de todos los discos que lo
@@ -458,7 +458,6 @@ Estudiaremos ambas posibilidades.
 .. |BtrFS| replace:: :abbr:`BtrFS (B-TRee File System)`
 .. |MD| replace:: :abbr:`MD (Multiple Devices)`
 .. |JBOD| replace:: :abbr:`JBOD (Just a Bunch Of Drives)`
-.. |NAS| replace:: :abbr:`NAS (Network Attached Storage)`
 
 .. |xor| unicode:: U+2295 .. CIRCLED PLUS
 

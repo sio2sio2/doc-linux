@@ -94,7 +94,7 @@ Citaremos dos clasificaciones:
      Cuando el tráfico es, en cambio, |HTTP|\ s la información es inaccesible y
      en principio, no hay forma de llevar a cabo estas dos tareas. Sin embargo,
      la :ref:`extensión SNI <sni>` de |TLS| envía, al menos, el nombre de
-     dominio sin cifrar durante la fase de negociación, lo cual, posibilita las
+     dominio sin cifrar durante la fase de negociación, lo cual posibilita las
      labores de filtrado, siempre que éste se base exclusivamente en el nombre
      del dominio.
 
@@ -106,7 +106,7 @@ Citaremos dos clasificaciones:
      - Si son varios los servidores de respaldo, balancear la carga entre
        todos ellos.
      - Absorber el tráfico excesivo (p,e, ataques |DoS|).
-     - Cachear selectivamente páginas para agilizar las respuestas, lo cual si
+     - Cachear selectivamente páginas para agilizar las respuestas, lo cual, si
        el tráfico es |HTTP|\ s,  implica trasladar el punto extremo de la conexión
        cifrada al propio *proxy*. Cachean tanto contenido estático (lo cual
        ahorra ancho de banda al servidor y evita que tenga que atender la petición)

@@ -434,7 +434,7 @@ resto de la partición::
    # mdadm --grow /dev/md0 --assume-clean -z max
    # pvresize /dev/md0
 
-Y ya el grupo de volúmen ocupará todo el disco y, en consecuencia, podremos
+Y ya el grupo de volumen ocupará todo el disco y, en consecuencia, podremos
 aplicar los volúmenes lógicos al tamaño que deseemos, empezando eso sí, por el
 dedicado a *swap* cuyo espacio debe ser contiguo::
 
