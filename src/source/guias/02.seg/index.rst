@@ -34,7 +34,7 @@ diseñado atendiendo a los siguientes criterios:
 
       01.intro
       04.crypto
-      f03.entorno
+      no.03.entorno
       05.redes
       02.discos
       03.desktop

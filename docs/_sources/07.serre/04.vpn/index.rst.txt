@@ -23,7 +23,7 @@ A diferencia de otros servicios como |HTTP| o |SMTP| en que existe un protocolo
 y diversas implementaciones del mismo que, obviamente por principio, son
 compatibles entre sí, |VPN| es más bien un concepto de encapsulamiento que
 admite implementarse mediante distintos protocolos. Esto provoca que la elección
-del servidor, implique qué solo puedan usarse aquellos clientes que implementen
+del servidor implique qué solo puedan usarse aquellos clientes que implementen
 el protocolo de éste.
 
 :abbr:`PPTP (Point to Point Tunneling Protocol)` |VPN|

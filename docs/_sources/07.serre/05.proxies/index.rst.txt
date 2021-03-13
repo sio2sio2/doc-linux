@@ -73,7 +73,7 @@ Citaremos dos clasificaciones:
 
   En la figura la máquina *192.168.0.200/23* entiende que la subred
   *192.168.1.0/24* forma parte de su red, así que al intentar conectar con una
-  máquina de esa subred enviará un petición |ARP|, no el paquete directamente a
+  máquina de esa subred enviará una petición |ARP|, no el paquete directamente a
   una puerta de enlace.
 
 :dfn:`Proxy web`

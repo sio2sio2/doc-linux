@@ -19,7 +19,7 @@ oficialmente como módulo.
 - Lo que podríamos denominar *falta de anonimato*, aunque el administrador
   del servidor no tenga intención de querer identificar al cliente. Esto es
   debido a que, por un lado, a los clientes debe asignárseles una |IP| fija en
-  su extremo del túnel y, a que por otro, la asociación entre |IP| real
+  su extremo del túnel y, a que, por otro, la asociación entre |IP| real
   del cliente y su correspondiente |IP| en el túnel no se registra sin más en
   un fichero de registro (que podría ser :file:`/dev/null` para evitar el
   registro efectivo), sino que es permanentemente consultable a través de la

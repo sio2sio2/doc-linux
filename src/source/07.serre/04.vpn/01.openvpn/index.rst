@@ -30,10 +30,10 @@ cuatro aspectos:
 **Tipo de certificado de servidor**
    El certificado de servidor podemos obtenerlo a través de una entidad
    certificadora como :ref:`Let's Encrypt <certbot>`, o bien, crear nosotros una
-   entidad certificadora y con élla acreditar el certificado del servidor.
+   entidad certificadora y con ella acreditar el certificado del servidor.
 
    .. note:: Esta misma entidad se encarga de acreditar también los
-       certificados de los clientes, por lo que si nuestra intención es usarlos
+       certificados de los clientes, por lo que, si nuestra intención es usarlos
        como método de autenticación para clientes, deberemos olvidarnos de usar
        *Let's Encrypt*.
 
@@ -46,7 +46,7 @@ certificadora, en los casos de conexión entre dos sedes y la autenticación con
 usuario y contraseña y certificado de *Let's Encrypt* en los casos de conexión
 entre equipo móvil y sede.
 
-.. note:: La configuracion "sede-equipo móvil" implementada en capa 3, por ser
+.. note:: La configuración "sede-equipo móvil" implementada en capa 3, por ser
    la primera que se desarrolla tiene la configuración abundantemente comentada.
    Muchos de estos comentarios son pertinentes en las restantes configuraciones,
    pero no se repiten. Échele un ojo a esta configuración, aunque no sea la que
@@ -55,17 +55,17 @@ entre equipo móvil y sede.
 Posiblemente, no todos los casos sean igual de pertinentes y nos convendrá
 elegir uno u otro según sean nuestras necesidades:
 
-+ Cuando se pretende conectar con la sede central equipos móviles, hacer que el
++ Cuando se pretende conectar con la sede central equipos móviles, hacer que en
   estos equipos se encuentren en la misma red no suele aportar nada, pero en
   cambio sí que aumenta el tráfico (p.e. los paquetes de broadcast circularán
   por el túnel). En consecuencia, lo natural es que las conexiones sede-equipo
   móvil sean conexiones en capa de red.
 
-+ Por el contrario en conexiones sede-sede:
++ Por el contrario, en conexiones sede-sede:
 
   - Si en la sede del servidor se encuentran centralizados todos los servicios,
     de nuevo no aporta gran cosa que la sucursal se encuentre en la misma red,
-    por lo que lo lógico es que se estableca el túnel en capa de red.
+    por lo que lo lógico es que se establezca el túnel en capa de red.
 
   - En cambio, si las sucursales también aportan servicios, esto querrá decir
     que necesitaremos acceder desde cualquier máquina a máquinas concretas
