@@ -3,10 +3,11 @@
 ************
 Criptografía
 ************
-La criptografía es uno de los pilares sobre los que se asienta gran parte de la
-seguridad de la transmisión, del almacenamiento o de la autenticación. Es por
-ello que se dedica una unidad completa a describir sus fundamentos y sus
-aplicaciones más inmediatas.
+La criptografía es la base de parte de la seguridad en redes, almacenamiento y
+autenticación. El apéndice repasa teóricamente los conceptos asociados a ella,
+ilustra el uso directo de :ref:`OpenSSL <openssl>` :ref:`GnuPG <gnupg>` para
+hacer las operaciones criptográficas básicas; y presenta las aplicaciones
+prácticas más habituales.
 
 .. toctree:: 
    :glob:
