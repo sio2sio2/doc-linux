@@ -14,10 +14,9 @@ volvió poco recomendable y fue sustituido por |SSH|, que cifra la comunicación
 sortea sus problemas de seguridad, amén de tener algunas otras funcionalidades
 muy útiles e interesantes.
 
-Aunque el servicio sigue estando disponible (el paquete
-`telnetd <https://packages.debian.org/es/stretch/telnetd>`_) no es en absoluto
-recomendable instalarlo, dado que adolece de dos **problemas fundamentales de
-seguridad**, comunes a todas las comunicaciones no cifradas:
+Aunque el servicio sigue estando disponible (el paquete :deb:`telnetd`) no es en
+absoluto recomendable instalarlo, dado que adolece de dos **problemas
+fundamentales de seguridad**, comunes a todas las comunicaciones no cifradas:
 
 **Intercepción** de la comunicación
    Al establecerse una comunicación no cifrada entre dos extremos, un tercero

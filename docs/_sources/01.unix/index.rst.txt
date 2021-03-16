@@ -101,8 +101,7 @@ principales diferencias son:
    :ref:`sudo <sudo>` para escalar privilegios.
 
 #. La configuración de la red que desde la versión 17 se hace con `netplan
-   <https://netplan.io/>`_ en vez de con el `paquete ifupdown
-   <https://packages.debian.org/search?keywords=ifupdown>`_ que lee la
+   <https://netplan.io/>`_ en vez de con el paquete :deb:`ifupdown`, que lee la
    configuración de :file:`/etc/network/interfaces`.
 
 .. rubric:: Notas al pie

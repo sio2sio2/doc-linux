@@ -30,10 +30,9 @@ Antes de empezar, es **indispensable** hacer varias cosas:
 
 * Sincronizar su hora con el controlador de dominio. Para ello, o bien,
   instalamos otr servidor de hora en el cliente y lo configuramos para que se
-  sincronice con ``dc``, o bien, instalamos el cliente de hora `ntpdate
-  <https://packages.debian.org/stable/ntpdate>`_ y nos aseguramos que usará el
-  controlador de dominio como servidor y que durante el arranque del sistema se
-  realiza una sincronización.
+  sincronice con ``dc``, o bien, instalamos el cliente de hora :deb:`ntpdate` y
+  nos aseguramos que usará el controlador de dominio como servidor y que durante
+  el arranque del sistema se realiza una sincronización.
 
 Para permitir que el cliente acceda a los usuarios del *controlador de dominio*
 usaremos *sssd* con el provisor *ad* que exige que la máquina sea miembro del
