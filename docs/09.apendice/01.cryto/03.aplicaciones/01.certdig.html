@@ -657,9 +657,16 @@ el servicio <abbr title="Online Certificate Status Protocol">OCSP</abbr>:</p>
 <div class="section" id="verificacion">
 <span id="verif-cert"></span><h2><span class="section-number">9.1.3.1.6. </span>Verificación<a class="headerlink" href="#verificacion" title="Enlazar permanentemente con este título">¶</a></h2>
 <p><strong class="command">openssl</strong> proporciona la suborden <code class="docutils literal notranslate"><span class="pre">verify</span></code> para verificar la validez
-de un certificado en lo referente a las fechas y a la firma de la <abbr title="Certification Authority">CA</abbr>. Aún, sin
-embargo, faltaría comprobar si el certificado está revocado para lo cual hay que
-consultar a la propia <abbr title="Certification Authority">CA</abbr> a través de <abbr title="Online Certificate Status Protocol">OCSP</abbr>.</p>
+de un certificado en lo referente a las fechas y a la cadena de confianza de las <abbr title="Certification Authority">CA</abbr>.
+Aún, sin embargo, el certificado puede ser invalido por haberse revocado. Por
+ello, las <abbr title="Certification Authority">CA</abbr> mantienen una listas de revocación (<abbr title="Certificate Revocation List">CRL</abbr> por sus siglas en
+inglés), donde se registran los números de serie de los certificados que han sido revocados y en qué
+momento se ha realizado tal operación. En consecuencia, cuando se verifica un
+certificado también ha de comprobarse si éste está incluido en la <abbr title="Certificate Revocation List">CRL</abbr>.</p>
+<p>Como verificar la revocación mediante <abbr title="Certificate Revocation List">CRL</abbr> exige descargar la lista y
+tiene que estar actualizada, existe el protocolo <abbr title="Online Certificate Status Protocol">OCSP</abbr> que permite consultar
+directamente a la propia <abbr title="Certification Authority">CA</abbr> si el certficado está revocado. Esta es la
+operación que pretendemos ilustrar bajo este epígrafe.</p>
 <p>Supongamos que tenemos el certificado <code class="file docutils literal notranslate"><span class="pre">CERTIFICADO.pem</span></code> del epígrafe
 anterior emitido por <a class="reference external" href="https://letsencrypt.org/">Let’s Encrypt</a>, la orden:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl verify CERTIFICADO.pem
@@ -773,6 +780,7 @@ tanto la solicitud como la expedición, no hay este problema.</p>
 cuáles serán los campos de extensión que deben contener los certificados.
 Preparemos el directorio de trabajo:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> mkdir -p store/<span class="o">{{</span>new,<span class="o">}</span>certs,crl,keys,csr<span class="o">}</span>
+<span class="gp">$</span> chmod <span class="m">700</span> store/keys
 <span class="gp">$</span> <span class="nb">echo</span> <span class="m">1000</span> &gt; store/serial
 <span class="gp">$</span> touch store/index.txt
 </pre></div>
@@ -781,6 +789,7 @@ Preparemos el directorio de trabajo:</p>
 <dl>
 <dt><strong>Certificado raíz</strong></dt><dd><p>Tiene la particularidad de que estará autofirmado:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl genrsa -aes256 -out store/ca.key <span class="m">4096</span>
+<span class="gp">$</span> chmod <span class="m">600</span> store/ca.key
 <span class="gp">$</span> openssl req -new -config ssl.conf -key store/ca.key -out store/csr/ca.csr
 <span class="gp">$</span> openssl x509 -req -sha256 -in store/csr/ca.csr -signkey store/ca.key <span class="se">\</span>
     -days <span class="m">3650</span> -extfile ssl.conf -extensions e_ca -out store/ca.crt
@@ -802,46 +811,67 @@ inferior y el certificado sólo podrá firmar certificados de usuario y no
 certificados para una <abbr title="Certification Authority">CA</abbr> intermedia subordinada.</p>
 </div>
 </dd>
-<dt><strong>Certificado intermedio</strong></dt><dd><p>Este certificado debe estar firmado con el certificado anterior:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl genrsa -out store/inter.key <span class="m">4096</span>
-<span class="gp">$</span> openssl req -new -config ssl.conf -key store/inter.key -out store/csr/inter.csr
-<span class="gp">$</span> openssl x509 -req -sha256 -in store/csr/inter.csr -CA store/ca.crt -CAkey store/ca.key <span class="se">\</span>
-    -CAcreateserial -days <span class="m">3650</span> -extfile ssl.conf -extensions e_inter -out store/inter.crt
+<dt><strong>Certificado intermedio</strong></dt><dd><p>Para esta <abbr title="Certification Authority">CA</abbr> subordinada crearemos su propia estructura de directorios,
+análoga a la anterior:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> mkdir -p store/sub1/<span class="o">{{</span>new,<span class="o">}</span>certs,crl,keys,csr<span class="o">}</span>
+<span class="gp">$</span> chmod <span class="m">700</span> store/sub1/keys
+<span class="gp">$</span> <span class="nb">echo</span> <span class="m">1000</span> &gt; store/sub1/serial
+<span class="gp">$</span> touch store/sub1/index.txt
+</pre></div>
+</div>
+<p>Y, manteniendo el directorio de trabajo, generamos el certificado de la
+subordinada:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl genrsa -out store/sub1/ca.key <span class="m">4096</span>
+<span class="gp">$</span> chmod <span class="m">600</span> store/sub1/ca.key
+<span class="gp">$</span> openssl req -new -config ssl.conf -key store/sub1/ca.key -out store/csr/inter1.csr
+<span class="gp">$</span> openssl ca -config ssl.conf -batch -notext -extensions e_inter -create_serial <span class="se">\</span>
+   -out store/sub1/ca.crt -infiles store/csr/inter1.csr
 </pre></div>
 </div>
 <p>Hay dos diferencias respecto al certificado raíz:</p>
 <ul class="simple">
 <li><p>La clave privada de este certificado no la cifraremos por comodidad (falta
 la opción <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">aes256</kbd></kbd>), porque será el que usemos para cifrar todos los
-certificados de usuario.</p></li>
-<li><p>Cambia el modo en que se genera el certificado (orden tercera) para
-firmarlo con el certificado raíz.</p></li>
+certificados de usuario. Obviamente, sería más conveniente sí cifrarla.</p></li>
+<li><p>Cambia la orden para generar el certificado, a fin de que usemos el
+certificado raíz para firmarlo.</p></li>
 </ul>
+<p>Una vez generado el certificado intermedio, como nuestra intención es usarlo
+para generar los certificados de usuario, cambiamos de directorio de trabajo
+y hacemos que <code class="file docutils literal notranslate"><span class="pre">sub1</span></code> haga el papel de <code class="file docutils literal notranslate"><span class="pre">store</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> <span class="nb">cd</span> store
+<span class="gp">$</span> ln -s store sub1
+</pre></div>
+</div>
 </dd>
-<dt><strong>Certificado personal</strong></dt><dd><p>Se cifra con el certificado intermedio:</p>
+<dt><strong>Certificado personal</strong></dt><dd><p>Al haber cambiado de directorio de trabajo, el certificado de la <abbr title="Certification Authority">CA</abbr>
+firmante, será el de la subordinada:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl genrsa -aes256 -out store/keys/<span class="k">$(</span>cat store/serial<span class="k">)</span>.key <span class="m">2048</span>
-<span class="gp">$</span> openssl req -new -config ssl.conf -key store/keys/<span class="k">$(</span>cat store/serial<span class="k">)</span>.key -out store/csr/<span class="k">$(</span>cat store/serial<span class="k">)</span>.csr <span class="se">\</span>
+<span class="gp">$</span> openssl req -new -config ../ssl.conf -key store/keys/<span class="k">$(</span>cat store/serial<span class="k">)</span>.key -out store/csr/<span class="k">$(</span>cat store/serial<span class="k">)</span>.csr <span class="se">\</span>
    -subj<span class="o">=</span><span class="s2">&quot;/C=ES/GN=MI NOMBRE/SN=MIS APELLIDOS/CN=APELLIDOS NOMBRE/emailAddress=midir@ecci.on&quot;</span>
-<span class="gp">$</span> openssl ca -config ssl.conf -batch -notext -extensions e_personal -infiles store/csr/<span class="k">$(</span>cat store/serial<span class="k">)</span>.csr
+<span class="gp">$</span> openssl ca -config ../ssl.conf -batch -notext -extensions e_personal -infiles store/csr/<span class="k">$(</span>cat store/serial<span class="k">)</span>.csr
 </pre></div>
 </div>
 <p>Obsérvese que:</p>
 <ul class="simple">
 <li><p>En vez de introducir de forma interactiva los datos para generar el
 «Subject», lo incluimos como parámetro en la orden que genera la solicitud.</p></li>
-<li><p>Utilizamos la suborden <strong class="command">ca</strong>, en vez de <strong class="command">x509</strong>, porque
-el archivo de configuración está preparado para utilizar el certificado
-intermedio como firmante y con él se irá incrementando automáticamente el
-número de serie (<code class="file docutils literal notranslate"><span class="pre">store/serial</span></code>) según se vayan creando nuevos certificados
-y, además, se creará un índice que lista todos los certificados creados
-(<code class="file docutils literal notranslate"><span class="pre">store/index.txt</span></code>).</p></li>
+<li><p>Volvemos a utilizar la suborden <strong class="command">ca</strong>, pero en esta ocasión no
+especificamos el certificado de salida. Esto tiene el efecto de generarnos
+el certificado con el nombre del identificador de serie (el <strong>1000</strong> en un
+comienzo) y, además, de crear un nuevo identificador (el <strong>1001</strong>) sin
+necesidad de incluir la opción <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">create_serial</kbd></kbd>. Además, se creará un
+índice que lista todos los certificados creados (<code class="file docutils literal notranslate"><span class="pre">store/index.txt</span></code>).</p></li>
 </ul>
 </dd>
-<dt><strong>Certificado de servidor</strong></dt><dd><p>La generación es semejante al de un certificado personal:</p>
+<dt><strong>Certificado de servidor</strong></dt><dd><p>Utilizaremos la misma <abbr title="Certification Authority">CA</abbr> subordinada, aunque también podríamos generar una
+distinta y dedicar una a los certificados de usuario, y otra a los de
+servidor. La generación, en cualquier caso, es semejante al de un
+certificado personal:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl genrsa -out store/keys/<span class="k">$(</span>cat store/serial<span class="k">)</span>.key <span class="m">2048</span>
-<span class="gp">$</span> openssl req -new -key store/keys/<span class="k">$(</span>cat store/serial<span class="k">)</span>.key -out store/csr/<span class="k">$(</span>cat store/serial<span class="k">)</span>.csr <span class="se">\</span>
+<span class="gp">$</span> openssl req -new -config ../ssl.conf -key store/keys/<span class="k">$(</span>cat store/serial<span class="k">)</span>.key -out store/csr/<span class="k">$(</span>cat store/serial<span class="k">)</span>.csr <span class="se">\</span>
    -subj<span class="o">=</span><span class="s2">&quot;/CN=www.example.net&quot;</span> -addext <span class="s2">&quot;subjectAltName=DNS:www.example.net,DNS:alt.example.net&quot;</span>
-<span class="gp">$</span> openssl ca -config ssl.conf -batch -notext -extensions e_server -infiles store/csr/<span class="k">$(</span>cat store/serial<span class="k">)</span>.csr
+<span class="gp">$</span> openssl ca -config ../ssl.conf -batch -notext -extensions e_server -infiles store/csr/<span class="k">$(</span>cat store/serial<span class="k">)</span>.csr
 </pre></div>
 </div>
 <p>aunque:</p>
@@ -851,7 +881,51 @@ y, además, se creará un índice que lista todos los certificados creados
 solicitud (de ahí que luego necesitemos copiarla al generar el certificado<a class="footnote-reference brackets" href="#id22" id="id10">9</a>).</p></li>
 </ul>
 </dd>
+<dt><strong>Revocación</strong></dt><dd><p>Del modo ilustrado podemos seguir generando más certificados de usuario. Si
+generados los dos anteriores, comprobamos el archivo <code class="file docutils literal notranslate"><span class="pre">index.txt</span></code> que
+lista los certificados generados por la <abbr title="Certification Authority">CA</abbr> subordinada obtendremos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> cat store/index.txt
+<span class="go">V  220317174209Z                 1000    unknown /C=ES/SN=APELLIDOS/GN=NOMBRE/CN=APELLIDOS NOMBRE/emailAddress=midir@ecci.on</span>
+<span class="go">V  220317174342Z                 1001    unknown /CN=www.example.net</span>
+</pre></div>
+</div>
+<p>esto es, la lista de los certificados generados. Para revocar el primero de
+ellos podemos hacer:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl ca -config ../ssl.cnf -revoke store/newcerts/1001.pem -crl_reason keyCompromise
+</pre></div>
+</div>
+<p>lo cual provoca:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> cat store/index.txt
+<span class="go">V  220317174209Z                              1000    unknown /C=ES/SN=APELLIDOS/GN=NOMBRE/CN=APELLIDOS NOMBRE/emailAddress=midir@ecci.on</span>
+<span class="go">R  220317174342Z  210317175803Z,keyCompromise 1001    unknown /CN=www.example.net</span>
+</pre></div>
+</div>
+<p>Podríamos generar la <abbr title="Certificate Revocation List">CRL</abbr>, aunque antes debemos generar
+<code class="file docutils literal notranslate"><span class="pre">store/crlnumber</span></code> (que cumple un papel semejante a <code class="file docutils literal notranslate"><span class="pre">store/serial</span></code>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> <span class="nb">echo</span> <span class="m">1000</span> &gt; store/crlnumber
+<span class="gp">$</span> openssl ca -config ../ssl.conf -gencrl -out store/crl/<span class="k">$(</span>cat store/crlnumber<span class="k">)</span>.crl
+</pre></div>
+</div>
+<p>Esto generará <code class="file docutils literal notranslate"><span class="pre">store/crl/1000.crl</span></code> que contiene la lista de
+certificados revocados:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl crl -in store/crl/1000.crl -text -noout
+<span class="go">[...]</span>
+<span class="go">Revoked Certificates:</span>
+<span class="go">    Serial Number: 1001</span>
+<span class="go">        Revocation Date: Mar 17 17:58:03 2021 GMT</span>
+<span class="go">        CRL entry extensions:</span>
+<span class="go">            X509v3 CRL Reason Code:</span>
+<span class="go">                Key Compromise</span>
+<span class="go">[...]</span>
+</pre></div>
+</div>
+</dd>
 </dl>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p><a class="reference external" href="https://sourceforge.net/projects/gnomint/">GnoMint</a> permite
+gestiornar gráficamente una infraestructura <abbr title="Public Key Infraestructure">PKI</abbr>.</p>
+</div>
 </div>
 <div class="section" id="catalogo-de-certificados">
 <span id="catalogo-cert"></span><h2><span class="section-number">9.1.3.1.8. </span>Catálogo de certificados<a class="headerlink" href="#catalogo-de-certificados" title="Enlazar permanentemente con este título">¶</a></h2>

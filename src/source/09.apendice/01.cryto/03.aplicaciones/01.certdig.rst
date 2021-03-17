@@ -496,9 +496,17 @@ el servicio |OCSP|::
 Verificación
 ============
 :command:`openssl` proporciona la suborden ``verify`` para verificar la validez
-de un certificado en lo referente a las fechas y a la firma de la |CA|. Aún, sin
-embargo, faltaría comprobar si el certificado está revocado para lo cual hay que
-consultar a la propia |CA| a través de |OCSP|.
+de un certificado en lo referente a las fechas y a la cadena de confianza de las |CA|.
+Aún, sin embargo, el certificado puede ser invalido por haberse revocado. Por
+ello, las |CA| mantienen una listas de revocación (|CRL| por sus siglas en
+inglés), donde se registran los números de serie de los certificados que han sido revocados y en qué
+momento se ha realizado tal operación. En consecuencia, cuando se verifica un
+certificado también ha de comprobarse si éste está incluido en la |CRL|.
+
+Como verificar la revocación mediante |CRL| exige descargar la lista y 
+tiene que estar actualizada, existe el protocolo |OCSP| que permite consultar
+directamente a la propia |CA| si el certficado está revocado. Esta es la
+operación que pretendemos ilustrar bajo este epígrafe.
 
 Supongamos que tenemos el certificado :file:`CERTIFICADO.pem` del epígrafe
 anterior emitido por `Let's Encrypt`_, la orden::
@@ -626,6 +634,7 @@ cuáles serán los campos de extensión que deben contener los certificados.
 Preparemos el directorio de trabajo::
 
 $ mkdir -p store/{{new,}certs,crl,keys,csr}
+$ chmod 700 store/keys
 $ echo 1000 > store/serial
 $ touch store/index.txt
 
@@ -635,6 +644,7 @@ Empecemos pues:
    Tiene la particularidad de que estará autofirmado::
 
       $ openssl genrsa -aes256 -out store/ca.key 4096
+      $ chmod 600 store/ca.key
       $ openssl req -new -config ssl.conf -key store/ca.key -out store/csr/ca.csr
       $ openssl x509 -req -sha256 -in store/csr/ca.csr -signkey store/ca.key \
           -days 3650 -extfile ssl.conf -extensions e_ca -out store/ca.crt
@@ -654,47 +664,71 @@ Empecemos pues:
       certificados para una |CA| intermedia subordinada.
 
 **Certificado intermedio**
-   Este certificado debe estar firmado con el certificado anterior::
+   Para esta |CA| subordinada crearemos su propia estructura de directorios,
+   análoga a la anterior::
 
-      $ openssl genrsa -out store/inter.key 4096
-      $ openssl req -new -config ssl.conf -key store/inter.key -out store/csr/inter.csr
-      $ openssl x509 -req -sha256 -in store/csr/inter.csr -CA store/ca.crt -CAkey store/ca.key \
-          -CAcreateserial -days 3650 -extfile ssl.conf -extensions e_inter -out store/inter.crt
+      $ mkdir -p store/sub1/{{new,}certs,crl,keys,csr}
+      $ chmod 700 store/sub1/keys
+      $ echo 1000 > store/sub1/serial
+      $ touch store/sub1/index.txt
+
+   Y, manteniendo el directorio de trabajo, generamos el certificado de la
+   subordinada::
+
+      $ openssl genrsa -out store/sub1/ca.key 4096
+      $ chmod 600 store/sub1/ca.key
+      $ openssl req -new -config ssl.conf -key store/sub1/ca.key -out store/csr/inter1.csr
+      $ openssl ca -config ssl.conf -batch -notext -extensions e_inter -create_serial \
+         -out store/sub1/ca.crt -infiles store/csr/inter1.csr
+
+   .. openssl x509 -req -sha256 -in store/csr/inter.csr -CA store/ca.crt -CAkey store/ca.key \
+       -CAcreateserial -days 3650 -extfile ssl.conf -extensions e_inter -out store/inter.crt
 
    Hay dos diferencias respecto al certificado raíz:
 
    + La clave privada de este certificado no la cifraremos por comodidad (falta
      la opción :kbd:`-aes256`), porque será el que usemos para cifrar todos los
-     certificados de usuario.
-   + Cambia el modo en que se genera el certificado (orden tercera) para
-     firmarlo con el certificado raíz.
+     certificados de usuario. Obviamente, sería más conveniente sí cifrarla.
+   + Cambia la orden para generar el certificado, a fin de que usemos el
+     certificado raíz para firmarlo.
+
+   Una vez generado el certificado intermedio, como nuestra intención es usarlo
+   para generar los certificados de usuario, cambiamos de directorio de trabajo
+   y hacemos que :file:`sub1` haga el papel de :file:`store`::
+
+      $ cd store
+      $ ln -s store sub1
 
 **Certificado personal**
-   Se cifra con el certificado intermedio::
+   Al haber cambiado de directorio de trabajo, el certificado de la |CA|
+   firmante, será el de la subordinada::
 
       $ openssl genrsa -aes256 -out store/keys/$(cat store/serial).key 2048
-      $ openssl req -new -config ssl.conf -key store/keys/$(cat store/serial).key -out store/csr/$(cat store/serial).csr \
+      $ openssl req -new -config ../ssl.conf -key store/keys/$(cat store/serial).key -out store/csr/$(cat store/serial).csr \
          -subj="/C=ES/GN=MI NOMBRE/SN=MIS APELLIDOS/CN=APELLIDOS NOMBRE/emailAddress=midir@ecci.on"
-      $ openssl ca -config ssl.conf -batch -notext -extensions e_personal -infiles store/csr/$(cat store/serial).csr
+      $ openssl ca -config ../ssl.conf -batch -notext -extensions e_personal -infiles store/csr/$(cat store/serial).csr
 
    Obsérvese que:
 
    * En vez de introducir de forma interactiva los datos para generar el
      "Subject", lo incluimos como parámetro en la orden que genera la solicitud.
-   * Utilizamos la suborden :command:`ca`, en vez de :command:`x509`, porque
-     el archivo de configuración está preparado para utilizar el certificado
-     intermedio como firmante y con él se irá incrementando automáticamente el
-     número de serie (:file:`store/serial`) según se vayan creando nuevos certificados
-     y, además, se creará un índice que lista todos los certificados creados
-     (:file:`store/index.txt`).
+   * Volvemos a utilizar la suborden :command:`ca`, pero en esta ocasión no
+     especificamos el certificado de salida. Esto tiene el efecto de generarnos
+     el certificado con el nombre del identificador de serie (el **1000** en un
+     comienzo) y, además, de crear un nuevo identificador (el **1001**) sin
+     necesidad de incluir la opción :kbd:`-create_serial`. Además, se creará un
+     índice que lista todos los certificados creados (:file:`store/index.txt`).
 
 **Certificado de servidor**
-   La generación es semejante al de un certificado personal::
+   Utilizaremos la misma |CA| subordinada, aunque también podríamos generar una
+   distinta y dedicar una a los certificados de usuario, y otra a los de
+   servidor. La generación, en cualquier caso, es semejante al de un
+   certificado personal::
 
       $ openssl genrsa -out store/keys/$(cat store/serial).key 2048
-      $ openssl req -new -key store/keys/$(cat store/serial).key -out store/csr/$(cat store/serial).csr \
+      $ openssl req -new -config ../ssl.conf -key store/keys/$(cat store/serial).key -out store/csr/$(cat store/serial).csr \
          -subj="/CN=www.example.net" -addext "subjectAltName=DNS:www.example.net,DNS:alt.example.net"
-      $ openssl ca -config ssl.conf -batch -notext -extensions e_server -infiles store/csr/$(cat store/serial).csr
+      $ openssl ca -config ../ssl.conf -batch -notext -extensions e_server -infiles store/csr/$(cat store/serial).csr
 
    aunque:
 
@@ -702,6 +736,50 @@ Empecemos pues:
    * Incluimos los nombres alternativos para el certificado en la orden de
      solicitud (de ahí que luego necesitemos copiarla al generar el certificado\
      [#]_).
+
+**Revocación**
+   Del modo ilustrado podemos seguir generando más certificados de usuario. Si
+   generados los dos anteriores, comprobamos el archivo :file:`index.txt` que
+   lista los certificados generados por la |CA| subordinada obtendremos::
+
+      $ cat store/index.txt
+      V  220317174209Z                 1000    unknown /C=ES/SN=APELLIDOS/GN=NOMBRE/CN=APELLIDOS NOMBRE/emailAddress=midir@ecci.on
+      V  220317174342Z                 1001    unknown /CN=www.example.net
+
+   esto es, la lista de los certificados generados. Para revocar el primero de
+   ellos podemos hacer::
+
+      $ openssl ca -config ../ssl.cnf -revoke store/newcerts/1001.pem -crl_reason keyCompromise
+
+   lo cual provoca::
+
+      $ cat store/index.txt
+      V  220317174209Z                              1000    unknown /C=ES/SN=APELLIDOS/GN=NOMBRE/CN=APELLIDOS NOMBRE/emailAddress=midir@ecci.on
+      R  220317174342Z  210317175803Z,keyCompromise 1001    unknown /CN=www.example.net
+
+   Podríamos generar la |CRL|, aunque antes debemos generar
+   :file:`store/crlnumber` (que cumple un papel semejante a :file:`store/serial`)::
+
+      $ echo 1000 > store/crlnumber
+      $ openssl ca -config ../ssl.conf -gencrl -out store/crl/$(cat store/crlnumber).crl
+
+   Esto generará :file:`store/crl/1000.crl` que contiene la lista de
+   certificados revocados::
+
+      $ openssl crl -in store/crl/1000.crl -text -noout
+      [...]
+      Revoked Certificates:
+          Serial Number: 1001
+              Revocation Date: Mar 17 17:58:03 2021 GMT
+              CRL entry extensions:
+                  X509v3 CRL Reason Code: 
+                      Key Compromise
+      [...]
+
+.. note:: `GnoMint <https://sourceforge.net/projects/gnomint/>`_ permite
+   gestiornar gráficamente una infraestructura |PKI|.
+
+.. gnomint ---> Certificados gráficos con Linux.
 
 .. _catalogo-cert:
 
@@ -905,6 +983,7 @@ Presentan, no obstante, algunas diferencias:
 .. |GnuPG| replace:: :abbr:`GnuPG (GNU Provacy Guard)`
 .. |PKI| replace:: :abbr:`PKI (Public Key Infraestructure)`
 .. |PGP| replace:: :abbr:`PGP (Pretty Good Privacy)`
+.. |CRL| replace:: :abbr:`CRL (Certificate Revocation List)`
 
 .. _Digital Signature Trust: https://www.identrust.com/
 .. _Let's Encrypt: https://letsencrypt.org/
