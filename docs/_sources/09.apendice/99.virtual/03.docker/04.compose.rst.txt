@@ -93,7 +93,7 @@ y una configuración del servidor que nos permita ejecutar |PHP|:
 .. note:: Obsérvese que para conectar el servidor web con el intérprete de
    |PHP|, se utiliza como nombre de máquina *php*. Esto es debido a que la
    dirección |IP| de cada máquina es resoluble utilizando el nombre de servicio
-   que se le ha asignada.
+   que se le ha asignado.
 
 El directorio :file:`webapp` es el directorio donde se almacenará la aplicación
 |PHP|. Nos limitaremos a utilizar el típico ejemplo::
@@ -122,12 +122,43 @@ Y, por último, el :file:`docker-compose.yaml`:
        depends_on:
          - php
 
+.. note:: Nótese que la primera imagen se obtiene directamente del repositorio
+   gracias a la directiva `image
+   <https://docs.docker.com/compose/compose-file/compose-file-v3/#image>`_. Al
+   indicar sólo su nombre y entiqueta, se obtendrá del registro predefinido. No
+   obstante, puede usarse:
+
+   .. code-block:: yaml
+
+      image: docker.io/php:fpm-alpine
+
+   La segunda, en cambio, añade la directiva `build
+   <https://docs.docker.com/compose/compose-file/compose-file-v3/#build>`_. Esto
+   significa que la imagen no se descarga sino que se construye a partir de la
+   configuración que se encuentre en el directorio especificado. Además de un
+   directorio local se puede especificar la |URL| de un repositorio de GitHub_:
+   
+   .. code-block:: yaml
+
+      build: https://github.com/miusuario/repositorio.git
+
+   En este caso, :kbd:`image` sirve únicamente para darle nombre a la imagen
+   construida.
+
 Para poner en funcionamiento ambos contenedores basta con encontrarse en el
 directorio :file:`nginx+php` y ejecutar\ [#]_::
 
    # docker-compose up -d
 
-Podemos finalizar la ejecución de ambos contenedores con::
+Podemos parar la ejecución de ambos contenedores con::
+
+   # docker-compose stop 
+
+los cuales quedará listos para una ejecución posterior con::
+
+   # docker-compose start
+
+En cambio, si queremos deshacernos de los contenedores tenemos que hacer::
 
    # docker-compose down
 
@@ -137,6 +168,57 @@ generar\ [#]_, aunque cambién los :file:`Dockerfile` correspondientes, a menos
 que específicamente se indique al levantar los servicios::
 
    # docker-compose up --build -d
+
+Sólo hemos definido la sección *services*, pero si es necesario crear volúmenes
+de datos, podremos añadir otra sección:
+
+.. code-block:: yaml
+
+   volumes:
+      socket:
+
+y haber hecho referencia a este volumen en uno de los servicios:
+
+.. code-block:: yaml
+
+   services:
+     php:
+       image: php:fpm-alpine
+       volumes:
+         - ./webapp:/srv/www
+         - socket: /var/run/php-fpm
+
+Por otro lado, no hemos establecido ninguna regla sobre la red de ambos
+contenedores.  Por defecto, :command:`docker-compose` crea una red de usuario de
+tipo *bridge* (de ahí que los nombres de las máquinas sean resolubles).
+
+Sin embargo podríamos haber redefinido la red que se crea por defecto añadiendo
+otra sección principal (al nivel de *services* o *volumes*):
+
+.. code-block:: yaml
+
+   networks:
+      default:
+         driver: bridge
+         ipam:
+            driver: default
+            config:
+               - subnet: 172.22.0.0/16
+
+La red es la red predeterminada porque la hemos llamado "default". Podríamos
+haberle dado otro nombre (p.e. "mired") y haber especificado en los servicios
+que esa era la red que usan:
+
+.. code-block:: yaml
+
+   services:
+     php:
+       image: php:fpm-alpine
+       volumes:
+         - ./webapp:/srv/www
+         - socket: /var/run/php-fpm
+       networks:
+         - mired
 
 .. rubric:: Notas al pie
 
@@ -159,5 +241,7 @@ que específicamente se indique al levantar los servicios::
 .. |YAML| replace:: :abbr:`YAML (YAML Ain't Markup Language)`
 .. |PHP| replace:: :abbr:`PHP (PHP HyperText Preprocessor)`
 .. |FPM| replace:: :abbr:`FPM (FastCGI Process Manager)`
+.. |URL| replace:: :abbr:`URL (Uniform Resource Locator)`
 
 .. _Docker Hub: https://hub.docker.com
+.. _GitHub: https://github.com

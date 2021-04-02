@@ -14,6 +14,11 @@ Para ello necesitamos:
   exportar la imagen desde nuestro repositorio local. Lo más sencillo es usar
   una cuenta gratuita en el propio `Docker Hub`_
 
+  .. note:: Alternativamente, se puede funcionar sin registro creando localmente
+     archivos :ref:`tar <tar>` con las imágenes usando :manpage:`docker-save` e
+     importar tales archivos con :manpage:`docker-load`. La distribución de las
+     imáegnes, no obstante, se complica mucho.
+
 - Generar en sí la imagen para lo cual hay dos vías:
 
   + Convertir en imagen un contenedor.
@@ -188,7 +193,59 @@ la generada por la directiva :kbd:`RUN` y la generada por la directiva
    las acciones en múltiples directivas :kbd:`RUN` y solo al final minimizar el
    número de capas.
 
-Hay otras directivas interesantes que puede incluir un :file:`Dockerfile`:
+Las principales directivas que contiene un archivo :manpage:`Dockerfile` son las
+siguientes:
+
+.. code-block:: docker
+
+   # Preámbulo
+   FROM      imagenbase
+   ARG       VERSION=3.9
+   ARG       PASSWORD
+   LABEL     clave1=valor1 clave2="valor 2"
+   LABEL     clave3=valor3
+
+   # Construcción
+   RUN       ordenes...
+   WORKDIR   directorio/de/trabajo/en/la/construccion
+   COPY      anfitrion/archivo http://servidor/archivo contenedor/directorio/
+   ADD       semejante a copy, pero desempaqueta si el archivo es un paquete.
+
+   # Compartición
+   EXPOSE    80/tcp 443/tcp
+   VOLUME    /tmp
+
+   # Ejecución
+   USER        www-data
+   ENV         DEBUG=True
+   ENTRYPOINT  ["orden", "param1", "param2"]
+   CMD         ["param3", "param4"]
+
+:kbd:`ARG`
+   Permite definir variables para tiempo de compilación (:ref:`docker build
+   <docker-build>`) que pueden usarse en otras directivas: Si las variables
+   se pasan a través de la opción :kbd:`--build-arg` de :ref:`docker
+   build <docker-build>` se sobrescribirán los valores indicados en el archivo.
+   Por ejemplo\ [#]_:
+
+   .. code-block:: docker
+
+      ARG   VERSION
+      FROM  alpine${VERSION:+:$VERSION}
+
+   En este caso, la orden::
+
+      # docker build -t miusuario/alpine:propio .
+
+   usará la última versión de alpine_, puesto que no se ha especificado versión.
+   En cambio::
+
+      # docker build -t miusuario/nginx-test:v1v --build-arg VERSION=3.9 .
+
+   utilizará la versión *3.9*.
+
+:kbd:`WORKDIR`
+   Define cuál es el directorio de trabajo dentro del contenedor.
 
 :kbd:`VOLUME`
    permite definir :ref:`volúmenes anónimos <docker-volume>` que se crearán
@@ -210,9 +267,6 @@ Hay otras directivas interesantes que puede incluir un :file:`Dockerfile`:
       EXPOSE  80/tcp
       CMD     ["nginx", "-g", "daemon off;"]
 
-:kbd:`WORKDIR`
-   Define cuál es el directorio de trabajo dentro del contenedor.
-
 :kbd:`ENV`
    Permite definir variables de entorno. Por ejemplo:
 
@@ -220,19 +274,32 @@ Hay otras directivas interesantes que puede incluir un :file:`Dockerfile`:
 
       ENV   DEBUG=True
 
-:kbd:`ARG`
-   Permite definir variables que pueden usarse en otras directivas:
+:kbd:`ENTRYPOINT`
+   Define una orden (con argumentos si así se desea) que se eejcutará al
+   arrancar el contenedor. Esta orden no es sobrescrita por los argumentos
+   posicionales de :ref:`docker run <docker-run>`, sino que tales argumentos se
+   añaden a la definición de :kbd:`ENTRYPOINT`. Por ejemplo::
 
-   .. code-block:: docker
+   .. code-block::
 
-      ARG   VERSION=3.9
-      FROM  alpine${VERSION:+:$VERSION}
+      FROM alpine
+      ENTRYPOINT ["echo"]
 
-   Las variables también pueden definirse a través de la opción
-   :kbd:`--build-arg` de :kbd:`docker build`, que, además, tiene preferencia
-   sobre la directiva :kbd:`ARG`::
+   Indefectiblemente ejecutará :ref:`echo <echo>` al arrancar el contenedor::
 
-      # docker build -t miusuario/nginx-test:v1v --build-arg VERSION=3.10 .
+      $ docker build -t alpine:lorito .
+      $ docker run alpine:lorito Mensaje del contenedor
+      Mensaje del contenedor
+
+:kbd:`RUN`
+   Es semejante a :kbd:`ENTRYPOINT`, pero los argumentos de :ref:`docker run
+   <docker-run>` sobrescriben lo que se haya dispuesto en la directiva. Si
+   también se dispuso una directiva :kbd:`ENTRYPOINT`, se añade a la orden que
+   determina ésta.
+
+.. note:: *DockerHub* permite `asociar a una imagen un repositorio de GitHub
+   <https://docs.docker.com/docker-hub/builds/link-source/>`_ para que al
+   actualizar el repositorio, se regenere automáticamente la imagen.
 
 .. rubric:: Cnstrucción *multi-stage*
 
@@ -285,6 +352,10 @@ en Alpine_ que contiene y ejecuta nuestra aplicación compilada.
 .. [#] Mediante :kbd:`docker login` se puede especificar cuál es el servidor de
    registro, si este no es `Docker Hub`_.
 
+.. [#] :kbd:`FROM` debe ser la primera directiva, pero desde la `versión 17.05
+   <https://github.com/moby/moby/releases/tag/v17.05.0-ce>`_ es posible utilizar
+   antes :kbd:`ARG` para facilitar la versión de base que se usa al crear el
+   contenedor.
 
 .. _Docker Hub: https://hub.docker.com/
 .. _Alpine: https://alpinelinux.org/

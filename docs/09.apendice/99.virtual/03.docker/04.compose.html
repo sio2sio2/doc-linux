@@ -132,7 +132,7 @@ siguiente contenido:</p>
 <p>Obsérvese que para conectar el servidor web con el intérprete de
 <abbr title="PHP HyperText Preprocessor">PHP</abbr>, se utiliza como nombre de máquina <em>php</em>. Esto es debido a que la
 dirección <abbr title="Internet Protocol">IP</abbr> de cada máquina es resoluble utilizando el nombre de servicio
-que se le ha asignada.</p>
+que se le ha asignado.</p>
 </div>
 <p>El directorio <code class="file docutils literal notranslate"><span class="pre">webapp</span></code> es el directorio donde se almacenará la aplicación
 <abbr title="PHP HyperText Preprocessor">PHP</abbr>. Nos limitaremos a utilizar el típico ejemplo:</p>
@@ -159,12 +159,39 @@ que se le ha asignada.</p>
       <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">php</span>
 </pre></div>
 </div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Nótese que la primera imagen se obtiene directamente del repositorio
+gracias a la directiva <a class="reference external" href="https://docs.docker.com/compose/compose-file/compose-file-v3/#image">image</a>. Al
+indicar sólo su nombre y entiqueta, se obtendrá del registro predefinido. No
+obstante, puede usarse:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">image</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">docker.io/php:fpm-alpine</span>
+</pre></div>
+</div>
+<p>La segunda, en cambio, añade la directiva <a class="reference external" href="https://docs.docker.com/compose/compose-file/compose-file-v3/#build">build</a>. Esto
+significa que la imagen no se descarga sino que se construye a partir de la
+configuración que se encuentre en el directorio especificado. Además de un
+directorio local se puede especificar la <abbr title="Uniform Resource Locator">URL</abbr> de un repositorio de <a class="reference external" href="https://github.com">GitHub</a>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">build</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">https://github.com/miusuario/repositorio.git</span>
+</pre></div>
+</div>
+<p>En este caso, <kbd class="kbd docutils literal notranslate">image</kbd> sirve únicamente para darle nombre a la imagen
+construida.</p>
+</div>
 <p>Para poner en funcionamiento ambos contenedores basta con encontrarse en el
 directorio <code class="file docutils literal notranslate"><span class="pre">nginx+php</span></code> y ejecutar<a class="footnote-reference brackets" href="#id7" id="id3">3</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker-compose up -d
 </pre></div>
 </div>
-<p>Podemos finalizar la ejecución de ambos contenedores con:</p>
+<p>Podemos parar la ejecución de ambos contenedores con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker-compose stop
+</pre></div>
+</div>
+<p>los cuales quedará listos para una ejecución posterior con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker-compose start
+</pre></div>
+</div>
+<p>En cambio, si queremos deshacernos de los contenedores tenemos que hacer:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker-compose down
 </pre></div>
 </div>
@@ -173,6 +200,48 @@ No así, las imágenes que se hayan generado, que de hecho no se volverán a
 generar<a class="footnote-reference brackets" href="#id8" id="id4">4</a>, aunque cambién los <code class="file docutils literal notranslate"><span class="pre">Dockerfile</span></code> correspondientes, a menos
 que específicamente se indique al levantar los servicios:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker-compose up --build -d
+</pre></div>
+</div>
+<p>Sólo hemos definido la sección <em>services</em>, pero si es necesario crear volúmenes
+de datos, podremos añadir otra sección:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">volumes</span><span class="p">:</span>
+   <span class="nt">socket</span><span class="p">:</span>
+</pre></div>
+</div>
+<p>y haber hecho referencia a este volumen en uno de los servicios:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">services</span><span class="p">:</span>
+  <span class="nt">php</span><span class="p">:</span>
+    <span class="nt">image</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">php:fpm-alpine</span>
+    <span class="nt">volumes</span><span class="p">:</span>
+      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">./webapp:/srv/www</span>
+      <span class="p p-Indicator">-</span> <span class="nt">socket</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">/var/run/php-fpm</span>
+</pre></div>
+</div>
+<p>Por otro lado, no hemos establecido ninguna regla sobre la red de ambos
+contenedores.  Por defecto, <strong class="command">docker-compose</strong> crea una red de usuario de
+tipo <em>bridge</em> (de ahí que los nombres de las máquinas sean resolubles).</p>
+<p>Sin embargo podríamos haber redefinido la red que se crea por defecto añadiendo
+otra sección principal (al nivel de <em>services</em> o <em>volumes</em>):</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">networks</span><span class="p">:</span>
+   <span class="nt">default</span><span class="p">:</span>
+      <span class="nt">driver</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">bridge</span>
+      <span class="nt">ipam</span><span class="p">:</span>
+         <span class="nt">driver</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">default</span>
+         <span class="nt">config</span><span class="p">:</span>
+            <span class="p p-Indicator">-</span> <span class="nt">subnet</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">172.22.0.0/16</span>
+</pre></div>
+</div>
+<p>La red es la red predeterminada porque la hemos llamado «default». Podríamos
+haberle dado otro nombre (p.e. «mired») y haber especificado en los servicios
+que esa era la red que usan:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">services</span><span class="p">:</span>
+  <span class="nt">php</span><span class="p">:</span>
+    <span class="nt">image</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">php:fpm-alpine</span>
+    <span class="nt">volumes</span><span class="p">:</span>
+      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">./webapp:/srv/www</span>
+      <span class="p p-Indicator">-</span> <span class="nt">socket</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">/var/run/php-fpm</span>
+    <span class="nt">networks</span><span class="p">:</span>
+      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">mired</span>
 </pre></div>
 </div>
 <p class="rubric">Notas al pie</p>

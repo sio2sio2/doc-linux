@@ -177,7 +177,20 @@ audio :kbd:`tutorial.webm`, necesitamos una :download:`página html como ésta
 
 .. warning:: La página debe estar alojada en un servidor. Si intenta usarla
    cargándola como un fichero local en el navegador, le será imposible cargar el
-   vídeo y el audio.
+   vídeo y el audio. Ahora bien, dado que el vídeo nunca suele ser
+   excesivamente pesado, ya que el formato no es propiamente vídeo, se puede
+   incrustar como `dataURI <https://es.wikipedia.org/wiki/Esquema_de_URI_de_datos>`_:
+
+   .. code-block:: html
+
+      <asciinema-player src="data:text/plain;base64, CAST.EN.BASE64" title="Reproducción..."></asciinema-player>
+
+   donde :kbd:`CAST.EN.BASE64` es la salida de la orden::
+
+      $ base64 tutorial.cast
+
+   Desgraciadamente, el audio es normalmente excesivamente largo como para
+   incrustarlo análogamente en el propio |HTML|.
 
 .. rubric:: Notas al pie
 
@@ -211,3 +224,4 @@ audio :kbd:`tutorial.webm`, necesitamos una :download:`página html como ésta
 .. |CLI| replace:: :abbr:`CLI (Command Line Interface)`
 .. |JSON| replace:: :abbr:`JSON (JavaScript Object Notation)`
 .. |URL| replace:: :abbr:`URL (Uniform Resource Locator)`
+.. |HTML| replace:: :abbr:`HTML (HyperText Markup Language)`

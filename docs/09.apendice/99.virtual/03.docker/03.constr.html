@@ -57,12 +57,20 @@ propias o servicios preconfigurados. Esto implica generar nuestras propias
 imágenes para que terceros sean capaces de crear sus propios contenedores a
 partir de ellas.</p>
 <p>Para ello necesitamos:</p>
-<ul class="simple">
+<ul>
 <li><p>Un registro con el que poder hacer la distribución y <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate">docker</kbd> <kbd class="kbd docutils literal notranslate">push</kbd></kbd> para
 exportar la imagen desde nuestro repositorio local. Lo más sencillo es usar
-una cuenta gratuita en el propio <a class="reference external" href="https://hub.docker.com/">Docker Hub</a></p></li>
+una cuenta gratuita en el propio <a class="reference external" href="https://hub.docker.com/">Docker Hub</a></p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Alternativamente, se puede funcionar sin registro creando localmente
+archivos <a class="reference internal" href="../../../02.conbas/11.backup/02.empaquetado.html#tar"><span class="std std-ref">tar</span></a> con las imágenes usando <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/docker-save">docker-save</a></em> e
+importar tales archivos con <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/docker-load">docker-load</a></em>. La distribución de las
+imáegnes, no obstante, se complica mucho.</p>
+</div>
+</li>
 <li><p>Generar en sí la imagen para lo cual hay dos vías:</p>
-<ul>
+<ul class="simple">
 <li><p>Convertir en imagen un contenedor.</p></li>
 <li><p>La más apropiada que consiste en construir la imagen indicando a
 <strong class="program">Docker</strong> cómo llevarlo a cabo.</p></li>
@@ -108,7 +116,7 @@ momento de generar a partir de él la imagen y ponerle un nombre y un a etiqueta
 </div>
 <p>Obsérvese que hemos dado al contenedor el nombre <em>miusuario/nginx-test</em> donde
 «miusuario» es el usuario del que disponemos en <a class="reference external" href="https://hub.docker.com/">Docker Hub</a>.</p>
-<p id="docker-login"><span id="docker-push"></span>Finalmente, ya podemos subir la imagen al repositorio<a class="footnote-reference brackets" href="#id2" id="id1">1</a>:</p>
+<p id="docker-login"><span id="docker-push"></span>Finalmente, ya podemos subir la imagen al repositorio<a class="footnote-reference brackets" href="#id3" id="id1">1</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker login -u miusuario
 <span class="gp">#</span> docker push miusuario/nginx-srv:v1
 </pre></div>
@@ -221,8 +229,54 @@ lo que puede interesar durante la fase de desarrollo de la imagen, descomponer
 las acciones en múltiples directivas <kbd class="kbd docutils literal notranslate">RUN</kbd> y solo al final minimizar el
 número de capas.</p>
 </div>
-<p>Hay otras directivas interesantes que puede incluir un <code class="file docutils literal notranslate"><span class="pre">Dockerfile</span></code>:</p>
+<p>Las principales directivas que contiene un archivo <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/Dockerfile">Dockerfile</a></em> son las
+siguientes:</p>
+<div class="highlight-docker notranslate"><div class="highlight"><pre><span></span><span class="c"># Preámbulo</span>
+<span class="k">FROM</span>      <span class="s">imagenbase</span>
+<span class="k">ARG</span>       <span class="nv">VERSION</span><span class="o">=</span><span class="m">3</span>.9
+<span class="k">ARG</span>       PASSWORD
+<span class="k">LABEL</span>     <span class="nv">clave1</span><span class="o">=</span>valor1 <span class="nv">clave2</span><span class="o">=</span><span class="s2">&quot;valor 2&quot;</span>
+<span class="k">LABEL</span>     <span class="nv">clave3</span><span class="o">=</span>valor3
+
+<span class="c"># Construcción</span>
+<span class="k">RUN</span>       ordenes...
+<span class="k">WORKDIR</span><span class="s">   directorio/de/trabajo/en/la/construccion</span>
+<span class="k">COPY</span>      anfitrion/archivo http://servidor/archivo contenedor/directorio/
+<span class="k">ADD</span>       semejante a copy, pero desempaqueta si el archivo es un paquete.
+
+<span class="c"># Compartición</span>
+<span class="k">EXPOSE</span><span class="s">    80/tcp 443/tcp</span>
+<span class="k">VOLUME</span><span class="s">    /tmp</span>
+
+<span class="c"># Ejecución</span>
+<span class="k">USER</span><span class="s">        www-data</span>
+<span class="k">ENV</span>         <span class="nv">DEBUG</span><span class="o">=</span>True
+<span class="k">ENTRYPOINT</span>  <span class="p">[</span><span class="s2">&quot;orden&quot;</span><span class="p">,</span> <span class="s2">&quot;param1&quot;</span><span class="p">,</span> <span class="s2">&quot;param2&quot;</span><span class="p">]</span>
+<span class="k">CMD</span>         <span class="p">[</span><span class="s2">&quot;param3&quot;</span><span class="p">,</span> <span class="s2">&quot;param4&quot;</span><span class="p">]</span>
+</pre></div>
+</div>
 <dl>
+<dt><kbd class="kbd docutils literal notranslate">ARG</kbd></dt><dd><p>Permite definir variables para tiempo de compilación (<a class="reference internal" href="#docker-build"><span class="std std-ref">docker build</span></a>) que pueden usarse en otras directivas: Si las variables
+se pasan a través de la opción <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">build</kbd>-<kbd class="kbd docutils literal notranslate">arg</kbd></kbd> de <a class="reference internal" href="#docker-build"><span class="std std-ref">docker
+build</span></a> se sobrescribirán los valores indicados en el archivo.
+Por ejemplo<a class="footnote-reference brackets" href="#id4" id="id2">2</a>:</p>
+<div class="highlight-docker notranslate"><div class="highlight"><pre><span></span><span class="k">ARG</span>   VERSION
+<span class="k">FROM</span>  <span class="s">alpine${VERSION:+:$VERSION}</span>
+</pre></div>
+</div>
+<p>En este caso, la orden:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker build -t miusuario/alpine:propio .
+</pre></div>
+</div>
+<p>usará la última versión de <a class="reference external" href="https://alpinelinux.org/">alpine</a>, puesto que no se ha especificado versión.
+En cambio:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker build -t miusuario/nginx-test:v1v --build-arg <span class="nv">VERSION</span><span class="o">=</span><span class="m">3</span>.9 .
+</pre></div>
+</div>
+<p>utilizará la versión <em>3.9</em>.</p>
+</dd>
+<dt><kbd class="kbd docutils literal notranslate">WORKDIR</kbd></dt><dd><p>Define cuál es el directorio de trabajo dentro del contenedor.</p>
+</dd>
 <dt><kbd class="kbd docutils literal notranslate">VOLUME</kbd></dt><dd><p>permite definir <a class="reference internal" href="02.uso.html#docker-volume"><span class="std std-ref">volúmenes anónimos</span></a> que se crearán
 automáticamente al generar un contenedor a partir de la imagen sin que sea
 necesario declararlos con <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">v</kbd></kbd>. Por ejemplo, si hubiéramos querido hacer
@@ -241,26 +295,39 @@ permanentes los registros podríamos haber utilizado este <code class="file docu
 </pre></div>
 </div>
 </dd>
-<dt><kbd class="kbd docutils literal notranslate">WORKDIR</kbd></dt><dd><p>Define cuál es el directorio de trabajo dentro del contenedor.</p>
-</dd>
 <dt><kbd class="kbd docutils literal notranslate">ENV</kbd></dt><dd><p>Permite definir variables de entorno. Por ejemplo:</p>
 <div class="highlight-docker notranslate"><div class="highlight"><pre><span></span><span class="k">ENV</span>   <span class="nv">DEBUG</span><span class="o">=</span>True
 </pre></div>
 </div>
 </dd>
-<dt><kbd class="kbd docutils literal notranslate">ARG</kbd></dt><dd><p>Permite definir variables que pueden usarse en otras directivas:</p>
-<div class="highlight-docker notranslate"><div class="highlight"><pre><span></span><span class="k">ARG</span>   <span class="nv">VERSION</span><span class="o">=</span><span class="m">3</span>.9
-<span class="k">FROM</span>  <span class="s">alpine${VERSION:+:$VERSION}</span>
+<dt><kbd class="kbd docutils literal notranslate">ENTRYPOINT</kbd></dt><dd><p>Define una orden (con argumentos si así se desea) que se eejcutará al
+arrancar el contenedor. Esta orden no es sobrescrita por los argumentos
+posicionales de <a class="reference internal" href="02.uso.html#docker-run"><span class="std std-ref">docker run</span></a>, sino que tales argumentos se
+añaden a la definición de <kbd class="kbd docutils literal notranslate">ENTRYPOINT</kbd>. Por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">.. code-block::</span>
 </pre></div>
 </div>
-<p>Las variables también pueden definirse a través de la opción
-<kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">build</kbd>-<kbd class="kbd docutils literal notranslate">arg</kbd></kbd> de <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate">docker</kbd> <kbd class="kbd docutils literal notranslate">build</kbd></kbd>, que, además, tiene preferencia
-sobre la directiva <kbd class="kbd docutils literal notranslate">ARG</kbd>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> docker build -t miusuario/nginx-test:v1v --build-arg <span class="nv">VERSION</span><span class="o">=</span><span class="m">3</span>.10 .
+<blockquote>
+<div><p>FROM alpine
+ENTRYPOINT [«echo»]</p>
+</div></blockquote>
+<p>Indefectiblemente ejecutará <a class="reference internal" href="../../../02.conbas/01.preliminares/index.html#echo"><span class="std std-ref">echo</span></a> al arrancar el contenedor:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> docker build -t alpine:lorito .
+<span class="gp">$</span> docker run alpine:lorito Mensaje del contenedor
+<span class="go">Mensaje del contenedor</span>
 </pre></div>
 </div>
 </dd>
+<dt><kbd class="kbd docutils literal notranslate">RUN</kbd></dt><dd><p>Es semejante a <kbd class="kbd docutils literal notranslate">ENTRYPOINT</kbd>, pero los argumentos de <a class="reference internal" href="02.uso.html#docker-run"><span class="std std-ref">docker run</span></a> sobrescriben lo que se haya dispuesto en la directiva. Si
+también se dispuso una directiva <kbd class="kbd docutils literal notranslate">ENTRYPOINT</kbd>, se añade a la orden que
+determina ésta.</p>
+</dd>
 </dl>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p><em>DockerHub</em> permite <a class="reference external" href="https://docs.docker.com/docker-hub/builds/link-source/">asociar a una imagen un repositorio de GitHub</a> para que al
+actualizar el repositorio, se regenere automáticamente la imagen.</p>
+</div>
 <p class="rubric">Cnstrucción <em>multi-stage</em></p>
 <p>Hay por último un concepto bastante interesante que es el de la cosntrucción
 multistage de una <em>imagen</em> que se requiere cuando para crear una imagen
@@ -303,9 +370,14 @@ mundo»:</p>
 en <a class="reference external" href="https://alpinelinux.org/">Alpine</a> que contiene y ejecuta nuestra aplicación compilada.</p>
 <p class="rubric">Notas al pie</p>
 <dl class="footnote brackets">
-<dt class="label" id="id2"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dt class="label" id="id3"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
 <dd><p>Mediante <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate">docker</kbd> <kbd class="kbd docutils literal notranslate">login</kbd></kbd> se puede especificar cuál es el servidor de
 registro, si este no es <a class="reference external" href="https://hub.docker.com/">Docker Hub</a>.</p>
+</dd>
+<dt class="label" id="id4"><span class="brackets"><a class="fn-backref" href="#id2">2</a></span></dt>
+<dd><p><kbd class="kbd docutils literal notranslate">FROM</kbd> debe ser la primera directiva, pero desde la <a class="reference external" href="https://github.com/moby/moby/releases/tag/v17.05.0-ce">versión 17.05</a> es posible utilizar
+antes <kbd class="kbd docutils literal notranslate">ARG</kbd> para facilitar la versión de base que se usa al crear el
+contenedor.</p>
 </dd>
 </dl>
 </div>
