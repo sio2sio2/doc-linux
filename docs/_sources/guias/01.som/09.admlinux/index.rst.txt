@@ -58,6 +58,20 @@ relación de ejercicios:
 
 Monitorización
 ==============
+De modo superficial, debe referirse el :ref:`sistema tradicional de
+monitorización <rsyslog>` para dejar claro:
+
++ Que los eventos se registran.
++ Que hay distintos tipos de eventos.
++ Que tienen distinta importancia (nivel).
++ Que dentro de :file:`/var/log` hay un servicio que ofrece el sistema operativo
+  para que se apunten los eventos dependiendo de su naturaleza.
+
+  * :file:`auth.log` para los mensajes de autenticación.
+  * :file:`syslog` para todos los mensajes excepto los anteriores.
+
++ Que hay servicios que registran al margen del servicio anterior, pero suelen
+  apuntar también los eventos en archivos propios dentro de :file:`/var/log`.
 
 Gestión de procesos
 ===================
