@@ -466,39 +466,79 @@ modificar la forma en que se da la orden para lograr distintos fines.
       programa se ha cerrado. En bastantes programas interactivos la señal puede
       tener el efecto de un apagado suavve como *SIGTERM*, pero en los
       demonios, que como no son interactivos, no suelen ejecutarse en una
-      terminal, es común se interprete como que es necesario volver a leer la
+      terminal, es común que se interprete como que es necesario volver a leer la
       configuración y, en consecuencia, el programa no acabe. Por tanto, si
       nuestra intención es acabar un proceso de forma suave, es más recomendable
       la opción anterior.
 
    **SIGINT** (2)
-      Que equivale a :kbd:`Ctrl+C` y que realiza acaba taxativamente el proceso,
-      aunque éste puede no hacer caso a la señal.
+      Acaba taxativamente el proceso, aunque éste puede no hacer caso a la
+      señal. Equivale a :kbd:`Ctrl+C` sobre un proceso en primer plano.
 
    **SIGKILL** (9)
       Provoca el apagado obligatorio, por lo que, aunque tiene las mismas
       consecuencias de la señal anterior (puede quedar algo abierto), la señal
       no puede ser obviada por el proceso. 
 
-   Lo habitual, cuando se intenta acabar manualmente con un proceso, es intentar
-   el apagado suave (*SIGTERM*) y, si este no es posible, intentar el apagado
-   forzoso (*SIGKILL*). Por tanto, si quisiéramos acabar con los procesos de
-   |PID| 1037 y 1000, haríamos::
+      Lo habitual, cuando se intenta acabar manualmente con un proceso, es intentar
+      el apagado suave (*SIGTERM*) y, si este no es posible, intentar el apagado
+      forzoso (*SIGKILL*). Por tanto, si quisiéramos acabar con los procesos de
+      |PID| 1037 y 1000, haríamos::
 
-      $ kill 1897 1000
+         $ kill 1897 1000
 
-   o bien::
+      o bien::
 
-      $ kill -15 1897 1000
+         $ kill -15 1897 1000
 
-   que es lo mismo. Y, si esto no funciona, no tendremos más remedio que hacer::
+      que es lo mismo. Y, si esto no funciona, no tendremos más remedio que hacer::
 
-      $ kill -9 5675 6676
+         $ kill -9 5675 6676
 
-   .. note:: En ocasiones, es imposible acabar del todo con un proceso ni aun
-      con la señal ``SIGKILL`` (*9*). En estos casos, el proceso acaba en un estado
-      *zombi* por tiempo indefinido, que se nota con un **Z**\  al consultar el
-      proceso con :command:`ps`.
+      .. note:: En ocasiones, es imposible acabar del todo con un proceso ni aun
+         con la señal ``SIGKILL`` (*9*). En estos casos, el proceso acaba en un estado
+         *zombi* por tiempo indefinido, que se nota con un **Z**\  al consultar el
+         proceso con :command:`ps`.
+
+   **SIGTSTP** (20)
+      Suspende el proceso, esto es, lo deja en :ref:`estado "Suspendido"
+      <proc-status>` a la espera de que otra orden de usuario vuelva a ponerlo
+      en ejecución. Equivale a :kbd:`Ctrl+Z` sobre un proceso en primer plano.
+      
+   **SIGSTOP** (19)
+      Como el anterior, pero la parada es más agresiva. Es preferible la orden
+      anterior.
+
+   **SIGCONT** (18)
+      Reanima un proceso suspendido3
+
+   El uso de :command:`kill` es bastante sencillo::
+
+      $ kill -SEÑAL PID1 PID2 ...
+
+   o sea, se indica la señal y se indican la relación de |PID| correspondientes
+   a los procesos a los que se quiere enviar la señal. Para expresar la señal
+   podemos usar el número (p.e. **9**), su nombre (p.e. *SIGKILL*) o su nombre
+   abreviado (p.e. *KILL*).
+
+   .. warning:: :command:`kill` es una orden interna del intérprete, por lo que
+      depende de este. Usar el nombre completo (*SIGKILL*) funciona en la
+      versión de :command:`bash`, pero no en :command:`dash`
+
+   También es posible utilizar en vez del |PID| del proceso, su identificador de
+   trabajo en la sesión (véase :ref:`jobs <jobs>`), pero antecediéndolo con un
+   "%"::
+
+      $ sleep 1000 &
+      [1] 12699
+      $ jobs
+      [1]+  Ejecutando              sleep 1000 &
+      $ kill -TSTP 12699
+      $ jobs
+      [1]+  Detenido                sleep 1000
+      $ kill -CONT %1
+      $ jobs
+      [1]+  Ejecutando              sleep 1000 &
 
 .. _killall:
 .. index:: killall
@@ -531,7 +571,7 @@ una cuenta de 1 a 10 esperando un segundo entre número y número::
 .. index:: jobs
 
 :command:`jobs`
-   Permite consultar la lista de trabajos activos::
+   Permite consultar la lista de trabajos activos en la sesión actual::
 
       $ jobs
       [1]+  Detenido                ( for i in {1..10};
@@ -543,10 +583,11 @@ posibilidades: que mandemos que se ejecute en primer plano...
 .. index:: fg
 
 :command:`fg`
-   Manda una tarea a primer plano. Para referirse a ella se debe especificar
-   el número de trabajo que proporciona :command:`jobs`::
+   Manda una tarea a primer plano (y la activa en caso de que estuviera
+   suspendida). Para referirse a ella se debe especificar el número de trabajo
+   que proporciona :command:`jobs`::
 
-      $ fg 1
+      $ fg %1
       2
       3
       ...
@@ -562,7 +603,7 @@ o mandamos que se ejecute en segundo plano...
    Manda una tarea a segundo plano. Para referirse a ella se debe especificar el
    número de trabajo que proporciona :command:`jobs`::
 
-      $ bg 1
+      $ bg %1
 
 Es posible también ejecutar una tarea en segundo plano acabando la orden con un
 *&*::
@@ -571,12 +612,6 @@ Es posible también ejecutar una tarea en segundo plano acabando la orden con un
    [1] 15991
    $ jobs
    [1]+  Ejecutando              sleep 60 &
-
-Al ejecutar de esta forma se facilita el número de |PID|. Es posible usar el
-comando :command:`kill` para cancelar tareas usando el número de tarea, en vez
-de el *pid*::
-
-   $ kill %1
 
 .. _ej-procesos:
 
