@@ -37,6 +37,16 @@ la sesión (con :ref:`exit <exit>`, :ref:`logout <logout>` o cualquier otro
 método análogo), se parará la grabación. El resultado será el archivo
 :file:`tutorial.cast`.
 
+Es muy interesante la opción :kbd:`-i SECONDS` que convierte cualquier periodo
+de inactividad mayor a *SECONDS* en un tiempo de inactividad igual a *SECONDS*.
+De este modo, si la grabación se lleva a cabo así::
+
+   $ asciinema red -i 2 tutorial.cast
+
+Podemos hacer pausas por tiempo indefinido, mientras creamos el tutorial, si
+temor a que el vídeo se vuelva largo e insufrible: ninguna de esas pausas
+superará los dos minutos.
+
 .. note:: Si nuestra intención es acabar añadiéndole sonido por algún método que
    veremos más adelante, entonces deberemos a la vez que comezamos la grabación
    del vídeo, grabar nuestra voz con un micrófono y algún *software* apropiado.
@@ -67,8 +77,16 @@ Creado el vídeo, podemos probar su reproducción con::
 
 que debería reproducir fielmente lo que hicimos previamente. Si en algún momento
 pulsamos :kbd:`Space`, la reproducción se pausará y podremos volverla a reanudar
-pulsando la misma tecla. Sin embargo, esta posibilidad se queda un poco corta si
-lo que pretendemos es crear un tutorial para terceros.
+pulsando la misma tecla. Tambiés es posible alterar la velocidad de reproducción::
+
+   $ asciinema play -s 1.2 tutorial.cast
+
+lo cual aumentará en un 20% la velocidad a la que se reproduce el vídeo. Sea
+como sea, esta posibilidad de reproducción se queda un poco corta si lo que
+pretendemos es crear un tutorial para terceros.
+
+.. note:: La reproducción también dispone de la opción :kbd:`-i SECONDS`, pero
+   sólo será necesaria si queremos acortar las pausas y no la usamos al grabar.
 
 Publicación
 ===========
@@ -191,6 +209,10 @@ audio :kbd:`tutorial.webm`, necesitamos una :download:`página html como ésta
 
    Desgraciadamente, el audio es normalmente excesivamente largo como para
    incrustarlo análogamente en el propio |HTML|.
+
+.. note:: El elemento :kbd:`<asciinema-player>` pude incluir el atributo :kbd:`speed`
+   para modificar la velocidad de reproducción. Si se ha grabado vídeo, no obstante,
+   álterar la velocidad es un problema.
 
 .. rubric:: Notas al pie
 
