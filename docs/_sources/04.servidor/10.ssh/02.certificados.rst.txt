@@ -1,29 +1,46 @@
 .. _ssh-cert:
 
-Certificados de autenticación
-*****************************
-Los certificados digitales permiten tanto identificar al servidor frente al
-cliente, como al revés. En el primer caso, se usan siempre, ya que es la única
-forma que tiene el cliente de identificar al servidor; en el segundo, en cambio,
-el uso es opcional, ya que el cliente puede optar por usar una identificación
-basada en usuario y contraseña. Analicemos por separado ambos casos.
+*******************************
+Autenticación con clave pública
+*******************************
+Las técnicas de :ref:`cifrado asimétrico <asimetrico>` se usan en el protocolo
+|SSH| para la autenticación tanto de servidor como de cliente. En el caso del
+segundo, también es posible la autenticación con contraseña, que es justamente
+la que hemos visto hasta ahora.
+
+Cuando se usa autenticación con clave pública hay dos posibilidades:
+
++ Una solución basada exclusivamente en el uso de claves asimétricas
++ Otra que, sobre la base de la anterior, genera :ref:`certificados digitales
+  <cert-digital>` a partir de las claves privadas utilizando una
+  :ref:`infraestructura PKI <pki>`.
+
+Como para analizar la segunda solución es conveniente conocer la primera,
+analizaremos la primera y, sobre ella, expondremos la segunda.
+
+.. _ssh-auth-keys:
+
+Claves
+******
+Analicemos por separado cómo se identifica el servidor ante el cliente y cómo lo
+hace el cliente ante el servidor.
 
 Identificación del servidor
 ===========================
-Ya se ha mencionado al anteriormente que para evitar ataques *man-in-the-middle*
+Ya se ha mencionado anteriormente que para evitar ataques *man-in-the-middle*
 mediante la suplantación de la identidad del servidor, éste envía al cliente su
 clave pública. En la primera conexión aceptar la clave pública de un servidor es
 un acto de fe, a menos que se haya obtenido esa clave pública de algún modo
-seguro. Sea como sea, el cliente, por su parte, almacena las claves públicas de
-todos los servidores a los que se conecta, de modo que si se produce una segunda
-conexión compara la clave pública que le vuelve a enviar el servidor con la que
-previamente tiene almacenada. En realidad lo que compara es el *fingerprint* o
-huella dactilar de la clave pública, una sucesión de pares de números
-hexadecimales que se obtiene a partir de dicha: si coinciden, el cliente se
-fiará de que el servidor es quien dice ser; si no coinciden, entonces sospechará
-que hay una suplantación y, o bien avisará (caso de :program:`putty`), o bien,
-se negará en rotundo a conectar hasta que no se elimine del cliente la clave
-pública antigua (caso del cliente de *openssh*).
+seguro. Sea como sea, el cliente, por su parte, puede almacenar las claves
+públicas de todos los servidores a los que se conecta, de modo que si se produce
+una segunda conexión compara la clave pública que le vuelve a enviar el servidor
+con la que previamente tiene almacenada. En realidad lo que compara es el
+*fingerprint* o huella dactilar de la clave pública, una sucesión de pares de
+números hexadecimales que se obtiene a partir de ella: si coinciden, el cliente
+se fiará de que el servidor es quien dice ser; si no coinciden, entonces
+sospechará que hay una suplantación y, o bien avisará (caso de
+:program:`putty`), o bien, se negará en rotundo a conectar hasta que no se
+elimine del cliente la clave pública antigua (caso del cliente de *openssh*).
 
 Del párrafo anterior, hay dos ideas que es necesario remarcar y que se
 desglosarán bajo los siguientes epígrafes:
@@ -106,7 +123,7 @@ fichero :file:`~/.ssh/known_hosts`. Ahora bien::
    256 SHA256:vOef4Mo/0obxdDeS9iNIZ5+kQpMB+krMf9XTedRMUbE |1|l4/bYn6a2ImKN27oCuwD3wb9M8o=|b5i6kcIRct1K1U9EBVH4PgfoJJU= (ECDSA)
 
 si comprobamos los *fingerprints* almacenados no seremos capaces de saber a qué
-servidor corresponde tal *fingerprint*. Esto se hace así, por privacidad, esto
+servidor corresponde tal *fingerprint*. Esto se hace así por privacidad, esto
 es, por evitar que otros usuarios sean capaces de conocer a qué servidores nos
 conectamos\ [#]_. El comportamiento puede modificarse cambiando el valor de la
 directiva *HashKnownHosts* en la configuración del cliente. Por tanto, si
@@ -125,8 +142,8 @@ se almacenarán las direcciones en claro::
    256 SHA256:vOef4Mo/0obxdDeS9iNIZ5+kQpMB+krMf9XTedRMUbE servidor,192.168.1.11 (ECDSA)
 
 A partir de ahora, cada ve que se conecte a *servidor*, se confirmará que el
-*firgenprint* de la clave proporcionada por este coincide con la almacena. Si no
-es así, ocurrirá esto::
+*firgenprint* de la clave proporcionada por este coincide con la almacenada. Si
+no es así, ocurrirá esto::
 
    pepe@cliente$ ssh usuario@servidor
    @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
@@ -245,6 +262,54 @@ Quizás lo más sencillo es abrir una sesión de :program:`putty` y copiar
 contenido de la clave pública directamente sobre el fichero anterior, en vez de
 en un fichero cualquiera del cliente *windows*.
 
+.. _ssh-auth-certs:
+
+Certificados
+************
+La autenticación con claves presenta algunos inconvenientes\ [#]_:
+
++ Un cambio en la identidad del servidor (es decir, en las claves del servidor)
+  provoca un aviso de suplantación, porque los clientes han almacenando
+  la clave pública anterior del servidor y no concuerda con la nueva.
+
++ Si un cliente quiere autenticarse en varios servidores, deberá distribuir su
+  clave pública en todos ellos.
+
++ Las claves no tienen caducidad.
+
+Para subsanarlo, se puede echar mano de la creación de certificados a partir de
+las claves públicas que hemos visto en el epígrafe anterior. Estos certificados
+no son :ref:`certificados X.509 <X.509>`, como los usados en |SSL|, sino propios
+de |SSH|, y se generan utilizando nuestro ya conocido :ref:`ssh-keygen
+<ssh-keygen>`. 
+
+La idea es crear una |CA| que firme las claves públicas de clientes y servidores
+con objeto de crear los certificados:
+
+.. image:: files/CA-SSH.png
+
+Tal como se señala en el esquema se pueden tener dos parejas de claves:
+*CA_host* para firmar certificados de servidor y *CA_user* para firmar
+certificados de cliente:
+
+- Cualquier servidor remitirá su clave pública a la |CA| para obtener el
+  certificado correspondiente (como consecuencia de la firma con *CA_host*) y,
+  además, necesitará una copia de la clave pública *CA_user*, si quiere poder
+  autenticar clientes mediante certificado.
+
+- Cualquier cluiente remitirá su clave pública a la |CA| para obtener el
+  certificado correspondiente (como consecuencia de la firma con *CA_user*) y,
+  además, necesitará una copia de la clave pública *CA_host*, si quiere poder
+  identificar clientes meduabte certificado.
+
+.. note:: Por supuesto, las dos parejas de claves pueden ser la misma.
+
+Identificación del servidor
+===========================
+
+Identificación del cliente
+==========================
+
 .. rubric:: Notas al pie
 
 .. [#] Hasta la versión *7.0*, también existía una versión `DSA
@@ -271,3 +336,10 @@ en un fichero cualquiera del cliente *windows*.
 .. [#] Consúltese el apartado **TOKENS** de la página de manual de *ssh_config*
    para entender por qué ``%h`` se convierte en el nombre de la máquina remota
    (*servidor*).
+
+.. [#] Para leer una larga disscusión sobre los inconvenientes, puede echar un
+   ojo a `ester artículo de smallsetp
+   <https://smallstep.com/blog/use-ssh-certificates/>`_.
+
+.. |SSL| replace:: :abbr:`SSL (Secure Sockets Layer)`
+.. |CA| replace:: :abbr:`CA (Certification Authority)`
