@@ -22,7 +22,7 @@ Ejercicios sobre consulta y gestión de usuarios
 
 #. Crear un usuario *maria*, pero no crearle directorio personal.
 
-#. Añadir el usuario *donjose* a los grupos *floopy* y *audio*.
+#. Añadir el usuario *donjose* a los grupos *floppy* y *audio*.
 
 #. Borrar el usuario *maria*.
 
