@@ -54,14 +54,14 @@
 <p>En ocasiones, por ejemplo cuando se han habilitido mecanismos para restringir el
 acceso según el origen o se desea limitar el número de accesos, es imprescindible
 para los servidores conocer cuál es el cliente que lleva a cabo la petición. Sin
-embargo, un <em>proxy</em> inverso provoca que la peticion original del cliente se
-capture y se replique dirigiéndola al servidor y que, por tanto, sea en realidad
-el <em>proxy</em> el que está llevando a cabo la petición. En consecuencia, el servidor
-final sólo recibirá peticiones originadas por una única máquina (el <em>proxy</em>) y
-será incapaz de tomar decisiones en base al origen de la petición.</p>
+embargo, un <em>proxy</em> inverso recoibe la peticion original del cliente y la replique
+dirigiéndola al servidor por lo que la petición recibe el servidor
+la hace el <em>proxy</em> y no el cliente. En consecuencia, el servidor final sólo
+recibirá peticiones originadas por una única máquina (el <em>proxy</em>) y será
+incapaz de tomar decisiones en base al origen de la petición.</p>
 <p>Para paliar este problema existen dos soluciones:</p>
 <ul class="simple">
-<li><p>Que el protocolo de capa de aplicación articule un mecanismo para informar al
+<li><p>Que el protocolo de capa de aplicación articule algún mecanismo para informar al
 servidor final de que la petición se hacen a través de un <em>proxy</em> y de cuál
 es el cliente en realidad. Tal es el caso en <abbr title="HyperText Transfer Protocol">HTTP</abbr> de la cabecera
 <a class="reference internal" href="../../02.web/01.desc/03.cabecera.html#xforwardedfor"><span class="std std-ref">X-Forwarder-For</span></a>, gracias a la cual el servidor <em>web</em>
@@ -69,13 +69,15 @@ será capaz de saber cuál es en realidad el cliente, aunque la <abbr title="Int
 de los paquetes sea la del <em>proxy</em>, El tratamiento de esta cabecera en
 <a class="reference internal" href="../../02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a>, se lleva a cabo en <a class="reference internal" href="../../02.web/02.nginx/02.avanz/09.misc.html#nginx-tras-proxy"><span class="std std-ref">su epígrafe correspondiente</span></a>.</p></li>
 <li><p>La que nos ocupa que es hacer el <em>proxy</em> realmente <strong>transparente</strong>, esto es,
-que en los paquetes de la petición que replica la <abbr title="Internet Protocol">IP</abbr> de origen sea la del
-cliente y no la suya.</p></li>
+que en los paquetes de la petición que recibe el servidor fiunal, la <abbr title="Internet Protocol">IP</abbr> de
+origen sea la del cliente y no la del <em>proxy</em>.</p></li>
 </ul>
 <div class="section" id="requisitos">
 <span id="proxy-transparente-req"></span><h2><span class="section-number">7.5.2.3.2.1. </span>Requisitos<a class="headerlink" href="#requisitos" title="Enlazar permanentemente con este título">¶</a></h2>
 <p>Para hacer un transparente un <em>proxy</em> es necesario:</p>
 <ul class="simple">
+<li><p>Que los clientes comuniquen con el proxy (lo cual es lo que se espera
+si el proxy es inverso).</p></li>
 <li><p>Una configuración extra de la máquina en la que se ejecuta de forma
 transparente el <em>proxy</em>.</p></li>
 <li><p>Que las respuestas del servidor, que obviamente tendrán como destino el
@@ -84,10 +86,64 @@ despache hacia el cliente original. Así pues, el servidor final no puede estar
 dispuesto en cualquier lugar, sino en uno cuyo camino de regreso pase por el
 proxy.</p></li>
 </ul>
-<div class="admonition-todo admonition" id="id1">
-<p class="admonition-title">Por hacer</p>
-<p>Imagen explicativa.</p>
-</div>
+<p>Lustremnos lo dicho con un ejemplo:</p>
+<img alt="../../../_images/transparente.png" src="../../../_images/transparente.png" />
+<p>Las comunicaciones del esquema son las siguientes:</p>
+<table class="docutils align-default" id="id10">
+<caption><span class="caption-text">proxy-transparente</span><a class="headerlink" href="#id10" title="Enlace permanente a esta tabla">¶</a></caption>
+<colgroup>
+<col style="width: 9%" />
+<col style="width: 15%" />
+<col style="width: 15%" />
+<col style="width: 60%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Conexión</p></th>
+<th class="head"><p>Origen</p></th>
+<th class="head"><p>Destino</p></th>
+<th class="head"><p>Comentario</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><ol class="arabic simple">
+<li></li>
+</ol>
+</td>
+<td><p>213.10.11.12</p></td>
+<td><p>80.80.80.80</p></td>
+<td><p>El cliente conecta coon la <abbr title="Internet Protocol">IP</abbr> 80.80.80.80 que, en realidad,
+es el <em>proxy</em> y no el servidor final.</p></td>
+</tr>
+<tr class="row-odd"><td><ol class="arabic simple" start="2">
+<li></li>
+</ol>
+</td>
+<td><p>213.10.11.12</p></td>
+<td><p>192.168.255.10</p></td>
+<td><p>La <abbr title="Internet Protocol">IP</abbr> original no cambia porque el proxy es transparebte.</p></td>
+</tr>
+<tr class="row-even"><td><ol class="arabic simple" start="3">
+<li></li>
+</ol>
+</td>
+<td><p>192.168.255.10</p></td>
+<td><p>213.10.11.12</p></td>
+<td><p>El servidor responde al cliente, pero el proxy captura la
+respuesta, porque está situado en el camino de vuelta.</p></td>
+</tr>
+<tr class="row-odd"><td><ol class="arabic simple" start="4">
+<li></li>
+</ol>
+</td>
+<td><p>80.80.80.80</p></td>
+<td><p>213.10.11.12</p></td>
+<td><p>La respuesta acaba en el cliente.</p></td>
+</tr>
+</tbody>
+</table>
+<p>En consecuencia, aunque el cliente habla con el <em>proxy</em> y el <em>proxy</em> redirige la
+petición al servidor; el servidor recibe las peticiones como si estuviera
+hablando directamente con el cliente.</p>
 </div>
 <div class="section" id="solucion-general">
 <span id="proxy-transparente-sol-gen"></span><h2><span class="section-number">7.5.2.3.2.2. </span>Solución general<a class="headerlink" href="#solucion-general" title="Enlazar permanentemente con este título">¶</a></h2>
@@ -97,23 +153,19 @@ transparente, para lo cual se requiere:</p>
 <li><p>Que la aplicación <em>proxy</em> esté <strong>preparada para ello</strong> y utilice un <em>socket</em>
 transparente. Este requisito debe cumplirlo la aplicación, por lo que como
 administradores sólo podemos comprobar si es apta o no. Ahora bien, poder
-crear un <em>socket</em> transparente se le exige a la aplicación la capacidad (véase
+crear un <em>socket</em> transparente  exige a la aplicación la capacidad (véase
 <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/capabilities(7)">capabilities(7)</a></em>) <code class="docutils literal notranslate"><span class="pre">CAP_NET_ADMIN</span></code>. Esto puede lograrse:</p>
 <ul class="simple">
 <li><p>Ejecutando la aplicación como <em>root</em>.</p></li>
-<li><p>Conceder la capacidad al ejecutable (p.e. <a class="reference external" href="https://wiki.archlinux.org/index.php/Capabilities">vea cómo hacerlo</a>).</p></li>
+<li><p>Concediéndole tal capacidad al ejecutable (p.e. <a class="reference external" href="https://wiki.archlinux.org/index.php/Capabilities">vea cómo hacerlo</a>).</p></li>
 </ul>
 <p>Cómo se configure la aplicación para que pueda actuar transparentemente es
 particular de cada una: el siguiente epígrafe estará dedicado a la
 configuración de algunas.</p>
 </li>
-<li><p>Como el <em>proxy</em> debe interceptar también el tráfico de vuelta procedente del
-servidor final, <strong>debe encontrarse en el camino de regreso</strong>, ya que al no
-cambiar el <em>proxy</em> la <abbr title="Internet Protocol">IP</abbr> del cliente original, el servidor final intentará
-devolver la respuesta al cliente.</p>
-<p>Para cumplir con este requisito debemos escoger el lugar donde situar el
-<em>proxy</em>.</p>
-</li>
+<li><p>Como el tráfico de respuesta del servidor tiene por destino el cliente original
+y el <em>proxy</em> ha de interceptar también este tráfico, <strong>es forzoso que el proxy
+se interponga en el camnio de regreso</strong>.</p></li>
 <li><p>Finalmente, al pasar los paquetes de respuesta por el <em>proxy</em> éste debe
 procesarlos, aunque la <abbr title="Internet Protocol">IP</abbr> de destino sea la del cliente. Para ello debe
 <strong>manipularse el encaminamiento</strong>. Este es el único requisito que sí podemos
@@ -121,31 +173,17 @@ configurar de forma general y al que dedicaremos el resto del epígrafe.</p>
 <p>Para que los paquetes de respuesta dirigidos al cliente pasen por la aplicación
 de <em>proxy</em> debe lograrse que éstos se encaminen a través de la interfaz de
 <em>loopback</em>. Para ello:</p>
-<ol class="loweralpha">
-<li><p>Se indica al núcleo que haga posible el encaminamiento a través de la
-interfaz de <em>loopback</em><a class="footnote-reference brackets" href="#id6" id="id2">1</a>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> sysctl -w net.ipv4.conf.default.route_localnet<span class="o">=</span><span class="m">1</span>
-<span class="gp">#</span> sysctl -w net.ipv4.conf.all.route_localnet<span class="o">=</span><span class="m">1</span>
-</pre></div>
-</div>
-</li>
-<li><p>Se alteran las reglas de encaminamiento para que el tráfico marcado (con, por
-ejemplo, <em>0xff</em>) vaya a la interfaz de <em>loopback</em>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> ip rule add fwmark 0xff lookup <span class="m">100</span>
-<span class="gp">#</span> ip route add <span class="nb">local</span> <span class="m">0</span>.0.0.0/0 dev lo table <span class="m">100</span>
-</pre></div>
-</div>
-</li>
+<ol class="arabic">
 <li><p>Hacemos que el tráfico que debe volver a pasar por el <em>proxy</em> esté marcado
-con la marca anterior (la <em>0xff</em>), para lo cual podemos utilizar el
-cortafuegos. Cómo deba utilizarse el cortafuegos depende de si donde se
+con una marca (p.e. la <em>0xff</em>), para lo cual podemos utilizar el
+cortafuegos. Cómo deba utilizarse el cortafuegos depende de dónde se
 encuentre el servidor final:</p>
 <ol class="loweralpha">
-<li><p>Cuando está ien la misma máquina que el <em>proxy</em><a class="footnote-reference brackets" href="#id7" id="id3">2</a>, podemos usar la
-estrategia de que el éste redirija los paquetes a una dirección local
-particular (p.e. la <em>127.1.1.1</em>, en la que por supusto debe responder tal
-servidor).  De esta forma, lograremos marcar sólo los paquetes dirigidos
-al servidor que proceden del <em>proxy</em>:</p>
+<li><p>Cuando está en la misma máquina que el <em>proxy</em><a class="footnote-reference brackets" href="#id6" id="id1">1</a>, podemos usar la
+estrategia de que éste redirija los paquetes a una dirección local
+particular (p.e. la <em>127.1.1.1</em>, en la que debe escuchar el
+servidor y ningún otro). De esta forma, lograremos marcar sólo los
+paquetes dirigidos al servidor procedentes del <em>proxy</em>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> iptables -t raw -A PREROUTING ! -i lo -d <span class="m">127</span>.0.0.0/8 -j DROP
 <span class="gp">#</span> iptables -t mangle -A POSTROUTING ! -o lo -s <span class="m">127</span>.0.0.0/8 -j DROP
 
@@ -156,7 +194,7 @@ al servidor que proceden del <em>proxy</em>:</p>
 </li>
 <li><p>Cuando está en una máquina distinta, la estrategia es marcar en el <em>proxy</em>
 los paquetes entrantes (que son los de vuelta) cuyo destino es un proxy
-transparente:</p>
+transparente<a class="footnote-reference brackets" href="#id7" id="id2">2</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> iptables -t mangle -A PREROUTING -m socket --transparent -j MARK --set-mark 0xff
 </pre></div>
 </div>
@@ -173,6 +211,20 @@ incapaz de traducir la sentencia anterior, pero existe equivalente:</p>
 </li>
 </ol>
 </li>
+<li><p>Se indica al núcleo que haga posible el encaminamiento a través de la
+interfaz de <em>loopback</em><a class="footnote-reference brackets" href="#id8" id="id3">3</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> sysctl -w net.ipv4.conf.default.route_localnet<span class="o">=</span><span class="m">1</span>
+<span class="gp">#</span> sysctl -w net.ipv4.conf.all.route_localnet<span class="o">=</span><span class="m">1</span>
+</pre></div>
+</div>
+</li>
+<li><p>Se alteran las reglas de encaminamiento para que el tráfico marcado (con, por
+ejemplo, <em>0xff</em>) vaya a la interfaz de <em>loopback</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> ip rule add fwmark 0xff lookup <span class="m">100</span>
+<span class="gp">#</span> ip route add <span class="nb">local</span> <span class="m">0</span>.0.0.0/0 dev lo table <span class="m">100</span>
+</pre></div>
+</div>
+</li>
 </ol>
 </li>
 </ol>
@@ -185,15 +237,15 @@ modo transparente, es necesario que el servidor final nos muestre cuál es la
 <abbr title="Internet Protocol">IP</abbr> del cliente. Un modo muy sencillo es usar como servidor final
 <strong class="program">nginx</strong> con esta configuración:</p>
 <div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">server</span> <span class="p">{</span>
-   <span class="kn">listen</span> <span class="mi">80</span><span class="p">;</span>  <span class="kn">//</span> <span class="s">Puerto</span> <span class="s">y</span> <span class="s">dirección</span> <span class="s">de</span> <span class="s">escucha</span> <span class="s">pueden</span> <span class="s">cambiar</span> <span class="s">según</span> <span class="s">el</span> <span class="s">caso.</span>
+   <span class="kn">listen</span> <span class="mi">80</span><span class="p">;</span>  <span class="c1"># Puerto y dirección de escucha pueden cambiar según el caso.</span>
 
-   <span class="s">location</span> <span class="s">/</span> <span class="p">{</span>
+   <span class="kn">location</span> <span class="s">/</span> <span class="p">{</span>
       <span class="kn">return</span> <span class="mi">200</span> <span class="s">&quot;Saludos</span> <span class="s">desde</span> <span class="s">&#39;</span><span class="nv">$hostname&#39;.</span> <span class="s">Te</span> <span class="s">conectas</span> <span class="s">desde</span> <span class="nv">$remote_addr:$remote_port.\n&quot;</span><span class="p">;</span>
    <span class="p">}</span>
 <span class="p">}</span>
 </pre></div>
 </div>
-<p>y que desde el cliente se haga la consulta<a class="footnote-reference brackets" href="#id8" id="id4">3</a>:</p>
+<p>y que desde el cliente se haga la consulta<a class="footnote-reference brackets" href="#id9" id="id4">4</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> wget --no-check-certificate -qO- https://destino
 <span class="go">Saludos desde &#39;servidor&#39;. Te conectas desde 192.168.0.20:43123.</span>
 </pre></div>
@@ -215,10 +267,10 @@ puede ser esta, si el servidor final se encuentra en la misma máquina:</p>
 
 <span class="k">[netcat-ssl]</span>
 <span class="hll"><span class="na">transparent</span> <span class="o">=</span> <span class="s">source</span>
-</span><span class="hll"><span class="na">cert</span> <span class="o">=</span> <span class="s">/etc/stunnel/stunnel.pem</span>
-</span><span class="na">accept</span> <span class="o">=</span> <span class="s">192.168.0.14:443</span>
-<span class="na">connect</span> <span class="o">=</span> <span class="s">127.1.1.1:80</span>
-</pre></div>
+</span><span class="na">cert</span> <span class="o">=</span> <span class="s">/etc/stunnel/stunnel.pem</span>
+<span class="na">accept</span> <span class="o">=</span> <span class="s">192.168.0.14:443</span>
+<span class="hll"><span class="na">connect</span> <span class="o">=</span> <span class="s">127.1.1.1:80</span>
+</span></pre></div>
 </div>
 <p>donde las novedades son la particular dirección local del servidor final
 (coherente con la que se cita en la <a class="reference internal" href="#proxy-transparente-sol-gen"><span class="std std-ref">solución general para proxy
@@ -355,30 +407,30 @@ usar <strong class="command">haproxy</strong> sin permisos de administración.</
 </div>
 <p class="rubric">Notas al pie</p>
 <dl class="footnote brackets">
-<dt class="label" id="id6"><span class="brackets"><a class="fn-backref" href="#id2">1</a></span></dt>
-<dd><p>Si queremos hacer permanente el cambio, podemos incluir la definición de
-los parámentros en <code class="file docutils literal notranslate"><span class="pre">/etC/sysctl.conf</span></code> como ya se ha hecho en otros
-epígrafes de este manual.</p>
-</dd>
-<dt class="label" id="id7"><span class="brackets"><a class="fn-backref" href="#id3">2</a></span></dt>
-<dd><p>Si <em>stunnel</em> no se ejecuta como administrador, sino con su propio usuario,
+<dt class="label" id="id6"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p>Si el <em>proxy</em> no se ejecuta como administrador, sino con su propio usuario,
 entonces podemos identificar el tráfico, no por el destino, sino por el usuario
 que lo ejecuta:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> iptables -t nat -A OUTPUT -m owner --uid-owner stunnel -j CONNMARK --set-mark 0xff
 </pre></div>
 </div>
 </dd>
-<dt class="label" id="id8"><span class="brackets"><a class="fn-backref" href="#id4">3</a></span></dt>
-<dd><p>Se añade <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">no</kbd>-<kbd class="kbd docutils literal notranslate">check</kbd>-<kbd class="kbd docutils literal notranslate">certificate</kbd></kbd> para evitar problemas si en
-nuestras pruebas usamos certificados autofirmados.</p>
-</dd>
-<dt class="label" id="id9"><span class="brackets">4</span></dt>
+<dt class="label" id="id7"><span class="brackets"><a class="fn-backref" href="#id2">2</a></span></dt>
 <dd><p>Esta configuración requiere que el núcleo se haya compilado con el módulo
 <code class="docutils literal notranslate"><span class="pre">NETFILTER_XT_MATCH_SOCKET</span></code>, pero esto es así en las <em>debian</em> modernas:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> grep -i match_socket /boot/config-<span class="sb">`</span>uname -r<span class="sb">`</span>
 <span class="go">CONFIG_NETFILTER_XT_MATCH_SOCKET=m</span>
 </pre></div>
 </div>
+</dd>
+<dt class="label" id="id8"><span class="brackets"><a class="fn-backref" href="#id3">3</a></span></dt>
+<dd><p>Si queremos hacer permanente el cambio, podemos incluir la definición de
+los parámentros en <code class="file docutils literal notranslate"><span class="pre">/etC/sysctl.conf</span></code> como ya se ha hecho en otros
+epígrafes de este manual.</p>
+</dd>
+<dt class="label" id="id9"><span class="brackets"><a class="fn-backref" href="#id4">4</a></span></dt>
+<dd><p>Se añade <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">no</kbd>-<kbd class="kbd docutils literal notranslate">check</kbd>-<kbd class="kbd docutils literal notranslate">certificate</kbd></kbd> para evitar problemas si en
+nuestras pruebas usamos certificados autofirmados.</p>
 </dd>
 </dl>
 </div>
