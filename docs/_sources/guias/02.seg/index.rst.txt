@@ -5,6 +5,12 @@ segundo curso del Ciclo Formativo de Grado Medio de |SMR| y su currículo se
 desarrolla en la `Orden de 7 de julio de 2009
 <https://www.juntadeandalucia.es/boja/2009/165/1>`_.
 
+.. toctree::
+   :maxdepth: 1
+   :glob:
+
+   orientaciones/[0-9]*
+
 .. rubric:: Contenidos
 
 .. toctree::
@@ -31,14 +37,6 @@ desarrolla en la `Orden de 7 de julio de 2009
       02.discos
       03.desktop
       06.ley
-
-.. rubric:: Orientaciones educativas
-
-.. toctree::
-   :maxdepth: 1
-   :glob:
-
-   orientaciones/[0-9]*
 
 .. rubric:: Ejercicios
 

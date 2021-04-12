@@ -1,3 +1,5 @@
+.. _som-si:
+
 El sistema informático
 **********************
 La palabra *informática* procede de la fusión de los términos "INFORMación" y

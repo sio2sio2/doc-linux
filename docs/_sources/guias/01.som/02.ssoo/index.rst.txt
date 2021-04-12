@@ -1,3 +1,5 @@
+.. _som-ssoo:
+
 Sistemas operativos
 ===================
 El tema presenta muy someramente qué es un sistema operativos y cuáles son las

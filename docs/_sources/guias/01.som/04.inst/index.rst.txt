@@ -1,4 +1,4 @@
-.. _son-inst:
+.. _som-inst:
 
 Instalación de |SSOO|
 *********************

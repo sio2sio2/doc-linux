@@ -1,11 +1,9 @@
-.. _som-conflinux:
+.. _som-conflinux.2:
 
-Configuración básica de linux (|CLI|)
-*************************************
-
-Interfaz |CLI|
-==============
-Desarrollado en el :ref:`epígrafe sobre entorno de texto <cli>`.
+Configuración administrativa de *Linux*
+***************************************
+Esta unidad se reserva para algunos aspectos de configuración muy comúnmente
+realizados por el propio administrador del sistema.
 
 Gestión de *software*
 =====================
@@ -50,54 +48,26 @@ Las relaciones de ejericicios asociados a este apartado son:
 
 * :ref:`ej-softw`
 
-Configuración de red
-====================
-Para interfaz de texto puede usarse el epígrafe de :ref:`configuración mínima de
-la red <redminima>`.
+Recuperación del sistema
+========================
+En *Linux* puede restaurarse el sistema a un punto anterior mediante el uso de
+:ref:`instantáneas de volúmenes lógicos <lvm-snapshots>`. Esto, sin embargo,
+excede con mucho el propósito del módulo de conocer cómo se configura a nivel
+básico un sistema *Linux*, así que centraremos nuestro estudio en la creación de
+copias de seguridad. Por tanto, el epígrafe persigue cónocer cuáles son las
+herramientas habituales de compresión y empaquetado, lo cual supone estudiar
+todo este epígrafe de :ref:`copias de seguridad <backup-simple>`. La relación de
+ejericios es la que se encuentra al final de ese epigrafe:
 
-* :ref:`ej-redmin`
+* :ref:`Ejercicios sobre compresión y empaquetado <ej-compr-paq>`.
 
-Sistema de archivos
-===================
-Desarrollado en los epígrafes que componen:
+Automatización de tareas
+========================
+Estudiaremos este aspecto sólo haciendo uso del :ref:`método clásico <cronat>`
+con :command:`at` y :program:`crontab`. La relación de ejercicios
+correspondiente es ésta:
 
-* :ref:`filesystem`
-* :ref:`fic-dir`
-
-aunque es conveniente no dar en tanta profundidad :ref:`find <find>`. Para esta
-orden basta con limitarse al uso::
-
-   # find /ruta [-type f|l|d] -iname "nombre-con-comodines"
-
-Dentro de este apartado hay dos relaciones de ejercicios pertinentes:
-
-* :ref:`ej-rutas`
-* :ref:`ej-fic`
-
-Órdenes avanzadas
-=================
-El epígrafe está dedicado a como construir órdenes más complejas en la |CLI|.
-
-Concatenación de órdenes
-------------------------
-En este apartado toca aprender :ref:`cómo concatenar varias órdenes dentro de
-una misma línea <sh-concat>` y cuáles son las :ref:`substituciones en línea
-<sh-interp-cl>` que hace la *shell* antes de ejecutar de modo efectivo la
-orden. Los conocimientos pueden ponerse a prueba con los ejercicios:
-
-* :ref:`Ejercicios sobre expansiones <ej-exp>`.
-
-Redirecciones de |E/S|
-----------------------
-Respecto al concepto de :ref:`redirección <ioredirect>` basta con centrarse en
-el apartado de :ref:`redirección básica <ioredirect-bas>` **sin** antender a los
-conceptos de :ref:`tuberías con nombre <mkfifo>` ni :ref:`process substitution
-<bash-process-substitution>`. Es importante los conceptos incluidos en este
-apartado porque es la herramienta básica para hacer cooperar las órdenes entre
-sí y lograr órdenes conjuntas muy poderosas. Entendidas bien estas ideas,
-realice los ejercicios:
-
-* :ref:`Ejercicios sobre redirecciones <ej-redirect>`.
+* :ref:`ej-cronat`
 
 .. rubric:: Notas al pie
 
@@ -108,7 +78,6 @@ realice los ejercicios:
    *restricted*.
 
 .. |CLI| replace:: :abbr:`CLI (Command Line Interface)`
-.. |E/S| replace:: :abbr:`E/S (Entrada/Salida)`
 
 .. _Debian: https://www.debian.org
 .. _RedHat: https://www.redhat.com
