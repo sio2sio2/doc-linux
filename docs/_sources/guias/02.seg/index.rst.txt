@@ -31,8 +31,8 @@ desarrolla en la `Orden de 7 de julio de 2009
       :glob:
 
       01.intro
+      no.02.entorno
       04.crypto
-      no.03.entorno
       05.redes
       02.discos
       03.desktop

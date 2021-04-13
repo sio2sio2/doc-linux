@@ -9,4 +9,4 @@ Entorno físico y acceso
    :maxdepth: 2
    :glob:
 
-   03.entorno/[0-9]*
+   02.entorno/[0-9]*
