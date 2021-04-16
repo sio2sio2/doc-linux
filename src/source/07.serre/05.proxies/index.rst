@@ -35,7 +35,7 @@ Citaremos dos clasificaciones:
         Sí es la situación habitual cuando el *proxy* es gestionado por la misma
         organización que el servidor *web*, pero no lo es en absoluto si se
         contrata el servicio (p.e. el servicio `cloudflare
-        <https://www.cloudflare.com/>`).
+        <https://www.cloudflare.com/>`_).
 
 - Atendiendo al efecto de su presencia, los proxies se dividen en :dfn:`proxy
   explícito`, que es aquel que deja notas su presencia, y :dfn:`proxy
