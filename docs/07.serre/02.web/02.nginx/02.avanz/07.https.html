@@ -289,9 +289,29 @@ puede estar desfasada, así que antes de generarlo es conveniente editar <code c
 </div>
 <div class="admonition warning">
 <p class="admonition-title">Advertencia</p>
-<p>Al desinstalar el paquete parece que ni se elimina el trabajo de
-cron (hágase <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate">crontab</kbd> <kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">l</kbd></kbd> como <em>root</em>) ni se elimina la línea que se
-creó en <code class="file docutils literal notranslate"><span class="pre">/root/.bashrc</span></code> por lo que habrá que hacerlo a mano.</p>
+<p>El paquete, no obstante, tiene <strong>un par de defectos</strong> que es imprescindible
+corregir:</p>
+<ul>
+<li><p>Para las renovaciones automáticas de certificados, el <em>script</em> original
+añade una línea al <a class="reference internal" href="../../../../04.servidor/07.tareas/01.cronat.html#cron"><span class="std std-ref">cron</span></a> de <em>root</em> para que comprueba diariamente
+si es preciso renovar alguno:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">11 0 * * * &quot;/usr/lib/acme.sh&quot;/acme.sh --cron --home /usr/lib/acme.sh &gt; /dev/null</span>
+</pre></div>
+</div>
+<p>donde <strong>11</strong> es un minuto aleatorio. Esto tal vez funcione, si se usa
+directamente el <em>script</em> sin demasiada personalización. Sin embargo, el
+paquete guarda la configuración en <code class="file docutils literal notranslate"><span class="pre">/etc/acme.sh</span></code> y es dentro de ese
+directorio donde se encuentran los certificados, por lo que la renovación
+automática fallará. La solución es alterar esa línea para que se carguen las
+variables de ambiente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">11 0 * * * . /etc/acme.sh/acme.sh.env ; &quot;/usr/lib/acme.sh&quot;/acme.sh --cron &gt; /dev/null</span>
+</pre></div>
+</div>
+</li>
+<li><p>No incluye ningún script de desinstalación <code class="file docutils literal notranslate"><span class="pre">prerm</span></code>, por lo que ni se
+elimina el trabajo de <a class="reference internal" href="../../../../04.servidor/07.tareas/01.cronat.html#cron"><span class="std std-ref">cron</span></a> ni la línea que se creó en
+<code class="file docutils literal notranslate"><span class="pre">/root/.bashrc</span></code> por lo que habrá que hacer ambas acciones a mano.</p></li>
+</ul>
 </div>
 <p class="rubric">Generación del certificado</p>
 <p>Proponemos lo más sencillo<a class="footnote-reference brackets" href="#id20" id="id7">7</a> (y que en muchos casos nos será suficiente):</p>
@@ -521,10 +541,10 @@ como <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils lite
 <span id="dns-challenge"></span><h3><span class="section-number">7.2.2.2.8.3.3. </span>Desafío <abbr title="Domain Name Server">DNS</abbr><a class="headerlink" href="#desafio-dns" title="Enlazar permanentemente con este título">¶</a></h3>
 <p>Cuando en un servidor web disponemos distintos sitios (<em>blogs</em> con <em>wordpress</em>,
 <em>moodle</em>, aplicaciones diversas), el certificado tendrá que contenemos muchos
-nombres y se tendrán que llevar a cabo pruebas en muchos directorios razón. Si,
+nombres y se tendrán que llevar a cabo pruebas en muchos directorios raíz. Si,
 además, ampliamos los servicios y creamos un nuevo sitio con un nuevo nombre,
-tendremos que regenerar el servidor para incluirlo. En estos casos, lo mejor es
-generar un certificado comodín y esto sólo se puede hacer utilizando el
+tendremos que regenerar el certificado para incluirlo. Para evitarlo, lo mejor
+es generar un certificado comodín y esto sólo se puede hacer utilizando el
 <a class="reference internal" href="#desafios-acme"><span class="std std-ref">desafío DNS</span></a>. Su única dificultad es que durante la
 generación y renovación del certificado, requiere la creación dinámica del
 registro <code class="docutils literal notranslate"><span class="pre">TXT</span></code> en nuestra zona <abbr title="Domain Name Server">DNS</abbr> y que se pueda realmente hacer y cómo

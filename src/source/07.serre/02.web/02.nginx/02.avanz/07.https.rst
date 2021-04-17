@@ -267,9 +267,27 @@ que generará en el directorio padre el paquete listo para ser instalado::
    # cd ..
    # apt install ./acme.sh_0.1-2_amd64.deb
 
-.. warning:: Al desinstalar el paquete parece que ni se elimina el trabajo de
-   cron (hágase :kbd:`crontab -l` como *root*) ni se elimina la línea que se
-   creó en :file:`/root/.bashrc` por lo que habrá que hacerlo a mano.
+.. warning:: El paquete, no obstante, tiene **un par de defectos** que es imprescindible
+   corregir:
+
+   * Para las renovaciones automáticas de certificados, el *script* original
+     añade una línea al :ref:`cron <cron>` de *root* para que comprueba diariamente
+     si es preciso renovar alguno::
+
+      11 0 * * * "/usr/lib/acme.sh"/acme.sh --cron --home /usr/lib/acme.sh > /dev/null
+
+     donde **11** es un minuto aleatorio. Esto tal vez funcione, si se usa
+     directamente el *script* sin demasiada personalización. Sin embargo, el
+     paquete guarda la configuración en :file:`/etc/acme.sh` y es dentro de ese
+     directorio donde se encuentran los certificados, por lo que la renovación
+     automática fallará. La solución es alterar esa línea para que se carguen las
+     variables de ambiente::
+
+      11 0 * * * . /etc/acme.sh/acme.sh.env ; "/usr/lib/acme.sh"/acme.sh --cron > /dev/null
+
+   * No incluye ningún script de desinstalación :file:`prerm`, por lo que ni se
+     elimina el trabajo de :ref:`cron <cron>` ni la línea que se creó en
+     :file:`/root/.bashrc` por lo que habrá que hacer ambas acciones a mano.
 
 .. rubric:: Generación del certificado
 
@@ -487,10 +505,10 @@ Desafío |DNS|
 -------------
 Cuando en un servidor web disponemos distintos sitios (*blogs* con *wordpress*,
 *moodle*, aplicaciones diversas), el certificado tendrá que contenemos muchos
-nombres y se tendrán que llevar a cabo pruebas en muchos directorios razón. Si,
+nombres y se tendrán que llevar a cabo pruebas en muchos directorios raíz. Si,
 además, ampliamos los servicios y creamos un nuevo sitio con un nuevo nombre,
-tendremos que regenerar el servidor para incluirlo. En estos casos, lo mejor es
-generar un certificado comodín y esto sólo se puede hacer utilizando el
+tendremos que regenerar el certificado para incluirlo. Para evitarlo, lo mejor
+es generar un certificado comodín y esto sólo se puede hacer utilizando el
 :ref:`desafío DNS <desafios-acme>`. Su única dificultad es que durante la
 generación y renovación del certificado, requiere la creación dinámica del
 registro ``TXT`` en nuestra zona |DNS| y que se pueda realmente hacer y cómo
