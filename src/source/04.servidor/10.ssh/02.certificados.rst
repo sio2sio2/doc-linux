@@ -110,7 +110,7 @@ cliente. El primer número (**256**) indica la longitud de la clave.
 
       # ssh-keygen -t ecdsa -f /etc/ssh/ssh_host_ecdsa_key -N ""
 
-   que crea una clave *ECDSA* en el fichero apropiado sin contraseña (esto
+   que crea una clave |ECDSA| en el fichero apropiado sin contraseña (esto
    último necesario, porque el servidor debe ser capaz de usarlas sin pedir
    la contraseña a nadie). La orden debería repetirse para todos los algoritmos,
    así que podríamos hacer::
@@ -203,7 +203,7 @@ En este caso, la generación es sencilla. La orden::
 
    $ ssh-keygen -t ecdsa -C "Comentario alusivo a la clave"
 
-generará una clave de tipo *ECDSA* y, como fichero, se escogerá el
+generará una clave de tipo |ECDSA| y, como fichero, se escogerá el
 predeterminado para este tipo de clave (:file:`~/.ssh/id_ecdsa` y
 :file:`~/.ssh/id_ecdsa.pub`, para la clave pública). Si no se altera la
 configuración, en el momento en que intentemos conectar a cualquier servidor se
@@ -338,7 +338,7 @@ de servidor::
 
 .. note:: Usamos claves de tipo ecdsa para evitar problemas con versiones de
    Open\ |SSH| por encima de la 8.1. Para más información, consulte `esta
-   entrada de iBug <https://ibug.io/blog/2020/04/ssh-8.2-rsa-ca/>`.
+   entrada de iBug <https://ibug.io/blog/2020/04/ssh-8.2-rsa-ca/>`_.
 
 Con esta pareja de claves operativas, debemos pasar las claves públicas del
 servidor a la máquina *ca* para que puedan ser firmadas (esto es, generado el
@@ -352,7 +352,7 @@ y una vez en ella, firmarlas para crear el certificado::
    ca# scp /tmp/ssh_host_*-cert.pub servidor:/etc/ssh
 
 La orden genera certificados de servidor (gracias a :kbd:`-h`), firmados
-(kbd:`-s`) con :file:`ca_host`, con un determinado identificador (:kbd:`-I`) y
+(:kbd:`-s`) con :file:`ca_host`, con un determinado identificador (:kbd:`-I`) y
 que son válidos para una máquina llamada *example.net* o *www.example.net*.
 Podríamos haber definido una validez determinada con :kbd:`-V`, pero por ser
 estos certificados de servidor los haremos eternos.
@@ -427,6 +427,96 @@ Por último, el usuario en el cliente deberá obtener el certificado y guardarlo
 
    cliente# scp ca:/tmp/id_rsa-cert.pub ~/.ssh
 
+.. _openssh-openssl:
+
+Open\ |SSH| y Open\ |SSL|
+*************************
+Dado que ambas aplicaciones usan :ref:`cifrado asimétrico <asimetrico>` y
+algoritmos comunes, es posible hacer conversiones entre las claves generadas con
+ellas. En principio:
+
++ Pueden hacerse conversiones para claves |RSA| y |ECDSA|. Las claves |EdDSA| no
+  tienen soporte en :ref:`OpenSSL <openssl>`.
+
++ El formato para las claves públicas es distinto e incompatible, pero
+  :ref:`ssh-keyget <ssh-keygen>` es capaz de hacer conversiones entre ambos formatos.
+  Para obtener la clave pública en formato reconocible por Open\ |SSL|::
+
+   # ssh-keygen -e -f miclave.pub -m pkcs8 > miclave.pem
+
+  Y para el proceso inverso::
+
+   # ssh-keygen -i -f miclave.pem -m pkcs8 > miclave.pub
+
++ El formato para las claves privadas era el mismo hasta no hace demasiado, pero
+  las últimas versiones de Open\ |SSH| utilizan por defecto un formato
+  incompatible. En cualquier caso, el formato de Open\ |SSH| sigue soportado
+  por Open\ |SSH|:. Así, si se tiene una clave privada en el formato de Open\
+  |SSH|::
+
+   $ cp miclave miclave.key
+   $ ssh-keygen -p -f miclave.key -m pem
+
+  Y si se tiene una clave generada con Open\ |SSL|::
+
+   $ cp miclave.key miclave
+   $ ssh-keygen -p -f miclave
+
+  .. note:: En estos casos :ref:`ssh-keygen <ssh-keygen>` genera el nuevo
+     formato sobrescribiendo el archivo, por lo que se hace necesaria la copia
+     previa.
+
++ Los formatos de :ref:`certificado digital <cert-digital>` son absolutamente
+  incompatibles y no hay conversión entre ellos, pero sí podemos tener sendos
+  certificados generados con el mismo par de claves.
+
+.. seealso:: Puede echar una lectura a `este artículo sobre formatos de claves
+   en ambas aplicaciones
+   <https://coolaj86.com/articles/openssh-vs-openssl-key-formats/>`_.
+
+Partiendo de Open\ |SSH|
+========================
+Si tenemos un par de claves, las habremos generado así (para que sean |ECDSA|
+habrá que añadir :kbd:`-t ecdsa`)::
+
+   $ ssh-keygen -f miclave
+
+lo cual creará los archivos de clave :file:`miclave` y :file:`miclave.pub`, ambas
+en formato incomprensible para Open\ |SSL|. Para convertir podremos hacer::
+
+   $ cp miclave miclave.key
+   $ ssh-keygen -p -f miclave.key -m pem
+
+Y la clave pública la podremoe obtener a partir de la clave privada usando Open\
+|SSL|, La orden exacta dependerá de si la clave es |RSA| o |ECDSA|. Podemos
+también usar :command:`ssh-keygen` para obtener la clave pública\ [#]_, que no
+presenta diferencias sea una u otra la clave::
+
+   $ ssh-keygen -e -f miclave.pub -m pkcs8
+
+Partiendo de Open\ |SSL|
+========================
+Podemos haber generado unas claves |RSA|::
+
+   $ openssl genrsa -aes128 -out miclave.key
+   $ openssl rsa -in miclave.key -pubout -out miclave.pem
+
+o bien unas claves |ECDSA|\ [#]_::
+
+   $ openssl ecparam -name prime256v1 -genkey -noout -out miclave.key
+   $ openssl ec -in miclave.key -pubout -out miclave.pem
+
+Sea como sea, el proceso de obtención de claves válidas para Open\ |SSH| es el
+mismo::
+
+   $ ln -s miclave.key miclave
+   $ ssh-keygen -y -f miclave > miclave.pub
+
+donde no hemos cambiado de formato la clave privada, porque Open\ |SSH| soporta
+el formato de Open\ |SSL| y hemos obtenido la clave pública a partir de la
+privada (otra opción habría sido convertir desde la clave pública en el formato
+de Open\ |SSL| :file:`miclave.pem`).
+
 .. rubric:: Notas al pie
 
 .. [#] Hasta la versión *7.0*, también existía una versión `DSA
@@ -458,5 +548,17 @@ Por último, el usuario en el cliente deberá obtener el certificado y guardarlo
    ojo a `ester artículo de smallsetp
    <https://smallstep.com/blog/use-ssh-certificates/>`_.
 
+.. [#] La orden de exportación puede hacerse utilizando como argumento de la
+   opción :kbd:`-f` tanto la clave pública como la clave privada. Con la privada
+   se requerirá introducir la contraseña de cifrado.
+
+.. [#] La clave privada no tendrá contraseña que la proteja. Si se quiere
+   proteger con una, habrá que añadir una orden más::
+
+      $ openssl ec -in miclave.key -aes256 -out miclave.crypt.key
+
 .. |SSL| replace:: :abbr:`SSL (Secure Sockets Layer)`
 .. |CA| replace:: :abbr:`CA (Certification Authority)`
+.. |ECDSA| replace:: :abbr:`ECDSA (Elliptic Curve Digital Signature Algorithm)`
+.. |RSA| replace:: :abbr:`RSA (Rivest, Shamir y Adleman)`
+.. |EdDSA| replace:: :abbr:`EdDSA (EDwards-curve Curve Digital Signature Algorithm)`
