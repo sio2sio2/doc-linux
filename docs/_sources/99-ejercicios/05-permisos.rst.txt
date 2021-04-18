@@ -6,15 +6,15 @@ Ejercicios sobre permisos
 #. Mejorar la privacidad de nuestro usuario para que
    solamente él pueda ver los archivos contenidos en su espacio personal.
 
-#. Vuelva a dejar el directorio personal como estaba y crear dentro un
+#. Volver a dejar el directorio personal como estaba y crear dentro un
    subdirectorio al que no puedan acceder los usuarios que no pertenezca a mi
    grupo principal.
 
 #. Crear un directorio propiedad de *root* al que solo puedan acceder
    los usuarios del grupo "netdev" (además del propio *root*).
 
-#. Crear un directorio :file:`D`, un fichero :file:`f` y permitir que todos
-   puedan ver el contenido del fichero :file:`f`, pero impedir que alguien
+#. Crear un directorio :file:`D`, dentro un fichero :file:`f` y permitir que
+   todos puedan ver el contenido del fichero :file:`f`, pero impedir que alguien
    (incluido uno mismo) lo pueda borrar.
 
 #. Cambiar el grupo del directorio :file:`D` a *plugdev*. ¿Es posible? ¿Y a
