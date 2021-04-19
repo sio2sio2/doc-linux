@@ -284,13 +284,18 @@ La autenticación con claves presenta algunos inconvenientes\ [#]_:
 + Si un cliente quiere autenticarse en varios servidores, deberá distribuir su
   clave pública en todos ellos.
 
-+ Las claves no tienen caducidad.
-
 Para subsanarlo, se puede echar mano de la creación de :ref:`certificados
 <cert-digital>` a partir de las claves públicas que hemos visto en el epígrafe
 anterior. Estos certificados no son :ref:`certificados X.509 <X.509>`, como los
 usados en |SSL|, sino propios de |SSH|, y se generan utilizando nuestro ya
 conocido :ref:`ssh-keygen <ssh-keygen>`. 
+
+Además, autenticar al cliente mediante certificados presenta otras ventajas
+añadidas:
+
++ Se puede establecer una caducidad para los certificados.
++ Se pueden definir en los propios certificados limitaciones de uso: por
+  ejemplo, prohibir que con el certificado se pueda tunelizar.
 
 La idea es crear una |CA| que firme las claves públicas de clientes y servidores
 con objeto de crear los certificados:
@@ -323,9 +328,9 @@ A partir de ahora trabajaremos sobre tres máquinas:
 Para indicar en qué máquina estamos actuando al ejecutar una orden, utilizaremos
 el *prompt*::
 
-   ca#
-   servidor#
-   cliente$
+   root@ca:~#
+   root@servidor:~#
+   pepe@cliente:~$
 
 Identificación del servidor
 ===========================
@@ -334,7 +339,7 @@ intención es que los clientes sean capaces de identificar al servidor mediante
 certificado. Debemos antes de nada generar las claves para firmar certificados
 de servidor::
 
-   ca# ssh-keygen -t ecdsa -f /etc/ssh/ca_host -C "Clave de CA para servidores"
+   root@ca:~# ssh-keygen -t ecdsa -f /etc/ssh/ca_host -C "Clave de CA para servidores"
 
 .. note:: Usamos claves de tipo ecdsa para evitar problemas con versiones de
    Open\ |SSH| por encima de la 8.1. Para más información, consulte `esta
@@ -344,12 +349,12 @@ Con esta pareja de claves operativas, debemos pasar las claves públicas del
 servidor a la máquina *ca* para que puedan ser firmadas (esto es, generado el
 certificado)::
 
-   servidor$ scp /etc/ssh/ssh_host_*key.pub ca:/tmp
+   root@servidor:~$ scp /etc/ssh/ssh_host_*key.pub ca:/tmp
 
 y una vez en ella, firmarlas para crear el certificado::
 
-   ca# ssh-keygen -h -s /etc/ssh/ca_host -I s_hostID -n example.net,www.example.net /tmp/ssh_host_*key.pub
-   ca# scp /tmp/ssh_host_*-cert.pub servidor:/etc/ssh
+   root@ca:~# ssh-keygen -h -s /etc/ssh/ca_host -I s_hostID -n example.net,www.example.net /tmp/ssh_host_*key.pub
+   root@ca:~# scp /tmp/ssh_host_*-cert.pub servidor:/etc/ssh
 
 La orden genera certificados de servidor (gracias a :kbd:`-h`), firmados
 (:kbd:`-s`) con :file:`ca_host`, con un determinado identificador (:kbd:`-I`) y
@@ -365,13 +370,13 @@ Una vez que los certificados se remiten al servidor y se almacenan en
 :kbd:`/etc/ssh` debemos modificar la configuración del servidor para que los
 use::
 
-   servidor# printf "HostCertificate %s\n" /etc/ssh/ssh_host_*-cert.pub >> /etc/ssh/sshd_config
-   servidor# invoke-rc.d ssh reload
+   root@servidor:~# printf "HostCertificate %s\n" /etc/ssh/ssh_host_*-cert.pub >> /etc/ssh/sshd_config
+   root@servidor:~# invoke-rc.d ssh reload
 
 Y con esto, hemos completado la configuración en él. Ahora debemos lograr que
 los clientes confien en cualquier certificado firmado por nuestra |CA|. Para ello debemos copiar la clave pública de la |CA| en el cliente::
 
-   ca# scp /etc/ssh/CA_host.pub cliente:/tmp
+   root@ca:~# scp /etc/ssh/CA_host.pub cliente:/tmp
 
 con objeto de añadirla a :file:`~/.ssh/known_hosts` (o :file:`/etc/ssh/ssh_known_hosts` si se quiere que afecte a todos los usuarios)::
 
@@ -383,28 +388,28 @@ Identificación del cliente
 ==========================
 Para que el cliente pueda autenticarse en el servidor, también pueden utilizarse certificados. Generemos primero unas claves de |CA| para firmar certificados de cliente::
 
-   ca# ssh-keygen -t ecdsa -f /etc/ssh/ca_user -C "Clave de CA para clientes"
+   root@ca:~# ssh-keygen -t ecdsa -f /etc/ssh/ca_user -C "Clave de CA para clientes"
 
 .. note:: Podríamos reaprovechar la pareja de claves anteriores, pero por pulcritud usaremos dos claves distintas.
 
 Debemos pasar la clave al servidor para que este acepte clientes que tengan su certificado firmado con ella. Esto se logra añadiendo una línea a la configuración::
 
-   servidor# scp ca:/etc/ssh/ca_user.pub /etc/ssh
-   servidor# echo "TrustedUserCAKeys /etc/ssh/ca_user.pub" >> /etc/ssh/sshd_config
-   servidor# invoke-rc.d ssh reload
+   root@servidor:~# scp ca:/etc/ssh/ca_user.pub /etc/ssh
+   root@servidor:~# echo "TrustedUserCAKeys /etc/ssh/ca_user.pub" >> /etc/ssh/sshd_config
+   root@servidor:~# invoke-rc.d ssh reload
 
 Y ahora, un usuario que desee autenticarse en tal servidor, deberá generar un par de claves para sí y pasarla a la |CA| para que se las firme::
 
-   cliente$ ssh-keygen -C "Clave de pepe"
-   cliente# scp ~/.ssh/id_rsa.pub ca:/tmp
+   pepe@cliente:~$ ssh-keygen -C "Clave de pepe"
+   pepe@cliente:~# scp ~/.ssh/id_rsa.pub ca:/tmp
 
 La |CA| firmará esas claves::
 
-   ca# ssh-keygen -s /etc/ssh/ca_user -I u_pepeID -n pepe,root -V +32w /tmp/id_rsa.pub
+   root@ca:~# ssh-keygen -s /etc/ssh/ca_user -I u_pepeID -n pepe,root -V +32w /tmp/id_rsa.pub
 
 sin indicar la opción :kbd:`-h`, porque esta es una clave de cliente, indicando con :kbd:`-n` que la clave es válida para el usuario del servidor "pepe" y el administrador del mismo, y que el certificado tiene una validez de 32 semanas a partir del momento en el que se firma::
 
-   ca# ssh-keygen -Lf /tmp/id_rsa.pub
+   root@ca:~# ssh-keygen -Lf /tmp/id_rsa.pub
    id_rsa-cert.pub:
            Type: ssh-rsa-cert-v01@openssh.com user certificate
            Public key: RSA-CERT SHA256:eFEoGIJgDNFgiQycGvKXWc1FbJQOQljc90gjzRgI4uA

@@ -317,12 +317,18 @@ provoca un aviso de suplantación, porque los clientes han almacenando
 la clave pública anterior del servidor y no concuerda con la nueva.</p></li>
 <li><p>Si un cliente quiere autenticarse en varios servidores, deberá distribuir su
 clave pública en todos ellos.</p></li>
-<li><p>Las claves no tienen caducidad.</p></li>
 </ul>
 <p>Para subsanarlo, se puede echar mano de la creación de <a class="reference internal" href="../../09.apendice/01.cryto/03.aplicaciones/01.certdig.html#cert-digital"><span class="std std-ref">certificados</span></a> a partir de las claves públicas que hemos visto en el epígrafe
 anterior. Estos certificados no son <a class="reference internal" href="../../09.apendice/01.cryto/03.aplicaciones/01.certdig.html#x-509"><span class="std std-ref">certificados X.509</span></a>, como los
 usados en <abbr title="Secure Sockets Layer">SSL</abbr>, sino propios de <abbr title="Security SHell">SSH</abbr>, y se generan utilizando nuestro ya
 conocido <a class="reference internal" href="#ssh-keygen"><span class="std std-ref">ssh-keygen</span></a>.</p>
+<p>Además, autenticar al cliente mediante certificados presenta otras ventajas
+añadidas:</p>
+<ul class="simple">
+<li><p>Se puede establecer una caducidad para los certificados.</p></li>
+<li><p>Se pueden definir en los propios certificados limitaciones de uso: por
+ejemplo, prohibir que con el certificado se pueda tunelizar.</p></li>
+</ul>
 <p>La idea es crear una <abbr title="Certification Authority">CA</abbr> que firme las claves públicas de clientes y servidores
 con objeto de crear los certificados:</p>
 <img alt="../../_images/CA-SSH.png" src="../../_images/CA-SSH.png" />
@@ -352,9 +358,9 @@ se encarga de firmar los certificados de las demás</p></li>
 </ul>
 <p>Para indicar en qué máquina estamos actuando al ejecutar una orden, utilizaremos
 el <em>prompt</em>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ca#</span>
-<span class="go">servidor#</span>
-<span class="go">cliente$</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">root@ca:~#</span>
+<span class="gp">root@servidor:~#</span>
+<span class="gp">pepe@cliente:~$</span>
 </pre></div>
 </div>
 <div class="section" id="id9">
@@ -363,7 +369,7 @@ el <em>prompt</em>:</p>
 intención es que los clientes sean capaces de identificar al servidor mediante
 certificado. Debemos antes de nada generar las claves para firmar certificados
 de servidor:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ca# ssh-keygen -t ecdsa -f /etc/ssh/ca_host -C &quot;Clave de CA para servidores&quot;</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">root@ca:~#</span> ssh-keygen -t ecdsa -f /etc/ssh/ca_host -C <span class="s2">&quot;Clave de CA para servidores&quot;</span>
 </pre></div>
 </div>
 <div class="admonition note">
@@ -375,12 +381,12 @@ entrada de iBug</a>.</p>
 <p>Con esta pareja de claves operativas, debemos pasar las claves públicas del
 servidor a la máquina <em>ca</em> para que puedan ser firmadas (esto es, generado el
 certificado):</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">servidor$ scp /etc/ssh/ssh_host_*key.pub ca:/tmp</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">root@servidor:~$</span> scp /etc/ssh/ssh_host_*key.pub ca:/tmp
 </pre></div>
 </div>
 <p>y una vez en ella, firmarlas para crear el certificado:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ca# ssh-keygen -h -s /etc/ssh/ca_host -I s_hostID -n example.net,www.example.net /tmp/ssh_host_*key.pub</span>
-<span class="go">ca# scp /tmp/ssh_host_*-cert.pub servidor:/etc/ssh</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">root@ca:~#</span> ssh-keygen -h -s /etc/ssh/ca_host -I s_hostID -n example.net,www.example.net /tmp/ssh_host_*key.pub
+<span class="gp">root@ca:~#</span> scp /tmp/ssh_host_*-cert.pub servidor:/etc/ssh
 </pre></div>
 </div>
 <p>La orden genera certificados de servidor (gracias a <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">h</kbd></kbd>), firmados
@@ -397,13 +403,13 @@ el certificado sea aplicable a la máquina <em>www.example.net</em>.</p>
 <p>Una vez que los certificados se remiten al servidor y se almacenan en
 <kbd class="kbd docutils literal notranslate">/etc/ssh</kbd> debemos modificar la configuración del servidor para que los
 use:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">servidor# printf &quot;HostCertificate %s\n&quot; /etc/ssh/ssh_host_*-cert.pub &gt;&gt; /etc/ssh/sshd_config</span>
-<span class="go">servidor# invoke-rc.d ssh reload</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">root@servidor:~#</span> <span class="nb">printf</span> <span class="s2">&quot;HostCertificate %s\n&quot;</span> /etc/ssh/ssh_host_*-cert.pub &gt;&gt; /etc/ssh/sshd_config
+<span class="gp">root@servidor:~#</span> invoke-rc.d ssh reload
 </pre></div>
 </div>
 <p>Y con esto, hemos completado la configuración en él. Ahora debemos lograr que
 los clientes confien en cualquier certificado firmado por nuestra <abbr title="Certification Authority">CA</abbr>. Para ello debemos copiar la clave pública de la <abbr title="Certification Authority">CA</abbr> en el cliente:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ca# scp /etc/ssh/CA_host.pub cliente:/tmp</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">root@ca:~#</span> scp /etc/ssh/CA_host.pub cliente:/tmp
 </pre></div>
 </div>
 <p>con objeto de añadirla a <code class="file docutils literal notranslate"><span class="pre">~/.ssh/known_hosts</span></code> (o <code class="file docutils literal notranslate"><span class="pre">/etc/ssh/ssh_known_hosts</span></code> si se quiere que afecte a todos los usuarios):</p>
@@ -415,7 +421,7 @@ los clientes confien en cualquier certificado firmado por nuestra <abbr title="C
 <div class="section" id="id10">
 <h3><span class="section-number">4.5.4.2.2. </span>Identificación del cliente<a class="headerlink" href="#id10" title="Enlazar permanentemente con este título">¶</a></h3>
 <p>Para que el cliente pueda autenticarse en el servidor, también pueden utilizarse certificados. Generemos primero unas claves de <abbr title="Certification Authority">CA</abbr> para firmar certificados de cliente:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ca# ssh-keygen -t ecdsa -f /etc/ssh/ca_user -C &quot;Clave de CA para clientes&quot;</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">root@ca:~#</span> ssh-keygen -t ecdsa -f /etc/ssh/ca_user -C <span class="s2">&quot;Clave de CA para clientes&quot;</span>
 </pre></div>
 </div>
 <div class="admonition note">
@@ -423,22 +429,22 @@ los clientes confien en cualquier certificado firmado por nuestra <abbr title="C
 <p>Podríamos reaprovechar la pareja de claves anteriores, pero por pulcritud usaremos dos claves distintas.</p>
 </div>
 <p>Debemos pasar la clave al servidor para que este acepte clientes que tengan su certificado firmado con ella. Esto se logra añadiendo una línea a la configuración:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">servidor# scp ca:/etc/ssh/ca_user.pub /etc/ssh</span>
-<span class="go">servidor# echo &quot;TrustedUserCAKeys /etc/ssh/ca_user.pub&quot; &gt;&gt; /etc/ssh/sshd_config</span>
-<span class="go">servidor# invoke-rc.d ssh reload</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">root@servidor:~#</span> scp ca:/etc/ssh/ca_user.pub /etc/ssh
+<span class="gp">root@servidor:~#</span> <span class="nb">echo</span> <span class="s2">&quot;TrustedUserCAKeys /etc/ssh/ca_user.pub&quot;</span> &gt;&gt; /etc/ssh/sshd_config
+<span class="gp">root@servidor:~#</span> invoke-rc.d ssh reload
 </pre></div>
 </div>
 <p>Y ahora, un usuario que desee autenticarse en tal servidor, deberá generar un par de claves para sí y pasarla a la <abbr title="Certification Authority">CA</abbr> para que se las firme:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cliente$ ssh-keygen -C &quot;Clave de pepe&quot;</span>
-<span class="go">cliente# scp ~/.ssh/id_rsa.pub ca:/tmp</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">pepe@cliente:~$</span> ssh-keygen -C <span class="s2">&quot;Clave de pepe&quot;</span>
+<span class="gp">pepe@cliente:~#</span> scp ~/.ssh/id_rsa.pub ca:/tmp
 </pre></div>
 </div>
 <p>La <abbr title="Certification Authority">CA</abbr> firmará esas claves:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ca# ssh-keygen -s /etc/ssh/ca_user -I u_pepeID -n pepe,root -V +32w /tmp/id_rsa.pub</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">root@ca:~#</span> ssh-keygen -s /etc/ssh/ca_user -I u_pepeID -n pepe,root -V +32w /tmp/id_rsa.pub
 </pre></div>
 </div>
 <p>sin indicar la opción <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">h</kbd></kbd>, porque esta es una clave de cliente, indicando con <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">n</kbd></kbd> que la clave es válida para el usuario del servidor «pepe» y el administrador del mismo, y que el certificado tiene una validez de 32 semanas a partir del momento en el que se firma:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ca# ssh-keygen -Lf /tmp/id_rsa.pub</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">root@ca:~#</span> ssh-keygen -Lf /tmp/id_rsa.pub
 <span class="go">id_rsa-cert.pub:</span>
 <span class="go">        Type: ssh-rsa-cert-v01@openssh.com user certificate</span>
 <span class="go">        Public key: RSA-CERT SHA256:eFEoGIJgDNFgiQycGvKXWc1FbJQOQljc90gjzRgI4uA</span>
