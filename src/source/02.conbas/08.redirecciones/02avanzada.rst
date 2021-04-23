@@ -125,7 +125,7 @@ Pero Antes de ello introduzcamos un par de herramientas más:
 
       $ exec 1>/dev/null
 
-   Habremos mandado a :file:`/dev/null` la salida estándar de cualquier comando
+   habremos mandado a :file:`/dev/null` la salida estándar de cualquier comando
    que ejecutemos a continuación en la misma *shell*.
 
 Puesto estos mimbres veamos qué otras cosas podemos hacer.
