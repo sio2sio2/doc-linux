@@ -443,6 +443,12 @@ Estudiaremos ambas posibilidades.
 
    [0-9]*
 
+Pruebas de rendimiento
+======================
+.. todo:: Proponer pruebas de lectura y escritura con alguna de las
+   herramientas sogeridas en `este artículo de Linuxhint
+   <https://linuxhint.com/benchmark_hard_disks_linux/>`_.
+
 .. rubric:: Notas al pie
 
 .. [#] Aunque puede llegarse a utilizar también el término |JBOD|.
