@@ -99,6 +99,8 @@ Antes de empezar, no obstante, hay que introducir cuatro conceptos:
       realiza toda mediante *software*. Esto es mucho menos eficiente que la
       aceleración por *hardware*.
 
+.. _paravirt:
+
 **Paravirtualización**
    Es aquella en la que no se construye para el huésped un *hardware* virtual,
    ya que este tiene los controladores adecuados para hacer las peticiones
