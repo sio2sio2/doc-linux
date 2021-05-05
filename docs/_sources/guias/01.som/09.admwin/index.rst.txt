@@ -165,9 +165,9 @@ avanzados que permite definir *Windows* sobre |NTFS|:
    2. Leer el contenido de un archivo regular o de un directorio (en este último
       caso exclusivamente los nombres de los archivos que contiene)
    #. Leer cuáles son los :ref:`atributos de un archivo <win10-attrs>`.
-   #. Leer cuáles son los atributos extendidos de un archivos, que son parejas
-      nombre-valor equivalentes a lo que denominamos en *Linux* :ref:`atributos
-      extendidos de usuario <user_xattr>`.
+   #. Leer cuáles son los atributos extendidos de un archivo, que son parejas
+      nombre/valor equivalentes a lo que denominamos en *Linux* :ref:`atributos
+      extendidos de usuario <xattr>`.
    #. Leer cuáles los permisos asociados a un archivo.
 
 **Escritura**

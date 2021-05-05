@@ -1,33 +1,35 @@
-Permisos y atributos
-====================
+Permisos
+========
 Los archivos del sistema se encuentran protegidos mediante un sistema de
 permisos para impedir que usuarios o torpes o malintencionados puedan provocar
 daños al sistema; y también, para proteger la privacidad frente a usuarios
 indiscretos.
 
-En lo referente a permisos y atributos se puede discutir sobre:
+Los permisos en *Linux* implementan un :ref:`control de accesos DAC <control-dac>` y 
+siguen el estándar |POSIX| compuesto por dos sistemas de permisos
+complementarios:
 
-* Los *permisos clásicos* de *Unix* (estándar |POSIX|).
-* Los *atributos extendidos* en sistemas *ext4*.
-* Los *atributos extendidos de usuario* en sistemas que los soporten (*ext4*,
-  *brtfs*, *xfs*).
-* Las listas de control de accesos (:abbr:`ACL (Access Control List)`).
+* Los *permisos clásicos* de *Unix*.
+* Las listas de control de accesos (|ACL|) adicional al anterior.
 
-Se tratarán aquí exhaustivamente los permisos clásicos, por ser un pilar básico
-para el uso del sistema y se comentarán brevemente los atributos extendidos, que
-carecen de demasiada importancia. En cambio, son útiles para algunas situaciones
-los permisos basados en listas de control de accesos, pero se su estudio se
-diferirá para más adelante.
+Por lo general, el primer sistema es suficiente y es al que dedicaremos el resto
+del epígrafe.
+
+.. seealso:: Más adelante, el manual estudia también las :ref:`reglas ACL <acls>`.
+
+.. note:: Hay otros metadatos de archivo que influyen en los permisos de usuario
+   como los :ref:`atributos de archivo <ext4-fattr>` o los :ref:`atributos
+   extendidos <xattr>`, pero que no trataremos aquí.
 
 .. _ugo:
 
-Estándar |POSIX|
-----------------
-En el sistema clásico de permisos de *unix* cada archivo tiene un usuario
+Sistema |UGO|
+-------------
+En el sistema clásico de permisos de *Unix* cada archivo tiene un usuario
 propietario y un grupo propietario, que ya hemos visto que pueden consultarse a
-través de :ref:`ls <ls>` o :ref:`stat <stat>`. Recibe también el nombre de
-*permisos UGO* (de **U**\ suario-\ **G**\ rupo-\ **Otro**\ ), porque consiste
-en definir los permisos del archivo para:
+través de :ref:`ls <ls>` o :ref:`stat <stat>`. El nombre es un acrónimo de
+**U**\ suario-\ **G**\ rupo-\ **Otro**\ ), porque consiste en definir los
+permisos del archivo para:
 
 * El usuario propietario.
 * El grupo propietario.
@@ -78,7 +80,7 @@ cálculo::
 .. _perm-habituales:
 
 Permisos habituales
-"""""""""""""""""""
+-------------------
 Hemos introducido ya los permisos habituales, pero no hemos entrado a valorar
 qué significan exactamente. Dependiendo de si el archivo es un archivo regular o
 un directorio, el significado cambia:
@@ -110,7 +112,7 @@ un directorio, el significado cambia:
 .. _perm-especiales:
 
 Permisos especiales
-"""""""""""""""""""
+-------------------
 Además de los permisos habituales, se pueden definir sobre los archivos otros
 tres permisos:
 
@@ -177,7 +179,7 @@ para el grupo propietario::
    ejecución no existe, la letra se muestra en mayúscula.
 
 Máscara
-"""""""
+-------
 Cuando se crean archivo y directorios, estos pertenecen al usuario que lo crea
 y el grupo propietario es el principal del creador. Además, se crean con unos
 permisos específicos::
@@ -222,7 +224,7 @@ permisos específicos::
       autenticación <pam-umask>`.
 
 Manipulación
-""""""""""""
+------------
 Manipular el sistema de permisos implica cambiar usuario y grupo propietarios y
 cambiar los propios permisos.
 
@@ -339,97 +341,6 @@ cambiar los propios permisos.
 
    Como las dos órdenes anteriores, dispone de la opción ``-R``.
 
-.. _ext4-xattr:
-
-Atributos extendidos
---------------------
-**ext4** permite asignar a los archivos una serie de atributos que modifican
-su comportamiento. No son en modo alguno permisos, aunque alguno de estos
-atributos influye en la capacidad que tenemos para modificar o eliminar su
-información. Para manipularlos es necesario ser administrador.
-
-.. _lsattr:
-.. index:: lsattr
-
-:command:`lsattr`
-   Sirve para comprobar cuáles son los atributos que tiene asignados el
-   archivo::
-
-      $ lsattr archivo
-      -------------e-- archivo
-
-   Sólo tiene activo el atributo ``e``\ [#]_.
-
-.. _chattr:
-.. index:: chattr
-
-:command:`chattr`
-   Permite modificar el atributo con un signo ``+`` para activarlo y con un
-   signo menos para desactivarlo. Por ejemplo, para hacer inmutable el archivo
-   (lo cual implica que sea imborrable)::
-
-      # chattr +i archivo
-      # lsaatr archivo
-      ----i--------e-- archivo
-
-   Hecho esto, será imposible alterar de forma alguna el archivo, incluso siendo
-   administrador::
-
-      # rm archivo
-      rm: no se puede borrar «archivo»: Operación no permitida
-      # echo "GGGGG" >> archivo
-      -su: archivo: Permiso denegado
-
-.. _user_xattr:
-
-Atributos extendidos de usuario
--------------------------------
-Los *atributos extendidos de usuario* tampoco tienen relación con permisos, pero
-permiten asociar a un archivo atributos arbitrarios de texto con su respectivo
-valor. Para poder utilizarlos es necesario haber instalado el paquete *attr* y
-que el sistema de archivos haya sido montado con la opción user_xattr::
-
-   $ grep xattr /proc/fs/ext4/sda1/options
-   user_xattr
-
-.. _attr:
-.. index:: attr
-
-:command:`attr`
-   Para consultar y definir los atributos extendidos de usuarios puede usarse el
-   comando :command:`attr`\ [#]_::
-
-      $ touch archivo
-      $ attr -qs autor -V "Perico de los Palotes" archivo
-      $ attr -qs desc -V "Un archivo vacio" archivo
-
-   Esto ha fijado dos atributos: *autor* y *desc* (de descripción). Los
-   atributos son arbitrarios, así que pueden usarse cualquier nombre. Podemos
-   consultados también con :command:`attr`::
-
-      $ attr -ql archivo
-      autor
-      desc
-      $ attr -qg autor archivo
-      Perico de los Palotes
-
-   También pueden borrarse atributos ya creados::
-
-      $ attr -qr autor archivo
-      $ attr -ql archivo
-      desc
-
-.. _setfattr:
-.. _getfattr:
-
-El paquete *attr* también incluye los programas :command:`setfattr` y
-:command:`getfattr`, que permiten fijar, borrar y consultar permisos.
-
-.. warning::
-   Cuando se usan :command:`setfattr` y :command:`getfattr` a los nombres
-   de los atributos se les debe añadir el prefijo *user*: *user.autor*,
-   *user.desc*, etc.
-
 .. _ej-perm:
 
 .. include:: /99-ejercicios/05-permisos.rst
@@ -455,12 +366,5 @@ El paquete *attr* también incluye los programas :command:`setfattr` y
        en decimal. Para archivos obtendremos, :math:`666 - 022 = 644` y, para
        directorios, :math:`777 - 022 = 755`.
 
-.. [#] Todos los atributos disponibles y su explicación correspondiente se
-       encuentran disponibles en la página de manual de :command:`chattr`.
-
-.. [#] El comando no viene instalado de serie, por lo que es necesario instalar
-   el paquete homónimo::
-
-      # apt-get install attr
-
 .. |POSIX| replace:: :abbr:`POSIX (Portable Operating System Interface for uniX)`
+.. |UGO| replace:: :Abbr:`UGO (User-Group-Others)`

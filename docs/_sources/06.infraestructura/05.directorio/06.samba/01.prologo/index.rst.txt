@@ -62,8 +62,8 @@ Sistema de ficheros
 -------------------
 
 Hay que asegurarse de que el sistema de ficheros que compartiremos con samba\
-[#]_ soporta :ref:`atributos extendidos de usuarios <user_xattr>` y
-:ref:`permisos acl <acls>`. Lo habitual en *linux* es que usemos *ext4* y este
+[#]_ soporta :ref:`atributos extendidos de usuarios <xattr>` y
+:ref:`permisos ACL <acls>`. Lo habitual en *linux* es que usemos *ext4* y este
 ya tiene habilitadas estas dos características por defecto. De todos modos,
 podemos cercionarnos revisando las opciones de montaje de la partición
 :file:`/dev/VGserver/samba`, que es en la que se supone que almacenaremos los

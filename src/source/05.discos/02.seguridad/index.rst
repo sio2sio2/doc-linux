@@ -1,7 +1,7 @@
 .. _segavanz:
 
-Seguridad en el acceso y los datos
-==================================
+Acceso a datos
+==============
 Ya se ha tratado el modo básico de gestionar la seguridad de archivos y
 directorios a través de :ref:`usuarios y permisos <permusu>`. Ello supone usar
 el sistema de permisos |POSIX| sobre un mecanismo de control de accesos |DAC|, lo
