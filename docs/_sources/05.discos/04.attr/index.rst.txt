@@ -15,7 +15,8 @@ determinado archivo. La mayor parte de los sistemas de archivos utilizados en
 nombres distinto):
 
 Atributos extendidos de seguridad (*security*)
-   Son atributos que utiliza los módulos de seguridad del kernel como SELinux_.
+   Son atributos que se utilizan para los módulos de seguridad del kernel como
+   SELinux_ o para implementar las :ref:`capacidades <capabilities>`.
 
 Atributos extendidos de sistema (*system*):
    Se utilizan para implementar las :ref:`ACL <acls>`, por lo que se manipulan a
@@ -24,7 +25,7 @@ Atributos extendidos de sistema (*system*):
 
 Atributos extendidos de confianza (*trusted*):
    Son atributos solamente accesibles para los procesos que tiene la
-   :ref:`capacidad <capabilitites>` *CAP_SYS_ADMIN*.
+   :ref:`capacidad <capabilities>` *CAP_SYS_ADMIN*.
 
 Atributos extendidos de usuario (*user*):
    Son atributos definidos a volutad por el usuario sobre archivos regulares y
@@ -36,18 +37,18 @@ Atributos extendidos de usuario (*user*):
 Para poder definidor *atributos extendidos de usuarios* se precisan dos
 requisitos:
 
-   + Que el sistema de archivos los soporte y los tenga habilitados (lo cual es
-     lo habitual en sistemas de archivos modernos)::
++ Que el sistema de archivos los soporte y los tenga habilitados (lo cual es
+  lo habitual en sistemas de archivos modernos)::
 
-      $ grep xattr /proc/fs/ext4/sda1/options
-      user_xattr
+   $ grep xattr /proc/fs/ext4/sda1/options
+   user_xattr
 
-   + Tener instalado el paquete *attr*::
++ Tener instalado el paquete *attr*::
 
-      # apt install attr
+   # apt install attr
 
 El paquete proporciona las herramientas básicas para manipular los atributos
-extendidos de usuario::
+extendidos de usuario:
 
 .. _attr:
 .. index:: attr
