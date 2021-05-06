@@ -1,8 +1,76 @@
 .. _capabilities:
 
 Privilegios
-============
-.. todo:: En este epígrafe deben tratarse las capabilities tomando como
-   referencia la página del manual (:manpage:`capabilities(7)`).
+===========
+Cuando la consecución de una acción implica exclusivamente la manipulación de un archivo, basta con tener permisos sobre tal archivo para poder llevarla a término. Por ejemplo, :ref:`los dispositivos tiene un representación como archivo <dispositivos>` (p.e. :file:`/dev/sda`), por lo que el privilegio de particionar un disco se reduce a tener permisos de escritura sobre el archivo que lo representa. Sin embargo, existen otras actuaciones que no están directamente relaconadas con un archivo por lo que, en consecuencia, el privilegio no puede reducirse a un mero problema de permisos sobre archivos. Tal es el caso de cambiar de hora el sistema o crear o manipular una interfaz de red.
+
+Trataremos bajo este epígrafe las dos estrategias para que un usuario
+inicialmente sin privilegios pueda llevar a término estas acciones
+privilegiadas.
+
+.. warning:: El núcleo de *Linux* se desentiende del *setuid* y las
+   *capabilities* definidas en ejecutables interpretados (p.e. un *script* de
+   :program:`bash`). Así pues, su definición sólo tiene sentido para programas
+   compilados. Esta limitación, no obstante, no es común a todos los *UNIX*.
+
+.. rubric:: El *setuid*
+
+La solución tradicional en los sistemas *Linux* fue la dicotomía entre el usuario con *UID* **0** (o sea, *root*) y el resto: con el primero el *kernel* salta todas las comprobaciones referentes a privilegios convirtiéndolo en un usuario omnímodo; mientras que sobre los demás operan los permisos de archivo y las limitaciones en las acciones privilegidas. En consecuencia, la única forma de que un usuario pueda realizar algo sobre lo que no tiene privilegio es actuar con *UID* **0**. Para eso se creó el :ref:`setuid <perm-especiales>` y todas las escaladas legítimas de privilegios se basan en ello:
+
++ En principio, aplicar el *setuid* a un programa cuyo propietario es el
+  administrador implica que cualquier usuario actúe de forma incondicional como
+  administrador cuando lo ejecuta.
++ Una variante es :ref:`su <su>` (o :ref:`runuser <runuser>`): tiene el *setuid*
+  activado, pero para que dé paso es necesario conocer la contraseña de
+  administrador, por lo que el acceso no es incondicional. En contraposición,
+  da acceso a cualquier acción, ya que convierte al usuario en administrador.
++ La última variante más restrictiva aún es :ref:`sudo <sudo>`: como el anterior
+  tiene el *setuid* activado y también establece una autenticación para su uso,
+  pero a diferencia de :command:`su`, permite definir unas reglas que limitan
+  qué puede hacer como administrador el usuario. Gracias a ello, puede definirse
+  que un determinado usuario sólo pueda ejecutar un programa como administrador
+  o incluso definir con qué argumentos podrá ejecutar tal programa.
+
+Gracias a :command:`sudo`, pues, pueden restringirse los casos en los que un
+usuario sin privilegios accede a ser administrador. Sin embargo, su
+identificación como *root* es completa y el proceso correrá con privilegios
+absolutos. Por tanto, sigue adoleciendo del principal problema de segurodad
+asociado al *setuid*: violar el `principio de mínimo privilegio
+<https://news.sophos.com/es-es/2013/03/25/principio-de-minimo-privilegio-reducir-el-area-de-ataque/>`,
+lo cual propicia que cualquier programa se convierta en un peligro potencial de
+seguridad si contiene algún *bug* que permita a un usuario malintencionado
+utilizar el programa para algo distinto de lo que fue diseñado.
+
+.. rubric:: Las capacidades
+
+Por este motivo, *Linux* a partir de su versión *2.2* introdujo el concepto de
+:manpage:`capabilities(7)`, cuya filosofía es descomponer el poder 
+para realizar acciones privilegiadas en múltiples capacidades
+independientes. De este modo, en vez de darle poder absoluto a un programa
+activando su *setuid*, se le activan exclusivamente las capacidades necesarias
+para que pueda completar su tarea. Por ejemplo, si requerimos que un programa
+cree y configure alguna interfaz de red podemos, simplemente, activarle la
+capacidad **CAP_NET_ADMIN**.
+
+Las herramientas para manipular las capacidades deben estar ya instaladas en el
+sistema, puesto que el paquete que las contiene (*libcap2-bin*) es dependencia
+de *systemd*. En cualquier caso, antes de ilustrar cómo usarlas, conviene
+explicar en qué consisten:
+
+.. todo:: Seguir e introducir libpam-cap
+
+Los archivos permiten definir cada capacidad por separado con un juego de tres
+*flags*:
+
+**P**\ *ermitida*
+
+**E**\ *fectiva*
+
+*heredable* (**I**\ *nheritable*)
+
+.. https://www.elladodelmal.com/2021/02/como-escalar-privilegios-en-gnulinux.html
+.. https://clibre.io/blog/por-secciones/hardening/item/417-capabilities-compartimentar-al-todopoderoso-root#tabla-resumen-de-las-operaciones-permitidas-en-cada-capability
+.. https://blog.container-solutions.com/linux-capabilities-why-they-exist-and-how-they-work
 
 .. https://www.incibe-cert.es/blog/linux-capabilities
+   https://unix.stackexchange.com/a/87371
