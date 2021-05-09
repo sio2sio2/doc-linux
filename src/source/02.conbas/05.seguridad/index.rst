@@ -21,5 +21,5 @@ del sistema y los datos que se almacenan.
    complejo de lo expuesto aquí. Este es un tema introductorio que analiza el
    control más básico sobre la autenticación y los permisos de archivo.
    Posteriormente son analizados :ref:`otros mecanismos de control de acceso
-   <segavanz>` y se discute sobre la :ref:`política de contraseñas
+   <control-accesos>` y se discute sobre la :ref:`política de contraseñas
    <politica-contraseñas>`.
