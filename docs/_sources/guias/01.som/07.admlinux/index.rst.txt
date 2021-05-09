@@ -12,8 +12,9 @@ ejercicios:
 
 * :ref:`ej-usu`
 
-Además, es necesario como escalar privilegios. En el manual hay :ref:`un
-epígrafe dedicado a esta tarea <escalar-priv>`, pero para nuestro nivel se
+Además, es necesario como obtener privilegios para realizar tareas de
+administración. En el manual hay :ref:`un
+epígrafe dedicado a esta tarea <privilegios>`, pero para nuestro nivel no se
 requiere saber cómo configurar :ref:`sudo <sudo>`, sino simplemente:
 
 - entender que hay distribuciones que usan preferentemente :ref:`su <su>` y

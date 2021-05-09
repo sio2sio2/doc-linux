@@ -1,0 +1,123 @@
+.. _privilegios:
+
+Privilegios
+***********
+En un principio (incluso históricamente hablando), en el sistema corren dos
+tipos de procesos: los **procesos privilegiados** y los **procesos sin
+privilegios**. Es, pues, una distinción dicotómica sin escala de grises: los
+primeros pueden hacer cualquier tipo de llamadas al *kernel*, incluidas aquuellas
+que requieren un nivel de administración; mientras que para los segundos sólo es
+posible un conjunto de llamadas a nivel de usuario. Por ejemplo, manipular
+interfaces de ed (crear interfaces virtual, dar o borrar configuración, etc) son
+operaciones que requieren privilegio.
+
+.. note:: Téngase en cuenta que dentro de las llamadas no privilegiadas, también
+   existen restricciones: las que se establecen a través de los permisos sobre
+   archivos. Así, por ejemplo, no todos los procesos sin privilegios tienen la
+   capacidad de formatear dispostivos; sino sólo aquellos cuyo ejecutante posea
+   permisos para escribir sobre la `representación en forma de archivo del
+   dispositivo <dispositivos>`.
+
+Un proceso ejecutado por el usuario de |UID| **0**, esto es, por el
+administrador, es siempre un proceso privilegiado, de ahí que en un sistema
+*UNIX* pueda realizar cualquier acción. La pregunta entonces es, ¿existe alguna
+estrategia para que a un proceso iniciado por un usuario distinto a *root*, se
+le permita ejecutar una acción que requiera privilegios? Y la respuesta es sí:
+hay dos estrategias a las que dedicaremos el resto del epígrafe.
+
+.. warning:: El núcleo de *Linux* se desentiende del *setuid* y las
+   *capabilities* definidas en ejecutables interpretados (p.e. un *script* de
+   :program:`bash`). Así pues, su definición sólo tiene sentido para programas
+   compilados. Esta limitación, no obstante, no es común a todos los *UNIX*.
+
+.. _setuid:
+
+**setuid**
+   La solución tradicional en los sistemas *Linux* para que usuarios sin
+   privilegios puedan realizar acciones privilegidas es el :ref:`setuid
+   <perm-especiales>` habilitado en un ejecutable cuyo propietario es el
+   administrador. De este modo, el proceso corre como si fuera ejecutado por
+   *root*. Basado en estas estrategias, hay tres modos de que el usuario escale
+   legítimamente sus privilegios:
+
+   #. Habilitar directamente el *setuid* sobre el archivo de un ejecutable que
+      pertenece al administrador). De este modo, cualquier usuario con permisos
+      de ejecución creará un proceso privilegiado al ejecutarlo.
+
+   #. Utilizar :ref:`su <su>` (o :ref:`runuser <runuser>`) que es un programa con
+      el *setuid* habilitado, que permite la ejecución de cualquier otro programa.
+      De este modo, cualquier usuario que conozca la contraseña del administrador\
+      [#]_, podrá ejecutar programa de forma privilegiada.
+
+   #. Como variante del anterior, utilizar :ref:`sudo <sudo>`, que también tiene
+      habilitado su *setuid* y cuya principal aportación es ser mucho más
+      configurable que :command:`su`:
+
+      + Para la *autenticación* permite la introducción de la propia contraseña del
+        usuario, de la contraseña del administrador o ninguna.
+      + Permite restringir, según cada usuario, cuáles son los *programas* que
+        podrán ejecutarse en modo privilegiado.
+
+   Por lo general, para que un usuario acceda a una consola interactiva con la
+   identidad de *root*, se usan :command:`su` o :command:`sudo` dependiendo de
+   la distribución:
+
+   - :ref:`su <su>` viene de base en *Debian* y su uso ya se describió::
+
+         $ su -
+
+     Esta orden requiere la introducción de la contraseña de administrador\ [#]_,
+     tras lo cual conseguiremos una sesión interactivos en la que nos convertiremos
+     en el administrador.
+
+   - :ref:`sudo <sudo>` es la estrategia que han adoptado otras
+     distribuciones como *Ubuntu*, y a cuya configuración y uso dedicaremos
+     epígrafe aparte.
+
+
+   Sea como sea, esta estrategia tiene un problema principal: viola el `principio
+   de mínimo privilegio
+   <https://news.sophos.com/es-es/2013/03/25/principio-de-minimo-privilegio-reducir-el-area-de-ataque/>`_,
+   lo cual propicia que cualquier programa se convierta en un peligro potencial de
+   seguridad si contiene algún *bug* que permita a un usuario malintencionado
+   utilizar el programa para algo distinto de lo que fue diseñado.
+
+.. _capabilities:
+
+**Capacidades**
+   por este motivo, *Linux* a partir de su versión *2.2* introdujo el concepto de
+   :manpage:`capabilities(7)`, cuya filosofía es descomponer el poder para realizar
+   acciones privilegiadas en múltiples capacidades independientes (unas 40
+   actualmente). cada una de las cuales habilita la realización de
+   determinadas llamadas del núcleo, de modo que si, por ejemplo, se requiere que
+   un proceso cree y configure alguna interfaz de red podemos, simplemente, deberá
+   tener habilitada la capacidad *CAP_NET_ADMIN*, pero no las restantes.
+
+   Desde el punto de vista de las capacidades, ejecutar un procesos como *root*
+   (que es lo que hace utlizando el *setuid*) equivale a dotar al proceso de
+   todas las capacidades. Profundizaremos en el estudio de las capacidades,
+   también en un :ref:`epígrafe aparte <capabilities-prof>`.
+
+.. rubric:: Profundización
+
+.. toctree::
+   :maxdepth: 1
+   :glob:
+
+   10.priv/[0-9]*
+
+.. rubric:: Notas al pie
+
+.. [#] Puede establecerse alguna condicional adicional como el que el usuario
+   pertenezca a un determinado grupo (típicamente *wheel*).
+
+.. [#] En realidad, :ref:`su <su>` permite convertirse en cualquier otro
+   usuario::
+
+      $ su - otro_usuario
+
+   para la cual se requerirá la contraseña de ese otro usuario (a menos que ya
+   seamos el administrador que cambiará de itentidad sin necesidad de contraseña
+   alguna).
+
+.. |UID| replace:: :abbr:`UID (User IDentifier)`
