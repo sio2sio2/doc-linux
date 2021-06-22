@@ -33,7 +33,12 @@ Ejercicios sobre usuarios y permisos
    a. Permita que se pueda ejecutar.
    #. Ejecútelo.
 
-#. ¿Cuál es el equivalente numérico a los permisos r-xrwxr-x?
+#. ¿Cuál es el equivalente numérico a los permisos :kbd:`r-xrwxr-x`? ¿Cuál es la
+   máscara que debe definirse para que los ficheros de los usuarios se creen con
+   permisos :kbd:`rw-------`?
 
-#. ¿Cuál es la máscara que debe definirse para que los ficheros de los usuarios
-   se creen con permisos rw-------?
+#. Un dispositivo se configura a través de su puerto serie (representando por
+   :file:`/dev/ttyS0` en los sistemas *Linux*), por lo que se conecta mediante
+   cable nuestro equipo con *Linux*. Si configurar implica poder leer y escribir
+   el archivo de dispositivo referido, ¿qué debemos hacer para permitir
+   al usuario habitual configurar el dispositivo?
