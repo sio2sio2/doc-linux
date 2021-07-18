@@ -301,20 +301,11 @@ en un *proxy* |HTTP|:
 
 haproxy
 =======
-A la :ref:`solución general <proxy-transparente-sol-gen>`, basta añadirle estos
-pequeños cambios en la configuración:
-
-* Comentar en la sección *global* los líneas que impiden que
-  :program:`haproxy` se ejecute con permisos de administrador:
-
-  .. code-block:: bash
-
-     #user haproxy
-     #group haproxy
-
-* Añadir a todos los servidores con los que se quiere actuar como proxy
-  transparente una directiva más para que se envíen los paquetes utilizando
-  la |IP| del cliente como origen. Por ejemplo:
+A la :ref:`solución general <proxy-transparente-sol-gen>`, basta añadirle
+algunos pequeños cambios en la configuración. Dependiendo de si queremos correr
+el servicio como administrador o utilizar las :ref:`capabilities <capabilities>`
+así deberán ser los cambios, pero en cualquier caso deberemos configurar
+cualquier *backend* de este modo:
 
   .. code-block:: bash
      :emphasize-lines: 3
@@ -324,26 +315,73 @@ pequeños cambios en la configuración:
         source 0.0.0.0 usesrc clientip
         server ssh 127.1.1.1:22
 
-  .. note:: Si los servidores están en la misma máquina recuerde hacer
-     referencia a ellos usando una |IP| local no habitual como la *127.1.1.1*
-     sugerida en la solución general.
+para que se envíen los paquetes utilizando la |IP| del cliente como origen.
 
-  .. note:: En el caso del servidor web, como se conserva la |IP| del cliente,
-     no es necesario alterar la cabecera `X-Forwarded-For`, pero sí la referente
-     al protocolo, que cambia de |HTTP|\ s a |HTTP|:
+.. note:: Si los servidores finales están en la misma máquina recuerde hacer
+  referencia a ellos usando una |IP| local no habitual como la *127.1.1.1*
+  sugerida en la solución general.
+
+.. note:: En el caso del servidor web, como se conserva la |IP| del cliente,
+  no es necesario alterar la cabecera `X-Forwarded-For`, pero sí la referente
+  al protocolo, que cambia de |HTTP|\ s a |HTTP|:
+
+  .. code-block:: bash
+     :emphasize-lines: 3, 4
+
+     backend http
+        mode http
+        #option forwardfor
+        source 0.0.0.0 usesrc clientip
+        reqadd X-Forwarded-Proto:\ https
+        server nginx 127.1.1.1:80
+
+Y los cambios, según optemos por una estrategia u otra:
+
+**Como root**
+   * Comentar en la sección *global* los líneas que propician
+     que :program:`haproxy` degrade sus permisos una vez arrancado:
 
      .. code-block:: bash
-        :emphasize-lines: 3, 4
 
-        backend http
-           mode http
-           #option forwardfor
-           source 0.0.0.0 usesrc clientip
-           reqadd X-Forwarded-Proto:\ https
-           server nginx 127.1.1.1:80
+        #user haproxy
+        #group haproxy
 
-.. todo:: Probar si `esta solución <https://serverfault.com/a/953868>`_ permite
-   usar :command:`haproxy` sin permisos de administración.
+**Usando capabilities**
+   * Comentar en la sesión *global* las dos líneas anteriores y también otra
+     referente a una jaula que ya es imposible e innecesaria:
+
+     .. code-block:: bash
+
+        #chroot /var/lib/haproxy 
+        #user haproxy
+        #group haproxy
+
+   * Como posiblemente hayamos arrancado ya el servicio, limpiar algunos
+     archivos que genera la ejecución porque pertenecen a *root* y el usuario
+     sin privilegios no tiene permisos para sobrescribirlos::
+
+      # invoke-rc.d haproxy stop
+      # rm -f /run/haproxy.pid /run/haproxy/*
+      # ls -ld /run/haproxy
+      drwxrwsr-x 2 haproxy haproxy 80 Jul 17 21:59 /run/haproxy/
+      # echo 'PIDFILE="/run/haproxy/haproxy.pid"' >> /etc/default/haproxy
+
+     .. note:: La última orden cambia la ubicación del archivo que almacena el
+        |PID| simplemente por pulcritud
+
+   * Forzar a :ref:`systemd <systemd>` para que ejecute el servicio como el
+     usuario *haproxy*, lo cual implica :ref:`manipular su configuración de
+     arranque <systemd-edicion>`::
+     
+      # mkdir /etc/systemd/system/haproxy.service.d
+      # cat > /etc/systemd/system/haproxy.service.d/10-nonroot.conf
+      [Service]
+      User=haproxy
+      Group=haproxy
+      # systemctl daemon-reload
+      # systemctl cat haproxy.service
+      [... configuración vigente del arranque de haproxy ...]
+      # invoke.rc-d haproxy start
 
 .. rubric:: Notas al pie
 
@@ -369,3 +407,4 @@ pequeños cambios en la configuración:
 .. |SSL| replace:: :abbr:`SSL (Secure Socket Layer)`
 .. |SNI| replace:: :abbr:`SNI (Server Name Indication)`
 .. |TCP| replace:: :abbr:`TCP (Transmission Control Protocol)`
+.. |PID| replace:: :abbr:`PID (Process IDentifier)`
