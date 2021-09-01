@@ -331,10 +331,11 @@ donde :kbd:`-d` introduce los nombres de máquina y :kbd:`-w` el directorio raí
 para ese servidor virtual. 
 
 .. note:: Podemos en un mismo certificado asociar varios nombres a distintos
-   directorios raíz, basta con que los nombres asociados al directorio raíz se
-   incluyan antes de su correspondiente directorio raíz::
+   directorios raíz, para lo cual debemos expresar cada directorio raíz
+   inmediatamente después de cada nombre::
 
-      # acme.sh --issue -d example.net -d www.example.net -w /srv/www/default \
+      # acme.sh --issue -d example.net -w /srv/www/default \
+                        -d www.example.net -w /srv/www/default \
                         -d moodle.example.net -w /srv/www/moodle
 
 Una vez generado el certificado, debemos instalarlo para que pueda usarlo
@@ -344,8 +345,22 @@ nuestro servidor :program:`nginx`\ [#]_::
    # acme.sh --install-cert -d example.net --key-file /etc/ssl/private/letsencrypt-example.net.key \
       --fullchain-file /etc/ssl/certs/letsencrypt-fullchain-example.net.cer --reloadcmd "systemctl force-reload nginx"
 
-Con esto, ya es funcional el certificado y, además, se renovará automáticamente,
-aunque nos pueden interesar algunas órdenes adicionales, como la que nos permite
+Esta orden toma las claves, la copia en la localización que indicamos y reinicia
+el servidor por lo que ya es funcional el certificado y, además, se renovará
+automáticamente sin necesidad de que demos la orden expresa o tengamos que
+reiniciar el servidor manualmente.
+
+.. note:: Una línea como la anterior es útil cuando el servidor que usa el
+   certificado mantiene por separado la(s) clave(s) pública(s) de la privada. No
+   hay, sin embargo, ninguna opción que copie juntas en un mismo archivo todas
+   las claves, por lo que si el servidor que usa el certificado requiere esto
+   (p.e. el *proxy* inverso :ref:`haproxy`) entonces tenemos que recurrir a
+   generar el archivo dentro de la orden que expresa :kbd:`--reloadcmd`::
+
+      # acme.sh --install-cert -d example.net \
+                --reloadcmd 'cat $CERT_KEY_PATH $CERT_FULLCHAIN_PATH > /etc/haproxy/keycert.pem && systemctl restart haproxy'
+
+Nos pueden interesar algunas órdenes adicionales, como la que nos permite
 listar todos los certificados gestionados por el *script*::
 
    # acme.sh --list
@@ -357,6 +372,11 @@ o la que permite revocar y borrar alguno de los certificados::
 
 El certificado, aunque ya no esté activo (no aparecerá al usar :kbd:`--list`),
 no se borrará del directorio :file:`/etc/acme.sh/cert/example.net`. Esta operación deberemos hacerla a mano.
+
+.. warning:: Si ha configurado el servidor de manera que :ref:`la conexión no segura
+   redirige a la segura <nginx-https+http>` (lo cual es muy habitual), la
+   revocación no funcionará, así que, antes de revocar comprueba, asegurese de
+   inhabilitarlo temporalmente.
 
 .. rubric:: Configuración
 

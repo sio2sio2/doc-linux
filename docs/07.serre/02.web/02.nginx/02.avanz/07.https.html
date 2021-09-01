@@ -17,7 +17,6 @@
     <script src="../../../../_static/underscore.js"></script>
     <script src="../../../../_static/doctools.js"></script>
     <script src="../../../../_static/translations.js"></script>
-    <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
     <link rel="index" title="Índice" href="../../../../genindex.html" />
     <link rel="search" title="Búsqueda" href="../../../../search.html" />
@@ -355,14 +354,15 @@ generar un certificado para esos nombres se lleva a cabo con:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> acme.sh --issue -d example.net -d www.example.net -w /srv/www/default
 </pre></div>
 </div>
-<p>donde <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">d</kbd></kbd> introduce los nombres de máquina y <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">w</kbd></kbd> el directorio raíz
+<p>donde <kbd class="kbd docutils literal notranslate">-d</kbd> introduce los nombres de máquina y <kbd class="kbd docutils literal notranslate">-w</kbd> el directorio raíz
 para ese servidor virtual.</p>
 <div class="admonition note">
 <p class="admonition-title">Nota</p>
 <p>Podemos en un mismo certificado asociar varios nombres a distintos
-directorios raíz, basta con que los nombres asociados al directorio raíz se
-incluyan antes de su correspondiente directorio raíz:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> acme.sh --issue -d example.net -d www.example.net -w /srv/www/default <span class="se">\</span>
+directorios raíz, para lo cual debemos expresar cada directorio raíz
+inmediatamente después de cada nombre:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> acme.sh --issue -d example.net -w /srv/www/default <span class="se">\</span>
+                  -d www.example.net -w /srv/www/default <span class="se">\</span>
                   -d moodle.example.net -w /srv/www/moodle
 </pre></div>
 </div>
@@ -373,8 +373,24 @@ nuestro servidor <strong class="program">nginx</strong><a class="footnote-refere
    --fullchain-file /etc/ssl/certs/letsencrypt-fullchain-example.net.cer --reloadcmd <span class="s2">&quot;systemctl force-reload nginx&quot;</span>
 </pre></div>
 </div>
-<p>Con esto, ya es funcional el certificado y, además, se renovará automáticamente,
-aunque nos pueden interesar algunas órdenes adicionales, como la que nos permite
+<p>Esta orden toma las claves, la copia en la localización que indicamos y reinicia
+el servidor por lo que ya es funcional el certificado y, además, se renovará
+automáticamente sin necesidad de que demos la orden expresa o tengamos que
+reiniciar el servidor manualmente.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Una línea como la anterior es útil cuando el servidor que usa el
+certificado mantiene por separado la(s) clave(s) pública(s) de la privada. No
+hay, sin embargo, ninguna opción que copie juntas en un mismo archivo todas
+las claves, por lo que si el servidor que usa el certificado requiere esto
+(p.e. el <em>proxy</em> inverso <a class="reference internal" href="../../../05.proxies/03.reverse/01.multi.html#haproxy"><span class="std std-ref">haproxy</span></a>) entonces tenemos que recurrir a
+generar el archivo dentro de la orden que expresa <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">-</kbd>-<kbd class="kbd docutils literal notranslate">reloadcmd</kbd></kbd>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> acme.sh --install-cert -d example.net <span class="se">\</span>
+          --reloadcmd <span class="s1">&#39;cat $CERT_KEY_PATH $CERT_FULLCHAIN_PATH &gt; /etc/haproxy/keycert.pem &amp;&amp; systemctl restart haproxy&#39;</span>
+</pre></div>
+</div>
+</div>
+<p>Nos pueden interesar algunas órdenes adicionales, como la que nos permite
 listar todos los certificados gestionados por el <em>script</em>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> acme.sh --list
 </pre></div>
@@ -384,8 +400,15 @@ listar todos los certificados gestionados por el <em>script</em>:</p>
 <span class="gp">#</span> acme.sh --remove -d example.net
 </pre></div>
 </div>
-<p>El certificado, aunque ya no esté activo (no aparecerá al usar <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">list</kbd></kbd>),
+<p>El certificado, aunque ya no esté activo (no aparecerá al usar <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">-</kbd>-<kbd class="kbd docutils literal notranslate">list</kbd></kbd>),
 no se borrará del directorio <code class="file docutils literal notranslate"><span class="pre">/etc/acme.sh/cert/example.net</span></code>. Esta operación deberemos hacerla a mano.</p>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Si ha configurado el servidor de manera que <a class="reference internal" href="#nginx-https-http"><span class="std std-ref">la conexión no segura
+redirige a la segura</span></a> (lo cual es muy habitual), la
+revocación no funcionará, así que, antes de revocar comprueba, asegurese de
+inhabilitarlo temporalmente.</p>
+</div>
 <p class="rubric">Configuración</p>
 <p>La configuración es prácticamente idéntica a la <a class="reference internal" href="#nginx-autofirmado"><span class="std std-ref">propuesta para los
 certificados autofirmados</span></a>:</p>
@@ -510,7 +533,7 @@ o desde la consola con <strong class="command">openssl</strong> al servidor:</p>
 <div class="admonition warning">
 <p class="admonition-title">Advertencia</p>
 <p><strong class="command">openssl</strong> no usa <abbr title="Server Name Indication">SNI</abbr> a menos que se use la opción
-<kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">servername</kbd></kbd>, de modo que haga las pruebas incluyéndola.</p>
+<kbd class="kbd docutils literal notranslate">-servername</kbd>, de modo que haga las pruebas incluyéndola.</p>
 </div>
 </div>
 <div class="section" id="certificados-con-zerossl">
@@ -525,9 +548,9 @@ registro previo que puede hacerse desde la propia línea de órdenes:</p>
 <p>Si ya estábamos registrados, sígase la <a class="reference external" href="https://github.com/acmesh-official/acme.sh/wiki/ZeroSSL.com-CA">documentación oficial de acme.sh sobre
 `certificados de ZeroSSL</a></p>
 </div>
-<p>Hecho el registro, la generación de certificados con <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">issue</kbd></kbd> es
+<p>Hecho el registro, la generación de certificados con <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">-</kbd>-<kbd class="kbd docutils literal notranslate">issue</kbd></kbd> es
 exactamente igual excepto pòr la salvedad de que deberermos añadir
-<kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">server</kbd> <kbd class="kbd docutils literal notranslate">zerossl</kbd></kbd>:</p>
+<kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">-</kbd>-<kbd class="kbd docutils literal notranslate">server</kbd> <kbd class="kbd docutils literal notranslate">zerossl</kbd></kbd>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> acme.sh --server zerossl --issue -d zero.iescdl.es -w /srv/www/zero1 <span class="se">\</span>
    -d zero2.iescdl.es -w /srv/www/zero2
 </pre></div>
@@ -536,9 +559,9 @@ exactamente igual excepto pòr la salvedad de que deberermos añadir
 <div class="admonition note">
 <p class="admonition-title">Nota</p>
 <p>En realidad la operativa es exactamente la misma que con <a class="reference external" href="https://letsencrypt.org/es`">Let’s
-Encrypt</a> con la salvedad de que requerirá indicar con <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">server</kbd></kbd> cual
+Encrypt</a> con la salvedad de que requerirá indicar con <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">-</kbd>-<kbd class="kbd docutils literal notranslate">server</kbd></kbd> cual
 es la <abbr title="Certification Authority">CA</abbr> en aquellas operaciones que requieren conexión con el servidor
-como <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">issue</kbd></kbd> o <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">revoke</kbd></kbd>.</p>
+como <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">-</kbd>-<kbd class="kbd docutils literal notranslate">issue</kbd></kbd> o <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">-</kbd>-<kbd class="kbd docutils literal notranslate">revoke</kbd></kbd>.</p>
 </div>
 <div class="admonition seealso">
 <p class="admonition-title">Ver también</p>
@@ -567,7 +590,7 @@ instrucciones para nuestro proveedor, la obtención del certificado usando el
 </div>
 <div class="admonition note">
 <p class="admonition-title">Nota</p>
-<p>El argumento de <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">dns</kbd></kbd> depende del proveedor.</p>
+<p>El argumento de <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">-</kbd>-<kbd class="kbd docutils literal notranslate">dns</kbd></kbd> depende del proveedor.</p>
 </div>
 </div>
 <div class="section" id="el-cliente-certbot">
@@ -714,13 +737,13 @@ SSLstrip</span></a>.</p>
 <dd><p>Desgraciadamente, no hay ninguna opción para copiar la clave privada y el
 certificado en un mismo archivo que es lo que requieren servidores como
 <a class="reference internal" href="../../../05.proxies/03.reverse/01.multi.html#haproxy"><span class="std std-ref">haproxy</span></a>. Para el caso de estos programas es posible generar
-el archivo único incluyéndolo en <kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">reloadcmd</kbd></kbd>:</p>
+el archivo único incluyéndolo en <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">-</kbd>-<kbd class="kbd docutils literal notranslate">reloadcmd</kbd></kbd>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> acme.sh --install-cert -d aulas.iescastillodeluna.es --reloadcmd <span class="se">\</span>
    <span class="s1">&#39;cat $CERT_KEY_PATH $CERT_FULLCHAIN_PATH &gt; /etc/haproxy/keycert.pem &amp;&amp; systemctl restart haproxy/etc/haproxy/keycert.pem&#39;</span>
 </pre></div>
 </div>
-<p>Para acciones más complicadas, es posible usar ganchos (<kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">pre</kbd>-<kbd class="kbd docutils literal notranslate">hook</kbd></kbd>,
-<kbd class="kbd docutils literal notranslate"><kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">post</kbd>-<kbd class="kbd docutils literal notranslate">hook</kbd></kbd>).</p>
+<p>Para acciones más complicadas, es posible usar ganchos (<kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">-</kbd>-<kbd class="kbd docutils literal notranslate">pre</kbd>-<kbd class="kbd docutils literal notranslate">hook</kbd></kbd>,
+<kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">-</kbd>-<kbd class="kbd docutils literal notranslate">post</kbd>-<kbd class="kbd docutils literal notranslate">hook</kbd></kbd>).</p>
 </dd>
 <dt class="label" id="id25"><span class="brackets"><a class="fn-backref" href="#id11">11</a></span></dt>
 <dd><p>Lo cual no es ningún problema, puesto que un certificado digital se puede
@@ -814,7 +837,7 @@ consultar la documentación del proyecto <a class="reference external" href="htt
     </div>
     <div class="footer" role="contentinfo">
         &#169; Derechos de autor CC BY 4.0, 2016-2021, José Miguel Sánchez Alés.
-      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 3.4.3.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 3.5.4.
     </div>
   </body>
 </html>

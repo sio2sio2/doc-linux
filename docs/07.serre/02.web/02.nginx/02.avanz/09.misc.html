@@ -17,7 +17,6 @@
     <script src="../../../../_static/underscore.js"></script>
     <script src="../../../../_static/doctools.js"></script>
     <script src="../../../../_static/translations.js"></script>
-    <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
     <link rel="index" title="Índice" href="../../../../genindex.html" />
     <link rel="search" title="Búsqueda" href="../../../../search.html" />
@@ -249,6 +248,129 @@ añadiendo otro bloque a la configuración:</p>
 </div>
 </div>
 </div>
+<div class="section" id="pagina-de-mantenimiento">
+<h2><span class="section-number">7.2.2.2.10.5. </span>Página de mantenimiento<a class="headerlink" href="#pagina-de-mantenimiento" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>En ocasiones, podemos requerir ocultar temporalmente uno o varios de los sitios
+web que nuestro servidor aloja. Podemos optar por distintas estrategias, pero
+una muy cómoda es configurar <strong class="command">nginx</strong> de modo que:</p>
+<ol class="loweralpha simple">
+<li><p>No se requiere alterar la configuración del servidor para habilitar o
+deshabilitar la situación de mantenimiento.</p></li>
+<li><p>Si en <code class="file docutils literal notranslate"><span class="pre">/srv/www/enobras</span></code>, creamos el archivo <code class="file docutils literal notranslate"><span class="pre">enabled</span></code>, todos los
+sitios que alojemos pasarán a encontrarse en mantemiento y se mostrará una
+página que informe de ello.</p></li>
+<li><p>Si deseamos poner en mantemiento un sitio particular, entonces debemos crear
+el archivo <code class="file docutils literal notranslate"><span class="pre">enabled-nombresitio</span></code>. Por ejemplo, para mostrar la página de
+mantenimiento exclusivamente para el sitio <em>info.example.net</em>, debemos crear
+el archivo <code class="file docutils literal notranslate"><span class="pre">enabled-info</span></code>.</p></li>
+</ol>
+<p>Para lograr este comportamiento debemos:</p>
+<ol class="arabic">
+<li><p>Crear el directorio <code class="file docutils literal notranslate"><span class="pre">/srv/www/enobras</span></code> con una página de matenimiento
+apropiada (p.e. <a class="reference download internal" download="" href="../../../../_downloads/630e362f9cfbcbae8fa57aec03d390c7/mantenimiento.html"><code class="xref download docutils literal notranslate"><span class="pre">ésta</span></code></a>).</p></li>
+<li><p>Crear el <em>snippet</em> <a class="reference download internal" download="" href="../../../../_downloads/c887e027546d9098e198d63d9f179b39/mantenimiento.conf"><code class="xref download docutils literal notranslate"><span class="pre">mantenimiento.conf</span></code></a>:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">set</span> <span class="nv">$enobras</span> <span class="s">&quot;/srv/www/mantenimiento/enabled&quot;</span><span class="p">;</span>
+<span class="k">if</span> <span class="s">(-f</span> <span class="s">&quot;</span><span class="nv">$enobras-$host&quot;</span><span class="s">)</span> <span class="p">{</span>
+   <span class="kn">set</span> <span class="nv">$mantenimiento</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="k">if</span> <span class="s">(-f</span> <span class="s">&quot;</span><span class="nv">$enobras&quot;</span><span class="s">)</span> <span class="p">{</span>
+   <span class="kn">set</span> <span class="nv">$mantenimiento</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="c1"># Pero hay que evitar la redirección cuando</span>
+<span class="c1"># se intenta el desafío HTML del protocolo ACME.</span>
+<span class="k">if</span> <span class="s">(</span><span class="nv">$uri</span> <span class="p">~</span> <span class="sr">&quot;/.well-known/&quot;)</span> <span class="p">{</span>
+   <span class="kn">set</span> <span class="nv">$mantenimiento</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="k">if</span> <span class="s">(</span><span class="nv">$mantenimiento</span><span class="s">)</span> <span class="p">{</span>
+   <span class="kn">return</span> <span class="mi">503</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">error_page</span> <span class="mi">503</span> <span class="s">@mantenimiento</span><span class="p">;</span>
+
+<span class="k">location</span> <span class="s">/enobras</span> <span class="p">{</span>
+   <span class="kn">internal</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">location</span> <span class="s">@mantenimiento</span> <span class="p">{</span>
+   <span class="kn">root</span> <span class="s">/srv/www/enobras</span><span class="p">;</span>
+   <span class="kn">rewrite</span> <span class="s">^</span> <span class="s">/mantenimiento.html</span> <span class="s">break</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</li>
+</ol>
+<div class="admonition-todo admonition" id="id1">
+<p class="admonition-title">Por hacer</p>
+<p>La configuración con <abbr title="Internet Protocol">IP</abbr>s que burlan el mantenimiento que se
+aconseja a continuación no está probada.</p>
+</div>
+<p>Listo. Ahora bien, si el mantenimiento exige hacer cambios sobre la página que
+requieren el acceso a la aplicación, la página de mantenimiento nos impedirá
+también a nosotros acceder y, por tanto, hacer y probar los cambios. Una
+solución es habilitar una serie de direcciones <abbr title="Internet Protocol">IP</abbr> desde las que habilitar el
+mantenimiento no tendrá efecto. Para ello necesitamos el módulo <a class="reference external" href="http://nginx.org/en/docs/http/ngx_http_geo_module.html">geo</a>. de
+<strong class="program">nginx</strong>. El módulo puede ayudar a identificar los grupos de direcciones
+<abbr title="Internet Protocol">IP</abbr> que queremos que burlen el mantenimiento. Para ello, debe crearse:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/nginx/conf.d/adminip.conf</span>
+<span class="k">geo</span> <span class="nv">$adminip</span> <span class="p">{</span>
+   <span class="kn">default</span>           <span class="mi">0</span><span class="p">;</span>
+   <span class="kn">127.0.0.0/8</span>       <span class="mi">1</span><span class="p">;</span>
+   <span class="kn">10.0.0.0/8</span>        <span class="mi">1</span><span class="p">;</span>
+   <span class="kn">172.16.0.0/12</span>     <span class="mi">1</span><span class="p">;</span>
+   <span class="kn">192.188.0.0/16</span>    <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>que identifica a los clientes que se conectan desde direcciones locales<a class="footnote-reference brackets" href="#id3" id="id2">1</a>:
+hecho lo cual, podemos modificar <code class="file docutils literal notranslate"><span class="pre">mantenimiento.conf</span></code> para que, cuando la
+<abbr title="Internet Protocol">IP</abbr> del cliente sea una de ellas, no tenga efecto el estado de mantemiento:</p>
+<blockquote>
+<div><div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">set</span> <span class="nv">$enobras</span> <span class="s">&quot;/srv/www/mantenimiento/enabled&quot;</span><span class="p">;</span>
+<span class="k">if</span> <span class="s">(-f</span> <span class="s">&quot;</span><span class="nv">$enobras-$host&quot;</span><span class="s">)</span> <span class="p">{</span>
+   <span class="kn">set</span> <span class="nv">$mantenimiento</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="k">if</span> <span class="s">(-f</span> <span class="s">&quot;</span><span class="nv">$enobras&quot;</span><span class="s">)</span> <span class="p">{</span>
+   <span class="kn">set</span> <span class="nv">$mantenimiento</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="c1"># Pero hay que evitar la redirección cuando</span>
+<span class="c1"># se intenta el desafío HTML del protocolo ACME.</span>
+<span class="k">if</span> <span class="s">(</span><span class="nv">$uri</span> <span class="p">~</span> <span class="sr">&quot;/.well-known/&quot;)</span> <span class="p">{</span>
+   <span class="kn">set</span> <span class="nv">$mantenimiento</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+<span class="hll"><span class="c1"># o cuando se accede desde una IP administrativa</span>
+</span><span class="hll"><span class="k">if</span> <span class="s">(</span><span class="nv">$adminip</span><span class="s">)</span> <span class="p">{</span>
+</span><span class="hll">   <span class="kn">set</span> <span class="nv">$mantenimiento</span> <span class="mi">0</span><span class="p">;</span>
+</span><span class="hll"><span class="p">}</span>
+</span><span class="k">if</span> <span class="s">(</span><span class="nv">$mantenimiento</span><span class="s">)</span> <span class="p">{</span>
+   <span class="kn">return</span> <span class="mi">503</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">error_page</span> <span class="mi">503</span> <span class="s">@mantenimiento</span><span class="p">;</span>
+
+<span class="k">location</span> <span class="s">/enobras</span> <span class="p">{</span>
+   <span class="kn">internal</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">location</span> <span class="s">@mantenimiento</span> <span class="p">{</span>
+   <span class="kn">root</span> <span class="s">/srv/www/enobras</span><span class="p">;</span>
+   <span class="kn">rewrite</span> <span class="s">^</span> <span class="s">/mantenimiento.html</span> <span class="s">break</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div></blockquote>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>El módulo <a class="reference external" href="http://nginx.org/en/docs/http/ngx_http_geo_module.html">geo</a> no viene incluido en el paquete <a class="reference external" href="https://packages.debian.org/stable/nginx-light">nginx-light</a>,
+así que deberá usar uno de los otros dos sabores del servidor.</p>
+</div>
+<p class="rubric">Notas al pie</p>
+<dl class="footnote brackets">
+<dt class="label" id="id3"><span class="brackets"><a class="fn-backref" href="#id2">1</a></span></dt>
+<dd><p>Podríamos, claro está, incluir también alguna dirección publica propia
+desde la que nos solemos conectar al servidor para administrarlo.</p>
+</dd>
+</dl>
+</div>
 </div>
 
 
@@ -269,6 +391,7 @@ añadiendo otro bloque a la configuración:</p>
 <li><a class="reference internal" href="#protocolo-original">7.2.2.2.10.4.2. Protocolo original</a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#pagina-de-mantenimiento">7.2.2.2.10.5. Página de mantenimiento</a></li>
 </ul>
 </li>
 </ul>
@@ -322,7 +445,7 @@ añadiendo otro bloque a la configuración:</p>
     </div>
     <div class="footer" role="contentinfo">
         &#169; Derechos de autor CC BY 4.0, 2016-2021, José Miguel Sánchez Alés.
-      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 3.4.3.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 3.5.4.
     </div>
   </body>
 </html>
