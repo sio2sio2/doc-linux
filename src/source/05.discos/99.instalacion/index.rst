@@ -285,10 +285,10 @@ Las operaciones de personalización son muy particulares y pueden incluir:
 
 Aprovisionamiento fino
 ----------------------
-Como el instalador no soporta *aprovisionamiento fino* es ahora cuando debemos
-llevarlo a cabo. Para ello hemos de arrancar el sistema,  instalar la
-herramienta propiada y convertir el volumen lógico que reservamos para esta
-función en un *pool*::
+Como el instalador no soporta :ref:`aprovisionamiento fino
+<lvm-aprovisionamiento>` es ahora cuando debemos llevarlo a cabo. Para ello
+hemos de arrancar el sistema, instalar la herramienta propiada y convertir el
+volumen lógico que reservamos para esta función en un *pool*::
 
    # apt install thin-provisioning-tools
    # lvconvert --thinpool /dev/VGraid/pool
