@@ -281,7 +281,7 @@ monitorización en el *maestro* (como el *script* de aviso o la orden
 ============================
 Si no se dispone de un |SAI|, puede probarse la configuración gracias al `driver
 dummy-ups <https://networkupstools.org/docs/man/dummy-ups.html>`_. Basta con
-descargar un fichero que contiene los parámetros del router que pretendemos
+descargar un fichero que contiene los parámetros del |SAI| que pretendemos
 comprar. Por ejemplo, en `esta página
 <https://networkupstools.org/ddl/Salicru/SPS_One_700VA.html>`_ hay un par de ellos y definir el |SAI| del siguiente modo:
 
