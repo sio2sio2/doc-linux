@@ -210,9 +210,9 @@ audio :kbd:`tutorial.webm`, necesitamos una :download:`página html como ésta
    Desgraciadamente, el audio es normalmente excesivamente largo como para
    incrustarlo análogamente en el propio |HTML|.
 
-.. note:: El elemento :kbd:`<asciinema-player>` pude incluir el atributo :kbd:`speed`
-   para modificar la velocidad de reproducción. Si se ha grabado vídeo, no obstante,
-   álterar la velocidad es un problema.
+.. note:: El elemento :kbd:`<asciinema-player>` puede incluir el atributo :kbd:`speed`
+   para modificar la velocidad de reproducción. No obstante, si también se ha
+   grabado audio, álterar la velocidad es un problema.
 
 .. rubric:: Notas al pie
 
