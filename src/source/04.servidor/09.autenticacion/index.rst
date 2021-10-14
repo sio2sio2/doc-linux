@@ -237,21 +237,20 @@ Los ficheros de configuración de |PAM| contienen líneas de tres tipos:
 
 .. _pam-auth-update:
 
-A pesar de que la configuración consiste en escribir apropiadamente las líneas
-para que el proceso de autenticación sea el adecuado, las distribuciones
-derivadas de *debian* tienen un :index:`programa <pam-auth-update>` llamado
-:program:`pam-auth-update` que permite mediante menú generar automáticamente las
-líneas de los ficheros :file:`common-*`. De esta forma, la instalación de
-servicios que aportan usuarios y grupos al sistema (como :ref:`samba <samba>` u
-:ref:`openldap <openldap>`).  es bastante sencilla\ [#]_.
-
-.. warning:: La modificación de los ficheros :file:`common-*` es algo delicada
-   por cuanto estos ficheros se generan con :command:`pam-auth-update`. Por lo
+.. warning:: A pesar de que la configuración consiste en escribir apropiadamente
+   las líneas para que el proceso de autenticación sea el adecuado, las
+   distribuciones derivadas de *Debian* tienen un :index:`programa
+   <pam-auth-update>` llamado :program:`pam-auth-update` que permite mediante
+   menú generar automáticamente las líneas de los ficheros :file:`common-*`. De
+   esta forma, la instalación de servicios que aportan usuarios y grupos al
+   sistema (como :ref:`samba <samba>` u :ref:`openldap <openldap>`).  es
+   bastante sencilla\ [#]_. Por ello, es conveniente no modificar los archivos
+   :file:`common-*`, por cuanto se regeneran con :command:`pam-auth-update`. Por lo
    general, añadir alguna directiva al final es posible sin que
    :command:`pam-auth-update` plantee problemas. Ahora bien, si lo que se desea
    es modificar argumentos de líneas que genera la utilidad, entonces es
    conveniente modificar los ficheros de los perfiles de
-   :command:`pam-auth-update` (véase la nota anterior).
+   :command:`pam-auth-update` (en :file:`/usr/share/pam-configs`).
 
 Módulos
 -------
