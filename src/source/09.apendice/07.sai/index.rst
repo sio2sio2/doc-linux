@@ -60,8 +60,8 @@ En :file:`nut.conf` es preciso indicar en qué modo actúa el servidor:
    MODE=standalone  # Para el primer caso (sin esclavos)
    #MODE=netserver  # Para el segundo caso (con esclavos)
 
-En :file:`ups.conf` debemos definir cuál es el |SAI| que configuramos. Para un
-`Salicru SPS One`, por ejemplo:
+Al final de :file:`ups.conf` debemos definir cuál es el |SAI| que configuramos.
+Para un `Salicru SPS One`, por ejemplo:
 
 .. code-block:: ini
 

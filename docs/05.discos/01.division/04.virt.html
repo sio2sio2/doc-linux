@@ -159,7 +159,7 @@ particiones, para ello es necesario usar <strong class="command">partx</strong><
 </pre></div>
 </div>
 <p>Hecho el particionado y expuestas las particiones, lo primero es declarar que la
-tercera partición es un volumen físico<a class="footnote-reference brackets" href="#id7" id="id1">1</a>:</p>
+tercera partición es un volumen físico<a class="footnote-reference brackets" href="#id5" id="id1">1</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> pvcreate /dev/loop0p3
 </pre></div>
 </div>
@@ -331,7 +331,7 @@ las dos órdenes anteriores son equivalente a:</p>
 </div>
 <p>aumenta hasta los 6GiB el volumen lógico cuyo anterior tamaño era 5GiB. Es
 posible también usar porcentajes en vez de tamaños o incrementos absolutos a
-través de la opción <kbd class="kbd docutils literal notranslate">-l</kbd><a class="footnote-reference brackets" href="#id8" id="id2">2</a>:</p>
+través de la opción <kbd class="kbd docutils literal notranslate">-l</kbd><a class="footnote-reference brackets" href="#id6" id="id2">2</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvcreate -l <span class="m">100</span>%FREE VGtest -n tercera
 </pre></div>
 </div>
@@ -454,12 +454,6 @@ sistema de ficheros participa de la ficción del tamaño:</p>
 <span class="go">  pool VGtest twi-aotz-- 388,00m             25,14  12,21</span>
 </pre></div>
 </div>
-<p>El aprovisionamiento fino es especialmente propicio para <a class="reference internal" href="#lvm-snapshots"><span class="std std-ref">las instantáneas</span></a>, ya que permite que la instantánea comparta el <em>pool</em> del
-volumen original. Además, no es necesario indicar tamaño, ya que por defecto se
-creará un volumen con el tamaño del volumen original:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvcreate -s -n tvol1_s VGtest/tvol1
-</pre></div>
-</div>
 <div class="admonition note">
 <p class="admonition-title">Nota</p>
 <p>No soportan aprovisionamiento fino ni el <a class="reference external" href="https://wiki.debian.org/DebianInstaller">instalador de debian</a>, ni <abbr title="GRand Unified Bootloader">GRUB</abbr>, lo cual dificulta
@@ -509,7 +503,7 @@ lógicos y a escribir dentro de él:</p>
 </pre></div>
 </div>
 <p>donde es importante tener presente que el tamaño como máximo puede ser el tamaño
-del volumen original<a class="footnote-reference brackets" href="#id9" id="id3">3</a> (<kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">-l</kbd> <kbd class="kbd docutils literal notranslate">100%ORIGIN</kbd></kbd>). También se puede añadir un
+del volumen original<a class="footnote-reference brackets" href="#id7" id="id3">3</a> (<kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">-l</kbd> <kbd class="kbd docutils literal notranslate">100%ORIGIN</kbd></kbd>). También se puede añadir un
 parámetro adicional para indicar sobre qué volumen físico de los que integran el
 grupo de volúmenes se quiere definir la instantánea. Hecho esto, podemos
 practicar dos estrategias:</p>
@@ -599,55 +593,296 @@ volúmenes de instantánea.</p>
 que realmente exista el espacio ocupado por todos ellos, es muy útil combinarlo
 con las <a class="reference internal" href="#lvm-snapshots"><span class="std std-ref">capacidades de instantánea de LVM</span></a> para tener un
 sistema de archivos con varios puntos de restauración.</p>
-<p>Para ilustrarlo partamos del siguiente disco ficticio al que definimos un grupo
+<p>Puede utilizarse una volumen lógico fuera del «<em>pool</em>» como volumen original
+(véase <a class="reference external" href="https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/logical_volume_manager_administration/thinly_provisioned_snapshot_creation">esta documentación de RedHat</a>),
+pero dado que este volumen original debe quedar como de sólo lectura y
+desactivo, planteemos que el volumen original está dentro del propio «<em>pool</em>».
+Para ilustrarlo partamos del siguiente disco ficticio al que definimos un grupo
 de volúmenes:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> truncate -s 1G <span class="m">0</span>.disk
 <span class="gp">#</span> losetup /dev/loop0 <span class="m">0</span>.disk
 <span class="gp">#</span> vgcreate VGtest /dev/loop0
 </pre></div>
 </div>
-<p>Sobre este grupo de volúmenes definimos un volumen lógico que albergará el
-sistema de archivos:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvcreate -L 300m -n sistema VGtest
+<p>y un «<em>pool</em>» para albergar un volumen y sus instantáneas:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvcreate --thinpool pool -L 500M VGtest
 </pre></div>
 </div>
-<p>y un «<em>pool</em>» para albergar los volúmenes de instantánea<a class="footnote-reference brackets" href="#id10" id="id4">4</a>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvcreate --thinpool pool -l <span class="m">100</span>%FREE VGtest
+<p>y el propio volumen:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvcreate -T -n original -V 350M VGtest/pool
+<span class="gp">#</span> mkfs.ext4 -L ORIGINAL /dev/VGtest/original
+<span class="gp">#</span> mount /dev/VGtest/original /mnt
 </pre></div>
 </div>
-<div class="admonition-todo admonition" id="id5">
-<p class="admonition-title">Por hacer</p>
-<p>SEGUIR…</p>
+<p>A partir de este momento podemos ir generando instantáneas que almacenen
+distintos estados del sistema de archivos. Por ejemplo, si inmediatamente
+generamos una instantánea, tendremos el estado en el que el sistema estaba
+vacío:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvcreate -s -n 0snap VGtest/original
+</pre></div>
 </div>
+<p>Podemos crear, borrar y modificar archivos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="nb">echo</span> <span class="s2">&quot;Primer archivo&quot;</span> &gt; /mnt/uno.txt
+</pre></div>
+</div>
+<p>y estos cambios se aplicarán a la partición original, ya que es esta la que se
+encuentra activa:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvs VGtest
+<span class="go">  LV       VG     Attr       LSize   Pool Origin   Data%  Meta%  Move Log Cpy%Sync Convert</span>
+<span class="hll"><span class="go">  0snap    VGtest Vwi---tz-k 352,00m pool original</span>
+</span><span class="hll"><span class="go">  original VGtest Vwi-aotz-- 352,00m pool          7,79</span>
+</span><span class="go">  pool     VGtest twi-aotz-- 500,00m               5,57   11,72</span>
+</pre></div>
+</div>
+<p>En un estado posterior, podremos generar una nueva instantánea, que fijará estos cambios:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvcreate -s -n 1snap VGtest/original
+</pre></div>
+</div>
+<p>Todas las instantáneas que generemos de este modo están inactivas (no aparece
+la <kbd class="kbd docutils literal notranslate">a</kbd> entre sus atributos) y, además, no se activarán aunque así lo
+ordenemos (atributo <kbd class="kbd docutils literal notranslate">k</kbd>). Si nuestra intención fuera recuperar algún
+archivo de ellas deberíamos corregir esto, hacer las operaciones pertinentes y
+volver a dejar todo como estaba. Por ejemplo, si por error perdemos <code class="file docutils literal notranslate"><span class="pre">uno.txt</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> rm -f /mnt/uno.txt
+</pre></div>
+</div>
+<p>aún podremos recuperarlo de la instantánea «1snap», para lo cual deberemos hacer:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvchange -kn -ay -pr VGtest/1snap
+</pre></div>
+</div>
+<p>que permite la activación (<kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">-k</kbd> <kbd class="kbd docutils literal notranslate">n</kbd></kbd>), activa el volumen (<kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">-a</kbd> <kbd class="kbd docutils literal notranslate">y</kbd></kbd>) y, por
+precaución, hace el volumen de sólo lectura (<kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">-p</kbd> <kbd class="kbd docutils literal notranslate">r</kbd></kbd>). Hecho esto, podemos
+montar el volumen sobre otro punto:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mount /dev/VGtest/1snap /tmp/mnt
+</pre></div>
+</div>
+<p>recuperar el archivo perdido:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cp /tmp/mnt/uno.txt /mnt
+</pre></div>
+</div>
+<p>y dejar todo como estaba en un principio:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> umount /tmp/mnt
+<span class="gp">#</span> lvchange -an -ky -prw Vgtest/1snap
+</pre></div>
+</div>
+<p>Hay, no obstante, un modo más cómodo de gestionar todo esto, que veremos
+justamente a continuación:</p>
 <span class="target" id="snapper"></span><p class="rubric" id="index-5">snapper</p>
-<div class="admonition-todo admonition" id="id6">
-<p class="admonition-title">Por hacer</p>
-<p>Explicar cómo funciona <a class="reference external" href="https://packages.debian.org/stable/snapper">snapper</a>.</p>
+<p><em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/snapper">snapper</a></em> es un programita de la línea de comandos que nos permite
+hacer y mantener instantáneas de una manera bastante cómoda. Además, gestiona
+tanto instantáneas basadas en aprovisionamiento fino de <abbr title="Logical Volume Management">LVM</abbr> como basadas en
+<abbr title="B-tree File System">BtrFS</abbr>, lo cual permite usar una misma interfaz de usuario para ambos tipos de
+instantáneas<a class="footnote-reference brackets" href="#id8" id="id4">4</a>.</p>
+<p>Partamos del supuesto anterior:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> truncate -s 1G <span class="m">0</span>.disk
+<span class="gp">#</span> losetup /dev/loop0 <span class="m">0</span>.disk
+<span class="gp">#</span> vgcreate VGtest /dev/loop0
+<span class="gp">#</span> lvcreate --thinpool pool -L 500M VGtest
+<span class="gp">#</span> lvcreate -T -n original -V 350M VGtest/pool
+<span class="gp">#</span> mkfs.ext4 -L ORIGINAL /dev/VGtest/original
+<span class="gp">#</span> mount /dev/VGtest/original /mnt
+</pre></div>
 </div>
+<p>en que ya hemos preparado el volumen lógico con un sistema de archivos y lo
+hemos montado. A partir de este momento, podemos centrarnos en que el sistema de
+archivos está montado sobre <code class="file docutils literal notranslate"><span class="pre">/mnt</span></code> y usar <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/snapper">snapper</a></em> olvidádonos
+de los comandos propios de <abbr title="Logical Volume Management">LVM</abbr>. Lo primero es crear una configuración asociada
+al punto de montaje que nos sirva para generar las instantáneas:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> snapper -c misnap create-config -f <span class="s2">&quot;lvm(ext4)&quot;</span> /mnt
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Si utilizáramos <strong class="command">snapper</strong> para gestionar las instantáneas de
+un sistema de archivos <abbr title="B-tree File System">BtrFS</abbr>, la única diferencia sería la declaración del
+sistema (-f «btrfs»), todo lo demás sería idéntico y las órdenes a partir de
+ésta las mismas.</p>
+</div>
+<p>Creada la configuración con nombre «misnap», podemos consultar las instantáneas
+que en este punto hay creadas:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> snapper -c misnap list
+<span class="gp"> #</span> <span class="p">|</span> Tipo   <span class="p">|</span> Pre número <span class="p">|</span> Fecha <span class="p">|</span> Usuario <span class="p">|</span> Limpieza <span class="p">|</span> Descripción <span class="p">|</span> Información del usuario
+<span class="go">---+--------+------------+-------+---------+----------+-------------+------------------------</span>
+<span class="go">0  | single |            |       | root    |          | current     |</span>
+</pre></div>
+</div>
+<p>Ahora mismo sólo hay un estado del sistema de archivos montado sobre
+<code class="file docutils literal notranslate"><span class="pre">/mnt</span></code>, el <strong>0</strong>, lo cual es normal, porque aún no hemos creado ninguna
+instantánea. Esta instantánea <strong>0</strong> siempre representará el estado en
+funcionamiento, este es, siempre será el estado sobre el que se reflejen los
+cambios cuando hagamos operaciones sobre el sistema de archivos.</p>
+<p>Aunque podemos olvidarnos de qué es lo que ocurre por debajo (o sea, cómo se
+comporta <abbr title="Logical Volume Management">LVM</abbr>) e incluso desconocerlo, podemos echarle un ojo, visto que
+acabamos aprender cómo gestionar las instantáneas directamente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvm vgtest
+<span class="go">  lv                 vg     attr       lsize   pool origin   data%  meta% move log cpy%sync convert</span>
+<span class="go">  original           vgtest vwi-aotz-- 352,00m pool          5,68</span>
+<span class="go">  pool               vgtest twi-aotz-- 500,00m               4,06 11,43</span>
+</pre></div>
+</div>
+<p>Como es natural, al no haberse generado ninguna instantánea, no se ha creado
+ningún volumen nuevo. Generemos una primera instantáne que refleje el estado
+inicial del sistema de archivos (completamente vacío):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> snapper -c misnap create --description <span class="s2">&quot;Estado inicial&quot;</span>
+</pre></div>
+</div>
+<p>lo cual debe provocar la aparición de una primera instantánea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> snapper -c misnap list
+<span class="gp"> #</span> <span class="p">|</span> Tipo   <span class="p">|</span> Pre número <span class="p">|</span> Fecha                    <span class="p">|</span> Usuario <span class="p">|</span> Limpieza <span class="p">|</span> Descripción    <span class="p">|</span> Información del usuario
+<span class="go">---+--------+------------+--------------------------+---------+----------+----------------+------------------------</span>
+<span class="go">0  | single |            |                          | root    |          | current        |</span>
+<span class="go">1  | single |            | vie 15 oct 2021 17:20:11 | root    |          | Estado inicial |</span>
+</pre></div>
+</div>
+<p>representada por el identificador <strong>1</strong>. Internamente, es obvio que ha surgido
+un nuevo volumen de aprovisionamiento fino:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvm vgtest
+<span class="go">  lv                 vg     attr       lsize   pool origin   data%  meta% move log cpy%sync convert</span>
+<span class="go">  original           vgtest vwi-aotz-- 352,00m pool          5,68</span>
+<span class="go">  original-snapshot1 vgtest vri---tz-k 352,00m pool original</span>
+<span class="go">  pool               vgtest twi-aotz-- 500,00m               4,06 11,43</span>
+</pre></div>
+</div>
+<p>y el comportamiento es idéntico al que se producía cuando operábamos
+directamente con <abbr title="Logical Volume Management">LVM</abbr>. Operemos un cambio sobre el sistema de archivos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="nb">echo</span> <span class="s2">&quot;1&quot;</span> &gt; /mnt/uno.txt
+</pre></div>
+</div>
+<p>La ventaja de usar <strong class="command">snapper</strong> es que es mucho más cómodo ver y recuperar
+estados antiguos. Por ejemplo, para comprobar qué diferencia hay entre el estado
+actual (el <strong>0</strong>) y el inicial (el <strong>1</strong>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> snapper -c misnap status <span class="m">1</span>..0
+<span class="go">+..... /mnt/uno.txt</span>
+</pre></div>
+</div>
+<p>O sea, <strong>0</strong> ha añadido («<kbd class="kbd docutils literal notranslate">+</kbd>») el archivo indicado al estado representado
+con <strong>1</strong>. Lo contrario (ha perdido un archivo), se representa con «<kbd class="kbd docutils literal notranslate">-</kbd>» y
+el cambio en el contenido de un archivo con una «<kbd class="kbd docutils literal notranslate">c</kbd>». Si queremos guardar
+este nuevo estado:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> snapper -c misnap create --description <span class="s2">&quot;Estado 1º&quot;</span>
+<span class="gp">#</span> snapper -c misnap list
+<span class="gp"> #</span> <span class="p">|</span> Tipo   <span class="p">|</span> Pre número <span class="p">|</span> Fecha                    <span class="p">|</span> Usuario <span class="p">|</span> Limpieza <span class="p">|</span> Descripción    <span class="p">|</span> Información del usuario
+<span class="go">---+--------+------------+--------------------------+---------+----------+----------------+------------------------</span>
+<span class="go">0  | single |            |                          | root    |          | current        |</span>
+<span class="go">1  | single |            | vie 15 oct 2021 17:20:11 | root    |          | Estado inicial |</span>
+<span class="go">2  | single |            | vie 15 oct 2021 17:34:31 | root    |          | Estado 1º      |</span>
+</pre></div>
+</div>
+<p>Supongamos ahora que cometemos un desliz y cambias equivocadamente el contenido del archivo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="nb">echo</span> <span class="s2">&quot;&quot;</span> &gt; /mnt/uno.txt
+<span class="gp">#</span> snapper -c misnap status <span class="m">2</span>..0
+<span class="go">c..... /mnt/uno.txt</span>
+<span class="gp">#</span> snapper -c misnap status <span class="m">1</span>..2
+<span class="go">+..... /mnt/uno.txt</span>
+</pre></div>
+</div>
+<p>Podemos comprobar cuál es el cambio muy fácilmente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> snapper -c misnap diff <span class="m">2</span>..0 /mnt/uno.txt
+<span class="go">--- /mnt/.snapshots/2/snapshot/uno.txt  2021-10-15 17:27:26.000000000 +0200</span>
+<span class="go">+++ /mnt/uno.txt        2021-10-15 17:37:07.000000000 +0200</span>
+<span class="go">@@ -1 +1 @@</span>
+<span class="go">-1</span>
+<span class="go">+</span>
+</pre></div>
+</div>
+<p>que muestra la diferencia haciendo uso de la orden <a class="reference internal" href="../../02.conbas/10.texto/02.busqueda.html#diff"><span class="std std-ref">diff</span></a>. Si
+hubiéramos prescindido del archivo concreto, la orden <strong class="command">diff</strong> se hubiera
+ejecutado para cada uno de los archivos distintos entre ambos estados. También
+podemos recuperar una versión antigua del archivo en el estado actual:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> snapper -c misnap undochange <span class="m">2</span>..0 /mnt/uno.txt
+<span class="go">crear:0 modificar:1 eliminar:0</span>
+<span class="gp">#</span> cat /mnt/uno.txt
+<span class="go">1</span>
+</pre></div>
+</div>
+<p>que devolverá el archivo al estado que tenía cuando se hizo la instantánea
+<strong>2</strong>. También pueden eliminarse instantáneas con la suborden <kbd class="kbd docutils literal notranslate">delete</kbd>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> snapper -c misnap delete <span class="m">2</span>
+</pre></div>
+</div>
+<p>Las instantáneas generadas con <strong class="command">snapper</strong> no se limitan a esto. La
+configuración creada inicialmente determina su comportamiento:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> snapper -c misnap get-config
+<span class="go">Clave                  | Valor</span>
+<span class="go">-----------------------+----------</span>
+<span class="go">ALLOW_GROUPS           |</span>
+<span class="go">ALLOW_USERS            |</span>
+<span class="go">BACKGROUND_COMPARISON  | yes</span>
+<span class="go">EMPTY_PRE_POST_CLEANUP | yes</span>
+<span class="go">EMPTY_PRE_POST_MIN_AGE | 1800</span>
+<span class="go">FREE_LIMIT             | 0.2</span>
+<span class="go">FSTYPE                 | lvm(ext4)</span>
+<span class="go">NUMBER_CLEANUP         | yes</span>
+<span class="go">NUMBER_LIMIT           | 50</span>
+<span class="go">NUMBER_LIMIT_IMPORTANT | 10</span>
+<span class="go">NUMBER_MIN_AGE         | 1800</span>
+<span class="go">QGROUP                 |</span>
+<span class="go">SPACE_LIMIT            | 0.5</span>
+<span class="go">SUBVOLUME              | /mnt</span>
+<span class="go">SYNC_ACL               | no</span>
+<span class="go">TIMELINE_CLEANUP       | yes</span>
+<span class="go">TIMELINE_CREATE        | yes</span>
+<span class="go">TIMELINE_LIMIT_DAILY   | 10</span>
+<span class="go">TIMELINE_LIMIT_HOURLY  | 10</span>
+<span class="go">TIMELINE_LIMIT_MONTHLY | 10</span>
+<span class="go">TIMELINE_LIMIT_WEEKLY  | 0</span>
+<span class="go">TIMELINE_LIMIT_YEARLY  | 10</span>
+<span class="go">TIMELINE_MIN_AGE       | 1800</span>
+</pre></div>
+</div>
+<p>El significado de estas variables puede consultar en la página del manual
+<em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/snapper-configs">snapper-configs</a></em>. Por ejemplo, la generación automática de
+instantáneas está habilitada por defecto y un algoritmo (<em>cleanup</em>) que
+determina qué instantáneas periódicas conservar. De hecho, como nos hemos
+demorado un poco al escribir este epígrafe, al programa le ha dado tiempo ha
+hacer una instantánea automática:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> snapper -c misnap list
+<span class="gp"> #</span> <span class="p">|</span> Tipo   <span class="p">|</span> Pre número <span class="p">|</span> Fecha                    <span class="p">|</span> Usuario <span class="p">|</span> Limpieza <span class="p">|</span> Descripción    <span class="p">|</span> Información del usuario
+<span class="go">---+--------+------------+--------------------------+---------+----------+----------------+------------------------</span>
+<span class="go">0  | single |            |                          | root    |          | current        |</span>
+<span class="go">1  | single |            | vie 15 oct 2021 17:20:11 | root    |          | Estado inicial |</span>
+<span class="go">2  | single |            | vie 15 oct 2021 17:34:31 | root    |          | Estado 1º      |</span>
+<span class="go">3  | single |            | vie 15 oct 2021 18:00:32 | root    | timeline | timeline       |</span>
+</pre></div>
+</div>
+<p>Obsérvese que hay instantáneas generadas manualmente y otras generadas
+automáticamente; y en las variables de configuración éstas refieren las
+limitaciones en el número de unas y otras. Al generar una instantánea manualmente
+se pueden marcar como importante del siguiente modo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> snapper -c misnap create -d <span class="s2">&quot;Estado 3º&quot;</span> -u <span class="s2">&quot;important=yes&quot;</span>
+</pre></div>
+</div>
+<p>lo cual hace que el algoritmo de limpieza de las instantáneas manuales las trate
+de un modo especial. En cualquier caso, si se quiere gestionar las instantáneas
+de forma totalmente manual, basta con cambiar la configuración:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> snapper -c misnap set-config <span class="s2">&quot;TIMELINE_CREATE=no&quot;</span> <span class="s2">&quot;NUMBER_CLEANUP=no&quot;</span>
+</pre></div>
+</div>
+<p>y se deshabilitará la creación de instantáneas automáticas y la limpieza de
+instantáneas antiguas (de lo que tendremos que encargarnos nosotros usando la
+suborden <kbd class="kbd docutils literal notranslate">delete</kbd>).</p>
 <p class="rubric">Notas al pie</p>
 <dl class="footnote brackets">
-<dt class="label" id="id7"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dt class="label" id="id5"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
 <dd><p>En las versiones más recientes, esto no es ya necesario y al incluir un
 disco  o partición en un grupo de volúmenes, se define ya como volumen físico
 automáticamente.</p>
 </dd>
-<dt class="label" id="id8"><span class="brackets"><a class="fn-backref" href="#id2">2</a></span></dt>
+<dt class="label" id="id6"><span class="brackets"><a class="fn-backref" href="#id2">2</a></span></dt>
 <dd><p>Los porcentajes puede referirse al espacio libre (<kbd class="kbd docutils literal notranslate">FREE</kbd>) en el grupo
 de volúmenes, al espacio del volumen lógico (<kbd class="kbd docutils literal notranslate">LV</kbd>), al espacio del grupo
 de volúmenes (<kbd class="kbd docutils literal notranslate">VG</kbd>) y, para instantáneas, <kbd class="kbd docutils literal notranslate">ORIGIN</kbd> que refiere al tamaño
 del volumen original.</p>
 </dd>
-<dt class="label" id="id9"><span class="brackets"><a class="fn-backref" href="#id3">3</a></span></dt>
+<dt class="label" id="id7"><span class="brackets"><a class="fn-backref" href="#id3">3</a></span></dt>
 <dd><p>De hecho, si se hace la instantánea del tamaño del volumen original jamás
 tendremos el problema de que la instantánea sea incapaz de albergar las
 copias de los ficheros originales y se malogre.</p>
 </dd>
-<dt class="label" id="id10"><span class="brackets"><a class="fn-backref" href="#id4">4</a></span></dt>
-<dd><p>El tamaño de este «<em>pool</em>» dependerá, además del tamaño del volúmen
-lógico que contiene el sistema de archivos, del número de instantáneas que
-preveamos que puedan llegarse a hacer. Por otro lado, dentro del grupo de
-volúmenes, pueden existir otros volúmenes lógicos independientes que
-alberguen otros sistemas de archivos.</p>
+<dt class="label" id="id8"><span class="brackets"><a class="fn-backref" href="#id4">4</a></span></dt>
+<dd><p>Crear y gestionar instantáneas con aprovisionamiento fino de <abbr title="Logical Volume Management">LVM</abbr> lo
+acabamos de ver; para lo propio con <abbr title="B-tree File System">BtrFS</abbr>, podemos consultar <a class="reference external" href="https://fedoramagazine.org/btrfs-snapshots-backup-incremental/">este
+artículo en Fedora Magazine</a>.</p>
 </dd>
 </dl>
 </div>

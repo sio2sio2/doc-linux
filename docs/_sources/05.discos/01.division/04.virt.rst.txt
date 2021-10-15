@@ -441,13 +441,6 @@ Sin embargo, el espacio real es el que ocupa el *pool*::
      LV   VG     Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
      pool VGtest twi-aotz-- 388,00m             25,14  12,21
 
-El aprovisionamiento fino es especialmente propicio para :ref:`las instantáneas
-<lvm-snapshots>`, ya que permite que la instantánea comparta el *pool* del
-volumen original. Además, no es necesario indicar tamaño, ya que por defecto se
-creará un volumen con el tamaño del volumen original::
-
-   # lvcreate -s -n tvol1_s VGtest/tvol1
-
 .. note:: No soportan aprovisionamiento fino ni el `instalador de debian
    <https://wiki.debian.org/DebianInstaller>`_, ni |GRUB|, lo cual dificulta
    enormemente meter el sistema de ficheros raíz en un volumen de este tipo.
@@ -598,32 +591,283 @@ que realmente exista el espacio ocupado por todos ellos, es muy útil combinarlo
 con las :ref:`capacidades de instantánea de LVM <lvm-snapshots>` para tener un
 sistema de archivos con varios puntos de restauración.
 
-.. https://fedoramagazine.org/btrfs-snapshots-backup-incremental/
-
+Puede utilizarse una volumen lógico fuera del "*pool*" como volumen original
+(véase `esta documentación de RedHat
+<https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/logical_volume_manager_administration/thinly_provisioned_snapshot_creation>`_),
+pero dado que este volumen original debe quedar como de sólo lectura y
+desactivo, planteemos que el volumen original está dentro del propio "*pool*".
 Para ilustrarlo partamos del siguiente disco ficticio al que definimos un grupo
 de volúmenes::
 
-# truncate -s 1G 0.disk
-# losetup /dev/loop0 0.disk
-# vgcreate VGtest /dev/loop0
+   # truncate -s 1G 0.disk
+   # losetup /dev/loop0 0.disk
+   # vgcreate VGtest /dev/loop0
 
-Sobre este grupo de volúmenes definimos un volumen lógico que albergará el
-sistema de archivos::
+y un "*pool*" para albergar un volumen y sus instantáneas::
 
-# lvcreate -L 300m -n sistema VGtest
+   # lvcreate --thinpool pool -L 500M VGtest
 
-y un "*pool*" para albergar los volúmenes de instantánea\ [#]_::
+y el propio volumen::
 
-# lvcreate --thinpool pool -l 100%FREE VGtest
+   # lvcreate -T -n original -V 350M VGtest/pool
+   # mkfs.ext4 -L ORIGINAL /dev/VGtest/original
+   # mount /dev/VGtest/original /mnt
 
-.. todo:: SEGUIR...
+A partir de este momento podemos ir generando instantáneas que almacenen
+distintos estados del sistema de archivos. Por ejemplo, si inmediatamente
+generamos una instantánea, tendremos el estado en el que el sistema estaba
+vacío::
+
+   # lvcreate -s -n 0snap VGtest/original
+
+Podemos crear, borrar y modificar archivos::
+
+   # echo "Primer archivo" > /mnt/uno.txt
+
+y estos cambios se aplicarán a la partición original, ya que es esta la que se
+encuentra activa:
+
+.. code-block:: console
+   :emphasize-lines: 4, 3
+
+   # lvs VGtest
+     LV       VG     Attr       LSize   Pool Origin   Data%  Meta%  Move Log Cpy%Sync Convert
+     0snap    VGtest Vwi---tz-k 352,00m pool original
+     original VGtest Vwi-aotz-- 352,00m pool          7,79
+     pool     VGtest twi-aotz-- 500,00m               5,57   11,72
+
+En un estado posterior, podremos generar una nueva instantánea, que fijará estos cambios::
+
+   # lvcreate -s -n 1snap VGtest/original
+
+Todas las instantáneas que generemos de este modo están inactivas (no aparece
+la :kbd:`a` entre sus atributos) y, además, no se activarán aunque así lo
+ordenemos (atributo :kbd:`k`). Si nuestra intención fuera recuperar algún
+archivo de ellas deberíamos corregir esto, hacer las operaciones pertinentes y
+volver a dejar todo como estaba. Por ejemplo, si por error perdemos :file:`uno.txt`::
+
+   # rm -f /mnt/uno.txt
+
+aún podremos recuperarlo de la instantánea "1snap", para lo cual deberemos hacer::
+
+   # lvchange -kn -ay -pr VGtest/1snap
+
+que permite la activación (:kbd:`-k n`), activa el volumen (:kbd:`-a y`) y, por
+precaución, hace el volumen de sólo lectura (:kbd:`-p r`). Hecho esto, podemos
+montar el volumen sobre otro punto::
+
+   # mount /dev/VGtest/1snap /tmp/mnt
+
+recuperar el archivo perdido::
+
+   # cp /tmp/mnt/uno.txt /mnt
+
+y dejar todo como estaba en un principio::
+
+   # umount /tmp/mnt
+   # lvchange -an -ky -prw Vgtest/1snap
+
+Hay, no obstante, un modo más cómodo de gestionar todo esto, que veremos
+justamente a continuación:
 
 .. _snapper:
 .. index:: snapper
 
 .. rubric:: snapper
 
-.. todo:: Explicar cómo funciona :deb:`snapper`.
+:manpage:`snapper` es un programita de la línea de comandos que nos permite
+hacer y mantener instantáneas de una manera bastante cómoda. Además, gestiona
+tanto instantáneas basadas en aprovisionamiento fino de |LVM| como basadas en
+|BtrFS|, lo cual permite usar una misma interfaz de usuario para ambos tipos de
+instantáneas\ [#]_.
+
+Partamos del supuesto anterior::
+
+   # truncate -s 1G 0.disk
+   # losetup /dev/loop0 0.disk
+   # vgcreate VGtest /dev/loop0
+   # lvcreate --thinpool pool -L 500M VGtest
+   # lvcreate -T -n original -V 350M VGtest/pool
+   # mkfs.ext4 -L ORIGINAL /dev/VGtest/original
+   # mount /dev/VGtest/original /mnt
+
+en que ya hemos preparado el volumen lógico con un sistema de archivos y lo
+hemos montado. A partir de este momento, podemos centrarnos en que el sistema de
+archivos está montado sobre :file:`/mnt` y usar :manpage:`snapper` olvidádonos
+de los comandos propios de |LVM|. Lo primero es crear una configuración asociada
+al punto de montaje que nos sirva para generar las instantáneas::
+
+   # snapper -c misnap create-config -f "lvm(ext4)" /mnt
+
+.. note:: Si utilizáramos :command:`snapper` para gestionar las instantáneas de
+   un sistema de archivos |BtrFS|, la única diferencia sería la declaración del
+   sistema (-f "btrfs"), todo lo demás sería idéntico y las órdenes a partir de
+   ésta las mismas.
+
+Creada la configuración con nombre "misnap", podemos consultar las instantáneas
+que en este punto hay creadas::
+
+   # snapper -c misnap list
+    # | Tipo   | Pre número | Fecha | Usuario | Limpieza | Descripción | Información del usuario
+   ---+--------+------------+-------+---------+----------+-------------+------------------------
+   0  | single |            |       | root    |          | current     |                        
+
+Ahora mismo sólo hay un estado del sistema de archivos montado sobre
+:file:`/mnt`, el **0**, lo cual es normal, porque aún no hemos creado ninguna
+instantánea. Esta instantánea **0** siempre representará el estado en
+funcionamiento, este es, siempre será el estado sobre el que se reflejen los
+cambios cuando hagamos operaciones sobre el sistema de archivos.
+
+Aunque podemos olvidarnos de qué es lo que ocurre por debajo (o sea, cómo se
+comporta |LVM|) e incluso desconocerlo, podemos echarle un ojo, visto que
+acabamos aprender cómo gestionar las instantáneas directamente::
+
+   # lvm vgtest
+     lv                 vg     attr       lsize   pool origin   data%  meta% move log cpy%sync convert
+     original           vgtest vwi-aotz-- 352,00m pool          5,68                                   
+     pool               vgtest twi-aotz-- 500,00m               4,06 11,43
+
+Como es natural, al no haberse generado ninguna instantánea, no se ha creado
+ningún volumen nuevo. Generemos una primera instantáne que refleje el estado
+inicial del sistema de archivos (completamente vacío)::
+
+   # snapper -c misnap create --description "Estado inicial"
+
+lo cual debe provocar la aparición de una primera instantánea::
+
+   # snapper -c misnap list
+    # | Tipo   | Pre número | Fecha                    | Usuario | Limpieza | Descripción    | Información del usuario
+   ---+--------+------------+--------------------------+---------+----------+----------------+------------------------
+   0  | single |            |                          | root    |          | current        |                        
+   1  | single |            | vie 15 oct 2021 17:20:11 | root    |          | Estado inicial |
+
+representada por el identificador **1**. Internamente, es obvio que ha surgido
+un nuevo volumen de aprovisionamiento fino::
+
+   # lvm vgtest
+     lv                 vg     attr       lsize   pool origin   data%  meta% move log cpy%sync convert
+     original           vgtest vwi-aotz-- 352,00m pool          5,68                                   
+     original-snapshot1 vgtest vri---tz-k 352,00m pool original                                        
+     pool               vgtest twi-aotz-- 500,00m               4,06 11,43
+
+y el comportamiento es idéntico al que se producía cuando operábamos
+directamente con |LVM|. Operemos un cambio sobre el sistema de archivos::
+
+   # echo "1" > /mnt/uno.txt
+
+La ventaja de usar :command:`snapper` es que es mucho más cómodo ver y recuperar
+estados antiguos. Por ejemplo, para comprobar qué diferencia hay entre el estado
+actual (el **0**) y el inicial (el **1**)::
+
+  # snapper -c misnap status 1..0
+  +..... /mnt/uno.txt
+
+O sea, **0** ha añadido (":kbd:`+`") el archivo indicado al estado representado
+con **1**. Lo contrario (ha perdido un archivo), se representa con ":kbd:`-`" y
+el cambio en el contenido de un archivo con una ":kbd:`c`". Si queremos guardar
+este nuevo estado::
+
+   # snapper -c misnap create --description "Estado 1º"
+   # snapper -c misnap list
+    # | Tipo   | Pre número | Fecha                    | Usuario | Limpieza | Descripción    | Información del usuario
+   ---+--------+------------+--------------------------+---------+----------+----------------+------------------------
+   0  | single |            |                          | root    |          | current        |                        
+   1  | single |            | vie 15 oct 2021 17:20:11 | root    |          | Estado inicial |
+   2  | single |            | vie 15 oct 2021 17:34:31 | root    |          | Estado 1º      |
+
+Supongamos ahora que cometemos un desliz y cambias equivocadamente el contenido del archivo::
+
+   # echo "" > /mnt/uno.txt
+   # snapper -c misnap status 2..0
+   c..... /mnt/uno.txt
+   # snapper -c misnap status 1..2
+   +..... /mnt/uno.txt
+
+Podemos comprobar cuál es el cambio muy fácilmente::
+
+   # snapper -c misnap diff 2..0 /mnt/uno.txt
+   --- /mnt/.snapshots/2/snapshot/uno.txt  2021-10-15 17:27:26.000000000 +0200
+   +++ /mnt/uno.txt        2021-10-15 17:37:07.000000000 +0200
+   @@ -1 +1 @@
+   -1
+   +
+
+que muestra la diferencia haciendo uso de la orden :ref:`diff <diff>`. Si
+hubiéramos prescindido del archivo concreto, la orden :command:`diff` se hubiera
+ejecutado para cada uno de los archivos distintos entre ambos estados. También
+podemos recuperar una versión antigua del archivo en el estado actual::
+
+   # snapper -c misnap undochange 2..0 /mnt/uno.txt
+   crear:0 modificar:1 eliminar:0
+   # cat /mnt/uno.txt 
+   1
+
+que devolverá el archivo al estado que tenía cuando se hizo la instantánea
+**2**. También pueden eliminarse instantáneas con la suborden :kbd:`delete`::
+
+   # snapper -c misnap delete 2
+
+Las instantáneas generadas con :command:`snapper` no se limitan a esto. La
+configuración creada inicialmente determina su comportamiento::
+
+   # snapper -c misnap get-config
+   Clave                  | Valor    
+   -----------------------+----------
+   ALLOW_GROUPS           |          
+   ALLOW_USERS            |          
+   BACKGROUND_COMPARISON  | yes      
+   EMPTY_PRE_POST_CLEANUP | yes      
+   EMPTY_PRE_POST_MIN_AGE | 1800     
+   FREE_LIMIT             | 0.2      
+   FSTYPE                 | lvm(ext4)
+   NUMBER_CLEANUP         | yes      
+   NUMBER_LIMIT           | 50       
+   NUMBER_LIMIT_IMPORTANT | 10       
+   NUMBER_MIN_AGE         | 1800     
+   QGROUP                 |          
+   SPACE_LIMIT            | 0.5      
+   SUBVOLUME              | /mnt     
+   SYNC_ACL               | no       
+   TIMELINE_CLEANUP       | yes      
+   TIMELINE_CREATE        | yes      
+   TIMELINE_LIMIT_DAILY   | 10       
+   TIMELINE_LIMIT_HOURLY  | 10       
+   TIMELINE_LIMIT_MONTHLY | 10       
+   TIMELINE_LIMIT_WEEKLY  | 0        
+   TIMELINE_LIMIT_YEARLY  | 10       
+   TIMELINE_MIN_AGE       | 1800
+
+El significado de estas variables puede consultar en la página del manual
+:manpage:`snapper-configs`. Por ejemplo, la generación automática de
+instantáneas está habilitada por defecto y un algoritmo (*cleanup*) que
+determina qué instantáneas periódicas conservar. De hecho, como nos hemos
+demorado un poco al escribir este epígrafe, al programa le ha dado tiempo ha
+hacer una instantánea automática::
+
+   # snapper -c misnap list
+    # | Tipo   | Pre número | Fecha                    | Usuario | Limpieza | Descripción    | Información del usuario
+   ---+--------+------------+--------------------------+---------+----------+----------------+------------------------
+   0  | single |            |                          | root    |          | current        |                        
+   1  | single |            | vie 15 oct 2021 17:20:11 | root    |          | Estado inicial |
+   2  | single |            | vie 15 oct 2021 17:34:31 | root    |          | Estado 1º      |
+   3  | single |            | vie 15 oct 2021 18:00:32 | root    | timeline | timeline       |
+
+Obsérvese que hay instantáneas generadas manualmente y otras generadas
+automáticamente; y en las variables de configuración éstas refieren las
+limitaciones en el número de unas y otras. Al generar una instantánea manualmente
+se pueden marcar como importante del siguiente modo::
+
+# snapper -c misnap create -d "Estado 3º" -u "important=yes"
+
+lo cual hace que el algoritmo de limpieza de las instantáneas manuales las trate
+de un modo especial. En cualquier caso, si se quiere gestionar las instantáneas
+de forma totalmente manual, basta con cambiar la configuración::
+
+   # snapper -c misnap set-config "TIMELINE_CREATE=no" "NUMBER_CLEANUP=no"
+
+y se deshabilitará la creación de instantáneas automáticas y la limpieza de
+instantáneas antiguas (de lo que tendremos que encargarnos nosotros usando la
+suborden :kbd:`delete`).
 
 .. rubric:: Notas al pie
 
@@ -640,11 +884,10 @@ y un "*pool*" para albergar los volúmenes de instantánea\ [#]_::
    tendremos el problema de que la instantánea sea incapaz de albergar las
    copias de los ficheros originales y se malogre.
 
-.. [#] El tamaño de este "*pool*" dependerá, además del tamaño del volúmen
-   lógico que contiene el sistema de archivos, del número de instantáneas que
-   preveamos que puedan llegarse a hacer. Por otro lado, dentro del grupo de
-   volúmenes, pueden existir otros volúmenes lógicos independientes que
-   alberguen otros sistemas de archivos.
+.. [#] Crear y gestionar instantáneas con aprovisionamiento fino de |LVM| lo
+   acabamos de ver; para lo propio con |BtrFS|, podemos consultar `este
+   artículo en Fedora Magazine
+   <https://fedoramagazine.org/btrfs-snapshots-backup-incremental/>`_.
 
 .. |LVM| replace:: :abbr:`LVM (Logical Volume Management)`
 .. |LV| replace:: :abbr:`LV (Logical Volume)`
