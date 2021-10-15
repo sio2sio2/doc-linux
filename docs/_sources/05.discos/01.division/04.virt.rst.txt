@@ -348,6 +348,119 @@ semejante::
      LV      VG     Attr       LSize Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
      segunda VGtest -wi-a----- 3,00g
 
+.. _lvm-aprovisionamiento:
+
+Aprovisionamiento fino
+======================
+El :dfn:`aprovisionamiento fino` (*thin provisioning*, en inglés) consiste en
+reservar para un volumen lógico más espacio de disco del que realmente tiene
+disponible. Es un concepto muy comúnmente usando en virtualización para cuyas
+máquinas virtuales podemos usar discos de un tamaño mucho mayor del que
+realmente ocupa su fichero correspondiente. Algo parecido se logra con la orden
+:ref:`truncate <truncate>`. Se contrapone al :dfn:`aprovisionamiento grueso`, que
+consiste en justo lo contrario, esto es, en reservar exactamente el tamaño del
+volumen. Hasta ahora, hemos practicado con |LVM| este último tipo de
+aprovisionamiento.
+
+Sin embargo, |LVM| soporta *aprovisionamiento fino* que, en principio, puede
+servir para dos propósitos distintos:
+
+- Ajustar el tamaño máximo de varios volúmenes lógicos a parte (o todo)
+  del tamaño del grupo de volúmenes. Si no tenemos claro, cuáles van a ser las
+  necesidades de crecimiento de estos volúmenes, esto puede ahorrarnos la
+  necesidad de hacerlos excesivamente pequeños y, según sea la evolución
+  posterior, tener después que aumentarles progresivamente el tamaño.
+
+- Si instalamos sobre un disco pequeño con intención de que el sistema acabe 
+  corriendo sobre un disco mayor, crear los volúmenes lógicos con el tamaño
+  que tendrán en el disco final. Usaremos esto al plantear la :ref:`instalación
+  del servidor <inst-servidor>`.
+
+Lo primero, antes de empezar, es asegurarse de que está instalado el paquete
+**thin-provisioning-tools**, hecho lo cual, podemos hacer pruebas con un nuevo
+disco::
+
+   # truncate -s 500M 0.disk
+   # losetup /dev/loop0 0.disk
+   # vgcreate VGtest /dev/loop0
+
+Para probar el concepto crearemos dos volúmenes lógicos: el primero normal y el
+segundo un "*pool*", esto es, un volumen en el que encerraremos los volúmenes
+para los que deseamos *aprovisionamiento fino*::
+
+   # lvcreate -L 100m -n fuera VGtest
+   # lvcreate --thinpool pool -l 100%FREE VGtest
+   # lvs VGtest
+     LV    VG     Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+     fuera VGtest -wi-a----- 100,00m                                                    
+     pool  VGtest twi-a-tz-- 388,00m             0,00   10,84
+
+El primero es un volumen de 100MiB y, además, no podrá cambiar su tamaño a menos
+que agrandemos el grupo de volúmenes con, por ejemplo, otro disco. El segundo es
+el *pool* dentro del que podemos crear volúmenes lógicos con aparentemente
+cualquier tamaño::
+
+   # lvcreate -T -n tvol1 -V 1G VGtest/pool
+   # lvcreate -T -n tvol2 -V 2G VGtest/pool
+   # lvs VGtest
+     LV    VG     Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+     fuera VGtest -wi-a----- 100,00m                                                    
+     pool  VGtest twi-aotz-- 388,00m             0,00   11,04                           
+     tvol1 VGtest Vwi-a-tz--   1,00g pool        0,00                                   
+     tvol2 VGtest Vwi-a-tz--   2,00g pool        0,00 
+
+Al crear ambos volúmenes, se nos refiere la opción
+:kbd:`activation/thin_pool_autoextend_threshold`, porque su valor es 100::
+
+   # lvm dumpconfig activation/thin_pool_autoextend_threshold
+   thin_pool_autoextend_threshold=100
+
+La variable fija el tanto por cierto de ocupación del *pool* para el que una vez
+alcanzado se incrementa el tamaño en un porcentaje fijado por::
+
+   # lvm dumpconfig activation/thin_pool_autoextend_percent
+   thin_pool_autoextend_percent=20
+
+pero justamente un valor de 100% deshabilita la posibilidad. Si ponemos un valor
+más bajo (p.e el 85%), sí se llevará a cabo la ampliación automática... si se
+puede, que no es nuestro caso, ya que el grupo de volúmenes está completamente
+lleno.
+
+Si probamos a dar formato a uno de los volúmenes del *pool*, comprobaremos el
+sistema de ficheros participa de la ficción del tamaño::
+
+   # mkfs.ext4 -L TVOL2 /dev/VGtest/tvol2
+   # mount /dev/VGtest/tvol2 /mnt/
+   # df -h /mnt/
+   S.ficheros               Tamaño Usados  Disp Uso% Montado en
+   /dev/mapper/VGtest-tvol2   2,0G   6,0M  1,8G   1% /mnt
+
+Sin embargo, el espacio real es el que ocupa el *pool*::
+
+   # lvs VGtest/pool
+     LV   VG     Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+     pool VGtest twi-aotz-- 388,00m             25,14  12,21
+
+El aprovisionamiento fino es especialmente propicio para :ref:`las instantáneas
+<lvm-snapshots>`, ya que permite que la instantánea comparta el *pool* del
+volumen original. Además, no es necesario indicar tamaño, ya que por defecto se
+creará un volumen con el tamaño del volumen original::
+
+   # lvcreate -s -n tvol1_s VGtest/tvol1
+
+.. note:: No soportan aprovisionamiento fino ni el `instalador de debian
+   <https://wiki.debian.org/DebianInstaller>`_, ni |GRUB|, lo cual dificulta
+   enormemente meter el sistema de ficheros raíz en un volumen de este tipo.
+   Lo primero impide crear o aprovechar volúmenes de aprovisionamiento fino
+   durante el proceso de instalación; y
+   lo segundo obliga a no incluir dentro de ellos el núcleo y el sistema
+   de ficheros inicial (*initrd*), lo cual se traduce en montar  :file:`/boot`
+   aparte o en copiar :ref:`ambos ficheros en la partición ESP
+   <efi-arranque-directo>`.
+
+.. https://www.theurbanpenguin.com/maning-lvm-snapshots/
+.. https://www.theurbanpenguin.com/thin-provisioning-lvm2/
+
 .. _lvm-snapshots:
 
 Instantáneas
@@ -469,127 +582,46 @@ y, si deseamos desecharlos, eliminar el volumen de la instantánea::
    # umount /tmp/snap
    # lvremove /dev/VGtest/primera_snap
 
-.. seealso:: Para la realización más cómoda de instantáneas y la conservación de
-   varios estados sucesivos (y no únicamente uno como lo ilustrado aquí), revise
-   más adelante :ref:`instantáneas con aprovisionamiento fino <snapper>`.
+Obsérvese que si nuestra intención fuera tener varias instantáneas de un mismo
+volumen lógico, entonces tendríamos que crear un volumen de instantánea para
+cada una de ellos, lo que resultaría en la reserva (y malgasto) de una ingente
+cantidad de espacio en el grupo de volúmenes. La solución es utilizar el
+:ref:`aprovisionamiento fino <lvm-aprovisionamiento>` para almacenar los
+volúmenes de instantánea.
 
-.. _lvm-aprovisionamiento:
+.. _lvm-aprovisionamiento-snapshots:
 
-Aprovisionamiento fino
-======================
-El :dfn:`aprovisionamiento fino` (*thin provisioning*, en inglés) consiste en
-reservar para un volumen lógico más espacio de disco del que realmente tiene
-disponible. Es un concepto muy comúnmente usando en virtualización para cuyas
-máquinas virtuales podemos usar discos de un tamaño mucho mayor del que
-realmente ocupa su fichero correspondiente. Algo parecido se logra con la orden
-:ref:`truncate <truncate>`. Se contrapone al :dfn:`aprovisionamiento grueso`, que
-consiste en justo lo contrario, esto es, en reservar exactamente el tamaño del
-volumen. Hasta ahora, hemos practicado con |LVM| este último tipo de
-aprovisionamiento.
+.. rubric:: Instantáneas con aprovisionamiento fino
 
-Sin embargo, |LVM| soporta *aprovisionamiento fino* que, en principio, puede
-servir para dos propósitos distintos:
+Dado que el aprovisionamiento fino permite crear múltiples volúmenes lógicos sin
+que realmente exista el espacio ocupado por todos ellos, es muy útil combinarlo
+con las :ref:`capacidades de instantánea de LVM <lvm-snapshots>` para tener un
+sistema de archivos con varios puntos de restauración.
 
-- Ajustar el tamaño máximo de varios volúmenes lógicos a parte (o todo)
-  del tamaño del grupo de volúmenes. Si no tenemos claro, cuáles van a ser las
-  necesidades de crecimiento de estos volúmenes, esto puede ahorrarnos la
-  necesidad de hacerlos excesivamente pequeños y, según sea la evolución
-  posterior, tener después que aumentarles progresivamente el tamaño.
+.. https://fedoramagazine.org/btrfs-snapshots-backup-incremental/
 
-- Si instalamos sobre un disco pequeño con intención de que el sistema acabe 
-  corriendo sobre un disco mayor, crear los volúmenes lógicos con el tamaño
-  que tendrán en el disco final. Usaremos esto al plantear la :ref:`instalación
-  del servidor <inst-servidor>`.
+Para ilustrarlo partamos del siguiente disco ficticio al que definimos un grupo
+de volúmenes::
 
-Lo primero, antes de empezar, es asegurarse de que está instalado el paquete
-**thin-provisioning-tools**, hecho lo cual, podemos hacer pruebas con un nuevo
-disco::
+# truncate -s 1G 0.disk
+# losetup /dev/loop0 0.disk
+# vgcreate VGtest /dev/loop0
 
-   # truncate -s 500M 0.disk
-   # losetup /dev/loop0 0.disk
-   # vgcreate VGtest /dev/loop0
+Sobre este grupo de volúmenes definimos un volumen lógico que albergará el
+sistema de archivos::
 
-Para probar el concepto crearemos dos volúmenes lógicos: el primero normal y el
-segundo un "*pool*", esto es, un volumen en el que encerraremos los volúmenes
-para los que deseamos *aprovisionamiento fino*::
+# lvcreate -L 300m -n sistema VGtest
 
-   # lvcreate -L 100m -n fuera VGtest
-   # lvcreate --thinpool pool -l 100%FREE VGtest
-   # lvs VGtest
-     LV    VG     Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
-     fuera VGtest -wi-a----- 100,00m                                                    
-     pool  VGtest twi-a-tz-- 388,00m             0,00   10,84
+y un "*pool*" para albergar los volúmenes de instantánea\ [#]_::
 
-El primero es un volumen de 100MiB y, además, no podrá cambiar su tamaño a menos
-que agrandemos el grupo de volúmenes con, por ejemplo, otro disco. El segundo es
-el *pool* dentro del que podemos crear volúmenes lógicos con aparentemente
-cualquier tamaño::
+# lvcreate --thinpool pool -l 100%FREE VGtest
 
-   # lvcreate -T -n tvol1 -V 1G VGtest/pool
-   # lvcreate -T -n tvol2 -V 2G VGtest/pool
-   # lvs VGtest
-     LV    VG     Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
-     fuera VGtest -wi-a----- 100,00m                                                    
-     pool  VGtest twi-aotz-- 388,00m             0,00   11,04                           
-     tvol1 VGtest Vwi-a-tz--   1,00g pool        0,00                                   
-     tvol2 VGtest Vwi-a-tz--   2,00g pool        0,00 
-
-Al crear ambos volúmenes, se nos refiere la opción
-:kbd:`activation/thin_pool_autoextend_threshold`, porque su valor es 100::
-
-   # lvm dumpconfig activation/thin_pool_autoextend_threshold
-   thin_pool_autoextend_threshold=100
-
-La variable fija el tanto por cierto de ocupación del *pool* para el que una vez
-alcanzado se incrementa el tamaño en un porcentaje fijado por::
-
-   # lvm dumpconfig activation/thin_pool_autoextend_percent
-   thin_pool_autoextend_percent=20
-
-pero justamente un valor de 100% deshabilita la posibilidad. Si ponemos un valor
-más bajo (p.e el 85%), sí se llevará a cabo la ampliación automática... si se
-puede, que no es nuestro caso, ya que el grupo de volúmenes está completamente
-lleno.
-
-Si probamos a dar formato a uno de los volúmenes del *pool*, comprobaremos el
-sistema de ficheros participa de la ficción del tamaño::
-
-   # mkfs.ext4 -L TVOL2 /dev/VGtest/tvol2
-   # mount /dev/VGtest/tvol2 /mnt/
-   # df -h /mnt/
-   S.ficheros               Tamaño Usados  Disp Uso% Montado en
-   /dev/mapper/VGtest-tvol2   2,0G   6,0M  1,8G   1% /mnt
-
-Sin embargo, el espacio real es el que ocupa el *pool*::
-
-   # lvs VGtest/pool
-     LV   VG     Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
-     pool VGtest twi-aotz-- 388,00m             25,14  12,21
-
-El aprovisionamiento fino es especialmente propicio para :ref:`las instantáneas
-<lvm-snapshots>`, ya que permite que la instantánea comparta el *pool* del
-volumen original. Además, no es necesario indicar tamaño, ya que por defecto se
-creará un volumen con el tamaño del volumen original::
-
-   # lvcreate -s -n tvol1_s VGtest/tvol1
-
-.. note:: No soportan aprovisionamiento fino ni el `instalador de debian
-   <https://wiki.debian.org/DebianInstaller>`_, ni |GRUB|, lo cual dificulta
-   enormemente meter el sistema de ficheros raíz en un volumen de este tipo.
-   Lo primero impide crear o aprovechar volúmenes de aprovisionamiento fino
-   durante el proceso de instalación; y
-   lo segundo obliga a no incluir dentro de ellos el núcleo y el sistema
-   de ficheros inicial (*initrd*), lo cual se traduce en montar  :file:`/boot`
-   aparte o en copiar :ref:`ambos ficheros en la partición ESP
-   <efi-arranque-directo>`.
-
-.. https://www.theurbanpenguin.com/maning-lvm-snapshots/
-.. https://www.theurbanpenguin.com/thin-provisioning-lvm2/
+.. todo:: SEGUIR...
 
 .. _snapper:
 .. index:: snapper
 
-.. rubric:: Instantáneas con aprovisionamiento fino
+.. rubric:: snapper
 
 .. todo:: Explicar cómo funciona :deb:`snapper`.
 
@@ -607,6 +639,12 @@ creará un volumen con el tamaño del volumen original::
 .. [#] De hecho, si se hace la instantánea del tamaño del volumen original jamás
    tendremos el problema de que la instantánea sea incapaz de albergar las
    copias de los ficheros originales y se malogre.
+
+.. [#] El tamaño de este "*pool*" dependerá, además del tamaño del volúmen
+   lógico que contiene el sistema de archivos, del número de instantáneas que
+   preveamos que puedan llegarse a hacer. Por otro lado, dentro del grupo de
+   volúmenes, pueden existir otros volúmenes lógicos independientes que
+   alberguen otros sistemas de archivos.
 
 .. |LVM| replace:: :abbr:`LVM (Logical Volume Management)`
 .. |LV| replace:: :abbr:`LV (Logical Volume)`
