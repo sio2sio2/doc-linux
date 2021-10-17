@@ -1,0 +1,419 @@
+.. _systemd-personalizacion:
+
+.. highlight:: dosini
+
+Personalización
+===============
+
+Ya se ha explicado cómo consultar, arrancar y parar servicios y cómo funcionan
+los *niveles de ejecución* en *systemd*. Con esto es suficiente para manipular
+de modo básico los servicios. Sin embargo, en algunas ocasiones, es necesario
+manipular la manera en la que arrancan éstos (p.e. añadiendo o eliminando una
+opción a la orden que crea el proceso) o, incluso, crear *lanzadores* de un
+determinado servicio para *systemd*.
+
+Bajo el presente epígrafe se describirá superficialmente cómo está organizado
+*systemd*, cuál es la estructura de los ficheros que permiten arrancar y parar
+los servicios y cómo pueden modificarse éstos para modificar tales acciones.
+
+Preliminares
+------------
+
+Es muy importante tener presente que un servicio no es más que un proceso que
+actúa en segundo plano. Consecuentemente, tal servicio debió originarse cómo
+consecuencia de la invocación de una orden. Por ejemplo, el servicio :ref:`ssh
+<ssh>` se crea mediante la ejecución del programa :program:`sshd`, así que si
+nos aseguramos de que el servicio no está corriendo\ [#]_, podemos levantar el
+servidor directamente del siguiente modo::
+
+   # /usr/sbin/sshd -D
+
+La terminal en este caso quedará ocupada y desde otras máquinas podremos acceder
+al servidor. Sin embargo, este manera de proceder sólo es útil cuando nos
+interesa ver mensajes de salida que pueda proporcionar el servidor en caso de
+depuración. Arrancar un servicio de forma adecuada exige más: controlar si el
+servicio está arrancado o no, hacerlo automáticamente, etc. Por este motivo, los
+servicios no se arrancar directamente, sino que el proceso *init* (en nuestro
+caso particular, *systemd*) se encarga de ello.
+
+Estructura
+----------
+
+Cada servicio\ [#]_ dispone de una unidad de *systemd* que describe los
+requisitos, el ejecutable y los parámetros con que tiene que arrancarse.
+
+En *debian* los ficheros que representan las unidades se incluyen dentro del
+directorio :file:`/lib/systemd/system`. Por ejemplo, para el servicio :abbr:`SSH
+(Secure SHell)` la instalación del paquete *openssh-server* proporciona un
+fichero llamado :file:`ssh.service`. En caso de que se desee hacer algún cambio,
+es mejor no tocarlos, ya que dentro del directorio :file:`/etc/systemd/system`
+se pueden incluir ficheros homónimos que sobrescriben el fichero instalado por
+la distribución.
+
+A partir de ahora nombraremos como :file:`unidad` al fichero que representa a la
+unidad. Por tanto, tendremos un fichero proporcionado por la distribución que es
+:file:`/lib/systemd/system/unidad` que será remplazado por el fichero
+:file:`/etc/systemd/system/unidad`, si existe.
+
+Además de estos ficheros, que representan la unidad, hay una serie de subdirectorios
+dentro de :file:`/etc/systemd/system/unidad` asociados también a ella:
+
+* :file:`unidad.d`, que permite incluir ficheros con directivas adicionales al
+  fichero de configuración principal. Si una directiva también existe en el
+  fichero principal, el valor no se sobreescribirá, sino que pasará a tener ambos
+  valores, lo cual puede ser lícito o no. Para sobreescribir el valor es necesario
+  incluirla primero con valor vacío y luego con el nuevo calor::
+
+     [Service]
+     ExecStart =
+     ExecStart = /usr/sbin/xxxx -p 
+
+* :file:`unidad.wants`, que contiene enlaces simbólicos a unidades de las que
+  depende opcionalmente la unidad.
+* :file:`unidad.requires`, que contiene enlaces simbólicos a unidades de las que
+  depende forzosamente la unidad.
+
+Por tanto, la configuración de la unidad que procesa *systemd*, procede de
+diversas fuentes y a priori es posible que no tengamos muy claro cuál es el
+valor de un determinada directiva de configuración. Para asegurarnos de cuál es
+la configuración final podemos optar por:
+
+.. code-block:: console
+
+   $ systemctl cat ssh.service
+
+que mostrará las directivas contenidas en todos los ficheros involucrados en la
+configuración del servicio, indicando a qué fichero pertenece cada una; o bien:
+
+.. code-block:: console
+
+   $ systemctl show ssh.service
+
+que nos devolverá la configuración resultante para el servicio *ssh* que incluye
+también las directivas que no se han esc rito pero poseen valor predeterminado.
+Como es larga y puede que nos interese sólo una directiva en particular, podemos
+añadir la opción ``-p``:
+
+.. code-block:: console
+
+   $ systemctl show -p "Wants" ssh.service
+   Wants=systemd-journald.socket systemd-journald-dev-log.socket system.slice
+
+Ficheros de unidad
+------------------
+
+Descripción
+"""""""""""
+
+.. note:: El epígrafe es un descripción muy somera. Para una en mayor
+   profundidad puede consultarse `este artículo
+   <https://www.digitalocean.com/community/tutorials/understanding-systemd-units-and-unit-files>`_ en inglés.
+
+Los ficheros de configuración de las unidades son un conjunto de parejas
+parámetro-valor agrupadas en distintas secciones::
+
+   [Seccion1]
+   Parametro1=Valor1
+   # [... otras directivas de esta sección ...]
+
+   [Sección2]
+   Parametro2=Valoe2
+   # [... otras directivas de esta sección ...]
+
+Las secciones\ [#]_ posibles son:
+
+**[Unit]**
+   Es una sección para describir la propia unidad y su relación con las
+   restantes. Suele situarse al principio del fichero. Algunos de las directivas
+   que se pueden definir en ella son:
+
+   *Description*
+      Permite describir brevemente para qué sirve la unidad. Esta descripción,
+      por ejemplo, es la que aparece para cada unidad al ejecutar:
+
+      .. code-block:: console
+
+         $ systemctl list-units
+
+
+   *Documentation*
+      Permite indicar :abbr:`URI (Uniform Resource Identifier)`\ s donde
+      encontrar información sobre el servicio relacionado con la unidad.
+
+   *Wants*
+      Lista otras unidades necesarias para el servicio, aunque no
+      indispensables. Cumple la misma función que el directorio
+      :file:`unidad.wants`.
+
+   *Requires*
+      Lista otras unidades indispensables para el servicio. Si alguna de
+      ellas falla, esta unidad también lo hará. Cumple la misma función que el
+      directorio :file:`unidad.requires`
+
+   *After*
+      Lista las unidades que deberán estar cargadas cuando se lanza la unidad.
+      Sólo implica orden y no requisito.
+
+   *Before*
+      Lista las unidades que requiren cargada la unidad representada por el
+      fichero cuando sean lanzadas.
+
+   *Condition\**
+      Familia de directivas que permite indicar condiciones que deben cumplirse
+      para lanzar la unidad.  Dependiendo de qué se compruebe, así es el hombre
+      exacto de la directiva. Por ejemplo, *ConditionPathExists* comprueba si
+      existe la ruta que se indica como valor. Para saber el nombre del resto
+      de directivas de esta familia puede consultarse:
+
+      .. code-block:: console
+
+         $ man systemd.unit
+
+**[Install]**
+   Contiene directivas relacionadas con acciones que deben realizarse al
+   habilitar o deshabilitar la unidad. Suele incluirse al final del fichero.
+   Algunas directivas interesantes son:
+
+   *WantedBy*
+      Permite indicar las unidades que requieren la desarrollada en el fichero.
+      Que una unidad aparezca aquí (llamémosla *otraunidad*), implica que al
+      habilitarse la unidad del fichero, se creará en el directorio
+      :file:`/etc/systemd/system/otraunidad.wants` un enlace simbólico a la
+      unidad del fichero, a fin de que se registre la dependencia y *systemd* la
+      conozca al arrancar los servicios.
+
+      Esta directiva es la complementaria a *Wants* de la sección *Unit*, de
+      manera que esto en el fichero *unidad*::
+
+         [Install]
+         WantedBy=otraunidad
+
+      provoca el mismo efecto que esto otro en el fichero *otraunidad*::
+
+         [Unit]
+         Wants=unidad
+
+      En cambio, la primera directiva permite mayor versatilidad. Por ejemplo,
+      *ssh.service* es un servicio que se levanta en el modo *multi-user.target*
+      El problema es que muchos otros servicios también se levantan en este
+      modo (un servidor *ftp* o un *web*, por ejemplo). De la primera forma, no
+      hay más que individualmente en la unidad de cada servicio indicar la
+      dependencia de *multi-user.target*. En cambio, de la segunda forma,
+      deberíamos tener presentes todos esos servicios al escribir la unidad de
+      *multi-user.target*.
+
+   *RequiredBy*
+      Análoga a *WantedBy*, pero el requisito es indispensable.
+
+   *Alias*
+      Permite indicar un nombre alternativo para el servicio.
+
+
+**[Service]**
+   Es una sección que incluye directivas exclusivas de unidades que son
+   servicios. Permite muchas directivas:
+
+   *Type*
+      El tipo de servicio. Son diversos. Consúltese la página recomendada para
+      más información.
+
+   *EnvironmentFile*
+      Indica un fichero que define variables que pueden usarse en las directivas
+      de esta sección. Consúltese el ejemplo posterior.
+
+   *ExecStart*
+      Orden que arranca el servicio.
+
+   *ExecStartPre*
+      Expresa comandos que deben realizarse antes de la orden que arranca el
+      servicio.
+
+   *ExecStartPost*
+      Expresa comandos que deben ejecutarse tras haber arrancado el servicio.
+
+   *ExecStop*
+      Orden para parar el servicio. Si no se indica ninguna, lo que se hace es
+      matar el proceso al parar el servicio.
+
+   *ExecStopPost*
+      Expresa comandos a ejecutar después de parar el servicio.
+
+   *ExecReload*
+      Orden que permite recargar la configuración.
+
+   *Restart*
+      Expresa la circunstancia bajo la cual se reiniciará el servicio. Hay
+      varias distintas.
+
+   *TimeoutSec*
+      Temporización en segundos después de la cual se marcará como fallado el
+      arranque de un servicio o se forzará su parada.
+
+**[Socket]**
+   Directivas para unidades *socket*
+
+**[Mount]**
+   Directivas de unidades *mount* que gestionan puntos de montaje. Estas
+   unidades (y las citadas a continuación= cumplen la función del fichero
+   tradicional :file:`/etc/fstab`. No obstante, *systemd* tiene un traductor
+   que al vuelo traduce el contenido de este fichero a estas unidades, por lo
+   que es perfectamente funcional seguir usando este fichero.
+
+**[Automount]**
+   Directivas para las unidades *automount* que permiten montar automáticamente
+   durante el arranque los dispositivos expresados en unidades *mount*.
+
+**[Swap]**
+   Directivas para unidades *swap* que permiten configurar la memoria de
+   intercambio. Pero esto también sigue siendo posible a través del fichero
+   :file:`/etc/fstab`.
+
+**[Path]**
+   Directivas para unidades *path* que sirven para definir rutas que se desean
+   monitorizar mediante *systemd*. Puede consultar `este enlace
+   <http://www.ocsmag.com/2015/09/02/monitoring-file-access-for-dummies/>`
+   para ver cómo se definen y funcionan.
+
+**[Timer]**
+   Directivas para unidades *timer* cuya utilidad es la misma que la de los
+   demonios :ref:`cron <cron>` y :ref:`at <at>`.
+
+Análisis
+""""""""
+
+Expuesto todo lo necesario para manipular de forma muy simple la gestión a
+través de *systemd*, lo más adecuado es analizar en profundidad un servicio.
+Tomemos a este efecto :file:`ssh.service`. El fichero de unidad proporcionado
+por el paquete *openssh-server* se encuentra en :file:`/lib/systemd/system` y es
+el siguiente:
+
+.. literalinclude:: files/ssh.service.txt
+   :language: ini
+   :linenos:
+
+En la sección :code:`[Unit]` vemos la directiva :code:`Description`, que
+describe qué servicio gestiona la unidad (*OpenBSD Secure Shell server*) y que
+aparece regularmente en las salidas de :command:`systemctl`. Por ejemplo:
+
+.. code-block:: console
+
+   $ systemctl status ssh.service 
+   ● ssh.service - OpenBSD Secure Shell server
+   [...]
+
+La directiva :code:`After` obliga a que esta unidad levante el servicio después
+de que se hayan activado por completo las unidades :file:`network.target` y
+:file:`auditd.service`. Además, se incluye con la directiva
+:code:`ConditionPathExists` para que el servicio no arranque en caso de que se
+haya creado el fichero :file:`/etc/ssh/sshd_not_to_be_run`.
+
+En la sección :code:`[Service]` encontramos la directiva :code:`EnvironmentFile`
+que expresa un fichero en que se definen variables de ambiente: :file:`/etC/default/ssh`:
+
+.. literalinclude:: files/etc.default.ssh.txt
+   :language: sh
+
+La ubicación del fichero no es caprichosa. Tradicionalmente con *SystemV*, los
+ficheros de configuración para los *scripts* de arranque los almacenaba
+*debian* bajo :file:`/etc/default`. Estos son ficheros en que se incluyen
+variables de entorno que tales *scripts* utilizan. Una variable muy comúnmente
+usada es la que define las opciones con las que arrancará el ejecutable que
+proporciona el servicio, como es el caso del ejemplo (variable
+:var:`$SSHD_OPTS` que se usa luego en la directiva :code:`ExecStart`). Con
+*systemd* se puede mantener esta filosofía gracias a la existencia de la
+directiva :code:`EnvironmentFile`.
+
+Por último, está la sección :code:`[Install]` que se aplica al habilitar o
+deshabilitar la unidad. Contiene dos directivas::
+
+   WantedBy=multi-user.target
+
+que indica que el modo de operación *multi-user* implica arrancar el servidor
+*SSH* y::
+
+   Alias=sshd.service
+
+que provoca que el servicio también pueda llamarse :code:`sshd.service`. Estas
+dos directivas provocan cambios en el sistema al habilitarse la unidad. La
+primera de las directivas provoca que aparezca un enlace simbólico bajo
+:file:`/etc/systemd/system/multi-user.target`:
+
+.. code-block:: console
+
+   $ readlink /etc/systemd/system/multi-user.target.wants/ssh.service 
+   /lib/systemd/system/ssh.service
+
+La segunda que en :file:`/etc/systemd/system` aparezca un enlace simbólico con
+nombre :file:`sshd.service` que apunte hacia :file:`ssh.service`:
+
+.. code-block:: console
+
+   $ readlink /etc/systemd/system/sshd.service 
+   /lib/systemd/system/ssh.service
+
+De hecho, si deshabilitamos la unidad veremos que tales enlaces simbólicos
+desaparacen.
+
+.. _systemd-edicion:
+
+Edición
+"""""""
+
+.. warning:: Este apartado se refiere únicamente a alterar la configuración con
+   la que systemd lanza el servicio. Cada servicio, a su vez, tendrá muy
+   probablemente un fichero (o varios) de configuración particular (p.e.
+   :ref:`ssh <ssh>` tiene :file:`/etc/ssh/sshd_config`). Si lo que se pretende
+   es alterar esta configuración, basta con alterar tal fichero y reiniciar el
+   servicio:
+
+   .. code-block:: console
+
+      # systemctl reload-or-restart ssh.service
+
+Si pretendemos modificar la configuración de arranque de un servicio, podemos
+optar por lo siguiente:
+
+#. Reescribir por completo el fichero dentro de :file:`/etc/systemd/system/`,
+   para lo cual es quizás mejor tomar como plantilla el predeterminado y
+   modificar a partir de él:
+
+   .. code-block:: console
+
+      # cp /lib/systemd/system/ssh.service /etc/systemd/system
+      # vim /etc/systemd/system/ssh.service
+
+#. Redefinir sólo algunas directivas, creando el directorio :file:`unidad.d`::
+
+      # mkdir /etc/systemd/system/ssh.service.d
+      # cat > /etc/systemd/system/ssh.service.d/10_desc.conf
+      [Unit]
+      Description=Servidor OpenSSH
+
+Cuando se modifica la configuración de la unidad, es necesario hacérselo saber a
+*systemd*, así que si deseáramos reiniciar un servicio ya activo deberíamos:
+
+.. code-block:: console
+
+   # systemctl stop ssh.service
+   # systemctl daemon-reload
+   # systemctl start ssh.service
+
+Es posible conocer los ficheros que parchean la configuración del
+fichero principal:
+
+.. code-block:: console
+
+   $ systemd-delta --type extended
+
+.. rubric:: Notas al pie
+
+.. [#] Por ejemplo, haciendo::
+
+      # systemctl stop ssh.service
+
+.. [#] En realidad, hay más tipos de unidades, no sólo unidades que representan
+   servicios, pero para el objetivo de nuestra exposición podemos centrarnos en
+   las unidades que representan servicios.
+
+.. [#] Nos centraremos en las directivas relacionadas con las unidades que
+   gestionan servicios

@@ -1,0 +1,601 @@
+
+
+
+<!DOCTYPE html>
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>7.1.3. SSH como servidor FTP &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css" />
+    <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+    
+    <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/jquery.js"></script>
+    <script src="../../_static/underscore.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/translations.js"></script>
+    
+    <link rel="index" title="Índice" href="../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../search.html" />
+    <link rel="next" title="7.2. Web" href="../02.web/index.html" />
+    <link rel="prev" title="7.1.2. FTP clásico" href="02.vsftpd.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="../02.web/index.html" title="7.2. Web"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="02.vsftpd.html" title="7.1.2. FTP clásico"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" ><span class="section-number">7. </span>Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="index.html" accesskey="U"><span class="section-number">7.1. </span>Transferencia de ficheros</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">7.1.3. </span><abbr title="Security SHell">SSH</abbr> como servidor <abbr title="File Transfer Protocol">FTP</abbr></a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="ssh-como-servidor-ftp">
+<span id="ssh-ftp"></span><h1><span class="section-number">7.1.3. </span><abbr title="Security SHell">SSH</abbr> como servidor <abbr title="File Transfer Protocol">FTP</abbr><a class="headerlink" href="#ssh-como-servidor-ftp" title="Enlazar permanentemente con este título">¶</a></h1>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Para la instalación y configuración de un servidor <abbr title="Security SHell">SSH</abbr> consulte
+<a class="reference internal" href="../../04.servidor/10.ssh/01.basico.html#ssh"><span class="std std-ref">el apartado referente  la administración remota</span></a>.</p>
+</div>
+<p>Bajo el epígrafe trataremos de afinar la configuración de un servidor <abbr title="Security SHell">SSH</abbr> para
+que cumpla las veces de un servidor <abbr title="File Transfer Protocol">FTP</abbr>. Esto supone la posibilidad de
+implementar los siguientes aspectos, aparte de la obvia transmisión de ficheros:</p>
+<ul class="simple">
+<li><p>Cortar la conexión tras un tiempo de inactividad.</p></li>
+<li><p>Limitar el número de conexiones simultáneas.</p></li>
+<li><p>Habilitar la transferencia anónima.</p></li>
+<li><p>Enjaular usuarios.</p></li>
+<li><p>Usuarios virtuales.</p></li>
+</ul>
+<p>De todas ellos, sólo el último no es posible, al menos no si pretendemos realizar
+el acceso con <a class="reference internal" href="02.vsftpd.html#ftp-virtuales-feten"><span class="std std-ref">usuarios realmente virtuales</span></a>.
+Restringir el acceso a otros servicios, en cambio, sí es posible.</p>
+<p>Antes de entrar en harina, definiremos un grupo <em>ftpusers</em> al que pertenecerán
+todos aquellos usuarios de los que queremos que su relación con el servidor se
+limite a la transferencia de ficheros:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> addgroup --system ftpusers
+</pre></div>
+</div>
+<p>Además, nos proponemos implementar dos versiones distintas:</p>
+<ol class="arabic simple">
+<li><p>Un servidor <abbr title="File Transfer Protocol">FTP</abbr> puro, que sólo permita la conexión mediante un cliente,
+a la manera de como lo hacen los servidores <abbr title="File Transfer Protocol">FTP</abbr> tradicionales.</p></li>
+<li><p>Un servidor <abbr title="File Transfer Protocol">FTP</abbr> <em>con esteroides</em>, que habilite también el uso de
+<a class="reference internal" href="../../04.servidor/10.ssh/04.adicional.html#scp"><span class="std std-ref">scp</span></a> e incluso de un <em>script</em> que permita el cambio de
+contraseña al usuario.</p></li>
+</ol>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Es preciso notar, antes de empezar que, aunque hablemos de servidor
+<abbr title="File Transfer Protocol">FTP</abbr>, lo que implementamos es un servidor <abbr title="Secure SHell FTP">sFTP</abbr>, que no es lo mismo, aunque
+sirva para lo mismo: no habrá dos canales independientes ni podrán usarse
+clientes <abbr title="File Transfer Protocol">FTP</abbr> (aunque muchos como <a class="reference external" href="http://filezilla-project.org">Filezilla</a> también implementan el protocolo <abbr title="Secure SHell FTP">sFTP</abbr>)</p>
+</div>
+<div class="section" id="ftp-puro">
+<h2><span class="section-number">7.1.3.1. </span><abbr title="File Transfer Protocol">FTP</abbr> puro<a class="headerlink" href="#ftp-puro" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Lograr esto es relativamente sencillo gracias a que el servidor de <em>openssh</em>
+dispone de un servidor <abbr title="Secure SHell FTP">sFTP</abbr> interno, que propicia que se puedan hacer
+enjaulamientos sin necesidad de preparar jaulas.</p>
+<div class="section" id="configuracion-basica">
+<h3><span class="section-number">7.1.3.1.1. </span>Configuración básica<a class="headerlink" href="#configuracion-basica" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Basta añadir a <code class="file docutils literal notranslate"><span class="pre">/etc/ssh/sshd_config</span></code> las siguientes líneas:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Match Group ftpusers</span>
+<span class="go">   ChrootDirectory         %h</span>
+<span class="go">   ForceCommand            internal-sftp</span>
+<span class="go">   X11Forwarding           no</span>
+<span class="go">   AllowTcpForwarding      no</span>
+<span class="go">   ClientAliveInterval     120</span>
+<span class="go">   ClientAliveCountMax     0</span>
+</pre></div>
+</div>
+<p>Es decir, creamos una configuración particular para los usuarios pertenecientes
+a grupo <em>ftpusers</em> para que sólo puedan usar el servidor como servidor FTP, no
+puedan hacer túneles <em>TCP</em>, ni arrancar aplicaciones gráficas, se desconecten
+automáticamente tras 2 minutos de inactividad y estén enjaulados dentro su
+propio directorio personal (<em>%h</em>).</p>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Para que el enjaulamiento funcione es necesario que todos los
+directorios que constituyen la ruta de la jaula pertenezcan al administrador<a class="footnote-reference brackets" href="#id13" id="id1">1</a>.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>El resto de aspectos <em>no básicos</em> que incluiremos en este <abbr title="File Transfer Protocol">FTP</abbr> puro,
+son tambien aplicables al <a class="reference internal" href="#ftp-est"><span class="std std-ref">FTP con esteroides</span></a>.</p>
+</div>
+</div>
+<div class="section" id="acceso-anonimo">
+<h3><span class="section-number">7.1.3.1.2. </span>Acceso anónimo<a class="headerlink" href="#acceso-anonimo" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Definitivamente, no es buena idea permitir un acceso anónimo ya que este suele
+incluirse para permitir la descarga de ficheros y, para esto, es mejor usar un
+servidor web, por ejemplo. Si, a pesar de todo, deseamos permitirlo, debemos
+primero crear un usuario adecuado:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> adduser ftp --ingroup ftpusers --no-create-home --home /srv/ftp/anonymous --shell /bin/false --disabled-password --gecos <span class="s2">&quot;Anonimo&quot;</span>
+<span class="gp">#</span> useradd anonymous -g <span class="k">$(</span>getent group ftpusers <span class="p">|</span> cut -d: -f3<span class="k">)</span> -M -d /srv/ftp/anonymous/ -s /bin/false -c <span class="s2">&quot;Anonimo&quot;</span> -o -u <span class="k">$(</span>id -u ftp<span class="k">)</span>
+<span class="gp">#</span> mkdir -p /srv/ftp/anonymous
+</pre></div>
+</div>
+<p>Lo que hacemos es crear un usuario, <em>ftp</em>, y otro usuario llamado <em>anonymous</em>,
+que en realidad es el mismo porque comparte <strong>uid</strong> con él.</p>
+<p>Además debemos usar el módulo <em>pam_ftp</em> en la autenticación, por lo que
+deberemos añadir en <code class="file docutils literal notranslate"><span class="pre">/etc/pam.d/sshd</span></code> justamente antes de que se incluya
+la configuración de autenticación la línea que carga ese módulo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">auth    sufficient      pam_ftp.so      ignore</span>
+<span class="gp">#</span> Standard Un*x authentication.
+<span class="go">@include common-auth</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Hacer esto es una pésima idea. Incluso la página de manual del
+módulo advierte de que «<em>this module is not safe and easily spoofable</em>».</p>
+</div>
+</div>
+<div class="section" id="limitacion-de-conexiones">
+<span id="ssh-ftp-limits"></span><h3><span class="section-number">7.1.3.1.3. </span>Limitación de conexiones<a class="headerlink" href="#limitacion-de-conexiones" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>El servidor <abbr title="Security SHell">SSH</abbr> no permite directamente la limitación en el número de
+conexiones, ni totales ni por usuario; pero puede lograrse su implementación
+actuando sobre el proceso de autenticación.</p>
+<p>Como las sessiones de <abbr title="File Transfer Protocol">FTP</abbr>, no abren para el servidor consolas interactivas, es
+absolutamente inútil usar <em>pam_limit</em>, ya que <em>maxlogins</em> y <em>maxsyslogins</em> sólo
+son aplicables cuando se abren <em>shells</em> en el servidor. Por tanto, añadir al
+fichero de configuración una línea de este tipo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">@ftpusers   -     maxlogins   2</span>
+<span class="gp">%</span>ftpusers   -     maxlogins   <span class="m">4</span>
+</pre></div>
+</div>
+<p>que, teóricamente, limitaría el número máximo de sesiones parsa cada usuario de
+<em>ftpusers</em> a <strong>2</strong> y el total de sesiones para todos los integrantes del grupo a
+<strong>4</strong> es absolutamente inútil<a class="footnote-reference brackets" href="#id14" id="id2">2</a>.</p>
+<p>Como esta solución es inútil, hemos de aplicar otra basada en la creación de un
+<em>script</em> que ejecute <em>pam_exec</em>. Es <a class="reference download internal" download="" href="../../_downloads/68c7dfde25747595bae2b67a9c88cc86/sftp_limits.sh"><code class="xref download docutils literal notranslate"><span class="pre">éste</span></code></a>.</p>
+<p>Para aplicar el <em>script</em> basta con añadir al final de <code class="file docutils literal notranslate"><span class="pre">/etc/pam.d/sshd</span></code> la
+siguiente línea (suponemos alojado el <em>script</em> en <code class="file docutils literal notranslate"><span class="pre">/usr/local/bin</span></code>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">session  required    pam_exec.so  quiet /usr/local/bin/sftp_limit.sh max_per_user=2</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>El <em>script</em> es muy simple y, aunque sólo se aplica a los grupos de
+usuarios que le indiquemos (<em>ftpusers</em> en nuestro caso), en el caso del
+<em>maxclients</em> y <em>max_per_ip</em> cuenta cualquier conexión <abbr title="Security SHell">SSH</abbr>, la haga quien la
+haga. Como consecuencia, todos los usuarios que acceden por <abbr title="Security SHell">SSH</abbr> contribuyen
+a alcanzar el máximo, aunque no les afecte.</p>
+</div>
+</div>
+</div>
+<div class="section" id="cuota">
+<h2><span class="section-number">7.1.3.2. </span>Cuota<a class="headerlink" href="#cuota" title="Enlazar permanentemente con este título">¶</a></h2>
+<div class="admonition seealso">
+<p class="admonition-title">Ver también</p>
+<p>Consulte cómo crear <a class="reference internal" href="../../05.discos/03.cuotas/index.html#disk-quota"><span class="std std-ref">cuotas de disco</span></a>.</p>
+</div>
+</div>
+<div class="section" id="ftp-con-esteroides">
+<span id="ftp-est"></span><h2><span class="section-number">7.1.3.3. </span><abbr title="File Transfer Protocol">FTP</abbr> con esteroides<a class="headerlink" href="#ftp-con-esteroides" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>En este caso, la dificultad estriba en que para que podamos enjaular usuarios,
+necesitamos construir una jaula con todo lo necesario. Recordemos, además, que
+nuestro propósito es permitir al usuario:</p>
+<ul class="simple">
+<li><p>El acceso <abbr title="Secure SHell FTP">sFTP</abbr>.</p></li>
+<li><p>El uso de <a class="reference internal" href="../../04.servidor/10.ssh/04.adicional.html#scp"><span class="std std-ref">scp</span></a>.</p></li>
+<li><p>El cambio de contraseña.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Si sólo nos interesaran las dos primeras acciones, podríamos usar <a class="reference external" href="http://www.pizzashack.org/rssh/">rssh</a>.</p>
+</div>
+<p>Para resolver la papeleta tiraremos —cómo no— de <em>script</em>. La
+idea es crear uno que dependiendo de qué cliente usemos (si <a class="reference internal" href="../../04.servidor/10.ssh/01.basico.html#ssh"><span class="std std-ref">ssh</span></a>, si
+<a class="reference internal" href="../../04.servidor/10.ssh/04.adicional.html#scp"><span class="std std-ref">scp</span></a> o si <a class="reference internal" href="../../04.servidor/10.ssh/04.adicional.html#sftp"><span class="std std-ref">sftp</span></a>) indique al servidor cómo debe
+comportarse (pedir contraseña, permitir la copia remota o ejecutar el servidor
+<abbr title="Secure SHell FTP">sFTP</abbr>, respectivamente)<a class="footnote-reference brackets" href="#id15" id="id3">3</a>. Además el propio <em>script</em> se encargará de realizar el
+enjaulado.</p>
+<p>Necesitamos cinco ingredientes:</p>
+<ol class="arabic">
+<li><p><a class="reference download internal" download="" href="../../_downloads/a6c95d1cfed761c00bdcb7d0300ed050/rssh.sh"><code class="xref download docutils literal notranslate"><span class="pre">el</span> <span class="pre">propio</span> <span class="pre">script</span></code></a> que colocaremos en
+<code class="file docutils literal notranslate"><span class="pre">/usr/local/bin</span></code>.</p></li>
+<li><p>La utilidad <strong class="command">fakechroot</strong> que permite enjaular con un usuario
+distinto del administrador:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt-get install fakechroot
+</pre></div>
+</div>
+</li>
+<li><p>El directorio donde haremos el enjaulamiento (<code class="file docutils literal notranslate"><span class="pre">/srv/ftp</span></code>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkdir -p /srv/ftp
+</pre></div>
+</div>
+</li>
+<li><p>Asegurarnos de que <code class="file docutils literal notranslate"><span class="pre">/etc/ssh/sshd_config</span></code> contiene descomentada la línea<a class="footnote-reference brackets" href="#id16" id="id4">4</a><a class="footnote-reference brackets" href="#id17" id="id5">5</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Subsystem   sftp  /usr/lib/openssh/sftp-server -d %d</span>
+</pre></div>
+</div>
+</li>
+<li><p>Un grupo al que pertenezcan los usuarios del <abbr title="File Transfer Protocol">FTP</abbr> y un usuario de pruebas<a class="footnote-reference brackets" href="#id18" id="id6">6</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> addgroup --system ftpusers
+<span class="gp">#</span> adduser paco --ingroup ftpusers --no-create-home --home /home/paco --gecos <span class="s2">&quot;PacoFTP&quot;</span> --shell /bin/sh
+<span class="gp">#</span> mkdir -p /home/paco/.ssh
+<span class="gp">#</span> chown -R paco:ftpusers /home/paco
+</pre></div>
+</div>
+</li>
+</ol>
+<p>Hecho esto, tantearemos dos soluciones: una en que todos los usuarios enjaulados
+comparten una jaula común; y otra en la que cada usuario se enjaula en una
+distinta.</p>
+<p class="rubric" id="mkchroot">Creación de jaulas</p>
+<p>Antes, sin embargo, es preciso aclarar cómo crear jaulas apropiadas. En
+principio, una <em class="dfn">jaula</em> es un subárbol del sistema de ficheros en que se
+encierra la acción de un usuario o programa. Esto implica, que dicho subárbol
+debe contener todos los componentes (programas y librerias) necesarios para que
+se puedan desarrollar dentro de él las acciones para la que ha sido concebida.
+Por ejemplo, si queremos que un usuario enjaulado pueda copiar ficheros es obvio
+que dentro de la jaula debe encontrarse el ejecutable <a class="reference internal" href="../../02.conbas/02.informacion/03.ficheros.html#cp"><span class="std std-ref">cp</span></a>.</p>
+<p>Por tanto, para crear una jaula primero debemos determinar cuáles son los
+ficheros que necesitaremos dentro de ella. En nuestro caso, son exclusivamente
+estos<a class="footnote-reference brackets" href="#id19" id="id7">7</a><a class="footnote-reference brackets" href="#id20" id="id8">8</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">/etc/nsswitch.conf</span>
+<span class="go">/etc/ld.so.conf</span>
+<span class="go">/etc/ld.so.cache</span>
+<span class="go">/etc/ld.so.conf.d/*</span>
+<span class="go">/lib/x86_64-linux-gnu/libnss_compat.so.2</span>
+<span class="go">/lib/x86_64-linux-gnu/libnss_files.so.2</span>
+<span class="go">/lib/x86_64-linux-gnu/libnsl.so.1</span>
+<span class="go">/usr/bin/scp</span>
+<span class="go">/usr/lib/openssh/sftp-server</span>
+</pre></div>
+</div>
+<p>O sea, los ficheros de configuración y las librerías necesarios para resolver
+usuarios, y los dos programas que se usarán dentro de la jaula<a class="footnote-reference brackets" href="#id22" id="id9">9</a>. Por
+supuesto, a esta lista es necesario añadir:</p>
+<ul class="simple">
+<li><p>Las librerías que usan los dos programas<a class="footnote-reference brackets" href="#id23" id="id10">10</a>.</p></li>
+<li><p>Algunos dispositivos (<code class="file docutils literal notranslate"><span class="pre">/dev/null</span></code> y <code class="file docutils literal notranslate"><span class="pre">/dev/zero</span></code>).</p></li>
+</ul>
+<p>Para evitarnos la tediosa tarea hacer a mano la jaula, hemos escrito…
+<a class="reference download internal" download="" href="../../_downloads/cfa1b4413c15e80f133aa8b6d6a26f29/enjaular.sh"><code class="xref download docutils literal notranslate"><span class="pre">otro</span> <span class="pre">script</span></code></a>, que admite por la entrada estándar
+la lista de ficheros y exige como argumento la dirección que ocupará la jaula.
+Así, si almacenamos la lista anterior en <code class="file docutils literal notranslate"><span class="pre">req.txt</span></code> y queremos crear la
+jaula en <code class="file docutils literal notranslate"><span class="pre">/srv/ftp</span></code>, podemos hacer lo siguiente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> ./enjaular.sh /srv/ftp &lt; req.txt
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Recuerde que los nuevos usuarios que cree no se añadirán
+automáticamente al <code class="file docutils literal notranslate"><span class="pre">/etc/passwd</span></code> de la jaula.</p>
+</div>
+<div class="section" id="jaula-unica">
+<h3><span class="section-number">7.1.3.3.1. </span>Jaula única<a class="headerlink" href="#jaula-unica" title="Enlazar permanentemente con este título">¶</a></h3>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Es necesario que lea (y haga) los preliminares de <a class="reference internal" href="#ftp-est"><span class="std std-ref">FTP con
+esteroides</span></a>.</p>
+</div>
+<p>Nuestra primera intención es enjaular a todos los usuarios del <abbr title="File Transfer Protocol">FTP</abbr>, dentro de
+<code class="file docutils literal notranslate"><span class="pre">/srv/ftp</span></code>. Para ello debemos añadir a <code class="file docutils literal notranslate"><span class="pre">/etc/ssh/sshd_config</span></code>, lo
+siguiente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Match Group ftpusers</span>
+<span class="go">   X11Forwarding        no</span>
+<span class="go">   AllowTcpForwarding   no</span>
+<span class="go">   ForceCommand         /usr/local/bin/rssh.sh /srv/ftp</span>
+</pre></div>
+</div>
+<p>A continuación debemos copiar la lista de ficheros requeridos en un fichero
+(p.e. <code class="file docutils literal notranslate"><span class="pre">/srv/ftp</span></code>) y crear la jaula:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> ./enjaular.sh /srv/ftp<span class="sb">`</span>&lt; req.txt
+</pre></div>
+</div>
+<p>y, finalmente, copiar el <em>script</em> en la ruta apropiada:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cp /path/donde/este/rssh.sh /usr/local/bin
+</pre></div>
+</div>
+<p>Además, <code class="file docutils literal notranslate"><span class="pre">/home</span></code> debe aparecer dentro de la jaula, así que:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> ln -s /home /srv/ftp/home
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Recuérdese que se fijó el directorio personal del usuario como
+el habitual <code class="file docutils literal notranslate"><span class="pre">/home/usuario</span></code>, pero, como estos usuarios siempre actúan
+enjaulados, su directorio real es <code class="file docutils literal notranslate"><span class="pre">/srv/ftp/home/usuario</span></code>,</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Con esta solución, al usar <a class="reference internal" href="../../04.servidor/10.ssh/04.adicional.html#scp"><span class="std std-ref">scp</span></a>, el directorio remoto
+de trabajo es la raíz de la jaula no el directorio personal, por lo que algo
+como:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> scp fichero.txt paco@servidor:
+</pre></div>
+</div>
+<p>intentaría copiar <code class="file docutils literal notranslate"><span class="pre">fichero.txt</span></code> en <code class="file docutils literal notranslate"><span class="pre">/srv/ftp</span></code> y no en
+<code class="file docutils literal notranslate"><span class="pre">/srv/ftp/home/paco</span></code><a class="footnote-reference brackets" href="#id24" id="id11">11</a>.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Obsérvese que la <em>shell</em> del usuario es <strong class="command">sh</strong>, porque así
+lo requiere el servidor <abbr title="Security SHell">SSH</abbr> para ejecutar nuestro <em>script</em>. Esta
+circunstancia provoca que el usuario puede autenticarse sin restricciones en
+cualquier otro servicio. Por ejemplo, a través de <em>login</em>, si alcanza
+físicamente el servidor. Para evitar este inconveniente podemos añadir al
+final de <code class="file docutils literal notranslate"><span class="pre">/etc/pam.d/common-session</span></code>, las líneas:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">session [success=2 default=ignore] pam_succeed_if.so service = sshd</span>
+<span class="go">session [success=1 default=ignore] pam_succeed_if.so user notingroup ftpusers</span>
+<span class="go">session required                   pam_deny.so</span>
+<span class="go">session required                   pam_permit.so</span>
+</pre></div>
+</div>
+<p>las cuales harán que el acceso falle cuando el servicio no sea <em>sshd</em> y el
+usuario pertenezca al grupo <em>ftpusers</em>.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>El usuario puede, incluso, usar autenticación con claves si quiere,
+aunque no podrá usar <a class="reference internal" href="../../04.servidor/10.ssh/02.certificados.html#ssh-copy-id"><span class="std std-ref">ssh-copy-id</span></a> para subirla, ni
+utilizar más de una pareja de claves:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> scp .ssh/id_ecdsa.pub paco@servidor:~/.ssh/authorized_keys
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="jaula-personal">
+<h3><span class="section-number">7.1.3.3.2. </span>Jaula personal<a class="headerlink" href="#jaula-personal" title="Enlazar permanentemente con este título">¶</a></h3>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Es necesario que lea (y haga) los preliminares de <a class="reference internal" href="#ftp-est"><span class="std std-ref">FTP con
+esteroides</span></a>.</p>
+</div>
+<p>Si queremos una jaula personal distinta para cada usuario es obvio que debemos
+construirla, pero crear físicamente una distinta para cada uno es un desperdicio
+de espacio en disco. Podríamos usar enlaces duros, pero sigue siendo una
+solución bastante guarra. Una estrategia más elegante es la siguiente:</p>
+<ul class="simple">
+<li><p>Se construye la base de la jaula que contiene todos los ficheros de
+configuracion, ejecutables y librerías necesarios en una ubicación, p.e.
+<code class="file docutils literal notranslate"><span class="pre">/var/lib/sftp_jail</span></code>.</p></li>
+<li><p>Cuando un usuario de <abbr title="File Transfer Protocol">FTP</abbr> accede, sin tener abierta otra sesión previa,
+se crea la vuelo la jaula fusionando con <a class="reference external" href="https://en.wikipedia.org/wiki/OverlayFS">overlay</a>
+el directorio anterior con el directorio personal del usuario. Cuando
+el usuario abandona el <abbr title="File Transfer Protocol">FTP</abbr> sin dejar otras sesiones abiertas, se destruye la
+jaula.</p></li>
+<li><p>Al construir al vuelo la jaula, se crea también un fichero <code class="file docutils literal notranslate"><span class="pre">/etc/passwd</span></code>
+con solamente una línea: la referente al usuario. Eso impedirá que dentro de
+la jaula haya información sobre el resto de usuarios.</p></li>
+</ul>
+<p>Empecemos por indicar cuál es la configuración a añadir dentro de
+<code class="file docutils literal notranslate"><span class="pre">/etc/ssh/sshd_config</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Match Group ftpusers</span>
+<span class="go">   X11Forwarding        no</span>
+<span class="go">   AllowTcpForwarding   no</span>
+<span class="go">   ForceCommand         /usr/local/bin/rssh.sh %x/ftp</span>
+</pre></div>
+</div>
+<p>o sea, la misma que anteriormente, excepto por el hecho de que ahora el
+directorio de enjaulamiento es <code class="file docutils literal notranslate"><span class="pre">%x/ftp</span></code>. <code class="docutils literal notranslate"><span class="pre">%x</span></code> representa el directorio
+<code class="docutils literal notranslate"><span class="pre">XDG_RUNTIME_DIR</span></code> que crea <strong class="program">systemd</strong> para cada usuario<a class="footnote-reference brackets" href="#id25" id="id12">12</a>.</p>
+<p>Como en el caso anterior hemos de crear la base de jaula:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> ./enjaular.sh /var/lib/sftp_jail
+</pre></div>
+</div>
+<p>Finalmente, crear al vuelo la jaula durante la autenticación, requiere manipular
+<em>pam</em>. El script <a class="reference download internal" download="" href="../../_downloads/682ed15b8d475014786fa7ed1e5e00af/sftp_jail.sh"><code class="xref download docutils literal notranslate"><span class="pre">sftp_jail.sh</span></code></a> para <em>pam_exec</em>
+hace esto suponiendo, de modo predeterminado, que la jaula se montará en
+<code class="file docutils literal notranslate"><span class="pre">%x/ftp</span></code>, que la base de la jaula está en <code class="file docutils literal notranslate"><span class="pre">/var/lib/sftp_jail</span></code> y que
+la parte de la jaula que contiene los datos de usuario está en
+<code class="file docutils literal notranslate"><span class="pre">/srv/ftp/nombre_usuario</span></code> [#]_.</p>
+<p>Para que <em>pam</em> ejecute el script se ha preparado un <a class="reference download internal" download="" href="../../_downloads/916452a2ad5e8e22017df1c36a3d8bbb/sftp_jail"><code class="xref download docutils literal notranslate"><span class="pre">fichero</span> <span class="pre">de</span>
+<span class="pre">automatización</span></code></a> para <strong class="command">pam-auth-update</strong> que, además,
+soluciona el problema de que el usuario pueda acceder al sistema con otros
+servicios:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mv /path/a/sftp_jail /usr/share/pam-configs
+<span class="gp">#</span> pam-auth-update
+</pre></div>
+</div>
+<p>Por último, necesitamos que el directorio personal de usuario aparezca debajo en
+uno de los componentes que constituirá el sistema de ficheros fusionado, de modo
+que para cada usuario habrá que hacer lo siguiente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkdir -p /srv/ftp/paco/home
+<span class="gp">#</span> ln -s /home/paco /srv/ftp/paco/home
+</pre></div>
+</div>
+<p class="rubric">Notas al pie</p>
+<dl class="footnote brackets">
+<dt class="label" id="id13"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p>Para cumplir con este precepto podríamos crear los usuarios del FTP así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> adduser paco --ingroup ftpusers --no-create-home --home /srv/ftp/paco --gecos <span class="s2">&quot;PacoFTP&quot;</span> --shell /bin/false
+<span class="gp">#</span> mkdir -p /srv/ftp/paco/incoming
+<span class="gp">#</span> chown paco:ftpusers /srv/ftp/paco/incoming
+</pre></div>
+</div>
+<p>Gracias a la inclusión del subdirectorio <code class="file docutils literal notranslate"><span class="pre">incoming</span></code>, el usuario podrá
+subir ficheros al servidor.</p>
+</dd>
+<dt class="label" id="id14"><span class="brackets"><a class="fn-backref" href="#id2">2</a></span></dt>
+<dd><p>En cambio, si metiéramos a todos los usuarios con acceso al <em>ssh</em> en un
+grupo, si sería útil para limitar el número de acceso simultáneosi a una
+<em>shell</em> del servidor.</p>
+</dd>
+<dt class="label" id="id15"><span class="brackets"><a class="fn-backref" href="#id3">3</a></span></dt>
+<dd><p><em>ssh</em> proporciona una variable de ambiente llamada
+<code class="docutils literal notranslate"><span class="pre">SSH_ORIGINAL_COMMAND</span></code> en la que se almacena qué se pretende hacer:</p>
+<ul class="simple">
+<li><p>Si se ejecutó el cliente <abbr title="Secure SHell FTP">sFTP</abbr>, la variable contendrá el ejecutable del
+servidor <abbr title="Secure SHell FTP">sFTP</abbr>, o sea, el valor de la directiva <code class="code docutils literal notranslate"><span class="pre">Subsystem</span> <span class="pre">sftp</span></code>, de
+la que se habla a continuación.</p></li>
+<li><p>Si se ejecutó <strong class="command">scp</strong>, contendrá el propio comando <strong class="command">scp</strong> y
+una serie de argumento pertinentes.</p></li>
+<li><p>Si se ejecutó el cliente <strong class="command">ssh</strong>, o no contendrá nada o contendrá
+las ordenes que se añadieron al cliente al final de la línea.</p></li>
+</ul>
+</dd>
+<dt class="label" id="id16"><span class="brackets"><a class="fn-backref" href="#id4">4</a></span></dt>
+<dd><p>Nótese que se ha añadido la opción <code class="docutils literal notranslate"><span class="pre">-d</span> <span class="pre">%d</span></code> para que el servidor use
+como directorio inicial el directorio de usuario.</p>
+</dd>
+<dt class="label" id="id17"><span class="brackets"><a class="fn-backref" href="#id5">5</a></span></dt>
+<dd><p>Existe otro servidor sftp, <a class="reference external" href="https://www.greenend.org.uk/rjk/sftp/sftpimpls.html">gesftpserver</a>, con capacidades
+extra (p.e. permite distinguir entre transferencia de texto o binaria como
+los servidores <abbr title="File Transfer Protocol">FTP</abbr> clásicos). Tiene paquete en <em>debian</em> y para usarlo
+es tan fácil como cambiar la línea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Subsystem   sftp  /usr/lib/gesftpserver -d %d</span>
+</pre></div>
+</div>
+<p>Para aprovecharlo eso sí, se necesitan clientes que soporten más allá de la
+versión 3 de protocolo <abbr title="Secure SHell FTP">sFTP</abbr>. Para una lista de clientes consulte <a class="reference external" href="https://www.greenend.org.uk/rjk/sftp/sftpimpls.html">la página
+proporcionada por el propio gesftpserver</a>.</p>
+</dd>
+<dt class="label" id="id18"><span class="brackets"><a class="fn-backref" href="#id6">6</a></span></dt>
+<dd><p>Aún falta por crear el directorio personal del usuario, pero esto se
+tratará más adelante, porque su ubicación exacta depende de si hacemos una
+jaula común o una jaula personal para cada usuario.</p>
+</dd>
+<dt class="label" id="id19"><span class="brackets"><a class="fn-backref" href="#id7">7</a></span></dt>
+<dd><p>No se necesitan más, porque el <em>script</em> que usaremos no actúa enjaulado:
+es él el que enjaula a <strong class="command">scp</strong> y al servidor <abbr title="Secure SHell FTP">sFTP</abbr>, que sí hemos
+incluido en la jaula.</p>
+</dd>
+<dt class="label" id="id20"><span class="brackets"><a class="fn-backref" href="#id8">8</a></span></dt>
+<dd><p>Si se usa la <em>pseudoshell</em> <a class="reference external" href="http://www.pizzashack.org/rssh/">rssh</a>,
+la lista es la misma y hay que añadir la propia <em>pseudoshell</em> y el ejecutable
+<strong class="command">/usr/lib/rssh/rssh_chroot_helper</strong>. El paquete de <em>debian</em> incluye
+un <em>script</em> para la creación de la jaula (<strong class="command">mkchroot</strong>) entre la
+documentación, pero puede usarse el <em>script</em> presentado aquí.</p>
+</dd>
+<dt class="label" id="id22"><span class="brackets"><a class="fn-backref" href="#id9">9</a></span></dt>
+<dd><p>En la lista hay un ilustre olvidado: <code class="file docutils literal notranslate"><span class="pre">/etc/passwd</span></code>. No se incluye,
+porque el <em>script</em> posterior se encargará de hacer un enlace simbólico.</p>
+</dd>
+<dt class="label" id="id23"><span class="brackets"><a class="fn-backref" href="#id10">10</a></span></dt>
+<dd><p>Para conocer las librerías que usa un programa puede usarse
+<strong class="command">ldd</strong>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> ldd /usr/bin/scp
+<span class="go">    linux-vdso.so.1 (0x00007ffdb69fb000)</span>
+<span class="go">    libc.so.6 =&gt; /lib/x86_64-linux-gnu/libc.so.6 (0x00007f04e9ba0000)</span>
+<span class="go">    /lib64/ld-linux-x86-64.so.2 (0x00007f04ea160000)</span>
+</pre></div>
+</div>
+</dd>
+<dt class="label" id="id24"><span class="brackets"><a class="fn-backref" href="#id11">11</a></span></dt>
+<dd><p>Es posible arreglar este pequeño detalle, pero exige incluir
+<strong class="command">sh</strong> en la jaula.</p>
+</dd>
+<dt class="label" id="id25"><span class="brackets"><a class="fn-backref" href="#id12">12</a></span></dt>
+<dd><p>El <em>script</em> también admite los símbolos:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">%u</span></code></dt><dd><p>Nombre del usuario</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%h</span></code></dt><dd><p>Nombre del directorio personal</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%n</span></code></dt><dd><p><em>UID</em> del usuario</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">%x</span></code></dt><dd><p>Directorio <code class="docutils literal notranslate"><span class="pre">XDG_RUNTIME_DIR</span></code>.</p>
+</dd>
+</dl>
+</dd>
+<dt class="label" id="id26"><span class="brackets">13</span></dt>
+<dd><p>El <em>script</em> admite parámetros para modificar su comportamiento (échele un
+vistazo al código), así que puede editarse el <a class="reference download internal" download="" href="../../_downloads/916452a2ad5e8e22017df1c36a3d8bbb/sftp_jail"><code class="xref download docutils literal notranslate"><span class="pre">fichero</span> <span class="pre">de</span> <span class="pre">actualización</span>
+<span class="pre">automática</span> <span class="pre">de</span> <span class="pre">pam</span></code></a> ya referido y añadirlos a:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">optional                   pam_exec.so /usr/local/bin/sftp_jail.sh</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+</div>
+</div>
+</div>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../index.html">Tabla de contenido</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">7.1.3. <abbr title="Security SHell">SSH</abbr> como servidor <abbr title="File Transfer Protocol">FTP</abbr></a><ul>
+<li><a class="reference internal" href="#ftp-puro">7.1.3.1. <abbr title="File Transfer Protocol">FTP</abbr> puro</a><ul>
+<li><a class="reference internal" href="#configuracion-basica">7.1.3.1.1. Configuración básica</a></li>
+<li><a class="reference internal" href="#acceso-anonimo">7.1.3.1.2. Acceso anónimo</a></li>
+<li><a class="reference internal" href="#limitacion-de-conexiones">7.1.3.1.3. Limitación de conexiones</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#cuota">7.1.3.2. Cuota</a></li>
+<li><a class="reference internal" href="#ftp-con-esteroides">7.1.3.3. <abbr title="File Transfer Protocol">FTP</abbr> con esteroides</a><ul>
+<li><a class="reference internal" href="#jaula-unica">7.1.3.3.1. Jaula única</a></li>
+<li><a class="reference internal" href="#jaula-personal">7.1.3.3.2. Jaula personal</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="02.vsftpd.html"
+                        title="capítulo anterior"><span class="section-number">7.1.2. </span><abbr title="File Transfer Protocol">FTP</abbr> clásico</a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="../02.web/index.html"
+                        title="próximo capítulo"><span class="section-number">7.2. </span>Web</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/07.serre/01.ftp/03.ssh.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="../02.web/index.html" title="7.2. Web"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="02.vsftpd.html" title="7.1.2. FTP clásico"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" ><span class="section-number">7. </span>Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="index.html" ><span class="section-number">7.1. </span>Transferencia de ficheros</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">7.1.3. </span><abbr title="Security SHell">SSH</abbr> como servidor <abbr title="File Transfer Protocol">FTP</abbr></a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor CC BY 4.0, 2016-2021, José Miguel Sánchez Alés.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.2.0.
+    </div>
+  </body>
+</html>

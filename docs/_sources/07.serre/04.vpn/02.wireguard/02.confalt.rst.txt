@@ -1,0 +1,385 @@
+**********************
+Configuración avanzada
+**********************
+Para la mayor parte de las situaciones, :command:`wg-quick` resuelve todas las
+tareas relacionadas con el encaminamiento (interfaz, encaminamiento, etc.). Sin
+embargo, :command:`wg-quick` es un *script* de alto nivel escrito en
+:command:`bash` que usa la orden :command:`wg` como herramienta para crear y
+configurar la interfaz virtual.
+
+Configuración manual
+********************
+La configuración manual del túnel supone:
+
+#. Crear la interfaz y darle una dirección |IP| con :ref:`ip <ip>`.
+#. Configurarla con :command:`wg setconf`.
+#. Alterar las tablas de encaminamiento, de nuevo otra vez con :ref:`ip <ip>`.
+#. Si la situación lo requiere, utilizar el cortafuegos.
+
+Por esta razón, cuando se escribe para :command:`wg-quick`, el fichero de
+configuración de la interfaz añade algunas variables que son ininteligibles para
+:command:`wg` y que el propio *script* se encarga de eliminar antes de pasárselo
+a este último: :kbd:`Address`, :kbd:`MTU`, :kbd:`DNS`, :kbd:`Table` y las
+que refieren órdenes para ejecutar antes y después de levantar y bajar la
+interfaz: :kbd:`PreUp`, :kbd:`PostUp`, :kbd:`PreDown` y :kbd:`PostDown`.
+
+Para conocer cuáles son las órdenes atómicas que lleva a cabo
+:command:`wg-quick` basta con usarla::
+
+   # wg-quick up wg0
+   [#] ip link add wg0 type wireguard
+   [#] wg setconf wg0 /dev/fd/63
+   [#] ip -4 address add 10.0.8.1/24 dev wg0
+   [#] ip link set mtu 1420 up dev wg0
+   [#] ip -4 route add 192.168.254.0/24 dev wg0
+
+cuya salida se corresponde con la configuración:
+
+.. code-block:: ini
+
+   [Interface]
+   Address = 10.0.8.1/24
+   ListenPort = 1194
+   PrivateKey = kEANNMfztMtzgwFyyaWOou7+c8ZPD/lyGhmcM7oFtXA=
+
+   [Peer]
+   PublicKey = f2CH3QXHiXwFhdATcDi42DU+PUOC9Ky8BgkHBigY5H4=
+   AllowedIPs = 10.0.8.2/32, 192.168.254.0/24
+
+Lo cual significa que, si eliminamos la línea :kbd:`Address` de la configuración
+y vamos ejecutando una tras otra las órdenes referidas por la salida,
+obtendremos el mismo efecto.
+
+Entraña especial dificultad solucionar el problema del encaminamiento, cuando en
+el cliente se desea sacar todo el tráfico a través del túnel, ya que es obvio
+que el tráfico local y el tráfico dirigido al servidor deben usar la puerta de
+enlace física. La documentación oficial de :program:`wireguard` propone `dos
+soluciones <https://www.wireguard.com/netns/#routing-all-your-traffic>`_, una
+basada en jugar con las tablas de encaminamiento y otra en jugar con dos
+espacios de nombres. :program:`wg-quick` usa el primer método. El segundo
+método, aunque bastante elegante, es complicado de implementar si se desea
+utilizar herramientas externas de configuración como :program:`ifupdown`.
+
+Redes restringidas
+******************
+Cuando nuestro *guerrero de la carretera* se encuentra dentro de una red
+restringida que no controlamos, nos topamos en ocasiones con el problema
+de que somos incapaces de acceder al puerto |UDP| en que hemos dejado escuchando
+el servidor (el *1194* en nuestra propuesta).
+
+En estas redes restringidas, lo habitual es que sólo podamos:
+
+- Hacer consultas |DNS| (*53/UDP*), aunque a veces se reduce a poder hacérselas
+  a un proxy |DNS| de la red local.
+- Navegar por internet (puertos *80/TCP* y *443/TCP*), aunque a veces
+  fiscalizado por *proxies*.
+
+Podríamos dejar escuchando el servicio en el puerto *53/UDP*, pero es bastante
+común que en estas redes restringidas, la consulta de nombres esté restringida
+a un proxy |DNS| interno.
+
+La solución general es usar los puertos para tráfico web, pero nos topamos con
+el problema de que por motivos de rendimiento :program:`wireguard` sólo se ha
+implementado para |UDP|. Una solución para solucionar este inconveniente es
+tunelizador el tráfico mediante `Websockets <https://v0ctor.me/websocket>`_. Como
+forma parte del estándar |HTML|\ 5, no deberíamos tener problemas con el proxy
+web, aun usando |HTTP| y no |HTTP|\ s. Si es posible usar |HTTP|, tendremos la
+ventaja de no tener que recifrar con |SSL|, lo que redundará en un mejor
+rendimiento.
+
+Para encapsular :program:`wireguard` podemos utilizar :ref:`wstunnel
+<wstunnel>`, como sugiere `este artículo
+<https://kirill888.github.io/notes/wireguard-via-websocket>`_.
+
+Encapsulación
+=============
+Para usar :program:`wireguard` con :ref:`wstunnel <wstunnel>` podemos obrar del
+siguiente modo.
+
+**Servidor**
+   En lo referente a los servicios:
+
+   * Hacemos que :program:`wireguard` escuche en un puerto de todas las interfaces,
+     lo cual permitirá establecer el túnel |VPN| directamente sin la intermediación
+     de :ref:`wstunnel <wstunnel>`.
+
+   * Hacemos que :ref:`wstunnel <wstunnel>` escuche en el puerto **80** ó **443**
+     de todas las interfaces y comunique con el puerto de la interfaz de *loopback*
+     en que escucha :program:`wireguard`. Esto nos permitirá la conexión desde
+     redes restringidas gracias a la intermediación de :ref:`wstunnel <wstunnel>`.
+
+   Hay, sin embargo, un pequeño gran problema cuando se desea sacar todo el tráfico
+   por el túnel |VPN| y se usa para comunicar con el servidor un nombre, en vez de
+   una dirección |IP|: para llegar a establecer el túnel necesitamos resolver el
+   nombre, pero para resolver el nombre debemos haber establecido el canal, puesto
+   que la petición |DNS| intenta salir a través de él. Esto puede resolverse bien
+   utilizando un proxy |DNS| como :ref:`dnsmasq` (que es lo que propugna el
+   artículo antes referido), bien asegurándonos que el tráfico que genera
+   :ref:`wstunnel <wstunnel>` nunca usa el propio túnel.
+
+   La resolución automatizada de este problema se encuentra en  `este script
+   llamado wgws <https://github.com/sio2sio2/wgws>`_:
+
+   * Necesita, obviamente, :ref:`wstunnel <wstunnel>` en algún directorio del
+     *PATH*.
+   * Utiliza la misma técnica de manipulación de las tablas de encaminamiento que
+     :program:`wg-quick`.
+   * El propio :program:`wstunnel` marca el tráfico para que el de encaminamiento
+     no salga por el tunel.
+   * Permite añadir una sección más al fichero de configuración llamada
+     :kbd:`[Tunnel]`, que puede incluir tres variables:
+
+     .. table::
+        :class: wgws
+
+        +-----------+-----------------------------------------------------------+
+        | Variable  | Descripción                                               |
+        +===========+===========================================================+
+        | Address   | Dirección y puerto donde escucha :program:`wstunnel`.     |
+        +-----------+-----------------------------------------------------------+
+        | Secure    | Habilita el modo seguro (:kbd:`wss`).                     |
+        +-----------+-----------------------------------------------------------+
+        | WPath     | Ruta de acceso en el servidor al *websocket*. Sólo tiene  |
+        |           | sentido su uso en el cliente, y si en el servidor se usa  |
+        |           | un proxy (véase :ref:`el uso con nginx <wg-nginx>`).      |
+        +-----------+-----------------------------------------------------------+
+
+     Si no se incluye la sección :kbd:`[Tunnel]` o si, aun habiéndola, se utiliza
+     la opción :kbd:`-n`, el *script* prescindirá de :program:`wstunnel` y su uso
+     será equivalente al de :command:`wg-quick`.
+
+   * Usa el cortafuegos para permitir que haya tráfico excepcional que no use el
+     túnel.
+
+   El uso es bastante sencillo. Para resolver el caso del *road warrior* ya
+   analizado, la configuración es exactamente la misma, con la salvedad de añadir en
+   ambos extremos la sección :kbd:`[Tunmel]`. Así, en el **servidor**:
+
+   .. code-block:: ini
+
+      [Interface]
+      Address = 10.8.0.1/24
+      ListenPort = 1194
+      PrivateKey = kEANNMfztMtzgwFyyaWOou7+c8ZPD/lyGhmcM7oFtXA=
+
+      [Peer]
+      PublicKey = f2CH3QXHiXwFhdATcDi42DU+PUOC9Ky8BgkHBigY5H4=
+      AllowedIPs = 10.8.0.2/32
+
+      [Tunnel]
+      ; No es necesaria configuración adicional
+
+   y arrancar el servidcio de este modo para dar la posibilidad de conexión directa
+   (puerto **1194**) o a través de websocket (puerto **80**)::
+
+      # wgws up wg0
+
+**Cliente**:
+   La configuración es la misma que para :command:`wg-quick` con la salvedad de
+   que debemos añadir la sección :kbd:`[Tunnel]`:
+
+   .. code-block:: ini
+
+      [Interface]
+      Address = 10.8.0.2/24
+      PrivateKey = WB4TAWIIlaOyULudlcdhqctTl/pdzO7m+6x4DhAP+0k=
+
+      [Peer]
+      PublicKey = /Pr37VgN7GVvizJw9FpCL62DSwocdNEf7lwfdDRZXj8=
+      Endpoint = 203.0.113.1:1194
+      AllowedIPs = 0.0.0.0/0
+
+      [Tunnel]
+      ; No es necesaria configuración adicional
+
+   Con esto ya podremos establecer el túnel, si queremos conexión directa::
+
+      # wgws -n up wg0
+
+   o, si queremos conexión a través del Websockets_:::
+
+      # wgws up  wg0
+
+   Si deseamos cifrar con |SSL| (lo cual mermará el rendimiento) debemos o
+   añadir la opción :kbd:`-s` en las órdenes de ambos extremos o añadir la
+   opción:
+
+   .. code-block:: ini
+
+      Secure = 1
+
+   en la sección :kbd:`[Tunnel]` de ambos ficheros de configuración\ [#]_.
+
+   El modo más cómodo de que un cliente móvil pueda conectarse directamente o a
+   través de *websocket* según la red en la que se encuentre es crear un fichero de
+   configuración :file:`/etc/wireguard/wg0.conf` sin configuración adicional para
+   el túnel y dos enlaces simbólicos::
+
+      # ln -s wg0.conf wgt0.conf
+      # ln -s wg0.conf wgts0.conf
+
+   y añadir en :file:`/etc/network/interfaces`:
+
+   .. code-block:: bash
+
+      # Conexión directa
+      iface wg0 inet manual
+         up   wgws -n up $IFACE
+         down wgws down $IFACE
+
+      # Conexión websocket
+      iface wgt0 inet manual
+         up   wgws up $IFACE
+         down wgws down $IFACE
+
+      # Conexión websocket SSL
+      iface wgts0 inet manual
+         up   wgws -s up $IFACE
+         down wgws down $IFACE
+
+   .. note:: El hecho de no requerir configuración adicional se debe a que
+      :command:`wgws` decide cuál es la dirección de escucha más lógica según haga
+      el papel de servidor o cliente. En el primero, :kbd:`0.0.0.0:80` o
+      :kbd:`0.0.0.0:443` (según se use o no |SSL|) y en el segundoo,
+      :kbd:`127.0.0.1:51820`.
+
+   También es posible evitar que cierto tráfico salga por el túnel |VPN| poniéndole
+   una marca. Por ejemplo, para evitar que el tráfico web usara el túnel, bastaría
+   añadir a la configuración:
+
+   .. code-block:: ini
+
+      PostUp = nft add rule wireguard output tcp dport { http, https } meta mark set 51820
+
+.. _wg-nginx:
+
+Añadiendo :program:`nginx` a la ecuación
+========================================
+El problema de colocar :ref:`wstunnel <wstunnel>` a escuchar en los puertos
+**80**/**443** es que inpide que la máquina puede albergar un servidor *web*, lo
+cual puede ser frecuente. En estos casos, la solución es restringir
+:program:`wstunnel` a escuchar en algún puerto de la interfaz de *loopback* y
+hacer que un *proxy* inverso gestione las peticiones a esos puertos y las dirija
+bien al servidor *web*, bien a :program:`wstunnel`. Como el propio :ref:`nginx
+<n-ginx>` puede llevar a cabo esta labor, será lo que usemos:
+
+.. rubric:: Cliente
+
+La configuración es exactamente la misma, aunque es más que probable que
+deseemos usar el nombre de máquina para identificar en el servidor el tráfico
+procedente del :program:`wstunnel` cliente:
+
+.. code-block:: ini
+   :emphasize-lines: 7
+
+   [Interface]
+   Address = 10.8.0.2/24
+   PrivateKey = WB4TAWIIlaOyULudlcdhqctTl/pdzO7m+6x4DhAP+0k=
+
+   [Peer]
+   PublicKey = /Pr37VgN7GVvizJw9FpCL62DSwocdNEf7lwfdDRZXj8=
+   Endpoint = vpn.example.net:1194
+   AllowedIPs = 0.0.0.0/0
+
+   [Tunnel]
+   ; No es necesaria configuración adicional
+
+Dependendiendo de cómo arranquemos :program:`wgws`, accederemos sin
+:program:`wstunnel` o a través de él con o sin |SSL|.
+
+.. note:: Si por alguna razón, no usamos el nombre para identifcar el
+   *websocket*, sino la ruta entonces habría que haber añadido a la
+   configuración de túnel la variable :kbd:`WPath`:
+
+   .. code-block:: ini
+
+      [Tunnel]
+      WPath = /wireguard/
+
+.. rubric:: Servidor
+
+En este extremo, la novedad es que hay que colocar a :program:`wstunnel` en
+algún puerto libre de la interfaz de *loopback* (p.e. **8080**) y no utilizar
+nunca |SSL| ya que en caso de que necesitemos recifrar, puede encargarse de ello
+:program:`nginx`:
+
+.. code-block:: ini
+   :emphasize-lines: 11
+
+   [Interface]
+   Address = 10.8.0.1/24
+   ListenPort = 1194
+   PrivateKey = kEANNMfztMtzgwFyyaWOou7+c8ZPD/lyGhmcM7oFtXA=
+
+   [Peer]
+   PublicKey = f2CH3QXHiXwFhdATcDi42DU+PUOC9Ky8BgkHBigY5H4=
+   AllowedIPs = 10.8.0.2/32
+
+   [Tunnel]
+   Address = 127.0.0.1:8080
+
+Por otro lado, para configurar :program:`nginx`, podemos crear un fichero con la
+configuración pertinente llamado :file:`snippets/websocket.conf`:
+
+   .. code-block:: nginx
+
+      proxy_http_version 1.1;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection $connection_upgrade;
+
+      proxy_set_header X-Forwarded-Host $host;
+      proxy_set_header X-Forwarded-Proto $x_forwarded_proto;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header Host $http_host;
+
+Y teniendo en cuenta que hemos usado *vpn.example.net* para identificar la
+conexión, definir el sitio como:
+
+   .. code-block:: nginx
+
+      map $http_upgrade $connection_upgrade {
+         default upgrade;
+         '' close;
+      }
+
+      map $https $x_forwarded_proto {
+         default http;
+         on      https;
+      }
+
+      server {
+         listen 80;
+         listen 443 ssl;
+
+         server_name vpn.example.net;
+
+         include snippets/snakeoil.conf;
+
+         location / {
+            proxy_pass http://127.0.0.1:8080;
+            include snippets/websocket.conf;
+         }
+      }
+
+configuración con la que permitimos tanto :kbd:`ws` como :kbd:`wss`.
+
+.. note:: Si la conexión se hubiera identificado con una ruta, no habría más que
+   haber cambiado la localización:
+
+   .. code-block:: nginx
+
+      location ^~ /wireguard/ {
+         proxy_pass http://127.0.0.1:8080;
+         include snippets/websocket.conf;
+      }
+
+.. rubric:: Notas al pie
+
+.. [#] Añadir la opción en el fichero de configuración, nos impedirá la conexión
+   no cifrada, ya que no hay ningún argumento de línea de comandos que lo revoque.
+
+.. |UDP| replace:: :abbr:`UDP (User Datagram Protocol)`
+.. |TCP| replace:: :abbr:`TCP (Transmission Control Protocol)`
+.. |HTML| replace:: :abbr:`HTML (HyperText Markup Language)`
+.. |SSL| replace:: :abbr:`SSL (Secure Sockets Layer)`
+

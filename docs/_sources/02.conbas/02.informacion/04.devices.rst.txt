@@ -1,0 +1,868 @@
+.. _dispositivos:
+
+Dispositivos
+============
+
+Lo que esconde :file:`/dev`
+---------------------------
+
+En los sistemas *unix* todo se representa a través de ficheros\ [#]_. Para
+realizar esta abstracción existen una serie de ficheros especiales al margen de
+los ya vistos (regulares, directorios y enlaces simbólicos), que se encuentran
+bajo :file:`/dev`. No son, pues, ficheros propiamente dichos, sino la
+abstracción de una comunicación que se hace ver al usuario como un fichero. Hay
+de dos tipos\ [#]_:
+
+.. _chardevice:
+
+Dispositivos orientados a **caracteres**
+   Sirven para la transmisión de datos byte a byte. Algunos ficheros
+   representan dispositivos de *hardware*:
+
+   * :file:`/dev/psaux`, el ratón conectado al puerto `PS/2
+     <https://es.wikipedia.org/wiki/PS/2>`_.
+   * :file:`/dev/ttyS0`, el puerto serie.
+   * :file:`/dev/ttyN`, las :ref:`terminales <terminal>` [#]_.
+   * :file:`/dev/pts/N`, las pseudoterminales.
+   * etc.
+
+   Otros, en cambio, representan dispositivos especiales que no se
+   corresponden con *hardware*. Algunos tocará usarlos de vez en cuando
+   como:
+
+   * :file:`/dev/null`, dispositivo que acepta cualquier flujo de
+     caracteres sin generar ninguna respuesta\ [#]_.
+   * :file:`/dev/zero`, dispositivo que devuelve ceros.
+   * :file:`/dev/random` o :file:`/dev/urandom`, que generan secuencias
+     de bytes (pseudoaleatorios). A menos que sea crítica la aleatoriedad,
+     es más conveniente usar :file:`/dev/urandom`.
+
+.. _blockdevice:
+
+Dispositivos orientados a **bloques**
+   Sirven para la trasmisión de datos en bloques y se usa con ellos el
+   *buffer* de datos del sistema. Típicamente se usan para representar los
+   dispositivos de almacenamiento:
+
+   * :file:`/dev/fd0`, representaba el disco flexible.
+   * :file:`/dev/hd[a-z]`, representaba los discos duros conectados al bus
+     `IDE <https://es.wikipedia.org/wiki/Integrated_Drive_Electronics>`_.
+   * :file:`/dev/sd[a-z]`, representa los discos :abbr:`SCSI (Small
+     Computer System Interface)` y también los discos :abbr:`SATA (Serial
+     Advanced Technology Attachment)` o `USB (Universal Serial Bus)`\ [#]_.
+   * :file:`/dev/sr0`, representa al lector de cd-rom SATA.
+
+Dispositivos de almacenamiento
+------------------------------
+
+En la administración de un sistema es muy común tener que acceder a los
+dispositivos de almacenamiento ya para saber de cuáles se dispone, ya para
+leerlos, ya para particionarlos, ya para montarlos si es que disponen de un
+sistema de ficheros. Bajo este epígrafe se verá cómo hacer todas estas
+operaciones.
+
+¿De cuáles dispongo?
+""""""""""""""""""""
+
+Dado que ya hemos avanzado que nombre tienen en el sistema, bastaría en
+principio con hacer::
+
+   $ ls /dev/sd[a-z]
+
+Y ver qué nos devuelve la orden. Es ciertamente una posibilidad, pero bastante
+precaria, porque no habrá forma de saber, por ejemplo, qué tamaño tienen. En
+cualquier caso, si en vez de usar el comando anterior, se hizo lo siguiente::
+
+   $ ls /dev/sd*
+
+Nos habremos dado cuenta que aparecen otros dispositivos con números al final
+como :file:`/dev/sda1`. Haciendo la prueba en mi sistema virtualizado::
+
+   $ ls /dev/sd[a-z]
+   /dev/sda
+   $ls /dev/sd*
+   /dev/sda   /dev/sda1 
+
+Hay un sólo disco (y un cd-rom en :file:`/dev/sr0`, que no viene al caso). Pero
+¿qué es :file:`/dev/sda1`? Fácil: una partición del disco *sda*, la única que
+tiene\ [#]_.
+
+Por tanto, escudriñando en :file:`/dev` sólo somos capaces de saber que tenemos
+un disco y que este tiene una sola partición: no hay tamaños, ni naturaleza de
+las particiones. Ni siquiera sabemos si esa partición contiene un sistema de
+ficheros o, por el contrario, algo más complejo.
+
+Es cierto que usando :command:`ls` y :command:`cat` dentro de :file:`/sys` o
+:file:`/proc`, podríamos obtener más información, pero lo mejor es cambiar de
+estrategia.
+
+La forma más simple, aunque aún algo precaria, de hacernos una idea de cómo está
+organizado nuestro disco duros es la siguiente::
+
+   $ cat /proc/partitions
+   major   minor    #blocks name
+
+      8        0    4194304 sda
+      8        1    4192256 sda1
+     11        0    1048575 sr0
+      9        0    4190208 md0
+    253        0    1949696 dm-0
+    253        1     249856 dm-1
+    253        2     241664 dm-2
+    253        3     241664 dm-3
+
+Mirar el contenido del fichero :file:`/proc/partitions` nos dice cuáles son los
+dispositivos y *particiones* de nuestro disco duro susceptibles de contener un
+sistema de ficheros. Por el número de la primera columna sabemos que hay cuatro
+dispositivos diferentes: *8*\ , *11*\ , *9*\ , y *253*\ . El primero es el disco
+duro; y el segundo, el cdrom. Hay otros dos *raros* y efectivamente lo son
+porque el particionado de este disco no es el más sencilla En cualquier caso:
+
+Disco duro:
+   tenemos dos dispositivos asociados al disco duro: *sda* y *sda1*. El
+   primero representa al disco en su totalidad y el segundo a una única partición
+   que ocupa todo el disco (los tamaños son prácticamente iguales). El tamaño
+   de disco es de 4194304 bloques. Como cada bloque es de 2KB, resulta
+   que el disco es exactamente de *8*\ GB. De todos modos, el tamaño de
+   bloque no está expresado, así que es sólo una suposición. Realmente no
+   podemos conocer con absoluta seguridad cuál es el tamaño.
+
+   Si nuestro sistema tuviera un particionado básico, simplemente tendríamos
+   varias particiones más *sda2*, *sda3* y *sda1* no ocuparía todo el
+   espacio.
+
+*CDROM*
+   Está representado por *sr0*. No hay mucho que decir.
+
+*md0*
+   Este es uno de esos raros dispositivos. Por el tamaño se ve que tiene
+   prácticamente el tamaño de *sda1*. No es extraño. En linux, los RAID por
+   software están asociados a los dispositivos :file:`/dev/mdN`, así que esto
+   es un RAID que ocupa la partición *sda1*. Pero ¿cómo puede existir un RAID
+   asociado a un único soporte físico? El más simple, el *RAID 1* necesita
+   dos soportes, puesto que consiste en sincronizar ambos de manera que en
+   ambos se escriba lo mismo. De ese modo, si uno se estropea, el otro
+   contiene toda la información. Lo cierto es que esto es un RAID 1. La
+   anomalía de que sólo esté asociada a un soporte es que, como esto es una
+   máquina virtual, lo mismo nos da un soporte que treinta. Los dispositivos
+   son en realidad ficheros y si se estropea el disco de la máquina real, se
+   van al garete todos los ficheros juntos. Así que se ha creado un falso
+   RAID en el que no hay redundancia. Pero funciona como RAID, así que se
+   puede observar cómo funciona y en cualquier momento se puede ampliar para
+   crear un RAID real.
+
+*dm-N*
+   Son *particiones* que están asociadas a un mismo dispositivo.
+   *Particiones*, porque cumplen su función, ya no lo son realmente. Vemos
+   que hay cuatro.
+
+En definitiva, que algo hemos visto, mejor que con :command:`ls`, pero tampoco
+es muy ilustrativo.
+
+.. _lsblk:
+.. index:: lsblk
+
+:command:`lsblk`
+   Un comando más elocuente y que nos muestra más a las claras cómo están
+   organizados nuestros dispositivos es :command:`lsblk`::
+
+      $ lsblk
+      NAME                 MAJ:MIN RM  SIZE RO TYPE  MOUNTPOINT
+      sda                    8:0    0    4G  0 disk
+      └─sda1                 8:1    0    4G  0 part
+        └─md0                9:0    0    4G  0 raid1
+           ├─vgserver-root  253:0    0  1,9G  0 lvm   /
+           ├─vgserver-swap  253:1    0  244M  0 lvm   [SWAP]
+           ├─vgserver-home  253:2    0  236M  0 lvm   /home
+           └─vgserver-mysql 253:3    0  236M  0 lvm   /var/lib/mysql
+      sr0                    11:0    1 1024M  0 rom
+
+   Esto ya es otra cosa. Se ve claramente el cdrom y el disco con su partición, que
+   dentro de la partición hay un dispositivo de raiz y que este raid tiene cuatro
+   particiones que en realidad son *volúmenes lógicos* (se sabe porque su tipo es
+   *lvm*) y cuya naturaleza no explicaremos, porque nos basta con creernos que son
+   particiones.
+
+   Además cada *partición* tiene expresado qué sistema de ficheros soporta. Y se
+   ven claramente los tamaños.
+
+   Si probamos a ver si esos dispositivos existen bajo :file:`/dev`, veremos que
+   sí::
+
+      $ ls -l /dev/vgserver
+      total 0
+      lrwxrwxrwx 1 root root 7 oct 17 18:53 home -> ../dm-2
+      lrwxrwxrwx 1 root root 7 oct 17 18:53 mysql -> ../dm-3
+      lrwxrwxrwx 1 root root 7 oct 17 18:53 root -> ../dm-0
+      lrwxrwxrwx 1 root root 7 oct 17 18:53 swap -> ../dm-1
+
+   y, como era de prever, están relacionados con los dispositivos *dm-N*, que vimos
+   en :file:`/proc/partitions`.
+
+   .. _disk-model:
+
+   La orden es también muy útil, si tenemos varios discos, para saber qué disco
+   físico es el que se corresponde con cada dispositivo. Por ejemplo, en este
+   equipo con cuatro discos::
+
+      $ lsblk -dao name,model,serial
+      NAME MODEL                 SERIAL
+      sda  TOSHIBA_HDWJ110       9581PKMWT
+      sdb  Intenso_SSD_Sata_III  AA000000000000003422
+      sdc  Storage_Device        125C20100726
+      sdd  WDC_WD5000AACS-00G8B0 WD-WCAUF0160817
+      sde  WDC_WD20EARX-00PASB0  WD-WCAZAE549485
+
+   obtenemos los modelos y números de serie de todos ellos.
+
+.. _blkid:
+.. index:: blkid
+
+:command:`blkid`
+   Otra orden interesante para bichear en nuestros dispositivos de almacenamiento
+   es :command:`blkid`, que hay que usar como administrador. Su salida no es tan
+   elocuente::
+
+      # blkid
+      /dev/sda1: UUID="c74e4d2d-848b-0c73-3fe6-acff0992a4ed"
+                 UUID_SUB="5a22044a-c1ce-ec62-c653-6572e0dfc9e0" LABEL="debian:0"
+                 TYPE="linux_raid_member" PARTUUID="b3847d39-01"
+      /dev/md0: UUID="2lGqII-SHAM-i9S6-Cm17-pt57-sHyo-4LDLdn" TYPE="LVM2_member"
+      /dev/mapper/vgserver-root: LABEL="root" UUID="dcbb187a-360a-4091-bc2a-ea18acf5e5fe" TYPE="ext4"
+      /dev/mapper/vgserver-swap: UUID="fa3d001a-40bb-4ee1-a9ef-635a110e0b89" TYPE="swap"
+      /dev/mapper/vgserver-home: LABEL="home" UUID="c447a88c-fb88-492b-b79e-818d687f2c37" TYPE="ext4"
+      /dev/mapper/vgserver-mysql: LABEL="mysql" UUID="844ec999-d6a1-4175-970f-7b98060a6c1f" TYPE="ext4"
+
+   pero añade información adicional, sobre todo en la referente a las particiones
+   que contienen sistemas de ficheros. Por un lado nos enteramos de que hay otro
+   enlace simbólico a los dispositivos *dm-N*::
+
+      $ ls /dev/mapper/vgserver-*
+      lrwxrwxrwx 1 root root 7 oct 17 18:53 /dev/mapper/vgserver-home -> ../dm-2
+      lrwxrwxrwx 1 root root 7 oct 17 18:53 /dev/mapper/vgserver-mysql -> ../dm-3
+      lrwxrwxrwx 1 root root 7 oct 17 18:53 /dev/mapper/vgserver-root -> ../dm-0
+      lrwxrwxrwx 1 root root 7 oct 17 18:53 /dev/mapper/vgserver-swap -> ../dm-1
+
+   Por otro, vemos en qué sistema de ficheros están formateados (*ext4*) y,
+   finalmente, conocemos también que etiqueta tienen estos sistemas de ficheros y
+   que identificador único. Veremos qué importancia tienen estos dos datos más
+   adelante.
+
+   :command:`blkid` también puede usarse de modo más restringido para obtener
+   alguna característica particular de un dispositivo. Por ejemplo::
+
+      $ blkid -s UUID -o value /dev/mapper/vgserver-swap
+      fa3d001a-40bb-4ee1-a9ef-635a110e0b89
+
+Preparación de dispositivos
+"""""""""""""""""""""""""""
+Bajo este epígrafe se discute, muy brevemente, cómo preparar los dispositivos
+que contendrán los sistemas de ficheros. Esto, en principio, tiene dos fases:
+
+#. Particionar el dispositivo.
+#. Conferir un sistema de fichero a las particiones creadas.
+
+La primera tarea tiene mucha miga y merece una explicación prolija, que no se
+dará aquí\ [#]_. Baste con decir que pueden crearse particiones *msdos* o las
+más modernas particiones *GPT*. Si el disco es mayor de 2TB, es necesario hacer
+estas últimas.
+
+La herramienta fundamental y más simple para crear particiones *msdos* es el
+:index:`programa <fdisk>` :program:`fdisk`, mientras que para crear particiones
+*gpt* es el :index:`programa <gdisk>` :command:`gdisk`. Para estas últimas
+particiones también es muy recomendable el :index:`comando <sgdisk>`
+:command:`sgdisk` que permite hacerlas a través de opciones en vez de con un
+menú interactivo.
+
+Supuesto que seamos capaces de :ref:`hacer el particionado <particionado>`, la
+segunda tarea consiste en formatear las particiones resultantes. Para ello, el
+comando apropiado es
+
+.. _mkfs:
+.. index:: mkfs
+
+:command:`mkfs`
+   En realidad, :command:`mkfs` no es un comando sino un *front-end* de una
+   familia de programas llamados **mkfs.<tipo>** (:command:`mkfs.ext4`,
+   :command:`mkfs.xfs`, :command:`mkfs.btrfs`, :command:`mkfs.ntfs`, etc.) que
+   se instalan por separado. Por ello hay dos formas para dar formato::
+
+      mkfs -t <tipo> [<opciones>] <dispositivo>
+      mkfs.<tipo> [<opciones>] <dispositivo>
+
+   Las opciones de formateo dependen del tipo de sistema de ficheros que vayamos
+   a usar, pero hay una serie de opciones que habitualmente se incluyen al hacer
+   el formateo:
+
+   * Para agilizar el formateo, no comprobar la integridad del dispositivo ni
+     llenarlo con ceros a fin de eliminar toda información anterior. Suele
+     ser el comportamiento predeterminado excepto para :command:`mkfs.ntfs`
+     que requiere la opción ``-f``.
+
+   * Poner una etiqueta (*LABEL*) al sistema de ficheros a través de ``-L``,
+     excepto para ``mkfs.vfat`` que usa la opción ``-n``
+
+   * Muy circunstancialmente, se puede desear dar al sistema de ficheros un
+     identificador (*UUID*) determinado. Por ejemplo, cuando la partición ya
+     formaba parte del sistema y, simplemente, se desea reformatear. Como es
+     posible que el antiguo **UUID** ya estuviera expresado en algún fichero
+     de configuración (por ejemplo, en el :ref:`fstab <fstab>`, es bastante
+     aconsejable que no cambie. La opción suele ser ``-U``, aunque
+     :command:`mkfs.vfat` utiliza ``-i``.
+
+   .. warning::
+      Consúltese antes la página de manual del comando de formateado, porque las
+      opciones pueden variar.
+
+   .. note::
+      Tanto el particionado como el formateo sólo lo puede realizar el
+      administrador o un usuario que pertenezca al grupo *disk*.
+
+   Por lo general, tocará formatear dispositivos para memoria de intercambio
+   (:command:`mkfs.swap`) y sistemas de ficheros *ext4* (:command:`mkfs.ext4`),
+   *ntfs* (:command:`mkfs.ntfs`), *vfat* (:command:`mkfs.vfat`), *xfs*
+   (:command:`mkfs.xfs`) y *btrfs* (:command:`mkfs.btrfs`); el primero porque es
+   el sistema de ficheros habitual en linux; y el segundo y tercero porque con
+   ellos se suelen formatear los pinchos *USB* para poder leerlos en ordenadores
+   que no utilicen *linux*. El formateo es sencillo:
+
+   #. Formatear la partición :file:`/dev/sda6` con *ext4* proporcionando un
+      nombre para la etiqueta::
+
+      # mkfs.ext4 -L HOME /dev/sda6
+
+   #. Formatear la partición :file:`dev/sdc1` en *ntfs*::
+
+      # mkfs.ntfs -f -L PINCHO /dev/sdc1
+ 
+   #. Formatear la partición :file:`dev/sdc1` en *vfat*::
+
+      # mkfs.vfat -n PINCHO /dev/sdc1
+
+   #. Reformatear la partición :file:`/dev/sdb1` manteniendo el mismo
+      *UUID*::
+
+         # mkfs.ext4 -L STORE -U $(blkid -s UUID -o value /dev/sdb1) /dev/sdb1
+
+      .. note::
+         En vez de consultar el *UUID* y trascribir el resultado de la
+         consulta en la línea de comandos, se ha preferido hacer uso de las
+         :ref:`subshells <subshell>`, como se mostrará más adelante, como se
+         mostrará más adelante.
+
+.. _mkswap:
+.. index:: mkswap
+
+:command:`mkswap`
+   Prepara un dispositivo para que pueda ser usado como memoria de intercambio.
+   Es el equivalente a :command:`mkfs.<tipo>` y su uso es semejante::
+
+      # mkswap [<opciones>] <dispositivo>
+
+   Dispone también de las opciones ``-L`` y ``-U``.
+
+Montaje de dispositivos
+"""""""""""""""""""""""
+Ya se ha explicado que en *unix* existe un único árbol de directorios sobre el
+cual se montan, sobre distintos directorios, los distintos sistemas de ficheros.
+Se llama :dfn:`punto de montaje` a cada uno de los directorios sobre los que se
+monta un sistema de ficheros.
+
+Un modo de saber cuáles son estos *puntos de montaje* se ha expuesto ya y,
+además, es bastante ilustrativo: a través de lsblk_.
+
+.. _df:
+.. index:: df
+
+:command:`df`
+   Otro modo de extraer la información sobre los puntos de montaje y sus
+   particiones asociadas y, de paso, conocer cuál es el grado de ocupación
+   es el comando :command:`df`::
+
+      $ df -h
+      S.ficheros                 Tamaño Usados  Disp Uso% Montado en
+      /dev/dm-0                    1,8G   892M  840M  52% /
+      udev                          10M      0   10M   0% /dev
+      tmpfs                         24M   4,4M   19M  19% /run
+      tmpfs                         59M      0   59M   0% /dev/shm
+      tmpfs                        5,0M      0  5,0M   0% /run/lock
+      tmpfs                         59M      0   59M   0% /sys/fs/cgroup
+      /dev/mapper/vgserver-mysql   225M   2,1M  207M   1% /var/lib/mysql
+      /dev/mapper/vgserver-home    225M   2,1M  207M   1% /home
+
+   Con la opción ``-h`` muestra los tamaños en la unidad de medida más apropiada
+   (como :command:`ls`) y así es como se ha usado. Aparecen en el listado
+   algunos sistemas de ficheros virtuales y tres de los cuatro volúmenes lógicos
+   que ya habíamos detectado con otras herramientas. El cuarto volumen lógico se
+   usó para memoria de intercambio, así que es lógico que no aparezca.
+
+   Si a la orden se le indica como argumento posicional un directorio, nos
+   devolverá exclusivamente información del sistema de archivos en el que se
+   encuentra tal directorio, lo cual, además de para obtener la información
+   anterior, nos puede servir para identificar a qué sistema de archivos pertenece
+   el directorio::
+
+      $ df -h ~
+      S.ficheros                 Tamaño Usados  Disp Uso% Montado en
+      /dev/mapper/vgserver-home    225M   2,1M  207M   1% /home
+
+.. _findmnt:
+.. index:: findmnt
+
+:command:`findmnt`
+   Es un comando cuya salida es bastante más versátil que la de :command:`df`,
+   ya que permite indicar qué campos desean obtenerse y de qué sistemas de
+   ficheros. Por ejemplo::
+
+      $ findmnt -T /var/lib/mysql -nlo TARGET,USE%
+      /var/lib/mysql       1%
+
+   Esta capacidad de seleccionar qué datos queremos mostrar, puede resultarnos
+   de mucha utilidad en la :ref:`programación de scripts <scripts>`. Por otro
+   lado, sin la opción ``-l`` muestra una salida semejante a :ref:`lsblk
+   <lsblk>`, así que podremos ver cómo se organizan los puntos de montaje.
+
+.. _mount:
+.. index:: mount
+
+:command:`mount`
+   No obstante, la herramienta básica para tratar los montajes de dispositivos es
+   el comando :command:`mount`. Su sintaxis básica es::
+
+       mount [opciones] [<dispositivo>] [<punto_montaje>]
+
+   En su forma más simple de uso puede ejecutarse sin más\ [#]_::
+
+       $ mount
+       sysfs on /sys type sysfs (rw,nosuid,nodev,noexec,relatime)
+       proc on /proc type proc (rw,nosuid,nodev,noexec,relatime)
+       udev on /dev type devtmpfs (rw,relatime,size=10240k,nr_inodes=61012,mode=755)
+       devpts on /dev/pts type devpts (rw,nosuid,noexec,relatime,gid=5,mode=620,ptmxmode=000)
+       tmpfs on /run type tmpfs (rw,nosuid,relatime,size=101240k,mode=755)
+       /dev/mapper/vgserver-root on / type ext4 (rw,relatime,errors=remount-ro,data=ordered)
+       [...]
+       /dev/mapper/vgserver-home on /home type ext4 (rw,relatime,data=ordered)
+       /dev/mapper/vgserver-mysql on /var/lib/mysql type ext4 (rw,relatime,data=ordered)
+       rpc_pipefs on /run/rpc_pipefs type rpc_pipefs (rw,relatime)
+
+   y mostrará todos los sistemas montados con expresión de en qué dispositivo se
+   montan y con qué opciones de montaje. Últimamente no es un método muy elocuente
+   para descubrir cuáles son los sistemas de ficheros que montamos en nuestro
+   linux, ya que linux, cada vez más, monta sistemas de ficheros virtuales
+   (*devtmpfs*, *proc*, *sysfs*, *tmpfs*, etc.), con lo que los sistemas de
+   ficheros que corresponden a *particiones* (en el sentido más amplio) quedan algo
+   escondidos en la maraña de montajes.
+
+   :command:`mount`, empero, no sólo sirve para ver los sistemas ya montados, sino
+   también para la acción de montar. Al hilo de esto, es importante tener claras
+   varias ideas:
+
+   * Con :command:`mount` realizamos montajes manuales lo cual para un sistema
+     de escritorio puede resultar engorroso. Para estos sistemas se usan
+     herramientas de autodetección y automontado como las que proporcionan los
+     grandes escritorios (*gnome*, *kde*, etc...) u otras independientes como
+     `udiskie <https://wiki.archlinux.org/index.php?title=Udisks>`_. Dado que
+     nuestra intención es llegar a administrar servidores, prescindiremos de esta
+     cómoda vía.
+
+   * Para montar un sistema de ficheros, obviamente, es necesario indicar el
+     sistema de ficheros y el punto de montaje.
+
+   * Hay sistemas de ficheros que se montan automáticamente en el arranque
+     (los montajes sobre :file:`/` o sobre :file:`/home`, por ejemplo), así que
+     tiene que haber algún sitio donde se asocien sistemas de ficheros a puntos
+     de montaje.
+
+   Comencemos obviando la existencia de este *sitio* y montemos un sistema de
+   ficheros. Para ello, imaginemos que pinchamos una memoria *usb*\ [#]_, lo que
+   provocará que aparezca un nuevo un nuevo disco (y una nueva partición si suponemos
+   que esta existe)::
+
+      $ ls /dev/sd*
+      /dev/sda    /dev/sda1    /dev/sdb    /dev/sdb1
+
+   Si existe esa primera partición y está formateada con un sistema de ficheros
+   entendible por nuestro linux, montarlo es tan fácil cómo::
+
+      $ mount /dev/sdb1 /mnt
+
+   Se ha escogido como punto de montaje :file:`/mnt`, porque este es el indicado
+   cuando se hacen montajes manuales (véase :ref:`el apartado correspondiente
+   <filesystem>`). :command:`mount` es medianamente inteligente, así
+   que no hace falta decirle en qué sistema de ficheros está formateado *sdb1*\ :
+   él sólo lo descubre. Además, hay definidas unas opciones de montaje
+   predeterminadas para el sistema de ficheros en cuestión (*ext4*, por ejemplo) y
+   esas serán las que se apliquen. Sin embargo, si queremos especificar otras, es
+   posible hacerlo a través de la opción ``-o``::
+
+      $ mount -o ro /dev/sdb1 /mnt
+
+   En este caso montamos el sistema de ficheros como de sólo lectura, por lo que no
+   podremos escribir en él. Una opción muy socorrida es volver a montar el sistema,
+   sin llegar a desmontarlo, para cambiar las opciones. Por ejemplo, si decidimos
+   en algún momento que queremos escribir en :file:`/mnt`, podemos hacer lo
+   siguiente::
+
+      $ mount -o remount,rw /mnt
+
+   *linux* permite montar un directorio sobre otro. Esto supone que el contenido
+   de un directorio aparecerá como contenido del otro\ [#]_. Por ejemplo::
+
+      $ mount -o bind /home /mnt
+
+   provocará que el contenido de :file:`/home` aparezca también dentro de
+   :file:`/mnt`.
+
+   Hay ciertas ocasiones en las que deseamos especificar el sistema de ficheros en
+   que queremos montar la partición. Por ejemplo, en el caso de particiones *ntfs*
+   puede hacerse necesario::
+
+      $ mount -t ntfs-3g /dev/sdb1 /mnt
+
+   .. note::
+      :command:`mount` también permite montar ficheros que contienen sistemas de
+      ficheros (como, por ejemplo, la imagen *iso* de un cdrom). Si tiene
+      interés en ello, consulte el apartado sobre :ref:`montaje de imágenes
+      <loop>`.
+
+.. _umount:
+.. index:: umount
+
+:command:`umount`
+   El proceso inverso de montar, o sea, desmontar, se hace con el comando
+   :command:`umount`::
+
+      $ umount /mnt
+
+   En este caso, basta con indicar el punto de montaje. Esta acción, no obstante,
+   puede fallar como consecuencia de que el dispositivo esté aún ocupado. Por
+   ejemplo, porque en alguna terminal nos hayamos quedado dentro de algún
+   directorio dentro de :file:`/mnt`.
+
+.. _lsof:
+.. index:: lsof
+
+:command:`lsof`
+   En ocasiones saber por qué está ocupado el dispositivo es sumamente sencillo:
+   puede deberse simplemente a que hayamos estado trabajando dentro de él y
+   hayamos intentado desmontar sin salirnos a un directorio externo. Pero en
+   otras cosas no es tan evidente, ya que el estar ocupado puede deberse a que
+   haya un programa en segundo plazo que esté trabajando sobre él. La mejor
+   forma de saber quién o quiénes son los culpables de la ocupación es usar el
+   comando :command:`lsof`::
+
+      $ lsof /mnt
+
+   que nos dirá quién esta usando qué y sobre qué fichero. Conocido el caso,
+   podremos tomar la determinación de solucionar el problema o, si es un proceso
+   que requiere terminarse, decirle a :command:`umount` que desmonte el
+   dispositivo cuando quede libre::
+
+      $ umount -l /mnt
+
+.. _swapon:
+.. index:: swapon
+
+:command:`swapon`
+   Sirve para *montar* (o sea, para activar) dispositivos como memoria de
+   intercambio que fuera formateados con :ref:`mkswap <mkswap>`::
+
+      $ swapon /dev/sdb2
+
+   Suponiendo que :file:`/dev/sdb2` sea la partición que se quiere usar para
+   intercambio.
+
+.. _swapoff:
+.. index:: swapoff
+
+:command:`swapoff`
+   Desactiva una partición como memoria de intercambio::
+
+      $ swapoff /dev/sdb2
+
+   Para que la operación tenga éxito, la memoria de intercambio no debe estarse
+   usando. Esto puede consultarse con el comando :ref:`free <free>`.
+
+.. _fstab:
+
+Para rematar este epígrafe sobre montaje de dispositivos queda describir cómo
+linux sabe de antemano qué sistemas de ficheros debe montar y sobre qué puntos
+de montaje. Esto lo logra gracias al fichero :file:`/etc/fstab`\ [#]_, que tiene
+líneas con el siguiente aspecto::
+
+   # 1.                                      2.        3.    4.               5.       6.
+   # --------------------------------------- --------- ----  ----------------- ------  ----
+   UUID=31f3c189-8786-4dd6-a826-91bbf8777a74 /         ext4  errors=remount-ro 0       1
+   UUID=2bee799a-740b-4106-90ad-d9a155d85afe /home     ext4  defaults          0       2
+
+Este fichero desglosa, línea a línea, los sistemas de ficheros definidos en el
+servidor y define las reglas para su montaje. Cada línea consta de seis campos:
+
+=================== ===================================================================
+        Campo       Descripción
+=================== ===================================================================
+1. Dispositivo      El dispositivo cuyas reglas define la línea
+2. Punto de montaje El directorio sobre el que se montará el dispositivo
+3. Tipo de sistema  El sistema de ficheros en el que está formateado el dispositivo
+4. Opciones         Las opciones de montaje con las que se monta el sistema de ficheros
+5. Volcado          Si el sistema necesita ser volcado o no.
+6. Chequeo          Orden en que se comprueban los sistemas de ficheros.
+=================== ===================================================================
+
+Para separar un campo de otro basta con usar uno o más caracteres de espaciado
+(espacios o tabulaciones). Lo habitual es que se escriban de modo que los campos
+queden alineados en vertical formando columnas.
+
+**Dispositivo**
+   Define el dispositivo (partición, volumen lógico, etc.) que se desea montar.
+
+   La manera más directa de hacer referencia a él es a través del nombre que
+   recibe dentro de :file:`/dev/`. Por ejemplo, si deseáramos montar la segunda
+   partición del primer disco, nos referiríamos a :file:`/dev/sda2`. Sin
+   embargo, esto modo de referirnos a los dispositivos no es muy adecuado. La
+   razón es que si hay cambios en el hardware o el disco se traslada a otro
+   ordenador, puede ocurrir que tal disco deje de ser *sda* y pase a ser *sdc*.
+   En tal caso, el dispositivo sería :file:`/dev/sdc2` y, consecuentemente, el
+   mentaje dejaría de funcionar. Si, además, estamos hablando de partes
+   esenciales del sistema que se deben montar en el arranque como :file:`/` o
+   :file:`/home` el resultado es que el sistema ni siquiera será capaz de
+   iniciarse.
+   
+   Para evitar estos inconvenientes, existen dos modos alternativos para
+   referirnos en :file:`/etc/fstab` al dispositivo: a través de
+  
+   #. Una etiqueta (*LABEL*)
+   #. Un identificador (:abbr:`UUID (universally unique identifier)`).
+
+   Tanto la etiqueta como el identificador se adjudican al sistema de ficheros
+   contenido en el dispositivo en el momento en que se :ref:`formatea <mkfs>`,
+   la diferencia es que la etiqueta la fija el usuario, mientras que el
+   identificador es un número de *128* bits, que se crea aleatoriamente\ [#]_.
+
+   Para usar etiqueta o identificador basta con escribir::
+
+     LABEL=RAIZ
+
+   si se trata de una etiqueta y le pusimos *RAIZ* al formatearlo, o::
+
+      UUID==63491fd0-3abd-4c27-ab8e-6dec89fd7c4a
+
+   si se trata de un identificador. Dada la longitud del identificador es casi
+   imposible que en dos dispositivos se haya generado el mismo *UUID* con lo que
+   podemos estar seguros de que este es único. No podemos decir lo mismo de las
+   etiquetas, así que es más conveniente usar el *UUID*, para expresar el
+   dispositivo. 
+
+**Punto de montaje**
+   No hay mucho que explicar: símplemente consiste en indicar el directorio que
+   servirá como punto de montaje. Por ejemplo, :file:`/home`.
+
+
+**Tipo de sistema**
+   Debe especificarse el sistema de ficheros en que está formateado el
+   dispositivo o partición (*ext3*, *xfs*, *ntfs*, *nfs*, etc). Puede ser *none*
+   en algunos casos (p.e. cuando se monta un directorio sobre otro, véase la
+   opción ``bind`` de :ref:`mount <mount>`.
+
+   También puede indicarse *auto* para que el sistema se encargue de adivinar
+   cuál es el tipo del sistema de ficheros.
+
+   .. note::
+      Cuando el dispositivo se usa como memoria de intercambio, se indica son
+      *swap*.
+
+**Opciones**
+   Son las opciones con las que se montará el sistema de ficheros. En la página
+   de manual de :ref:`mount <mount>` se enumeran las opciones generales para
+   cualquier sistema de ficheros y las que son particulares para cada uno. Para
+   expresarlas basta escribirlas separadas por comas: :kbd:`ro,nofail`.
+
+   El *kernel* de linux monta cada sistema con una opciones predeterminadas que
+   no hace falta especificar, por lo que sólo hace falta indicar las opciones
+   adicionales o las opciones que contradigan a las predeterminadas. Existe la
+   palabra ``defaults`` para expresar las opciones predeterminadas. Sin embargo,
+   :kbd:`defaults,ro` es equivalente a :kbd:`ro`, pues las predeterminadas
+   siempre se usan, por lo que esta palabra sólo es necesaria cuando no se va a
+   expresar ninguna opción adicional\ [#]_.
+
+   Dentro de las opciones universales para cualquier sistema de ficheros hay
+   unas cuantas interesantes:
+
+   **noauto**
+      No monta durante el arranque el dispositivo: lo predeterminado es que sí
+      se haga.
+
+   **nofail**
+      No provoca fallo que el dispositivo no exista y, por tanto, no se pueda
+      montar.
+
+   **user**
+      Permite montar manualmente el dispositivo a cualquier usuario. Sólo este
+      mismo usuario podrá desmontarlo.
+
+   **users**
+      Como el anterior, pero cualquier usuario podrá desmontarlo.
+
+   .. note::
+      Para los dispositivos que se usan como memoria de intercambio se usa la
+      opción *sw*.
+
+**Volcado**
+   Indica si se quieren hacer copias de seguridad con :command:`dump`. No suele
+   usarse, de modo que lo habitual es que se indique *0* (no hacer copia), y no
+   *1*, que significa sí hacerla.
+
+**Chequeo**
+   Indica cómo se llevara a efecto la comprobación del sistema de ficheros al
+   montarse. Puede tener valores 0, 1 ó 2. *0* es para aquellos sistemas que no
+   se desea comprobar; *1* para el sistema que se monta sobre la raíz del
+   sistema; y *2* para el resto de sistemas de ficheros.
+
+Sabido todo esto, ya es posible interpretar una línea de fstab::
+
+   UUID=63491fd0-3abd-4c27-ab8e-6dec89fd7c4a  /  ext4  errors=remount-ro  0  1
+
+Esta línea hace que se monte el sistema de ficheros con el *UUID* indicado como
+raíz del sistema, es *ext4*, se monta con las opciones
+predeterminadas, pero si se produce un error, se vuelve a montar cómo sólo
+lectura, no se hace copia con *dump* y se realiza el chequeo del sistema antes
+de ningún otro.
+
+Por otro lado, cuando un sistema aparece en :file:`/etc/fstab`, al hacer un
+montaje manual no es necesario más que indicar el punto de montaje, ya que el
+las opciones y el dispositivo las toma el comando de tal fichero. Por ejemplo,
+si existe una entrada para :file:`/home/store`, bastará con montarla del
+siguiente modo::
+
+   $ mount /home/store
+
+Lectura
+"""""""
+
+La forma más natural de leer un dispostivo es la más obvia: se monta ésta y se
+accede a sus ficheros y directorios. Sin embargo, en ocasiones, es interesante
+recurrir a una lectura (o una escritura) de *bajo nivel*, es decir, una lectura
+*byte* a *byte* del dispositivo.
+
+.. note::
+   Para el pleno entendimiento de este apartado es necesario saber qué son y
+   cómo funcionan las :ref:`redirecciones <ioredirect>`.
+
+Un caso muy habitual es el de querer hacer una copia de seguridad exacta del
+dispostivo. Esto implica leer *byte* a *byte* el dispotivo y almacenar la
+lectura en un fichero, O sea, si queremos hacer una copia de la primera
+partición del disco::
+
+   # cat /dev/sda1 > particion1.img
+
+Esto, no obstante, genera unos ficheros muy grandes, tan grandes como grande es
+la partición, por lo que, comúnmente, lo que se hace es almacenar la imagen
+comprimida::
+
+   # xz -9c < /dev/sda1 > particion1.img.xz
+
+La recuperación de estas imágenes consiste simplemente en hacer la lectura y la
+escritura en sentido inverso::
+
+   # cat particion1.img > /dev/sda1
+
+o bien, si la imagen estaba comprimida::
+
+   # xzcat particion1.img.xz > /dev/sda1
+
+Cuando se realiza esta recuperación, basta con que la partición en que se
+vuelque la imagen sea, como mínimo, del mismo tamaño que la partición original
+\ [#]_.
+
+.. _dd:
+.. index:: dd
+
+:command:`dd`
+   :command:`cat` permite hacer lecturas o escrituras, pero la operación acaba
+   bien cuando se acaba el soporte de lectura o bien cuando se acaba el soporte
+   de almacenamiento. Si lo que pretendemos en controlar cuántos *bytes* se leen
+   o escriben, la herramienta adecuada es :command:`dd`.
+
+   En principio, podemos usar :command:`dd` del mismo modo que :command:`cat`::
+
+      # dd < /dev/sda > copia.img
+
+   de modo que haremos una copia exacta del dispositivo. Sin embargo, la
+   utilidad de :command:`dd` radica en escoger cúanto queremos copiar. Para ello
+   tiene dos argumentos fundamentales, ``bs`` y ``count``, que nos permiten
+   indicar respectivamente qué cantidad de *bytes* queremos leer y escribir de
+   una tacada y cuántas veces. Por ejemplo, la orden::
+
+      # dd bs=512 count=1 < /dev/sda > mbr.img
+
+   hace una copia del :abbr:`MBR (Master Boot Record)` del disco *sda*, ya que
+   este es el primer sector ( 512 *bytes*\ ) del disco duro. Cuando no se quiere
+   empezar a leer desde el principio se puede usar el argumento ``skip``, que
+   permite indicar el número de bloques que se desean saltar antes de empezar a
+   leer del dispositivo de entrada. El tamaño de estos bloques es el indicado
+   por ``bs``. Por ejemplo::
+
+      # dd bs=2M count=1 skip=3 < /dev/sda > backup.img
+
+   copiará 2MB de datos del disco saltándose el primeros 6MB.
+
+.. _ej-dev:
+
+.. include:: /99-ejercicios/03-dispositivos.rst
+
+.. rubric:: Notas al pie
+
+.. [#] Excepto las tarjetas de red.
+
+.. [#] En realidad, los ficheros de dipositivo son tres: los dos referidos y los
+   dispositivos orientados a **sockets** que sirven para comunicar procesos
+   entre sí. No se refieren bajo este epígrafo porque suelen encontrarse bajo
+   :file:`/var/run`.
+
+.. [#] :file:`/dev/tty`, sin número, representa la terminal activa, sea terminal
+   o pseudo terminal. De hecho si probamos a hacer::
+
+      $ echo "Estoy aqui" > /dev/tty
+
+   Veremos como se escribe la frase en la terminal que estamos usando.
+
+.. [#] Es socorridísimo. Cuando queremos desechar la salida de alguna orden, basta
+   con que lo redirigamos a él.
+
+.. [#] En la transición entre discos IDE y SATA, se solían mapear los discos IDE
+   como SATA, de modo que también se representaban mediante ficheros
+   :file:`/dev/sdN`.
+
+.. [#] Tratar sobre las particiones, los tipos de particiones y el particiado en
+   sí requeriría un epígrafe amplio.
+
+.. [#] Puede encontrarse una explicación detallada `aquí
+   <http://docs.iescdl.es/~josem/discos.html>`_.
+
+.. [#] Como alternativa a usar :command:`mount` como consulta puede inspeccionarse
+    el contenido del fichero :file:`/proc/mounts`::
+
+       $ cat /proc/mounts
+
+.. [#] Si se trabaja con una máquina virtual, puede ser algo engorroso hacer que esta
+    vea una unidad externa; por lo que es bastante más simple enchufar un nuevo disco
+    virtual. Eso sí, deberá tener al menos una partición y estar esta formateada.
+
+.. [#] Tiene utilidad en algunos casos. Por ejemplo, en un servidor FTP
+   enjaulado, permite mostrar un directorio que esté fuera de la jaula.
+
+.. [#] En realidad, con **systemd** han cambiado un poco las cosas. **systemd**
+       tiene su propia forma de determinar los sistemas que se montan y dónde,
+       pero tiene un traductor que nos permite seguir usando :file:`/etc/fstab`
+       como desde hace treinta años.
+
+.. [#] Algunos sistemas (p.e. *ext4*) permiten fijar también el identificador,
+       aunque no es lo habitual y rara vez se tiene necesidad de ello.
+
+.. [#] Y es que necesariamente hay que escribir algo en cada campo, por lo que
+       si no se necesitan modificar las opciones predeterminadas, habrá que
+       escribir :kbd:`defaults`.
+
+.. [#] Si es más grande, no obstante, es necesario redimensionar el sistema de
+       ficheros después de hacer la restauración para poder aprovechar el espacio
+       extra.

@@ -1,0 +1,652 @@
+
+
+
+<!DOCTYPE html>
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>6.1.3. DHCP con dnsmasq &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css" />
+    <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+    
+    <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/jquery.js"></script>
+    <script src="../../_static/underscore.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/translations.js"></script>
+    
+    <link rel="index" title="Índice" href="../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../search.html" />
+    <link rel="next" title="6.1.4. ISC DHCP" href="04.isc.html" />
+    <link rel="prev" title="6.1.2. Software" href="02.tipos.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="04.isc.html" title="6.1.4. ISC DHCP"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="02.tipos.html" title="6.1.2. Software"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" ><span class="section-number">6. </span>Servicios de infraestructura</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="index.html" accesskey="U"><span class="section-number">6.1. </span>DHCP</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">6.1.3. </span>DHCP con <strong class="program">dnsmasq</strong></a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="dhcp-con-dnsmasq">
+<span id="dnsmasq-dhcp"></span><span id="dnsmasq"></span><h1><span class="section-number">6.1.3. </span>DHCP con <strong class="program">dnsmasq</strong><a class="headerlink" href="#dhcp-con-dnsmasq" title="Enlazar permanentemente con este título">¶</a></h1>
+<p><strong class="program">dnsmasq</strong> es un pequeño servidor que puede hacer las veces de servidor
+<abbr title="Domain Name Server">DNS</abbr> caché y servidor <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr><a class="footnote-reference brackets" href="#id11" id="id1">1</a>. Si la configuración es sencilla, podemos usarlo
+en vez del tándem <strong class="program">bind</strong> (para <abbr title="Domain Name Server">DNS</abbr>) y el servidor del <abbr title="Internet Systems Consortium">ISC</abbr> (para
+<abbr title="Dynamic Host Configuration Protocol">DHCP</abbr>). En particular puede interesarnos cuando se dan las siguientes
+circunstancias:</p>
+<ul class="simple">
+<li><p>El servicio <abbr title="Domain Name Server">DNS</abbr> es interno y no pretedemos hacer nada especialemnte
+complicado.</p></li>
+<li><p>No requerimos que la caché de direcciones sea muy grande (<strong class="program">dnsmasq</strong>
+almacena los nombres en memoria).</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Bajo este epígrafe trataremos sólo su capacidad para hacer de servidor
+<abbr title="Dynamic Host Configuration Protocol">DHCP</abbr>. Para ver cómo usarlo como servidor <abbr title="Domain Name Server">DNS</abbr>, consúltese <a class="reference internal" href="../03.dns/03.dnsmasq.html#dnsmasq-dns"><span class="std std-ref">más adelante</span></a>.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Sin configuración alguna, <strong class="program">dnsmasq</strong> levantará el servidor
+<abbr title="Domain Name Server">DNS</abbr>, por lo que si se quiere prescindir de él es necesario incluir en la
+configuración la directiva:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">port=0</span>
+</pre></div>
+</div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>No trataremos aquí la configuración del servicio para arranque por
+red. Si ese es un interés, vaya al <cite>epígrafe correspondiente &lt;pxe&gt;</cite> que se
+desarrolla más adelante.</p>
+</div>
+<p>Antes de empezar, supongamos que nuestro punto de partida es una máquina con
+tres interfaces físicas:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">allow-hotplug eth0</span>
+<span class="go">iface eth0 inet dhcp</span>
+<span class="go">   up   iptables -t nat -A POSTROUTING -o $IFACE -j MASQUERADE</span>
+<span class="go">   down iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE</span>
+
+<span class="gp">#</span> Red interna <span class="m">1</span> <span class="o">(</span>interna1.vm<span class="o">)</span>
+<span class="go">allow-hotplug eth1</span>
+<span class="go">iface eth1 inet static</span>
+<span class="go">   address 192.168.255.1/24</span>
+
+<span class="gp">#</span> Red interna <span class="m">2</span> <span class="o">(</span>interna2.vm<span class="o">)</span>
+<span class="go">allow-hotplug eth2</span>
+<span class="go">iface eth2 inet static</span>
+<span class="go">   address 192.168.254.1/24</span>
+</pre></div>
+</div>
+<p>y que nuestra intención es proporcionar configuración dinámica de direcciones a
+las dos redes internas.</p>
+<p>La instalación no tiene ninguna complicación:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt-get install dnsmasq
+</pre></div>
+</div>
+<div class="section" id="configuracion-basica">
+<span id="dnsmasq-dhcp-confbas"></span><h2><span class="section-number">6.1.3.1. </span>Configuración básica<a class="headerlink" href="#configuracion-basica" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Su fichero de configuración es <code class="file docutils literal notranslate"><span class="pre">/etc/dnsmasq.conf</span></code>, pero también
+puede hacerse una configuración modular creando ficheros dentro de
+<code class="file docutils literal notranslate"><span class="pre">/etc/dnsmasq.d</span></code>, gracias a cómo se lanza el servicio<a class="footnote-reference brackets" href="#id12" id="id2">2</a>. Así pues,
+creemos dentro de tal directorio un fichero <code class="file docutils literal notranslate"><span class="pre">dhcp.conf</span></code> con la siguiente
+configuración:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">log-dhcp</span>
+
+<span class="go">dhcp-range=192.168.255.64,192.168.255.127,10m</span>
+<span class="go">domain=interna1.vm,192.168.255.0/24</span>
+</pre></div>
+</div>
+<p>La primera línea es prescindible, pero provoca más información en el registro
+que nos puede ser útil mientras estudiamos una configuración. Las otras dos
+líneas establecen el rango y tiempo de concesión y el dominio asociado. Para
+simplificar, nos olvidaremos por ahora de la otra interfaz.</p>
+<p>Esta es la configuración más básica por cuanto el resto de parámetros de
+configuración necesarios (fundamentalmente <abbr title="Domain Name Server">DNS</abbr> y puerta de enlace) se ajustan
+a la <abbr title="Internet Protocol">IP</abbr> del servidor.</p>
+<p>Podemos, no obstante, añadir parámetros (opciones) del siguiente modo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-option=6,192.169.1.1</span>
+</pre></div>
+</div>
+<p>es decir, a la opción <strong>6</strong><a class="footnote-reference brackets" href="#id13" id="id3">3</a> (que representa los servidores <abbr title="Domain Name Server">DNS</abbr>) se le
+asocia el valor <em>192.168.1.1</em>. La mayoría de estas opciones tiene asociado
+también un nombre que puede consultarse con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> /usr/sbin/dnsmasq --help dhcp
+<span class="go">Opciones DHCP conocidas:</span>
+<span class="go">  1 netmask</span>
+<span class="go">  2 time-offset</span>
+<span class="go">  3 router</span>
+<span class="go">  6 dns-server</span>
+<span class="go">  7 log-server</span>
+<span class="go">  [...]</span>
+</pre></div>
+</div>
+<p>Usando el nombre, la línea anterior también podría haberse escrito así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-option=option:dns-server,192.168.1.1</span>
+</pre></div>
+</div>
+<p>Obsérvese que no se indica de qué tipo es el dato, por lo que <strong class="program">dnsmasq</strong>
+lo interpreta según el aspecto que tenga el valor:</p>
+<ul class="simple">
+<li><p>Si es una <abbr title="Internet Protocol">IP</abbr>, lo interpretará como cuatro <em>bytes</em><a class="footnote-reference brackets" href="#id14" id="id4">4</a>.</p></li>
+<li><p>Si una cadena, como cadena<a class="footnote-reference brackets" href="#id15" id="id5">5</a>. y si</p></li>
+<li><p>Si es un número decimal, habrá que especificar si se trata de un <em>byte</em>, dos o
+tres rematando la expresión del número con los sufijos <kbd class="kbd docutils literal notranslate">b</kbd>, <kbd class="kbd docutils literal notranslate">s</kbd> o <kbd class="kbd docutils literal notranslate">i</kbd>,
+respectivamente.</p></li>
+<li><p>Si se quieren escribir valores hexadecimales, debe separarse cada byte con dos
+puntos: <kbd class="kbd docutils literal notranslate">00:1A:CF</kbd>.</p></li>
+</ul>
+<p>Aunque el servidor <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> sólo envía las opciones requeridas por el cliente, es
+posible forzar el envío de otras opciones. Por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-option-force=209,pxelinux.cfg/normal</span>
+</pre></div>
+</div>
+<p>la cual, aunque no la haya pèdido, envía al cliente la opción <em>209</em>, que
+identifica al fichero de arranque y es propia de <a class="reference internal" href="../../07.serre/06.pxe/index.html#pxe"><span class="std std-ref">PXE</span></a>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Si atendemos al protocolo, el tiempo de concesión se envía como
+opción (es la número <strong>51</strong>). Sin embargo, es inutil fijarlo con
+<code class="docutils literal notranslate"><span class="pre">dhcp-option</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-option=51,300i   # Esto es inútil.</span>
+</pre></div>
+</div>
+<p>ya que <strong class="program">dnsmasq</strong> atiende sólo al valor establecido con
+<code class="docutils literal notranslate"><span class="pre">dhcp-range</span></code><a class="footnote-reference brackets" href="#id16" id="id6">6</a>.</p>
+</div>
+</div>
+<div class="section" id="declaracion-de-maquinas">
+<span id="dnsmasq-host-decl"></span><h2><span class="section-number">6.1.3.2. </span>Declaración de máquinas<a class="headerlink" href="#declaracion-de-maquinas" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>En ocasiones, se tienen máquinas en la red a las que se quiere asignar una <abbr title="Internet Protocol">IP</abbr>
+fija. Esto se puede hacer mediante la directiva <code class="docutils literal notranslate"><span class="pre">dhcp-host</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-host=00:11:22:33:44:55,192.168.255.2</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Cuando se asocian <abbr title="Internet Protocol">IP</abbr>s fijas con máquinas, éstas deben quedar
+fuera del rango definido con <code class="docutils literal notranslate"><span class="pre">dhcp-range</span></code>.</p>
+</div>
+<p>Es posible añadir más opciones:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-host=00:11:22:33:44:55,192.168.255.2,nas,24h</span>
+</pre></div>
+</div>
+<p>lo cual proporciona, además, el nombre <em>nas</em> y hace la concesión durante 24
+horas. Salvo la <abbr title="Media Access Control">MAC</abbr>, que es el campo identificativo, el resto de campos son
+optativos y, como son todos de distinto tipo, no es necesario marcar de modo
+alguno que falta. Por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-host=00:11:22:33:44:55,nas</span>
+</pre></div>
+</div>
+<p>asocia el nombre a la máquina con la <abbr title="Media Access Control">MAC</abbr> especificada, sin fijar <abbr title="Internet Protocol">IP</abbr> alguna
+por lo que esta se concederá según el rango que se definiera con <code class="docutils literal notranslate"><span class="pre">dhcp-range</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>El nombre no solamente se envía al cliente, sino que. si está
+funcionando el <abbr title="Domain Name Server">DNS</abbr> integrado en <strong class="program">dnsmasq</strong>, se hace la asociación
+con la <abbr title="Internet Protocol">IP</abbr> asignada en el servidor <abbr title="Domain Name Server">DNS</abbr>, por lo que, durante el tiempo que
+se encuentre concedida la <abbr title="Internet Protocol">IP</abbr>, podrá hacerse tanto la resolución directa
+como la inversa. Ahora bien, para esto es importante que se haya usado la
+directiva <code class="docutils literal notranslate"><span class="pre">dpmain</span></code> para fijar el dominio y que <strong class="program">dnsmasq</strong> pueda
+constituir el <abbr title="Full Qualified Domain Name">FQDN</abbr>.</p>
+</div>
+<p>Esta misma directiva permite identificar las máquinas con el identificador que
+envían al servidor, en vez de con la <abbr title="Media Access Control">MAC</abbr>. Para ello basta con usar el prefijo
+<em>id</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-host=id:00:AA:21:11,192.168.255.10</span>
+</pre></div>
+</div>
+<p>También se puede no escuchar la petición y dejárse tal máquina sin configuración:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-host=00:11:22:33:44:55,ignore</span>
+</pre></div>
+</div>
+<p>Es posible, incluso, usar la directiva así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-host=00:11:22:00:00:00,00:11:22:00:00:01,00:11:22:00:00:02</span>
+</pre></div>
+</div>
+<p>es decir, incluir varias direcciones <abbr title="Media Access Control">MAC</abbr> y asociarlas a alguna propiedad
+(<em>ignore</em>, un tiempo de concesión, etc.) o bien no asociarlas a ninguna. Al no
+incluir ninguna opción, no se realiza una configuración especial, lo cual en
+principio puede parecer estúpido, pero sólo aparentemente: todas las máquinas
+que se citan expresamente, <strong class="program">dnsmasq</strong> las considera <em>conocidas</em> y se les
+asocia una etiqueta <strong>known</strong>, que podrá ser usada para realizar
+<a class="reference internal" href="#dnsmasq-dhcp-if"><span class="std std-ref">configuración condicional</span></a>.</p>
+<p><strong class="program">dnsmasq</strong> da la posibilidad de hacer estas definiciones de máquina en
+uno o varios ficheros independientes gracias a las directivas <code class="docutils literal notranslate"><span class="pre">dhcp-hostsfile</span></code>
+y <code class="docutils literal notranslate"><span class="pre">dhcp-hostsdir</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-hostsfile=/etc/dnsmasq.dhcphosts.conf</span>
+</pre></div>
+</div>
+<p>Dentro de estos ficheros basta con escribir los valores que se usan en la
+directiva <code class="docutils literal notranslate"><span class="pre">dhcp-host</span></code>, uno por línea. Por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> Definición de máquinas para DHCP
+<span class="go">00:11:22:33:44:55,192.168.255.2,nas,24h</span>
+<span class="go">00:80:52:AA:BB:CC,alumno1,1h</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Hacer las definiciones de máquina de esta forma, es decir,
+independientes de los ficheros de configuración, tiene una ventaja capital:
+cuando se manda una señal <em>SIGHUP</em> <a class="footnote-reference brackets" href="#id17" id="id7">7</a> a <strong class="program">dnsmasq</strong> este no acaba,
+sino que recarga los ficheros de máquina, tanto estos como los que usa el
+servidor <abbr title="Domain Name Server">DNS</abbr>. En consecuencia, si se usan ficheros independientes para
+definir las máquinas, pueden modificarse y recargarse, sin necesidad de parar
+el servidor.</p>
+</div>
+</div>
+<div class="section" id="configuracion-condicional">
+<span id="dnsmasq-dhcp-if"></span><h2><span class="section-number">6.1.3.3. </span>Configuración condicional<a class="headerlink" href="#configuracion-condicional" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Imaginemos que añadimos a nuestra configuración la segunda red con lo que la
+configuración queda así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">log-dhcp</span>
+
+<span class="go">dhcp-range=192.168.255.64,192.168.255.127,10m</span>
+<span class="go">domain=interna1.vm,192.168.255.0/24</span>
+
+<span class="go">dhcp-range=192.168.254.64,192.168.254.127,20m</span>
+<span class="go">domain=interna2.vm,192.168.245.0/24</span>
+
+<span class="gp">#</span>dhcp-option<span class="o">=</span><span class="m">6</span>,192.168.1.1
+<span class="go">dhcp-hostsfile=/etc/dnsmasq.hosts.conf</span>
+</pre></div>
+</div>
+<p>Hemos definido los rangos y dominios para ambas redes y hasta aquí todo bien.
+Pero ahora imaginemos que descomentamos la directiva que define los servidores
+<abbr title="Domain Name Server">DNS</abbr> y reiniciamos el servicio. Cuando lo hagamos, comprobaremos que el valor
+de la opción afecta a ambas redes y los clientes de ambas redes configurarán su
+servidor <abbr title="Domain Name Server">DNS</abbr> como <em>192.168.1.1</em>. La pregunta ante esto es, ¿no hay alguna
+forma de que las definiciones de la configuración sean condicionales y no
+afecten a todos los clientes?</p>
+<p>La respuesta es que sí y para lograrlo se hace uso de las <strong>etiquetas</strong>. En el
+caso particular de la directiva <code class="docutils literal notranslate"><span class="pre">dhcp-range</span></code> se define implícitamente una
+etiqueta cuyo nombre coincide con el nombre de la interfaz<a class="footnote-reference brackets" href="#id18" id="id8">8</a>, por lo que
+podemos usarla luego al definir la opción para hacer que ésta sólo se aplique a
+los clientes a los que sea aplicable la etiqueta:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-option=tag:eth1,6,192.168.1.1</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>como está claro que en el caso de las directiva <code class="docutils literal notranslate"><span class="pre">dhcp-option</span></code> la
+etiqueta es para aplicación, no para definición, puede prescindirse del prefijo
+<kbd class="kbd docutils literal notranslate">tag:</kbd>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-option=eth1,6,192.168.1.1</span>
+</pre></div>
+</div>
+</div>
+<p>El criterio general es que podemos definir una etiqueta con aquellas directivas
+que sirven para caracterizar al cliente y aplicar la etiqueta en aquellas otras
+directivas que sirven para definir la información que se les envía.</p>
+<div class="section" id="definicion-de-etiquetas">
+<h3><span class="section-number">6.1.3.3.1. </span>Definición de etiquetas<a class="headerlink" href="#definicion-de-etiquetas" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Un cliente, al pedir una configuración, informa al servidor de lo siguiente<a class="footnote-reference brackets" href="#id19" id="id9">9</a>:</p>
+<ul class="simple">
+<li><p>El identificador del vendedor (la opción <strong>60</strong> o <em>vendor-class-identifier</em>)
+que en <strong class="program">dnsmasq</strong> puede inquirirse con la directiva
+<code class="docutils literal notranslate"><span class="pre">dhcp-vendorclass</span></code>.</p></li>
+<li><p>La dirección <abbr title="Media Access Control">MAC</abbr>, que puede inquirise con dos directivas:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">dhcp-host</span></code>, que ya hemos visto y que sirve para bastante más (por.
+ejemplo, para asociar un nombre o una <abbr title="Internet Protocol">IP</abbr>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dhcp-mac</span></code>, que sirve exclusivamente para lo que tratamos y que, además,
+no incluye las máquinas referidas dentro de la etiqueta «<em>known</em>».</p></li>
+</ul>
+</li>
+<li><p>Su identificador de cliente (la opción <strong>61</strong> o <em>dhcp-client-identifier</em>), que
+también puede inquirise con <code class="docutils literal notranslate"><span class="pre">dhcp-host</span></code>.</p></li>
+<li><p>La clase de usuario (la opción <strong>77</strong> o <em>user-class</em>), que se inquiere con la
+directiva <code class="docutils literal notranslate"><span class="pre">dhcp-userclass</span></code>.</p></li>
+<li><p>La lista de parámetros <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> (opción <strong>55</strong> o <em>parameter request list</em>) que
+el cliente pide al servidor.</p></li>
+<li><p>Indirectamente, la red en la que está al enviar la petición y que ésta sea
+recibida por el servidor a través de una interfaz (<code class="docutils literal notranslate"><span class="pre">dhcp-range</span></code>).</p></li>
+</ul>
+<p>Por tanto, las directivas que permiten definir etiquetas son:</p>
+<dl>
+<dt><code class="docutils literal notranslate"><span class="pre">dhcp-range</span></code></dt><dd><p>Ya hemos visto que <code class="docutils literal notranslate"><span class="pre">dhcp-range</span></code> realiza una definición implícita.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">dhcp-vendorclass</span></code>, <code class="docutils literal notranslate"><span class="pre">dhcp-userclass</span></code></dt><dd><p>Para ambas basta con incluir parte del valor que envíe el cliente y definir
+el nombre de la etiqueta. Por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-vendorclass=set:pxeclient,PXEClient</span>
+<span class="go">dhcp-userclass=set:ipxe,iPXE</span>
+</pre></div>
+</div>
+<p>asociaría la etiqueta <em>pxeclient</em> a todos los clientes que enviaran como
+identificador del vendedor una cadena que contenga «<em>PXEClient</em>» y asociaría la
+etiqueta <em>ipxe</em> a los clientes que enviaran como clase de usuario una cadena que
+contenga «<em>iPXE</em>».</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">dhcp-host</span></code></dt><dd><p>Como en los casos anteriores, basta con definir la etiqueta prefijándola con
+<kbd class="kbd docutils literal notranslate">set:</kbd>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-host=set:profesor,00:11:22:33:44:55,profesor,24h</span>
+</pre></div>
+</div>
+<p>De este modo, la máquina con <abbr title="Media Access Control">MAC</abbr> <em>00:11:22:33:44:55</em> estará asociada a la
+etiqueta «<em>profesor</em>». También puede usarse la misma etiqueta repetidas
+veces, de manera que todas las máquinas estará asociadas a la misma
+etiqueta:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-host=set:profesor,00:11:22:33:44:55,profesor1,24h</span>
+<span class="go">dhcp-host=set:profesor,00:11:22:33:44:56,profesor2,24h</span>
+</pre></div>
+</div>
+<p>Es posible dejar en la directiva indefinidos los últimos pares de la <abbr title="Media Access Control">MAC</abbr>
+sustituyéndolos por asteriscos («*»). Por ejemplo, si queremos sólo definir
+los tres primeros pares que identifican al fabricante:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-host=set:nuevos,00:11:22:*:*:*</span>
+</pre></div>
+</div>
+<p>Además, ha de tenerse en cuenta que cualquier máquina definida con esta
+directiva se incluye dentro de la etiqueta «<em>known</em>». Dentro de ellas están
+incluidas las máquinas que concuerdan con <abbr title="Media Access Control">MAC</abbr> que tienen asteriscos. Por
+tanto, en nuestro ejemplo, todas las máquinas «<em>nuevos</em>» son máquinas
+<em>conocidas</em>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">dhcp-mac</span></code></dt><dd><p>A diferencia de la anterior sólo permite definir una etiqueta basándose en el
+valor de la <abbr title="Media Access Control">MAC</abbr>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-mac=set:profesor,00:11:22:33:44:55</span>
+<span class="go">dhcp-mac=set:alumno,fc:a5:cd:*:*:*</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Téngase en cuenta que las máquinas o grupos de máquinas
+referidos mediante esta directiva no se consideran <em>conocidas</em> y, por
+tanto, no se incluirán dentro de la etiqueta «<em>known</em>».</p>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">dhcp-match</span></code></dt><dd><p>Permite comprobar el valor de una opción arbitraria mandada por el cliente,
+frente a <code class="docutils literal notranslate"><span class="pre">dhcp-vendorclass</span></code> y <code class="docutils literal notranslate"><span class="pre">dhcp-userclass</span></code> que hacen la comprobación
+exclusivamente para las opciones <strong>60</strong> y <strong>71</strong> respectivamente. Por ejemplo,
+las dos líneas anteriores son equivalentes a estas:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-match=set:pxeclient,60,PXEClient</span>
+<span class="go">dhcp-match=set:ipxe,71,iPXE</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>En el caso de esta opción, podemos prescindir del prefijo.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Con esta directiva es posible analizar el valor de la opción 55 y, ya
+que cada cliente usa una lista característica, puede llegarse a conocer
+cuál el sistema que ejecuta el cliente con bastante fiabiliad. Para más
+información sobre ello, recurra a la lectura del apartado dedicado al
+<a class="reference internal" href="06.misc.html#dhcp-smart"><span class="std std-ref">tratamiento de smartphones</span></a>.</p>
+</div>
+</dd>
+</dl>
+</div>
+<div class="section" id="aplicacion-de-etiquetas">
+<h3><span class="section-number">6.1.3.3.2. </span>Aplicación de etiquetas<a class="headerlink" href="#aplicacion-de-etiquetas" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Como ya se ha adelantado, la definición de <em>etiquetas</em> se hace para diferenciar el
+trato que se tiene con los clientes. Por tanto, podremos aplicar <em>etiquetas</em> en
+aquellas opciones que sirven para modificar la información que se envía a los
+clientes. Fundamentalmente:</p>
+<dl>
+<dt><code class="docutils literal notranslate"><span class="pre">dhcp-range</span></code></dt><dd><p>Permite definir el rango para las máquinas asociadas a una etiqueta. Por
+ejemplo, si queremos tratar de distinta forma las asignaciones a clientes
+<abbr title="Preboot eXecution Environment">PXE</abbr>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-vendorclass=set:pxeclient,PXEClient</span>
+<span class="go">dhcp-range=tag:pxeclient,192.168.255.100,192.168.255.127,3m</span>
+<span class="go">dhcp-range=tag:!pxeclient,192.168.255.128,192.168.255.223,8h</span>
+</pre></div>
+</div>
+<p>Obsérvese que para que que la directiva se aplique a los clientes <strong>no</strong>
+asociados a la etiqueta debe anteponerse un signo «!» (o una almohadilla) al
+nombre de la etiqueta.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Si no se quiere definir un rango exclusivo, sino simplemente hacer
+más corto el tiempo de concesión, basta con repetir el rango:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-vendorclass=set:pxeclient,PXEClient</span>
+<span class="go">dhcp-range=tag:pxeclient,192.168.255.128,192.168.255.223,3m</span>
+<span class="go">dhcp-range=tag:!pxeclient,192.168.255.128,192.168.255.223,8h</span>
+</pre></div>
+</div>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">dhcp-option</span></code> (y <code class="docutils literal notranslate"><span class="pre">dhcp-option-force</span></code>)</dt><dd><p>Para enviar la opción definida sólo a los clientes asociados a la etiqueta:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-option=tag:eth1,6,192.168.1.1</span>
+</pre></div>
+</div>
+<p>En este caso, es posible ahorrarse el prefijo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-option=eth1,6,192.168.1.1</span>
+</pre></div>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">dhc-ignore</span></code></dt><dd><p>Evita responder a los clientes asociados a la etiqueta:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span>dhcp-ignore<span class="o">=</span>tag:PXEClient  <span class="c1"># Esto también es válido</span>
+<span class="go">dhcp-ignore=PXEClient</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+<p>En cualquier caso, es posible incluir varias etiquetas lo que hará que sólo se
+aplique a los cliente que estén asociados a ambas. Por ejemplo, esto evitaría
+el arranque por red a las máquinas desconocidas, pero les permitiría obtener una
+configuración de red cuando ejecutan su sistema local:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-ignore=pxeclient,!known</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="configuraciones-habituales">
+<h2><span class="section-number">6.1.3.4. </span>Configuraciones habituales<a class="headerlink" href="#configuraciones-habituales" title="Enlazar permanentemente con este título">¶</a></h2>
+<div class="section" id="simple">
+<h3><span class="section-number">6.1.3.4.1. </span>Simple<a class="headerlink" href="#simple" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Una red con un rango único rango de asignación:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-range=192.168.255.128,192.168.255.191,4h</span>
+<span class="go">domain=interna.org,192.168.255.0/24</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="con-maquinas-conocidas">
+<h3><span class="section-number">6.1.3.4.2. </span>Con máquinas conocidas<a class="headerlink" href="#con-maquinas-conocidas" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Una red que tiene algunas máquinas conocidas a las que se quiere asignar un
+rango distinto o una ip fija:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">domain=interna.org,192.168.255.0/24</span>
+<span class="go">dhcp-range=tag:known,192.168.255.128,192.168.255.191,4h</span>
+<span class="go">dhcp-range=tag:!known,192.168.255.92,192.168.255.127,30m</span>
+
+<span class="go">dhcp-hostsfile=/etc/dnsmasq.hosts.file.conf</span>
+</pre></div>
+</div>
+<p>y el fichero <code class="file docutils literal notranslate"><span class="pre">/etc/dnsmasq.hosts.conf</span></code> con este contenido:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> Máquinas conocidas
+<span class="gp">00:11:22:*:*:*                             #</span> Tipo de máquinas que componen la red.
+<span class="gp">00:11:22:33:44:55,192.168.255.2,profesor   #</span> Ordenador del profesor
+</pre></div>
+</div>
+</div>
+<div class="section" id="con-rutas-estaticas-adicionales">
+<span id="dhcp-static-routes"></span><h3><span class="section-number">6.1.3.4.3. </span>Con rutas estáticas adicionales<a class="headerlink" href="#con-rutas-estaticas-adicionales" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Lo habitual es que al configurar un cliente sólo se le indique cuál es la puerta
+de enlace predeterminada<a class="footnote-reference brackets" href="#id20" id="id10">10</a>. pero puede ocurrir que necesitemos indicar a los
+clientes rutas adicionales. Para lograrlo existen dos opciones, la <strong>33</strong> que
+define el <span class="target" id="index-0"></span><a class="rfc reference external" href="https://tools.ietf.org/html/rfc2132.html"><strong>RFC 2132</strong></a> y la <strong>121</strong> definida en el <span class="target" id="index-1"></span><a class="rfc reference external" href="https://tools.ietf.org/html/rfc3442.html"><strong>RFC 3442</strong></a>. La diferencia
+entre una y otra es que la segunda permite usar la notación <abbr title="Classless Inter-Domain Routing">CIDR</abbr> para indicar
+la máscara de la red, mientras que con la primera no es posible expresar máscara
+alguna. Como por lo general los clientes piden la opción <strong>121</strong>, pero no la
+<strong>33</strong>, centraremos nuestra configuración en enviar esta opción para, por
+ejemplo, declarar cuál es la puerta de enlace que nos permite conectar con la
+red <em>172.16.0.0/16</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-range=192.168.255.128,192.168.255.191,4h</span>
+<span class="go">domain=interna.org,192.168.255.0/24</span>
+
+<span class="go">dhcp-option=121,172.16.0.0/16,192.168.255.2,0.0.0.0/0,192.168.255.1</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>El <span class="target" id="index-2"></span><a class="rfc reference external" href="https://tools.ietf.org/html/rfc3442.html"><strong>RFC 3442</strong></a> prescribe que si el cliente recibe la opción <strong>121</strong>
+y la opción <strong>3</strong> (la que indica cuál es la puerta de enlace predeterminada),
+debe obviar esta última. Por ello, cuando se desea la opción para añadir una
+ruta adicional siempre es necesarto incluir la ruta predeterminada.</p>
+</div>
+<p class="rubric">Notas al pie</p>
+<dl class="footnote brackets">
+<dt class="label" id="id11"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p>E incluso también de servidor <abbr title="Trivial FTP">TFTP</abbr> para integrar
+todo lo necesario para proporcionar <a class="reference internal" href="../../07.serre/06.pxe/index.html#pxe"><span class="std std-ref">arranque por red</span></a>.</p>
+</dd>
+<dt class="label" id="id12"><span class="brackets"><a class="fn-backref" href="#id2">2</a></span></dt>
+<dd><p>Véase <code class="file docutils literal notranslate"><span class="pre">/etc/default/dnsmsaq</span></code></p>
+</dd>
+<dt class="label" id="id13"><span class="brackets"><a class="fn-backref" href="#id3">3</a></span></dt>
+<dd><p>Para consultar las opciones disponibles, se puede echar un vistazo a
+<a class="reference external" href="http://www.networksorcery.com/enp/protocol/bootp/options.htm">esta tabla</a>.</p>
+</dd>
+<dt class="label" id="id14"><span class="brackets"><a class="fn-backref" href="#id4">4</a></span></dt>
+<dd><p>Por ejemplo, la <abbr title="Internet Protocol">IP</abbr> <em>192.168.1.1</em> equivaldría a <em>c0a80101</em> y así se
+codificaría.</p>
+</dd>
+<dt class="label" id="id15"><span class="brackets"><a class="fn-backref" href="#id5">5</a></span></dt>
+<dd><p>Cuando se quiere forzar a que un dato sea entendido como cadena, es
+necesario encerrarlo entre comillas:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-option=66,&quot;192.168.1.1&quot;</span>
+</pre></div>
+</div>
+</dd>
+<dt class="label" id="id16"><span class="brackets"><a class="fn-backref" href="#id6">6</a></span></dt>
+<dd><p>Si probamos a usar <code class="docutils literal notranslate"><span class="pre">dhcp-option-force</span></code> es aún peor, porque se incluirá
+la opción <strong>51</strong> dos veces, una con el valor declarado en <code class="docutils literal notranslate"><span class="pre">dhcp-range</span></code> y
+otra con el declarado con la opción, lo cual viola fragantemente el estándar.</p>
+</dd>
+<dt class="label" id="id17"><span class="brackets"><a class="fn-backref" href="#id7">7</a></span></dt>
+<dd><p>Para ello basta con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="nb">kill</span> -1 pid_de_dnsmasq
+</pre></div>
+</div>
+<p>o, más fácil aún, si la distribución usa <strong class="program">systemd</strong>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> systemctl reload dnsmasq
+</pre></div>
+</div>
+</dd>
+<dt class="label" id="id18"><span class="brackets"><a class="fn-backref" href="#id8">8</a></span></dt>
+<dd><p>aunque se podría haber hecho esta definición explícita, si se
+prefiere:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-range=set:eth1,192.168.255.64,192.168.192.255.127,10m</span>
+</pre></div>
+</div>
+<p>o incluso prescindiendo del prefijo <kbd class="kbd docutils literal notranslate">set:</kbd>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-range=eth1,192.168.255.64,192.168.192.255.127,10m</span>
+</pre></div>
+</div>
+</dd>
+<dt class="label" id="id19"><span class="brackets"><a class="fn-backref" href="#id9">9</a></span></dt>
+<dd><p>Los nombres alternativos  al número de opción que se dan a continuación
+son los que usa el servidor del <abbr title="Internet Systems Consortium">ISC</abbr>.</p>
+</dd>
+<dt class="label" id="id20"><span class="brackets"><a class="fn-backref" href="#id10">10</a></span></dt>
+<dd><p>Si esta puerta de enlace es el propio servidor <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> no será necesario
+ningún parámetro adicional, y, si es otra máquina, bastará con un
+<em>dhcp-option</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-option=3,192.168.255.2</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+</div>
+</div>
+</div>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../index.html">Tabla de contenido</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">6.1.3. DHCP con <strong class="program">dnsmasq</strong></a><ul>
+<li><a class="reference internal" href="#configuracion-basica">6.1.3.1. Configuración básica</a></li>
+<li><a class="reference internal" href="#declaracion-de-maquinas">6.1.3.2. Declaración de máquinas</a></li>
+<li><a class="reference internal" href="#configuracion-condicional">6.1.3.3. Configuración condicional</a><ul>
+<li><a class="reference internal" href="#definicion-de-etiquetas">6.1.3.3.1. Definición de etiquetas</a></li>
+<li><a class="reference internal" href="#aplicacion-de-etiquetas">6.1.3.3.2. Aplicación de etiquetas</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#configuraciones-habituales">6.1.3.4. Configuraciones habituales</a><ul>
+<li><a class="reference internal" href="#simple">6.1.3.4.1. Simple</a></li>
+<li><a class="reference internal" href="#con-maquinas-conocidas">6.1.3.4.2. Con máquinas conocidas</a></li>
+<li><a class="reference internal" href="#con-rutas-estaticas-adicionales">6.1.3.4.3. Con rutas estáticas adicionales</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="02.tipos.html"
+                        title="capítulo anterior"><span class="section-number">6.1.2. </span>Software</a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="04.isc.html"
+                        title="próximo capítulo"><span class="section-number">6.1.4. </span><abbr title="Internet Systems Consortium">ISC</abbr> DHCP</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/06.infraestructura/02.dhcp/03.dnsmasq.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="04.isc.html" title="6.1.4. ISC DHCP"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="02.tipos.html" title="6.1.2. Software"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" ><span class="section-number">6. </span>Servicios de infraestructura</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="index.html" ><span class="section-number">6.1. </span>DHCP</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">6.1.3. </span>DHCP con <strong class="program">dnsmasq</strong></a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor CC BY 4.0, 2016-2021, José Miguel Sánchez Alés.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.2.0.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,405 @@
+
+
+
+<!DOCTYPE html>
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>4.3.1.2. SystemD &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/classic.css" />
+    <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+    
+    <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/translations.js"></script>
+    
+    <link rel="index" title="Índice" href="../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../search.html" />
+    <link rel="next" title="4.3.1.3. Ejercicios sobre registros" href="03.ejercicios.html" />
+    <link rel="prev" title="4.3.1.1. Sistema tradicional" href="01.classic.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="03.ejercicios.html" title="4.3.1.3. Ejercicios sobre registros"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="01.classic.html" title="4.3.1.1. Sistema tradicional"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" ><span class="section-number">4. </span>Gestión del servidor</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" ><span class="section-number">4.3. </span>Monitorización</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="index.html" accesskey="U"><span class="section-number">4.3.1. </span>Ficheros <em>logs</em></a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">4.3.1.2. </span>SystemD</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <span class="target" id="journalctl"></span><div class="section" id="systemd">
+<span id="index-0"></span><h1><span class="section-number">4.3.1.2. </span>SystemD<a class="headerlink" href="#systemd" title="Enlazar permanentemente con este título">¶</a></h1>
+<p><em>SystemD</em> como de tantas otras tareas ha acabado por encargarse también de los
+registros del sistemai (servicio <em>systemd-journald</em>), de manera que su consulta
+puede llevarse a cabo a través de la orden <strong class="command">journalctl</strong>. La
+configuración predeterminada del demonio se lleva a cabo en
+<code class="file docutils literal notranslate"><span class="pre">/etc/systemd/journald.conf</span></code>.</p>
+<p>En esta configuración predeterminada:</p>
+<ul class="simple">
+<li><p>Los registros no son persistentes, porque se almacenan bajo
+<code class="file docutils literal notranslate"><span class="pre">/run/log/journal</span></code>. Ahora bien, si se crea el directorio
+<code class="file docutils literal notranslate"><span class="pre">/var/log/journal</span></code>, los registros pasarán a almacenarse en esta
+ubicación y, por tanto, se mantendrán entre reinicios<a class="footnote-reference brackets" href="#id7" id="id1">1</a>.</p></li>
+<li><p>Los registros se pasan también al demonio <strong class="command">rsyslogd</strong> para que este
+siga clasificándolos y registrándolos tal como venía haciendo antes de la
+aparición de <em>systemd</em>. Esta posibilidad es muy importante, porque muchos
+programas usan el sistema tradicional de <em>logs</em> para obtener datos.</p></li>
+</ul>
+<p>Por tanto, podríamos seguir consultando los <em>logs</em> como hasta ahora (de ahí que
+los apuntes hayan explicado con cierta extención <strong class="command">rsyslogd</strong> y
+<strong class="command">logrotate</strong>), pero la consulta a través de <strong class="command">journalctl</strong> tiene
+algunas ventajas, que trataremos a continuación.</p>
+<div class="section" id="consulta">
+<h2><span class="section-number">4.3.1.2.1. </span>Consulta<a class="headerlink" href="#consulta" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Con <strong class="command">systemd-journald</strong> los registros son binarios (no texto), así que
+no pueden consultarse a través de los comandos ordinarios. Sin embargo, para la
+consulta <em>systemd</em> provee del <strong class="command">journalctl</strong> que permite muchos criterios
+de filtrado.</p>
+<p>El modo más sencillo de usarlo es sin argumento alguno:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl
+</pre></div>
+</div>
+<p>Esto mostraría todos los registros desde el primero que se almacena. La orden
+pagina automáticamente con lo que no es necesario el uso de paginadores
+adicionales como <strong class="command">more</strong> o <strong class="command">less</strong>.</p>
+<p>Los criterios de selección son muy variados (y pueden usarse conjuntamente):</p>
+<ul>
+<li><p>Seleccionar por la <em>unidad</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl --unit ssh.service
+</pre></div>
+</div>
+<p>Es posible usar comodines:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl --unit <span class="s2">&quot;systemd-*&quot;</span>
+</pre></div>
+</div>
+</li>
+<li><p>Seleccionar por la prioridad (o el nivel) del mensaje:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl -p err
+</pre></div>
+</div>
+</li>
+<li><p>Seleccionar los mensajes del núcleo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl -k
+</pre></div>
+</div>
+</li>
+<li><p>Seleccionar los mensajes desde un determinado momento. Se puede poner
+tanto un momento absoluto:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl --since <span class="s2">&quot;2016-12-16 12:15:00&quot;</span>
+</pre></div>
+</div>
+<p>Como un periodo de tiempo respecto al momento actual. Esto muestra los
+mensajes de los últimos 10 minutos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl --since <span class="s2">&quot;-10m&quot;</span>
+</pre></div>
+</div>
+<p>También pueden usarse las palabras <em>today</em> o <em>yesterday</em>.</p>
+</li>
+<li><p>Seleccionar los mensajes hasta un determinado momento. Como en el caso
+anterior admite fechas absolutas o relativas:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl --since <span class="s2">&quot;-10m&quot;</span> --until <span class="s2">&quot;-5m&quot;</span>
+</pre></div>
+</div>
+</li>
+<li><p>Selecciona mensajes generados por un determinado comando:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl /usr/sbin/sshd
+</pre></div>
+</div>
+</li>
+<li><p>Selecciona según el identificador de <em>syslog</em><a class="footnote-reference brackets" href="#id8" id="id2">2</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl -t sshd
+</pre></div>
+</div>
+<p>El identificador es la cadena que hay antes del <em>PID</em> encerrado entre
+corchetes y que generalmente coincide con el ejecutable.</p>
+</li>
+<li><p>Selecciona mensajes según determinados campos. Los campos posibles pueden
+consultarse con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl -N
+</pre></div>
+</div>
+<p>o bien recurriendo a la página del manual:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> man systemd.journal-fields
+</pre></div>
+</div>
+<p>De entre ellos pueden ser útiles:</p>
+<dl>
+<dt><code class="code docutils literal notranslate"><span class="pre">SYSLOG_FACILITY</span></code></dt><dd><p>Para seleccionar por la <em>facility</em> (<em>mail</em>, <em>authpriv</em>, etc.). Sin
+embargo, sólo pueden usarse los códigos numéricos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl <span class="nv">SYSLOG_FACILITY</span><span class="o">=</span><span class="m">3</span>
+</pre></div>
+</div>
+</dd>
+<dt><code class="code docutils literal notranslate"><span class="pre">_TRANSPORT</span></code></dt><dd><p>Para seleccionar mensajes según la forma en que se transmitieron a
+<em>sytemd</em>. Por ejemplo, un valor <em>kernel</em> mostrará los mensajes del
+núcleo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl <span class="nv">_TRANSPORT</span><span class="o">=</span>kernel
+</pre></div>
+</div>
+<p>o un valor <em>audit</em> los mensajes generados por el <a class="reference internal" href="../02.audit/index.html#audit"><span class="std std-ref">servicio de
+auditoria</span></a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl <span class="nv">_TRANSPORT</span><span class="o">=</span>audit
+</pre></div>
+</div>
+</dd>
+<dt><code class="code docutils literal notranslate"><span class="pre">_UID</span></code></dt><dd><p>Mensajes generados por el usuario con un determinado <em>UID</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl <span class="nv">_UID</span><span class="o">=</span><span class="m">1000</span>
+</pre></div>
+</div>
+</dd>
+<dt><code class="code docutils literal notranslate"><span class="pre">_PID</span></code></dt><dd><p>Mensajes generados por el proceso con el <em>PID</em> indicado.</p>
+</dd>
+<dt><code class="code docutils literal notranslate"><span class="pre">_GID</span></code></dt><dd><p>Mensajes generados por el grupo con el <em>GID</em> especificado</p>
+</dd>
+</dl>
+<p>Algunos otros campos interesantes se pueden seleccionar mediante
+opciones ya vistas: <code class="code docutils literal notranslate"><span class="pre">PRIORITY</span></code> (<code class="docutils literal notranslate"><span class="pre">-p</span></code>), <code class="code docutils literal notranslate"><span class="pre">_SYSTEMD_UNIT</span></code>
+(<code class="docutils literal notranslate"><span class="pre">-unit</span></code> o <code class="docutils literal notranslate"><span class="pre">-u</span></code>).</p>
+<p>Si se especifican varios campos en la línea las condiciones se consideran
+enlazadas con el operador lógico <em>AND</em><a class="footnote-reference brackets" href="#id9" id="id3">3</a>. Para unirlos con <em>OR</em> debe
+añadirse un signo <code class="docutils literal notranslate"><span class="pre">+</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl <span class="nv">SYSLOG_FACILITY</span><span class="o">=</span><span class="m">4</span> + <span class="nv">SYSLOG_FACILITY</span><span class="o">=</span><span class="m">10</span>
+</pre></div>
+</div>
+</li>
+</ul>
+<p>Es posible conocer qué valores distintos muestra uno de los campos anteriores
+con la opción -F:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl -F _SYSTEMD_UNIT
+</pre></div>
+</div>
+<p>Además de estos criterios, se puede mostrar los últimos <em>N</em> mensajes con la
+opción <code class="docutils literal notranslate"><span class="pre">-n</span></code>. Esta orden mostraría los últimos diez registros de la unidad
+<em>ssh</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl --unit ssh.service -n
+</pre></div>
+</div>
+<p>Son 10, porque es el número que se muestra si no se especifica ningún argumento
+para <code class="docutils literal notranslate"><span class="pre">-n</span></code>. En estos casos en que sabemos de antemano que no ocuparemos toda la
+pantalla es útil prescindir del paginador:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl --unit ssh.service -n --no-pager
+</pre></div>
+</div>
+<p>Una alternativa a esto es desconfigurar el paginador:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="nv">PAGER</span><span class="o">=</span> journalctl --unit ssh.service -n
+</pre></div>
+</div>
+<p>También es posible hacer un seguimiento de los registros tal como se puede hacer
+con <code class="code docutils literal notranslate"><span class="pre">tail</span> <span class="pre">-f</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl --unit ssh.service -f
+</pre></div>
+</div>
+<p>que mostrará los diez últimos registros y quedará esperando a recibir los
+siguientes. En este caso, también se podría haber añadido <code class="docutils literal notranslate"><span class="pre">-n</span></code> para modificar
+el número de líneas previsualizadas.</p>
+<p>Por último, es posible cambiar el formato con que se muestran las líneas a
+través de la opción <code class="docutils literal notranslate"><span class="pre">-o</span></code>. Hay varios (véase la página de manual de
+<strong class="command">journalctl</strong>). Por ejemplo, esto mostraría una salida en formato <em>json</em>
+en que se muestra cada campo del mensaje:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl -o json-pretty
+</pre></div>
+</div>
+<p>Si se quiere filtrar registros usando expresiones regulares sobre el mensaje, no
+queda más remedio que pasar la salida de <strong class="command">journalctl</strong> a un comando como
+<a class="reference internal" href="../../../02.conbas/10.texto/02.busqueda.html#grep"><span class="std std-ref">grep</span></a>.</p>
+</div>
+<div class="section" id="persistencia">
+<h2><span class="section-number">4.3.1.2.2. </span>Persistencia<a class="headerlink" href="#persistencia" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Ya se ha indicado que los registros de <em>systemd</em> no son persistentes, puesto que
+se almacenan sobre un sistema de ficheros volátil (<code class="file docutils literal notranslate"><span class="pre">/run</span></code>). Sin embargo,
+existe la posibilidad de hacerlos persistentes:</p>
+<ul class="simple">
+<li><p>Porque deseemos revisar registros con <strong class="command">journalctl</strong> producidos
+antes del último reinicio.</p></li>
+<li><p>Porque deseamos prescindir de <strong class="command">rsyslogd</strong>. Para esto último
+deberíamos estar muy seguros de que ninguna de nuestras aplicaciones usa
+los archivos que este demonio genera.</p></li>
+</ul>
+<p>Lo primero es comprobar que <em>systemd-journald</em> está configurado para hacer
+persistentes lo datos. Para ello, en <code class="file docutils literal notranslate"><span class="pre">/etc/systemd/journald.conf</span></code> la
+directiva <code class="code docutils literal notranslate"><span class="pre">Storage</span></code> debe tener el valor de <em>auto</em> o de <em>persistent</em> o no
+estar fijada en absoluto (en cuyo caso, su valor será <em>auto</em>).</p>
+<p>Revisado esto, debemos crear el directorio donde se almacenará el log:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkdir /var/log/journal
+<span class="gp">#</span> chmod <span class="m">2755</span> /var/log/journal
+<span class="gp">#</span> chgrp systemd-journal /var/log/journal
+</pre></div>
+</div>
+<p>Y reiniciar el servicio:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> systemctl restart systemd-journald
+</pre></div>
+</div>
+<p>Algo importante a tener en cuenta, cuando se hacen persistentes, es el espacio
+que ocupan los registros. Para controlarlo existen las directivas<a class="footnote-reference brackets" href="#id10" id="id4">4</a>:</p>
+<ul class="simple">
+<li><p><code class="code docutils literal notranslate"><span class="pre">SystemMaxUse</span></code>, que determina la cantidad máxima de espacio que
+ocuparan los registros. Se indica con un número que expresa <em>bytes</em>,
+aunque el número puede acompañarse de unidades: <em>K</em>, <em>M</em>, <em>G</em>, etc.</p></li>
+<li><p><code class="code docutils literal notranslate"><span class="pre">SystemKeepFree</span></code>, que determina la cantidad mínima de espacio en el
+sistema de ficheros que deben dejar libre los registros.</p></li>
+<li><p><code class="code docutils literal notranslate"><span class="pre">SystemMaxFileSize</span></code>, que determina el tamaño máximo de archivo de
+registro. Pueden</p></li>
+<li><p><code class="code docutils literal notranslate"><span class="pre">SystemMaxFiles</span></code>, que determina el número máximo de ficheros de
+registros que puede haber.</p></li>
+<li><p><code class="code docutils literal notranslate"><span class="pre">MaxFileSec</span></code> indica el tiempo máximo que se almacenarán registros en
+un mismo fichero después del cual se procederá a rotarlo. Se expresa en
+segundos, pero puedo usar unidades: <em>m</em>, <em>h</em>, <em>day</em>, <em>week</em>, <em>month</em> ó
+<em>year</em>.</p></li>
+</ul>
+<p>Por defecto, <code class="code docutils literal notranslate"><span class="pre">SystemMaxUse</span></code> se fija al 10% y <cite>SystemMaxFileSize</cite> a la
+octava parte del valor anterior, por lo que se guardarán siete rotaciones del
+fichero de registro, antes de que empiecen a eliminarse entradas.</p>
+<p>Para comprobar cuánto espacio ocupan los <em>logs</em> puede hacerse:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl --disk-usage
+</pre></div>
+</div>
+<p>Al hacer persistentes los ficheros, se acomularán registros de varios arranques<a class="footnote-reference brackets" href="#id11" id="id5">5</a>.  <strong class="command">journalctl</strong> posee la opción <code class="docutils literal notranslate"><span class="pre">-b</span></code> para escoger de qué
+arranque mostrar los registros (<em>0</em> el actual, <em>-1</em> el penúltimo, etc). Por
+ejemplo, esto mostrará los mensajes generados por el servicio <em>ssh</em> durante el
+penúltimo arranque:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl -b -1 --unit ssh
+</pre></div>
+</div>
+<p>Si no se indica arranque alguno, se buscará en todos. Para conocer qué arranques
+hay almacenados en el registro:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl --list-boots
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>La persistencia de sus registros no implica que
+<strong class="command">systemd-journald</strong> deje de seguir enviando los registros a
+<strong class="command">rsyslogd</strong>. Esto se rige a través de la directiva
+<code class="code docutils literal notranslate"><span class="pre">ForwardToSyslog</span></code> que por defecto está fijada a <em>yes</em>. Puede fijarse a
+<em>no</em> y eliminar <em>rsyslog</em> y <em>logrotate</em><a class="footnote-reference brackets" href="#id12" id="id6">6</a>.</p>
+</div>
+<p class="rubric">Notas al pie</p>
+<dl class="footnote brackets">
+<dt class="label" id="id7"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p>Este comportamiento (y otros cuantos más) se deben a la configuración
+almacenada en <code class="file docutils literal notranslate"><span class="pre">/etc/systemd/journald.conf</span></code>. Puede echarle un ojo al
+fichero o consultar su página de manual:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> man journald.conf
+</pre></div>
+</div>
+</dd>
+<dt class="label" id="id8"><span class="brackets"><a class="fn-backref" href="#id2">2</a></span></dt>
+<dd><p>Tanto la opción <code class="docutils literal notranslate"><span class="pre">-t</span></code> como la opción <code class="docutils literal notranslate"><span class="pre">-N</span></code>, que se declara a
+continuación, no están disponibles en la versión de <em>jessie</em>.</p>
+</dd>
+<dt class="label" id="id9"><span class="brackets"><a class="fn-backref" href="#id3">3</a></span></dt>
+<dd><p>Excepto si se repite dos veces el mismo campo en cuyo caso se consideran
+unidos con <em>OR</em>.</p>
+</dd>
+<dt class="label" id="id10"><span class="brackets"><a class="fn-backref" href="#id4">4</a></span></dt>
+<dd><p>Para el caso de que no se hagan persistentes los registros existen las
+correspondientes directivas <em>Runtime-*</em>: <code class="code docutils literal notranslate"><span class="pre">RuntimeMaxUse</span></code>,
+<code class="code docutils literal notranslate"><span class="pre">RuntimeKeepFree</span></code>, etc.</p>
+</dd>
+<dt class="label" id="id11"><span class="brackets"><a class="fn-backref" href="#id5">5</a></span></dt>
+<dd><p>Entiéndase que se usa <em class="dfn">arranque</em> como el tiempo en que la máquina está
+en funcionamiento desde que se enciende hasta que se apaga; y no como el tiempo
+que la máquina tarda en arrancar los servicios desde su encendido.</p>
+</dd>
+<dt class="label" id="id12"><span class="brackets"><a class="fn-backref" href="#id6">6</a></span></dt>
+<dd><p>Eliminar <em>rsyslog</em> y <em>logrotate</em> puede ahorranos memoria y espacio de
+disco, pero por contra puede provocar que algunas aplicaciones que se
+alimenten de los ficheros tradicionales dejen de funcionar. Tal es el caso de
+<a class="reference external" href="http://www.fail2ban.org">fail2ban</a>, <em>software</em> muy conveniente en
+servidores para evitar los ataques de fuerza bruta. <strong class="program">fail2ban</strong>
+soporta los el sistema de <em>logs</em> de <strong class="program">systemd</strong>, pero sólo a partir de
+su versión <em>0.9.1</em>, que es más moderna que la que ofrece <em>jessie</em>.</p>
+</dd>
+</dl>
+</div>
+</div>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../../index.html">Tabla de contenido</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">4.3.1.2. SystemD</a><ul>
+<li><a class="reference internal" href="#consulta">4.3.1.2.1. Consulta</a></li>
+<li><a class="reference internal" href="#persistencia">4.3.1.2.2. Persistencia</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="01.classic.html"
+                        title="capítulo anterior"><span class="section-number">4.3.1.1. </span>Sistema tradicional</a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="03.ejercicios.html"
+                        title="próximo capítulo"><span class="section-number">4.3.1.3. </span>Ejercicios sobre registros</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../_sources/04.servidor/08.monitorizacion/01.logs/02.journalctl.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="03.ejercicios.html" title="4.3.1.3. Ejercicios sobre registros"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="01.classic.html" title="4.3.1.1. Sistema tradicional"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" ><span class="section-number">4. </span>Gestión del servidor</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" ><span class="section-number">4.3. </span>Monitorización</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="index.html" ><span class="section-number">4.3.1. </span>Ficheros <em>logs</em></a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">4.3.1.2. </span>SystemD</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor CC BY 4.0, 2016-2021, José Miguel Sánchez Alés.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.2.0.
+    </div>
+  </body>
+</html>

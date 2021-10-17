@@ -1,0 +1,481 @@
+
+
+
+<!DOCTYPE html>
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>7.3.3.4. Gestión de usuarios &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/classic.css" />
+    <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+    
+    <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/translations.js"></script>
+    
+    <link rel="index" title="Índice" href="../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../search.html" />
+    <link rel="next" title="7.3.3.5. Acreditación del remitente" href="05-dns.html" />
+    <link rel="prev" title="7.3.3.3. Entrega" href="03-entrega.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="05-dns.html" title="7.3.3.5. Acreditación del remitente"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="03-entrega.html" title="7.3.3.3. Entrega"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" ><span class="section-number">7. </span>Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" ><span class="section-number">7.3. </span>Correo electrónico</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="index.html" accesskey="U"><span class="section-number">7.3.3. </span>Servidor <abbr title="Simple Mail Transfer Protocol">SMTP</abbr></a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">7.3.3.4. </span>Gestión de usuarios</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="gestion-de-usuarios">
+<span id="postfix-gest-usu"></span><h1><span class="section-number">7.3.3.4. </span>Gestión de usuarios<a class="headerlink" href="#gestion-de-usuarios" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>Hasta ahora nos hemos limitado a utilizar usuarios definidos en el sistema que
+tienen todos cuenta en un mismo dominio. Sin embargo, esto es solamente un caso
+particular. Por un lado, lo habitual es que los usuarios de correo sea usuarios
+exclusivos, reconocibles sólo por este servicio. Por otro, puede darse el caso
+de que nuestro servidor gestione distintos dominios y que cada dominio tenga
+sus propios usuarios. Ambas situaciones, que generalizan la comnfiguración del
+servidor, se estudiaran bajo el prsente epígrafe.</p>
+<div class="admonition seealso">
+<p class="admonition-title">Ver también</p>
+<p>Es sumamente importante que lea qué se entiende por usuario,
+expuesto en los primeros párrafos del epígrafe dedicado a las <a class="reference internal" href="03-entrega.html#postfix-cue-virt"><span class="std std-ref">cuentas
+virtuales</span></a>.</p>
+</div>
+<div class="section" id="usuarios-exclusivos">
+<h2><span class="section-number">7.3.3.4.1. </span>Usuarios exclusivos<a class="headerlink" href="#usuarios-exclusivos" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Para que <strong class="program">postfix</strong> reconozca, además, usuarios distintos a los del
+sistema tenemos dos posibilidades:</p>
+<ul class="simple">
+<li><p>Manipular la autenticación con el servidor <em>smtp</em> de <abbr title="Pluggable Authentication Modules">PAM</abbr>.</p></li>
+<li><p>Si está disponible, es más recomendable manipular la autenticación de
+<strong class="program">dovecot</strong>, que pasa por haber usado <a class="reference internal" href="01-inst.html#postfix-dovecot-sasl"><span class="std std-ref">el SASL que éste
+proporciona para postfix</span></a>.</p></li>
+</ul>
+<div class="section" id="a-traves-de-pam">
+<span id="postfix-usu-virtual"></span><h3><span class="section-number">7.3.3.4.1.1. </span>A través de <abbr title="Pluggable Authentication Modules">PAM</abbr><a class="headerlink" href="#a-traves-de-pam" title="Enlazar permanentemente con este título">¶</a></h3>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Bajo este epígrafe se tratará la creación de usuarios exclusivos de manera
+muy simple y que no es en absoluto recomendable cuando se gestiona un gran número
+de este tipo de usuarios. Esto es así, porque si se usan módulos como
+<a class="reference internal" href="../../../04.servidor/09.autenticacion/pam_modules/14.pam_userdb.html#pam-userdb"><span class="std std-ref">pam_userdb</span></a> o <a class="reference external" href="https://github.com/tiwe-de/libpam-pwdfile">pam_pwdfile</a> sólo existe información sobre
+el nombre de usuario y su contraseña, y no sobre el resto de características
+de la cuenta (el directorio de usuario, por ejemplo). Además, tampoco
+posibilita el cambio de la contraseña.</p>
+</div>
+<p>La habilitación de usuarios exclusivos en <strong class="program">postfix</strong> supone tres
+operaciones distintas:</p>
+<div class="section" id="creacion-de-usuarios">
+<span id="userdb-crear"></span><h4><span class="section-number">7.3.3.4.1.1.1. </span>Creación de usuarios<a class="headerlink" href="#creacion-de-usuarios" title="Enlazar permanentemente con este título">¶</a></h4>
+<p>Necesitaremos el paquete <em>db-util</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt-get install db-util
+</pre></div>
+</div>
+<p>Tras ello, lo primero es crear una base de usuarios que contenga los nombres y
+contraseñas de los usuarios exclusivos. Para ello debe crear primero un fichero
+de texto plano en que se dispongan alternativamente nombres y contraseñas:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cat /etc/postfix/vusers
+<span class="go">pepe</span>
+<span class="go">24iLOKFSxXxdo</span>
+<span class="go">paco</span>
+<span class="go">bKsPsgguh00tU</span>
+</pre></div>
+</div>
+<p>Las contraseñas se obtienen cifrándolas con <strong class="command">openssl</strong>. Por ejemplo, si
+la contraseña de <em>pepe</em> es <em>soypepe</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl passwd -crypt soypepe
+<span class="go">24iLOKFSxXxdo</span>
+</pre></div>
+</div>
+<p>Hecho esto, debemos generar la base de datos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> db_load -T -t <span class="nb">hash</span> -f /etc/postfix/vusers /etc/postfix/vusers.db
+<span class="gp">#</span> chmod <span class="m">600</span> /etc/postfix/vusers.db
+</pre></div>
+</div>
+<p>Si no se conserva el fichero original, puede consultarse el contenido de la base
+de datos, así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> db_dump -p /etc/postfix/vusers.db
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Para añadir usuarios a la base de datos puede usarse un nuevo fichero
+que contenga los nuevos usuarios y la opción <code class="docutils literal notranslate"><span class="pre">-n</span></code> de <strong class="command">db_load</strong>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> db_load -T -n -t <span class="nb">hash</span> -f /etc/postfix/mas_usuarios /etc/postfix/vusers.db
+</pre></div>
+</div>
+<p>o bien, si es uno sólo leerlo directamente de la entrada estándar sin incluir
+la opción <code class="docutils literal notranslate"><span class="pre">-f</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> db_load -T -n -t <span class="nb">hash</span> /etc/postfix/vusers.db <span class="s">&lt;&lt;EOF</span>
+<span class="gp">&gt;</span><span class="s"> jesus</span>
+<span class="gp">&gt;</span><span class="s"> $(openssl passwd -crypt soyjesus)</span>
+<span class="gp">&gt;</span><span class="s"> EOF</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="configuracion-de-pam">
+<h4><span class="section-number">7.3.3.4.1.1.2. </span>Configuración de PAM<a class="headerlink" href="#configuracion-de-pam" title="Enlazar permanentemente con este título">¶</a></h4>
+<p>Es decir, configurar la autenticación para que <strong class="command">postfix</strong> reconozca los
+usuarios como válidos. Esto exige modificar (en realidad, crear) el fichero
+<code class="file docutils literal notranslate"><span class="pre">/etc/pam.d/smtp</span></code> y dejarlo del siguiente modo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">auth sufficient pam_userdb.so crypt=crypt db=/etc/postfix/vusers</span>
+<span class="go">account sufficient pam_userdb.so crypt=crypt db=/etc/postfix/vusers</span>
+
+<span class="go">account required pam_succeed_if.so user ingroup mailusers</span>
+
+<span class="go">@include common-auth</span>
+<span class="go">@include common-account</span>
+</pre></div>
+</div>
+<p>La configuración propuesta hace, en realidad, dos cosas:</p>
+<ul>
+<li><p>Permite la autenticación de los usuarios exclusivos.</p></li>
+<li><p>Exige a los usuarios reales la pertenencia al grupo <em>mailusers</em>, lo cual
+exigirá su creación:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> addgroup --system mailusers
+</pre></div>
+</div>
+</li>
+</ul>
+<p>Para comprobar la configuración basta hacer algo así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> testsaslauthd -u pepe -p soypepe -f /var/spool/postfix/var/run/saslauthd/mux -s smtp
+<span class="go">0: OK &quot;Success.&quot;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="configuracion-de-los-buzones">
+<h4><span class="section-number">7.3.3.4.1.1.3. </span>Configuración de los buzones<a class="headerlink" href="#configuracion-de-los-buzones" title="Enlazar permanentemente con este título">¶</a></h4>
+<p>Antes de continuar es preciso indicar que, aunque los usuarios exclusivos no
+existen para el sistema, sí es necesario almacenar en el sistema de ficheros los
+mensajes que reciben. Estos ficheros en que se transforman los mensajes, deben
+pertenecer a algún usuario y tener un grupo propietario. Sin embargo, los
+usuarios exclusivos no tienen nada de eso ya que son, simplemente, un nombre y
+una contraseña. Por ese motivo, <strong class="command">postfix</strong> requiere mapear esto usuarios
+pra que dispongan de un <strong>uid</strong> y un <strong>gid</strong>. La manera más sencilla de hacerlo
+es crear un usuario real y un grupo real (<em>mailusers</em> nos vale) y mapear todos
+los usuarios exclusivos con ellos dos.</p>
+<p>Consecuentemente, debemos crear un usuario<a class="footnote-reference brackets" href="#id6" id="id1">1</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> adduser --home /var/spool/mail/vusers --shell /bin/false --ingroup mailusers <span class="se">\</span>
+   --gecos <span class="s2">&quot;Usuario para usuarios de correo&quot;</span> mailuser --disabled-password --uid<span class="o">=</span><span class="m">500</span>
+</pre></div>
+</div>
+<p>La configuración de <strong class="command">postfix</strong> se basa en crear un dominio virtual que
+sepamos que no existe, por ejemplo, <code class="docutils literal notranslate"><span class="pre">mail1.vusers</span></code>, redirigir los mensajes de
+los usuarios exclusivos hacia este dominio virtual y, por último, definir los
+buzones de éstos.</p>
+<p>La configuración a añadir en <code class="file docutils literal notranslate"><span class="pre">/etc/postfix/main.cf</span></code> es la siguiente<a class="footnote-reference brackets" href="#id7" id="id2">2</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">virtual_mailbox_domains = mail1.vusers</span>
+<span class="go">virtual_mailbox_base = /var/spool/mail/vusers</span>
+<span class="go">virtual_alias_maps = hash:/etc/postfix/vusersmap</span>
+<span class="go">virtual_mailbox_maps = hash:/etc/postfix/mailbox_vusers</span>
+<span class="go">virtual_uid_maps = static:500</span>
+<span class="gp">#</span> Suponemos que el grupo mailusers tiene GID <span class="m">115</span>
+<span class="go">virtual_gid_maps = static:115</span>
+</pre></div>
+</div>
+<p>El fichero <code class="file docutils literal notranslate"><span class="pre">vusersmap</span></code> debe contener el mapeo de los usuarios exclusivos
+hacia el dominio virtual<a class="footnote-reference brackets" href="#id8" id="id3">3</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cat &gt; /etc/postfix/vusersmap
+<span class="go">pepe@mail1.org    pepe@mail1.vusers</span>
+<span class="go">paco@mail1.org    paco@mail1.vusers</span>
+</pre></div>
+</div>
+<p>Y el fichero <code class="file docutils literal notranslate"><span class="pre">mailbox_users</span></code> la localización de los buzones de éstos<a class="footnote-reference brackets" href="#id9" id="id4">4</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cat &gt; /etc/postfix/mailbox_vusers
+<span class="go">pepe@mail1.vusers    pepe/Maildir/</span>
+<span class="go">paco@mail1.vusers    paco/Maildir/</span>
+</pre></div>
+</div>
+<p>Lo cual quiere decir que los correos de <em>pepe</em> acabarán en
+<code class="file docutils literal notranslate"><span class="pre">pepe/Maildir/</span></code>, por ejemplo. La ruta es relativa, porque se ha definido
+ya la base en el fichero de configuración (<a class="reference external" href="http://www.postfix.org/postconf.5.html#virtual_mailbox_base">virtual_mailbox_base</a>), por lo que
+la ruta completa será <code class="file docutils literal notranslate"><span class="pre">/var/spool/mail/vusers/pepe/</span></code>. El hecho de que se
+incluya una barra final, implica que se quieren buzones en formato <em>maildir</em>.</p>
+<p>Por último, debe crearse el directorio que contendrá estos buzones:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkdir -p /var/spool/mail/vusers
+<span class="gp">#</span> chown mailuser:mailusers /var/spool/mail/vusers
+<span class="gp">#</span> chmod <span class="m">700</span> /var/spool/mail/vusers
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Que la autenticación no proporcione completamente la información sobre
+la cuenta (UID, GID, directorio de usuario) obligará, si se configura
+<strong class="program">dovecot</strong>, a mapear en ella también a estos usuarios exclusivos. Se
+verá <a class="reference internal" href="../03-imap/index.html#dovecot-usu-pam"><span class="std std-ref">más adelante</span></a>.</p>
+</div>
+</div>
+</div>
+<div class="section" id="a-traves-de-dovecot">
+<span id="postfix-usu-virtual-dovecot"></span><h3><span class="section-number">7.3.3.4.1.2. </span>A través de <strong class="program">dovecot</strong><a class="headerlink" href="#a-traves-de-dovecot" title="Enlazar permanentemente con este título">¶</a></h3>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Tenga presente quen si configura usuarios exclusivos usando
+<strong class="program">dovecot</strong>, se verá obligado a <a class="reference internal" href="01-inst.html#postfix-dovecot-sasl"><span class="std std-ref">autenticar con dovecot</span></a> y a <a class="reference internal" href="03-entrega.html#postfix-dovecot-mda"><span class="std std-ref">usarlo como MDA</span></a><a class="footnote-reference brackets" href="#id10" id="id5">5</a>.</p>
+</div>
+<div class="admonition seealso">
+<p class="admonition-title">Ver también</p>
+<p>Siga las indicaciones del <a class="reference internal" href="../03-imap/index.html#dovecot-usu-virtual"><span class="std std-ref">para habilitar los usuarios
+virtuales a dovecot</span></a></p>
+</div>
+<p>Hechas las modificaciones en <strong class="program">dovecot</strong>, aunque queda un escollo en
+<strong class="program">postfix</strong>. Dado que no hemos eliminado nuestro dominio <em>mail1.org</em> de
+<a class="reference external" href="http://www.postfix.org/postconf.5.html#mydestination">mydestination</a>, <strong class="program">postfix</strong> comprueba que el usuario es un usuario local
+para lo cual usa el valor de la directiva <a class="reference external" href="http://www.postfix.org/postconf.5.html#local_recipient_maps">local_recipient_maps</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> postconf local_recipient_maps
+<span class="go">local_recipient_maps = proxy:unix:passwd.byname $alias_maps</span>
+</pre></div>
+</div>
+<p>que básicamente comprueba si el nombre se encuentra en <code class="file docutils literal notranslate"><span class="pre">/etc/passwd</span></code> o
+listado en <code class="file docutils literal notranslate"><span class="pre">/etc/alias</span></code>. En consecuencia, cuando se envíe mensaje a un
+usuario virtual, se devolverá un error de que el usuario no existe («<em>User
+unknown in local recipient table</em>»). Para evitarlo puede redefinirse como vacía
+la directiva, que deshabilita la comprobación,pero eso <a class="reference external" href="http://www.postfix.org/LOCAL_RECIPIENT_README.html#main_config">lo desaconseja
+enérgicamente la documentación oficial</a>, así que lo
+que haremos es redefinirla para que se busquen también los usuarios en la base
+de datos:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">local_recipient_maps</span> = proxy:unix:passwd.byname $alias_maps sqlite:/etc/postfix/tb/users.cf
+</pre></div>
+</div>
+<p id="postfix-users-cf">y este fichero <code class="file docutils literal notranslate"><span class="pre">/etc/postfix/tb/users.cf</span></code> debe ser el siguiente:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">dbpath</span> = <span class="sx">/etc/dovecot/private/users.db</span>
+<span class="nb">query</span> = SELECT &#39;OK&#39; FROM users WHERE userid || &#39;@&#39; || domain = &#39;%s&#39; AND active = &#39;Y&#39;
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Por la forma en que hemos configurado <strong class="program">dovecot</strong>, los mensajes
+enviados al dominio <em>localhost</em>, se entregarán si el usuario es un
+usuario real del sistema, pero no si es un usuario exclusivo. No debería ser un
+problema, puesto que sólo tendría sentido usar esas direcciones dentro del
+sistema y los usuarios exclusivos no tienen acceso a él.</p>
+</div>
+</div>
+</div>
+<div class="section" id="usuarios-en-varios-dominios">
+<span id="postfix-mul-dom"></span><h2><span class="section-number">7.3.3.4.2. </span>Usuarios en varios dominios<a class="headerlink" href="#usuarios-en-varios-dominios" title="Enlazar permanentemente con este título">¶</a></h2>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Cerciórese primero de que el paquete <em>postfix-sqlite</em> está instalado
+en el sistema.</p>
+</div>
+<p>Para gestionar varios dominios con <strong class="program">postfix</strong> lo más sencillo es
+configurar con <strong class="program">dovecot</strong> <a class="reference internal" href="01-inst.html#postfix-dovecot-sasl"><span class="std std-ref">la autenticación</span></a>, la <a class="reference internal" href="03-entrega.html#postfix-dovecot-mda"><span class="std std-ref">entrega de mensajes</span></a> y
+la <a class="reference internal" href="../03-imap/index.html#dovecot-mul-dom"><span class="std std-ref">gestión de usuarios de los distintos dominios</span></a>. A
+continuación, debemos rematar la configuración en <strong class="program">postfix</strong>:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">mydestination</span> = sqlite:/etc/postfix/tb/domains.cf, localhost
+<span class="nb">local_recipient_maps</span> = proxy:unix:passwd.byname $alias_maps sqlite:/etc/postfix/tb/users.cf
+<span class="nb">mailbox_transport</span> = lmtp:unix:private/dovecot-lmtp
+<span class="c">#transport_maps = sqlite:/etc/postfix/tb/transports.cf</span>
+<span class="nb">virtual_alias_maps</span> = sqlite:/etc/postfix/tb/aliases.cf
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Recuerde que tendrá que usar <strong class="program">postmap</strong> después de crear
+cada fichero.</p>
+</div>
+<p><code class="file docutils literal notranslate"><span class="pre">/etc/postfix/tb/users.cf</span></code> debe contener <a class="reference internal" href="#postfix-users-cf"><span class="std std-ref">lo expuesto bajo el
+epígrafe anterior</span></a>. De hecho, convendría que leyera tal
+epígrafe, si aún no lo ha hecho.</p>
+<p>El fichero <code class="file docutils literal notranslate"><span class="pre">/etc/postfix/tb/domains.cf</span></code> nos permite obtener los dominios
+que gestionamos de la base de datos sin tener que escribirlos directamente:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">dbpath</span> = <span class="sx">/etc/dovecot/private/users.db</span>
+<span class="nb">query</span> = SELECT domain FROM domains WHERE domain=&#39;%s&#39;
+</pre></div>
+</div>
+<p>Si definimos <em>cuentas virtuales</em> en la base de datos entonces deberemos
+obtenerlas consultando en ella, consulta que declara <code class="file docutils literal notranslate"><span class="pre">/etc/postfix/tb/aliases.cf</span></code>:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">dbpath</span> = <span class="sx">/etc/dovecot/private/users.db</span>
+<span class="nb">query</span> = SELECT
+          <span class="nb">CASE</span> WHEN goto IS NULL
+            <span class="nb">THEN</span> userid || &#39;@&#39; || domain
+            <span class="nb">ELSE</span> goto
+          <span class="nb">END</span> AS goto
+        <span class="nb">FROM</span> aliases WHERE address=&#39;%s&#39; AND active = &#39;Y&#39;
+</pre></div>
+</div>
+<p>En principio, el único transporte que necesitaremos es el <abbr title="Local Mail Transfer Protocol">LMTP</abbr> de
+<strong class="program">dovecot</strong>, así que <a class="reference external" href="http://www.postfix.org/postconf.5.html#transport_maps">transport_maps</a> no será necesario, pero en caso
+contrario <code class="file docutils literal notranslate"><span class="pre">/etc/postfix/tb/transports.cf</span></code> debe quedar así:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">dbpath</span> = <span class="sx">/etc/dovecot/private/users.db</span>
+<span class="nb">query</span> = SELECT transport FROM domains WHERE domain=&#39;%s&#39;
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p><a class="reference external" href="http://www.postfix.org/postconf.5.html#transport_maps">transport_maps</a> se consulta antes de que opere el agente <em>local</em>
+de <strong class="program">postfix</strong>. En consecuencia, para los dominios que definan el
+transporte a través de la base de datos, no tendrá validez lo dispuesto para
+este agente (como las definiciones de <code class="file docutils literal notranslate"><span class="pre">/etc/aliases</span></code>).</p>
+</div>
+<p>Podemos comprobar cómo resolverá <strong class="program">postfix</strong> las consultas <abbr title="Structured Query Language">SQL</abbr> del
+siguiente modo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> postmap -q <span class="s1">&#39;mail1.org&#39;</span> sqlite:/etc/postfix/tb/domains.cf
+<span class="go">mail1.org</span>
+</pre></div>
+</div>
+<p class="rubric">Notas al pie</p>
+<dl class="footnote brackets">
+<dt class="label" id="id6"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p>Al usuario se le ha dado el <strong>uid</strong> 500 para separarlo del resto de usuarios
+normales (que tienen <strong>uid</strong> por encima del 1000 en <em>debian</em>) y para que cumpla
+la restricción de <strong class="program">dovecot</strong> que exige que los usuarios de correo tenga un
+<strong>uid</strong> a partir de este número.</p>
+</dd>
+<dt class="label" id="id7"><span class="brackets"><a class="fn-backref" href="#id2">2</a></span></dt>
+<dd><p>Obsérvese que la configuración incluye la definición de <a class="reference external" href="http://www.postfix.org/postconf.5.html#virtual_alias_maps">virtual_alias_maps</a>,
+el cual ya se definió anteriormente para otros propósitos. Si queremos mantenerlos,
+basta con separar con comas todos los ficheros:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">virtual_alias_maps</span> = hash:/etc/postfix/vmailbox, regexp:/etc/postfix/desechables, hash:/etc/postfix/vusermaps
+</pre></div>
+</div>
+</dd>
+<dt class="label" id="id8"><span class="brackets"><a class="fn-backref" href="#id3">3</a></span></dt>
+<dd><p>Desgraciadamente hay que escribir los usuarios uno a uno. Sin embargo, si decidiéramos
+que los usuarios exclusivos cumplieran una regla de nombrado que los distinguiera de los
+usuarios reales, entonces sí sería posible usar una expresión regular. Por ejemplo, si
+decidiéramos, que todos los nombres de usuarios exclusivos acaban en <em>.vir</em>, de modo que
+nuestros usuarios son de la forma <em>pepe.vir</em>, <em>paco.vir</em>, etc. Podríamos hacer lo siguiente:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">virtual_alias_maps</span> = regexp:/etc/postfix/vusermaps
+</pre></div>
+</div>
+<p>y crear el fichero así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cat &gt; /etc/postfix/vusermaps
+<span class="go">/(.+)\.vir@mail1\.org$/    $1.mail1.vusers</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Téngase en cuenta, en este caso, que eliminar el punto de los nombres
+es un problema, y esto:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">virtual_alias_maps</span> = pcre:/etc/postfix/desechables, regexp:/etc/postfix/vusermaps
+</pre></div>
+</div>
+<p>provocaría que jamás se detectaran los usuarios exclusivos. En este caso, podríamos
+eliminar todos los puntos, excepto aquel que antecede a <em>.vir</em>, haciendo uso de
+expresiones regulares de <em>perl</em> (de ahí que hayamos escrito <code class="docutils literal notranslate"><span class="pre">pcre:</span></code> y no <code class="docutils literal notranslate"><span class="pre">regexp:</span></code>.
+La línea que deberíamos incluir en el fichero es:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">/(.*)\.(?!vir@)(.*@mail1\.org)$/    $1$2</span>
+</pre></div>
+</div>
+</div>
+</dd>
+<dt class="label" id="id9"><span class="brackets"><a class="fn-backref" href="#id4">4</a></span></dt>
+<dd><p>Según la documentación (<em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/virtual(8)">virtual(8)</a></em>), para
+<a class="reference external" href="http://www.postfix.org/postconf.5.html#virtual_mailbox_maps">virtual_mailbox_maps</a> las substituciones de expresiones regulares están
+deshabilitadas, por lo que no podemos resolver la asignación de buzones con
+ellas.</p>
+</dd>
+<dt class="label" id="id10"><span class="brackets"><a class="fn-backref" href="#id5">5</a></span></dt>
+<dd><p>Esto último no es cierto y podrían seguirse entregando los mensajes con
+<strong class="program">postfix</strong> mediante la conversión de los dominios en virtuales y el uso de
+<a class="reference external" href="http://www.postfix.org/postconf.5.html#virtual_mailbox_maps">virtual_mailbox_maps</a>, <a class="reference external" href="http://www.postfix.org/postconf.5.html#virtual_uid_maps">virtual_uid_maps</a> y <a class="reference external" href="http://www.postfix.org/postconf.5.html#virtual_gid_maps">virtual_gid_maps</a> con consultas a
+la base de datos <em>sqlite</em> para definir la información de usuario necesaria.
+La solución, no obstante, es más engorrosa y no funcionará del todo bien con
+las <a class="reference internal" href="03-entrega.html#postfix-quota"><span class="std std-ref">cuotas</span></a> definidas en <strong class="program">dovecot</strong>.</p>
+</dd>
+</dl>
+</div>
+</div>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../../index.html">Tabla de contenido</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">7.3.3.4. Gestión de usuarios</a><ul>
+<li><a class="reference internal" href="#usuarios-exclusivos">7.3.3.4.1. Usuarios exclusivos</a><ul>
+<li><a class="reference internal" href="#a-traves-de-pam">7.3.3.4.1.1. A través de <abbr title="Pluggable Authentication Modules">PAM</abbr></a><ul>
+<li><a class="reference internal" href="#creacion-de-usuarios">7.3.3.4.1.1.1. Creación de usuarios</a></li>
+<li><a class="reference internal" href="#configuracion-de-pam">7.3.3.4.1.1.2. Configuración de PAM</a></li>
+<li><a class="reference internal" href="#configuracion-de-los-buzones">7.3.3.4.1.1.3. Configuración de los buzones</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#a-traves-de-dovecot">7.3.3.4.1.2. A través de <strong class="program">dovecot</strong></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#usuarios-en-varios-dominios">7.3.3.4.2. Usuarios en varios dominios</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="03-entrega.html"
+                        title="capítulo anterior"><span class="section-number">7.3.3.3. </span>Entrega</a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="05-dns.html"
+                        title="próximo capítulo"><span class="section-number">7.3.3.5. </span>Acreditación del remitente</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../_sources/07.serre/03.mail/02-smtp/04-usuarios.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="05-dns.html" title="7.3.3.5. Acreditación del remitente"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="03-entrega.html" title="7.3.3.3. Entrega"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" ><span class="section-number">7. </span>Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" ><span class="section-number">7.3. </span>Correo electrónico</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="index.html" ><span class="section-number">7.3.3. </span>Servidor <abbr title="Simple Mail Transfer Protocol">SMTP</abbr></a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">7.3.3.4. </span>Gestión de usuarios</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor CC BY 4.0, 2016-2021, José Miguel Sánchez Alés.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.2.0.
+    </div>
+  </body>
+</html>

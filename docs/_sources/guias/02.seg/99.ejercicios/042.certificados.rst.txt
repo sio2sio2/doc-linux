@@ -1,0 +1,163 @@
+.. _ej-cert-dig:
+
+Ejercicios sobre certificados digitales
+=======================================
+
+#. Análisis de un **certificado de servidor**:
+
+   a. Obtenga exclusivamente el certificado de servidor de la página del
+      `Ayuntamiento de Rota <https://www.aytorota.es>`_. Si se descaga
+      el certificado con el navegador, es probable que obtenga los certificados
+      intermedios. En ese caso elimínelos, porque una de las tareas posteriores
+      es obtenerlos personalmente y no dejar que el naevagador hasta esta tarea
+      por usted.
+   #. Obtenga el **Subject** y el **Issuer** del certificado.
+   #. ¿Cuándo caduca?
+   #. Obtenga la cadena de certificados de confianza hasta llegar al certificado
+      raíz.
+   #. ¿Tenía ya el certificado raíz instalado en el sistema? Puede comprobando
+      calculando su *hash* y viendo si está en :file:`/etc/ssl/certs` (échele
+      una lectura rápida a la :ref:`descripción de este directorio <cert-general>`).
+   #. Verifique la validez del certificado.
+   #. Compruebe si está revocado.
+
+   .. note:: Con algunos navegadores es posible descargar el certificado. De lo
+      contrario, puede obtenerlo con :command:`openssl`::
+
+         $ printf '' | openssl s_client -servername SERVIDOR -connect SERVIDOR:443 | openssl x509
+
+      donde *SERVIDOR* es el nombre del servidor (p.e. *www.juntadeandalucia.es*).
+
+#. Obtención de un **certificado de servidor**:
+
+   a. Como para generar un certificado de servidor mediante el :ref:`desafío HTTP
+      <desafios-acme>` es necesario tener una máquina directamente accesible desde
+      internet, cree una máquina virtual que disponga de |IP| pública. Ilustre todo el
+      proceso que ha llevado a cabo para lograrlo, incluido el proceso de alta, si
+      ha tenido que darse de alta en algún servicio. Las características de la
+      máquina deben ser las siguientes:
+
+      + La mínima posible.
+      + Puerto **22** abierto.
+      + Acceso |SSH| mediante usuario/contraseña.
+
+   #. Prepare la máquina virtual convenientemente, lo cual incluye:
+
+      * Acceso mediante |SSH| y :ref:`autenticación mediante clave pública
+        <ssh-auth-claves>`.
+      * Abrir el acceso a la máquina por los puertos  **80** y **443**.
+
+   #. Créese un dominio virtual gratuito en `freenom
+      <https://www.freenom.com/es/index.html?lang=es>`_ (escoja el que más le guste)
+      y en la definición de la zona asocie el nombre ``www`` a la máquina virtual
+      anterior.
+
+   #. Instale acme.sh_ en la máquina virtual, preferiblemente mediante la creación
+      previa de un paquete de *Debian*, como :ref:`se explica en el manual
+      <nginx-https>`.
+
+   #. Instale y configure mínimamente un :ref:`servidor nginx <n-ginx>`. A pesar de
+      la abundante documentación, se le exponen aquí los pasos de instalación para
+      que el servidor quede funcionando en modo no seguro:
+
+      i. Instalar el paquete **nginx-light**.
+      #. Sustituir el contenido de :file:`/etc/nginx/sites-available/default` por
+         este otro:
+
+         .. code-block:: nginx
+
+            server {
+               listen 80;
+
+               server_name _;
+
+               root /srv/www/default;
+               try_files $uri $uri/ =404;
+            }
+
+      #. Cree el directorio :file:`/srv/www/default`,
+      #. Incluya dentro del directorio anterior un fichero :file:`index.html` con
+         cualquier código |HTML|.
+      #. Reinicie el servicio::
+
+            # invoke-rc.d nginx restart
+
+      #. Pruebe desde un navegador a conectar con el servidor web para ver la
+         página.
+
+   #. Genere para su nombre de servidor un certificado `Let's Encrypt`_ según se
+      :ref:`expone en los apuntes <nginx-https>` e instálelo. ¿Cuántos archivos
+      se exportan para que los use el servidor web? ¿Cómo se llaman y qué
+      contiene cada uno?
+
+   #. Compruebe que acme.sh_ lista el certificado.
+
+   #. Modifique la configuración del servidor para atender al tráfico seguro.
+
+   #. Accede por |HTTP|\ s al servidor y cerciórese de que el certificado es
+      válido.
+
+   #. Averigüe con :command:`openssl` cuál es la cadena de confianza completa
+      del certificado.
+
+   #. Verique que el certificado es válido y que no está revocado.
+
+   #. Revoque el certificado haciendo uso de acme.sh_ (y desinstálelo pero sin
+      borrarlo).
+
+   #. Vuelva a comprobar el certificado usando |OCSP|. ¿Es ahora válido?
+
+   #. Elimine los archivos de certificado y vuelva a obtener otro certificado
+      para dejar el servidor nuevamente en funcionamiento.
+
+#. Obtención de un **certificado personal**:
+
+   a. Si no se posee ya, obtener un certificado personal de la |FNMT| acudiendo a
+      la autoridad de registro más cercana. Describa, en cualquier caso, cómo es
+      el proceso de obtención incluyendo capturas de pantalla de la parte que se
+      hace con el navegador.
+
+   #. Exportar en formato ``.p12`` el certificado almacenado en el navegador.
+
+   #. Usar :command:`openssl` para extraer la clave pública en formato |PEM|.
+   
+   #. Obtenga y separe en distintos archivos todas las claves públicas que
+      contenga el ``.p12``. ¿Cuál es la cadena completa de certificados hasta
+      el certificado raíz? ¿De qué direcciones de internet se pueden obtener los
+      certificados de |CA| incluidos en la cadena, en caso de que no los
+      contuviera el archivo ``.p12``?
+
+   #. Verifique el certificado y compruebe que no está revocado.
+
+   #. ¿Incluye su certificado personal entre los datos identificativos el correo
+      electrónico? Si lo incluye, ¿en qué campo del certificado se encuentra?
+
+   #. Importe el certificado personal en un navegador Chromium/Edge cerciorándose
+      de que es exportable, esto es, de que podremos volver a generar un archivo
+      ``.p12``.
+
+   #. Descargue la aplicación Java `Autofirma
+      <https://firmaelectronica.gob.es/Home/Descargas.html>`_ y utilícela para
+      firmar un documento |PDF| cualquiera. Una vez hecho esto:
+     
+      + Utilice la dirección que facilita esta propia aplicación para verificar 
+        la validez de la firma.
+      + Use :manpage:`pdfsig(1)` para realizar esta misma verificación.
+        
+        .. warning:: tenga en cuenta que en este segundo caso se verifica
+           utilizando la parte pública del certificado, pero la firma podría aún
+           ser inválida por estar éste revocado. Por tanto, para que
+           en realidad la verificación fuera total, debería verificarse el
+           propio certificado utilizando el servicio |OCSP|, que es asunto del
+           ejercicio siguiente.
+
+.. _acme.sh: https://github.com/acmesh-official/acme.sh
+.. _Let's Encrypt: https://letsencrypt.org/es/
+
+.. |HTML| replace:: :abbr:`HTML (HyperText Markup Language)`
+.. |RAM| replace:: :abbr:`RAM (Random Access Memory)`
+.. |FNMT| replace:: :abbr:`FNMT (Fábrica Nacional de Moneda y Timbre)`
+.. |OCSP| replace:: :abbr:`OCSP (Online Certificate Status Protocol)`
+.. |PEM| replace:: :abbr:`PEM (Private Enhanced Mail)`
+.. |PDF| replace:: :abbr:`PDF (Portable Document Format)`
+.. |CA| replace:: :abbr:`CA (Certification Authority)`

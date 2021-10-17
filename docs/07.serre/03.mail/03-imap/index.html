@@ -1,0 +1,1062 @@
+
+
+
+<!DOCTYPE html>
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>7.3.4. Servidor IMAP &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/classic.css" />
+    <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+    
+    <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/translations.js"></script>
+    
+    <link rel="index" title="Índice" href="../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../search.html" />
+    <link rel="next" title="7.3.5. Otros aspectos" href="../04-misc/index.html" />
+    <link rel="prev" title="7.3.3.5. Acreditación del remitente" href="../02-smtp/05-dns.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="../04-misc/index.html" title="7.3.5. Otros aspectos"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="../02-smtp/05-dns.html" title="7.3.3.5. Acreditación del remitente"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" ><span class="section-number">7. </span>Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" accesskey="U"><span class="section-number">7.3. </span>Correo electrónico</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">7.3.4. </span>Servidor <abbr title="Internet Message Access Protocol">IMAP</abbr></a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="servidor-imap">
+<span id="dovecot"></span><h1><span class="section-number">7.3.4. </span>Servidor <abbr title="Internet Message Access Protocol">IMAP</abbr><a class="headerlink" href="#servidor-imap" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>Si queremos montar un sistema de correo completo, necesitamos configurar un
+<abbr title="Mail Access Agent">MAA</abbr>, que haga accesibles los buzones de usuarios a máquinas remotas. Los dos
+protocolos más usados son <abbr title="Post Office Protocol v3">POP3</abbr> e <abbr title="Internet Message Access Protocol">IMAP</abbr>.</p>
+<p><abbr title="Post Office Protocol v3">POP3</abbr> es un protocolo pensado para que el cliente pueda descargar los mensajes
+en su máquina local. <abbr title="Internet Message Access Protocol">IMAP</abbr> en cambio, aunque permite esto, también deja la
+posibilidad de gestionar los mensajes directamente en el servidor.</p>
+<p>En esta guía instalaremos el servidor <abbr title="Internet Message Access Protocol">IMAP</abbr> <strong class="program">dovecot</strong>.</p>
+<div class="section" id="instalacion">
+<span id="dovecot-imap"></span><h2><span class="section-number">7.3.4.1. </span>Instalación<a class="headerlink" href="#instalacion" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>La instalación en <em>debian</em> es sencilla:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt-get install dovecot-imapd
+</pre></div>
+</div>
+<p>La configuración requiere la edición de tres ficheros sitos bajo
+<code class="file docutils literal notranslate"><span class="pre">/etc/dovecot</span></code>:</p>
+<dl>
+<dt><code class="file docutils literal notranslate"><span class="pre">conf.d/10-ssl.conf</span></code></dt><dd><p>Debe dejarse la línea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ssl = yes</span>
+</pre></div>
+</div>
+<p>y descomentar las líneas que señalan cuál es el certificado que se usará para
+la autenticación. Ahora bien, como ya generamos claves aptas también para
+este servicio, conviene usarlas, así que también cambiaremos el valor de las
+directivas<a class="footnote-reference brackets" href="#id11" id="id1">1</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ssl_cert = &lt;/etc/ssl/certs/ssl-cert-snakeoil.pem</span>
+<span class="go">ssl_key = &lt;/etc/ssl/private/ssl-cert-snakeoil.key</span>
+</pre></div>
+</div>
+</dd>
+<dt><code class="file docutils literal notranslate"><span class="pre">conf.d/10-auth.conf</span></code></dt><dd><p>Es recomendable descomentar la línea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">disable_plaintext_auth = yes</span>
+</pre></div>
+</div>
+<p>que obliga a que la conexión sea segura si la autenticación es en texto
+plano. Si en la directiva <code class="docutils literal notranslate"><span class="pre">ssl</span></code> del archivo anterior se hubiera fijado
+<code class="docutils literal notranslate"><span class="pre">required</span></code> se exigiría conexión segura, fuera cual fuera la autenticación.</p>
+<p>Además, debemos descomentar y dejar la línea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">auth_username_format = %n</span>
+</pre></div>
+</div>
+<p>que elimina el dominio del nombre de usuario, antes de pasar a comprobar si
+este existe, lo cual es fundamental si queremos que funcionen luego <a class="reference internal" href="#dovecot-quota"><span class="std std-ref">las
+cuotas</span></a>.</p>
+</dd>
+<dt><code class="file docutils literal notranslate"><span class="pre">conf.d/10-mail.conf</span></code></dt><dd><p>Permite indicar cuál es la ubicación de los buzones. Lo más conveniente es
+que estén en formato <a class="reference internal" href="../02-smtp/03-entrega.html#maildir"><span class="std std-ref">maildir</span></a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">mail_location = maildir:~/Maildir</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Si pretendemos que <a class="reference internal" href="../02-smtp/03-entrega.html#postfix-dovecot-mda"><span class="std std-ref">postfix ceda la entrega a dovecot</span></a> no es necesario más, pero si es el propio
+<strong class="program">postfix</strong> el que se encarga de ello entonces tendremos que
+definir estos mismos formato y ubicación en <code class="file docutils literal notranslate"><span class="pre">/etc/postfix/main.cf</span></code>:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">home_mailbox</span> = Maildir/
+</pre></div>
+</div>
+</div>
+</dd>
+</dl>
+<p>Opcionalmente, podemos hacer dos cambios más:</p>
+<dl>
+<dt><code class="file docutils literal notranslate"><span class="pre">dovecot.conf</span></code></dt><dd><p>Podemos dejar la línea:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">listen</span> = *
+</pre></div>
+</div>
+<p>para escuchar unicamente en IPv4.</p>
+</dd>
+<dt><code class="file docutils literal notranslate"><span class="pre">conf.d/10-master.conf</span></code></dt><dd><p><strong class="program">dovecot</strong>, por defecto escuchará en los puertos <strong>143</strong> (<abbr title="Internet Message Access Protocol">IMAP</abbr> con
+<em>STARTTLS</em>) y <strong>993</strong> (<abbr title="Internet Message Access Protocol">IMAP</abbr>s). Si queremos deshabilitar este último,
+podemos añadir una línea al bloque correspondiente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">inet_listener imaps {</span>
+<span class="go">   port = 0</span>
+<span class="go">}</span>
+</pre></div>
+</div>
+<p>Escuchar en el puerto <strong>0</strong>, equivale a deshabilitar el servicio.</p>
+</dd>
+</dl>
+<p>Hecho esto, ya se tiene todo preparado para cargar la nueva configuración:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> invoke-rc.d dovecot restart
+</pre></div>
+</div>
+<p>Para comprobar el cifrado y, de paso, comprobar si podemos autenticarnos,
+podemos hacer<a class="footnote-reference brackets" href="#id12" id="id2">2</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> openssl s_client -connect localhost:imap -starttls imap -quiet
+<span class="go">depth=0 CN = mail.mail1.org</span>
+<span class="go">verify error:num=18:self signed certificate</span>
+<span class="go">verify return:1</span>
+<span class="go">depth=0 CN = mail.mail1.org</span>
+<span class="go">verify return:1</span>
+<span class="go">. OK Pre-login capabilities listed, post-login capabilities have more.</span>
+<span class="hll"><span class="go">T1 LOGIN usuario contraseña</span>
+</span><span class="go">T1 OK [CAPABILITY IMAP4rev1 LITERAL+ SASL-IR LOGIN-REFERRALS ID ENABLE IDLE SORT SORT=DISPLAY THREAD=REFERENCES</span>
+<span class="go">THREAD=REFS THREAD=ORDEREDSUBJECT MULTIAPPEND URL-PARTIAL CATENATE UNSELECT CHILDREN NAMESPACE UIDPLUS</span>
+<span class="go">LIST-EXTENDED I18NLEVEL=1 CONDSTORE QRESYNC ESEARCH ESORT SEARCHRES WITHIN CONTEXT=SEARCH LIST-STATUS BINARY</span>
+<span class="go">MOVE SPECIAL-USE] Logged in</span>
+<span class="hll"><span class="go">T2 LIST &quot;&quot; &quot;*&quot;</span>
+</span><span class="go">* LIST (\HasNoChildren) &quot;.&quot; OtroBuzon</span>
+<span class="go">* LIST (\HasNoChildren) &quot;.&quot; INBOX</span>
+<span class="go">T2 OK List completed (0.000 + 0.000 secs).</span>
+<span class="hll"><span class="go">T3 EXAMINE INBOX</span>
+</span><span class="go">* FLAGS (\Answered \Flagged \Deleted \Seen \Draft)</span>
+<span class="go">* OK [PERMANENTFLAGS ()] Read-only mailbox.</span>
+<span class="go">* 0 EXISTS</span>
+<span class="go">* 0 RECENT</span>
+<span class="go">* OK [UIDVALIDITY 1544095512] UIDs valid</span>
+<span class="go">* OK [UIDNEXT 2] Predicted next UID</span>
+<span class="go">T3 OK [READ-ONLY] Examine completed (0.000 + 0.000 secs).</span>
+<span class="hll"><span class="go">T4 LOGOUT</span>
+</span><span class="go">* BYE Logging out</span>
+<span class="go">T4 OK Logout completed (0.000 + 0.000 secs).</span>
+<span class="go">Connection closed by foreign host.</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Los comandos introducidos por nosotros son lo que empiezan por las
+etiquetas <em>T1</em>, <em>T2</em> y <em>T3</em>, esto es, <code class="docutils literal notranslate"><span class="pre">LOGIN</span></code>, <code class="docutils literal notranslate"><span class="pre">LIST</span></code> y <code class="docutils literal notranslate"><span class="pre">LOGOUT</span></code>. El
+nombre de tales etiquetas no tiene la menor importancia.</p>
+</div>
+<p>Alternativamente, podríamos instalar un <abbr title="Mail User Agent">MUA</abbr> como <strong class="program">mutt</strong> y probar el
+servicio <abbr title="Internet Message Access Protocol">IMAP</abbr>, así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> mutt -f <span class="s1">&#39;imap://usuario@imap.mail1.org&#39;</span>
+</pre></div>
+</div>
+<p>lo cual nos mostraría el contenido del buzón <strong>INBOX</strong>. Para acceder al
+contenido de <strong>OtroBuzon</strong>, habría que añadirlo a la ruta:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> mutt -f <span class="s1">&#39;imap://usuario@imap.mail1.org/OtroBuzon&#39;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="autenticacion-sasl">
+<span id="dovecot-sasl"></span><h2><span class="section-number">7.3.4.2. </span>Autenticación <abbr title="Simple Authentication and Security Layer">SASL</abbr><a class="headerlink" href="#autenticacion-sasl" title="Enlazar permanentemente con este título">¶</a></h2>
+<p><strong class="program">dovecot</strong> dispone de un plugin que implementa <abbr title="Simple Authentication and Security Layer">SASL</abbr> y permite a
+<strong class="program">postfix</strong> autenticar con él. Para habilitarlo basta con buscar el
+fichero de configuración <code class="file docutils literal notranslate"><span class="pre">/etc/dovecot/conf.d/10-master.conf</span></code> y buscar
+el siguiente bloque y adaptar su contenido:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">service auth {</span>
+
+<span class="gp">   #</span> <span class="o">[</span>...<span class="o">]</span>
+
+<span class="gp">   #</span> Postfix smtp-auth
+<span class="go">   unix_listener /var/spool/postfix/private/auth {</span>
+<span class="go">      mode = 0660</span>
+<span class="go">      user = postfix</span>
+<span class="go">      group = postfix</span>
+<span class="go">   }</span>
+
+<span class="gp">   #</span> <span class="o">[</span> ... <span class="o">]</span>
+<span class="go">}</span>
+</pre></div>
+</div>
+<p>y en <code class="file docutils literal notranslate"><span class="pre">conf.d/10-auth.conf</span></code> permitir también <em>AUTH LOGIN</em>:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">auth_mechanisms</span> = plain login
+</pre></div>
+</div>
+<p>Por su parte, en la configuración de <strong class="program">postfix</strong>
+(<code class="file docutils literal notranslate"><span class="pre">/etc/postfix/main.cf</span></code>) deben añadirse las siguientes líneas:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="c"># Autenticación SASL</span>
+<span class="nb">smtpd_sasl_type</span> = dovecot
+<span class="nb">smtpd_sasl_auth_enable</span> = yes
+<span class="nb">smtpd_sasl_path</span> = private/auth
+<span class="nb">smtpd_sasl_local_domain</span> =
+<span class="nb">smtpd_sasl_security_options</span> = noanonymous
+<span class="nb">broken_sasl_auth_clients</span> = yes
+</pre></div>
+</div>
+<p>y configurar unas restricciones para que tengan en cuenta la autenticación del
+usuario, como las <a class="reference internal" href="../02-smtp/01-inst.html#postfix-auth-restrict"><span class="std std-ref">propuestas para la autenticación con Cyrus SASL</span></a>. Después de reiniciar ambos servicios, puede comprobar
+que funciona la autenticación haciendo <a class="reference internal" href="../02-smtp/01-inst.html#postfix-auth-check"><span class="std std-ref">las pruenas sugeridas para la otra
+autenticación</span></a>.</p>
+<p>Para comprobar la autenticación puede hacerse:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> doveadm auth <span class="nb">test</span> usuario contraseña
+<span class="go">passdb: usuario auth succeeded</span>
+<span class="go">extra fields:</span>
+<span class="go">  user=usuario</span>
+</pre></div>
+</div>
+<div class="admonition seealso">
+<p class="admonition-title">Ver también</p>
+<p>Puede encontrar más información <a class="reference external" href="https://wiki2.dovecot.org/HowTo/PostfixAndDovecotSASL">en la sección de la wiki de
+dovecot</a></p>
+</div>
+</div>
+<div class="section" id="cuotas">
+<span id="dovecot-quota"></span><h2><span class="section-number">7.3.4.3. </span>Cuotas<a class="headerlink" href="#cuotas" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Para habilitar las cuotas, es necesario tocar algunos ficheros:</p>
+<dl>
+<dt><code class="file docutils literal notranslate"><span class="pre">conf.d/10-mail.conf</span></code>:</dt><dd><p>Debe cargarse el <em>plugin</em> para la cuota, descomentando y completando:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">mail_plugins = quota</span>
+</pre></div>
+</div>
+</dd>
+<dt><code class="file docutils literal notranslate"><span class="pre">conf.d/20-imap.conf</span></code>:</dt><dd><p>Debe cargarse el <em>plugin</em> que permite informar de la cuota a través de
+<abbr title="Internet Message Access Protocol">IMAP</abbr>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">protocol imap {</span>
+<span class="go">   mail_plugins = $mail_plugins imap_quota</span>
+<span class="go">}</span>
+</pre></div>
+</div>
+</dd>
+<dt><code class="file docutils literal notranslate"><span class="pre">conf.d/90-quota.conf</span></code>:</dt><dd><p>Implementaremos una cuota de tipo <em>count</em> (aunque también puede usarse una
+cuota basada en la existente en el sistema de ficheros). Para ello:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">mailbox_list_index = yes</span>
+
+<span class="go">plugin {</span>
+<span class="go">   quota = count:User quota</span>
+<span class="gp">   #</span> Si se añade esto, habrá dos límites de cuota,
+<span class="gp">   #</span> Pero hay que habilitar las cuotas de disco.
+<span class="gp">   #</span> mount sirve para indicar cuál es el sistema de ficheros.
+<span class="gp">   #</span><span class="nv">quota2</span> <span class="o">=</span> fs:Disk quota:mount<span class="o">=</span>/home
+<span class="go">   quota_rule = *:storage=1G</span>
+<span class="gp">   #</span> Esto permitiría que hubiera 100M más en la basura.
+<span class="gp">   #</span><span class="nv">quota_rule2</span> <span class="o">=</span> Trash:storage<span class="o">=</span>+100M
+
+<span class="go">   quota_grace = 10%%</span>
+<span class="go">   quota_status_success = DUNNO</span>
+<span class="go">   quota_status_nouser = DUNNO</span>
+<span class="gp">   #</span><span class="nv">quota_status_nouser</span> <span class="o">=</span> <span class="s2">&quot;551 5.5.1 User not found&quot;</span>
+<span class="go">   quota_status_overquota = &quot;552 5.2.2 Mailbox is full&quot;</span>
+<span class="go">   quota_vsizes = yes</span>
+<span class="go">}</span>
+
+<span class="gp">#</span> Habilite esto, sólo si postfix no usa dovecot como MDA
+<span class="go">service quota-status {</span>
+<span class="go">    executable = quota-status -p postfix</span>
+<span class="go">    inet_listener {</span>
+<span class="go">      address = 127.0.0.1</span>
+<span class="go">      port = 12340</span>
+<span class="go">    }</span>
+<span class="go">    client_limit = 1</span>
+<span class="go">}</span>
+</pre></div>
+</div>
+<p>Obsérvese que:</p>
+<ul>
+<li><p>Si se ha superado la cuota, se genera un error (<strong>552</strong>), que será el
+que se comunique al servidor remitente.</p></li>
+<li><p>Si el usuario no existe, no se genera error. Podría hacerse, pero
+esto provocaría que cualquier <em>alias</em> de un usuario existente provocara
+el error.</p></li>
+<li><p>El último bloque habilita un servicio en el puerto <em>12340</em> de la interfaz
+de <em>localhost</em>, que permite a <strong class="program">postfix</strong> consultar la cuota y sólo
+es necesario en caso de que decidamos no usar <strong class="program">dovecot</strong> para la
+entrega en los buzones locales. Ahora bien, también podría usarse un
+<em>socket</em> UNIX del siguiente modo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">unix_listener /var/spool/postfix/private/quota-status {</span>
+<span class="go">   user = postfix</span>
+<span class="go">   group = postfix</span>
+<span class="go">   mode = 0660</span>
+<span class="go">}</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Si usa este servicio de cuota, deberá configurar
+<strong class="program">postfix</strong> para ello. Revise <a class="reference internal" href="../02-smtp/03-entrega.html#postfix-quota"><span class="std std-ref">el epígrafe dedicado a la
+cuota en postfix</span></a>.</p>
+</div>
+</li>
+</ul>
+</dd>
+</dl>
+<p>Podemos comprobar si se ha configurado la cuenta, realizando la siguiente
+consulta:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> doveadm quota get -u nombre_usuario
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Cerciórese de que, si ya se han enviado mensajes, estos se
+contabilizan en la estadística mostrada por la orden.</p>
+</div>
+</div>
+<div class="section" id="servicio-lmtp-con-dovecot">
+<span id="dovecot-mda"></span><h2><span class="section-number">7.3.4.4. </span>Servicio LMTP con <strong class="program">dovecot</strong><a class="headerlink" href="#servicio-lmtp-con-dovecot" title="Enlazar permanentemente con este título">¶</a></h2>
+<p><strong class="program">dovecot</strong>, a la hora de encargarse de la entrega en los buzones (o sea,
+de hacer la labor de un <abbr title="Mail Delivery Agent">MDA</abbr>), ofrece dos alternativas:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://wiki.dovecot.org/LDA">dovecot-lda</a>, que se desaconseja y
+permite tanto su uso como tabla <a class="reference external" href="http://www.postfix.org/virtual.5.html">virtual</a> como su uso como tabla <a class="reference external" href="http://www.postfix.org/local.8.html">local</a>, en el
+estadio final de entrega a los buzones locales.</p></li>
+<li><p>Un servidor <abbr title="Local Mail Transfer Protocol">LMTP</abbr><a class="footnote-reference brackets" href="#id13" id="id3">3</a> al que <strong class="program">postfix</strong> entregue el correo y que es
+el método más eficiente y aconsejado por <a class="reference external" href="https://wiki.dovecot.org/LMTP">la propia documentación de dovecot</a>.</p></li>
+</ul>
+<p>El epígrafe se dedica únicamente a describir cómo habilitar el servidor <abbr title="Local Mail Transfer Protocol">LMTP</abbr>,
+para lo cual lo primero es instalar el paquete correspondiente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt install dovecot-lmtpd
+</pre></div>
+</div>
+<p>La configuración necesaria pasa por modificar tres ficheros distintos:</p>
+<dl>
+<dt><code class="docutils literal notranslate"><span class="pre">conf.d/10-master.conf</span></code></dt><dd><p>Aquí debemos indicar cómo escuchará el servicio. Podemos optar por un socket
+<em>unix</em> (lo recomendado) o un puerto:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">service lmtp {</span>
+<span class="go">   unix_listener /var/spool/postfix/private/dovecot-lmtp {</span>
+<span class="go">      mode = 0600</span>
+<span class="go">      user = postfix</span>
+<span class="go">      group = postfix</span>
+<span class="go">   }</span>
+
+<span class="gp">   #</span>inet_listener lmtp <span class="o">{</span>
+<span class="gp">   #</span>   <span class="nv">address</span> <span class="o">=</span> localhost
+<span class="gp">   #</span>   <span class="nv">port</span> <span class="o">=</span> <span class="m">24</span>
+<span class="gp">   #</span><span class="o">}</span>
+<span class="go">}</span>
+</pre></div>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">conf.d/15-lda.conf</span></code></dt><dd><p>En este fichero las líneas de configuración pertinentes son las siguientes:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">postmaster_address</span> = no-reply@mail1.org
+<span class="nb">hostname</span> = smtp.mail1.org
+<span class="c"># La siguiente línea a sí, retendrá el correo en la cola,</span>
+<span class="c"># en espera de que pueda entregarse después. Si se quiere</span>
+<span class="c"># recibir una notificación inmediata, debe dejarse como &quot;no&quot;.</span>
+<span class="c"># quota_full_tempfail = yes</span>
+<span class="nb">sendmail_path</span> = <span class="sx">/usr/sbin/sendmail</span>
+<span class="nb">recipient_delimiter</span> = +
+</pre></div>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">conf.d/20-lmtp.conf</span></code></dt><dd><p>Si deseamos que se atienda a la cuota de usuario disponible en el momento de
+la entrega son necesarias las siguientes líneas:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">lmtp_save_to_detail_mailbox</span> = yes
+<span class="nb">lmtp_rcpt_check_quota</span> = yes
+</pre></div>
+</div>
+</dd>
+</dl>
+<p>Reiniciado el servidor, ya está listo el servicio para que pueda usarlo
+<strong class="program">postfix</strong>, <a class="reference internal" href="../02-smtp/03-entrega.html#postfix-dovecot-mda"><span class="std std-ref">previa configuración de éste</span></a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Utilizar <strong class="program">dovecot</strong> en la entrega, posibilita añadirle un
+<a class="reference internal" href="#dovecot-sieve"><span class="std std-ref">clasificador de mensajes</span></a> para almacenar los
+mensajes en buzones distintos atendiendo a múltiples criterios, en vez de
+todos en el buzón de entrada.</p>
+</div>
+</div>
+<div class="section" id="usuarios-virtuales">
+<h2><span class="section-number">7.3.4.5. </span>Usuarios virtuales<a class="headerlink" href="#usuarios-virtuales" title="Enlazar permanentemente con este título">¶</a></h2>
+<p><strong class="program">dovecot</strong> permite obtener los usuarios de distintas fuentes (<abbr title="Pluggable Authentication Modules">PAM</abbr>,
+<abbr title="Lightweight Directory Access Protocol">LDAP</abbr>, <abbr title="Structured Query Language">SQL</abbr>, etc). Por <em class="dfn">usuarios virtuales</em> nos referimos a aquellos que
+no son usuarios del sistema y que sólo se reconocen por el servicio de correo.</p>
+<div class="section" id="a-traves-de-pam">
+<span id="dovecot-usu-pam"></span><h3><span class="section-number">7.3.4.5.1. </span>A través de <abbr title="Pluggable Authentication Modules">PAM</abbr><a class="headerlink" href="#a-traves-de-pam" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Los usuarios virtuales pudimos generarlos manipulando <abbr title="Pluggable Authentication Modules">PAM</abbr>, tal cómo se propuso
+en la <a class="reference external" href="postfix-usu-virtual">configuración de postfix</a>. En ese caso, es necesario que
+<strong class="program">dovecot</strong>:</p>
+<ul class="simple">
+<li><p>use los mismos mecanismos de autenticación que <em>postfix</em>, esto es, que use
+<code class="file docutils literal notranslate"><span class="pre">/etc/pam.d/smtp</span></code>.</p></li>
+<li><p>si usamos módulos que sólo informan de nombre de usuario y contraseña, se mapeen
+los usuario virtuales a un UID, un GID y un directorio personal a partir de
+cual se defina su buzón.</p></li>
+</ul>
+<p>Para lograr ambas cosas, debe modificarse
+<code class="file docutils literal notranslate"><span class="pre">/etc/dovecot/conf.d/auth-system.conf.ext</span></code>, para que quede así<a class="footnote-reference brackets" href="#id14" id="id4">4</a>:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>passdb {
+  driver = pam
+  # Hace que se use /etc/pam.d/smtp
+<span class="hll">  args = smtp
+</span>}
+
+userdb {
+  driver = passwd
+<span class="hll">  default_fields = uid=500 gid=115 home=/var/spool/mail/vusers/%u
+</span><span class="hll">  result_failure = return-ok
+</span>}
+</pre></div>
+</div>
+<p>La configuración es sencilla: para autenticar basta con consultar <abbr title="Pluggable Authentication Modules">PAM</abbr>, pero
+para obtener la información de usuario, <abbr title="Name Service Switch">NSS</abbr> no es suficiente; ya que de parte
+de los usuarios la información de la cuenta no existe. Para solucionarlo se
+definen unos valores predeterminados para los campos de esta información (que
+coinciden con lo establecicdo en <strong class="program">postfix</strong>) y se devuelve éxito, incluso
+aunque el usuario no exista para <abbr title="Name Service Switch">NSS</abbr>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Con esta configuración, no se le ocurre usar <strong class="program">dovecot</strong>
+como <abbr title="Mail Delivery Agent">MDA</abbr>, ya que a sus ojos, toda cuenta de usuario siempre existirá.</p>
+</div>
+<p>Para comprobar la autenticación:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> doveadm auth <span class="nb">test</span> usuario contraseña
+</pre></div>
+</div>
+</div>
+<div class="section" id="a-traves-de-dovecot">
+<span id="dovecot-usu-virtual"></span><h3><span class="section-number">7.3.4.5.2. </span>A través de <strong class="program">dovecot</strong><a class="headerlink" href="#a-traves-de-dovecot" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Además de <abbr title="Pluggable Authentication Modules">PAM</abbr>, podemos escoger <a class="reference external" href="https://wiki2.dovecot.org/AuthDatabase">otras fuentes</a> de las que extraer información de
+usuario y con las que realizar la autenticación. En cualquier caso, no son
+excluyentes, sino que pueden usarse varias de ellas secuencialmente, de modo que
+sea válido cualquier usuario que se encuentre en una de las fuentes que hayamos
+configurado.</p>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Si opta por crear usuario virtuales con <strong class="program">dovecot</strong>, no
+tendrá más remedio que <a class="reference internal" href="#dovecot-mda"><span class="std std-ref">usarlo también para la entrega de mensajes</span></a>.</p>
+</div>
+<div class="section" id="principios-de-funcionamiento">
+<h4><span class="section-number">7.3.4.5.2.1. </span>Principios de funcionamiento<a class="headerlink" href="#principios-de-funcionamiento" title="Enlazar permanentemente con este título">¶</a></h4>
+<p>Si echamos un vistazo a la configuración de <strong class="program">dovecot</strong>, comprobaremos
+que usa para su autenticación <abbr title="Pluggable Authentication Modules">PAM</abbr> y para la obtención de información de
+usuario <abbr title="Name Service Switch">NSS</abbr><a class="footnote-reference brackets" href="#id15" id="id5">5</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> doveconf -n
+<span class="go">[...]</span>
+<span class="go">passdb {</span>
+<span class="go">   driver = pam</span>
+<span class="go">}</span>
+<span class="go">[...]</span>
+<span class="go">userdb {</span>
+<span class="go">   driver = passwd</span>
+<span class="go">}</span>
+</pre></div>
+</div>
+<p>El hecho de que haya dos bloques se debe a que <code class="docutils literal notranslate"><span class="pre">passdb</span></code> define la <a class="reference external" href="https://wiki2.dovecot.org/PasswordDatabase">base de
+datos para la autenticación</a> y
+<code class="docutils literal notranslate"><span class="pre">userdb</span></code> define la <a class="reference external" href="https://wiki2.dovecot.org/UserDatabase">base de datos para la obtención de la información de
+usuario</a>, que se usa después de que se
+haya completado la autenticación.</p>
+<p>Para que haya más fuentes de obtención de datos, basta con añadir más bloques
+que se irán revisando en orden de aparición. Tanto en autenticación como en
+obtención de información de usuario, si un bloque falla, se pasa al siguiente;
+Para controlar qué se hace al tener éxito en la búsqueda de un bloque existen
+directivas como <code class="docutils literal notranslate"><span class="pre">result_success</span></code> o <code class="docutils literal notranslate"><span class="pre">result_failure</span></code>, y para controlar qué se
+hace en función de lo que ocurriera anteriormente, existe la directiva <code class="docutils literal notranslate"><span class="pre">skip</span></code>.
+Por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">userdb {</span>
+<span class="go">   driver = passwd</span>
+<span class="go">   result_success = return-ok</span>
+<span class="go">}</span>
+
+<span class="go">userdb {</span>
+<span class="go">  driver = static</span>
+<span class="go">  args = uid=500 gid=115 home=/var/spool/mail/vhomes/%u mail=maildir:/var/spool/mail/vusers/%u</span>
+<span class="gp">  #</span> <span class="nv">skip</span> <span class="o">=</span> found  <span class="c1"># Alternativa al return-ok del bloque anterior</span>
+<span class="go">}</span>
+</pre></div>
+</div>
+<p>En este caso, se intenta obtener la información de usuario a través de <abbr title="Name Service Switch">NSS</abbr> y,
+si no se logra, se fijará la información que se indica a continuación<a class="footnote-reference brackets" href="#id16" id="id6">6</a>.
+Esta configuración, pues, es un alternativa a la que presentamos bajo el
+epígrafe anterior. Otro ejemplo es el siguiente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">passdb {</span>
+<span class="go">   driver = static</span>
+<span class="go">   args = user=%n  noauthenticate</span>
+<span class="go">}</span>
+
+<span class="go">passdb {</span>
+<span class="go">   driver = pam</span>
+<span class="go">   skip = authenticated</span>
+<span class="go">}</span>
+
+<span class="gp">#</span> Usamos passwd-file y no passwd, porque el primero permite
+<span class="gp">#</span> indicar el formato con el que buscar <span class="o">(</span>username_formart<span class="o">)</span>
+<span class="go">userdb {</span>
+<span class="go">   driver = passwd-file</span>
+<span class="go">   args =  username_format=%n /etc/passwd</span>
+<span class="go">}</span>
+</pre></div>
+</div>
+<p>Que permite eliminar el dominio del nombre de usuario, tanto en la autenticación
+como en la obtención de información, y es equivalente a la directiva:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">auth_username_format</span> = %n
+</pre></div>
+</div>
+<p>La ventaja de este segundo método es que podemos hacer que esta sustitición sólo
+opere con los usuarios de sistema, lo que nos permitiría gestionar distintos
+dominios.</p>
+<p>Una alternativa a la configuración anterior, que logra lo mismo, es dejar
+exactamente igual la autenticación y hacer de este modo la obtención de la
+información de usuario:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">userdb {</span>
+<span class="go">   srive = static</span>
+<span class="go">   args = user=%n</span>
+<span class="go">   result_success = continue</span>
+<span class="go">}</span>
+
+<span class="go">userdb {</span>
+<span class="go">   drive = passwd</span>
+<span class="go">}</span>
+</pre></div>
+</div>
+<p>En este caso, el primer bloque sirve simplemente para eliminar el dominio del
+nombre de usuario y devuelve <code class="docutils literal notranslate"><span class="pre">continue</span></code> para que se obtenga la información de
+usuario recurriendo al sistema, si es que el usuario existe. En realidad, ambas
+soluciones no son exactamente equivalentes, ya que puede haber usuarios
+definidos fuera de <code class="file docutils literal notranslate"><span class="pre">/etc/passwd</span></code> (p.e. definidos a través de <a class="reference internal" href="../../../06.infraestructura/05.directorio/06.samba/index.html#samba"><span class="std std-ref">samba</span></a>). Por tanto, esta segunda opción es más general y será la que preferamos.</p>
+</div>
+<div class="section" id="sqlite">
+<h4><span class="section-number">7.3.4.5.2.2. </span>SQLite<a class="headerlink" href="#sqlite" title="Enlazar permanentemente con este título">¶</a></h4>
+<p>Conocido cómo funciona la autenticación y obtención de información sobre
+usuarios en <strong class="program">dovecot</strong>, ilustramos cómo lograr definir usuarios
+virtuales de un modo sencillo. Una forma es mediante la definición de un archivo
+<code class="file docutils literal notranslate"><span class="pre">passwd</span></code> alternativo (<a class="reference external" href="https://wiki2.dovecot.org/AuthDatabase/PasswdFile">driver passwd-file</a>), pero nos decantaremos
+por usar <a class="reference external" href="https://www.sqlite.org/index.html">sqlite</a> que permite una mayor versatilidad manteniendo la idea de
+almacenar usuarios en un único fichero. Lo primero es instalar <strong class="program">sqlite</strong>
+y el driver de <strong class="program">dovecot</strong> para él:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt install sqlite3 dovecot-sqlite
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>El driver de <strong class="program">dovecot</strong> para <strong class="program">sqlite</strong> soporta
+únicamente la versión <strong>3</strong>. Tenga presente que en las versiones basadas en
+debian <strong class="program">sqlite</strong> es la versión <strong>2</strong> y <strong class="program">sqlite3</strong>, la versión
+<strong>3</strong>.</p>
+</div>
+<p>El esquema que nos propone <a class="reference external" href="https://wiki2.dovecot.org/AuthDatabase/SQL">la documentación sobre SQL</a> es el <a class="reference download internal" download="" href="../../../_downloads/8b5c8f211c57bddcae11d22e9bb8d35c/dovecot.sql"><code class="xref download docutils literal notranslate"><span class="pre">siguiente</span></code></a>:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">CREATE</span> <span class="k">TABLE</span> <span class="n">users</span> <span class="p">(</span>
+   <span class="n">userid</span>   <span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">128</span><span class="p">)</span>   <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+   <span class="k">domain</span>   <span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">128</span><span class="p">),</span>
+   <span class="n">password</span> <span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">64</span><span class="p">)</span>    <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+   <span class="n">uid</span>      <span class="nb">INTEGER</span><span class="p">,</span>
+   <span class="n">gid</span>      <span class="nb">INTEGER</span><span class="p">,</span>
+   <span class="n">home</span>     <span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">255</span><span class="p">),</span>
+   <span class="n">active</span>   <span class="nb">CHAR</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>        <span class="k">DEFAULT</span> <span class="s1">&#39;Y&#39;</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+   <span class="n">quota</span>    <span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">20</span><span class="p">)</span>    <span class="c1">-- Límite de la cuota: 2G, 100M, 200K.</span>
+<span class="p">);</span>
+</pre></div>
+</div>
+<p>al que podríamos añadir una tabla más si quisiéramos almacenar también en ella
+las cuentas virtuales que se definen a través de <a class="reference external" href="http://www.postfix.org/postconf.5.html#virtual_alias_maps">virtual_alias_maps</a>:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">CREATE</span> <span class="k">TABLE</span> <span class="n">aliases</span> <span class="p">(</span>
+   <span class="n">address</span>     <span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">255</span><span class="p">)</span>      <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+   <span class="k">goto</span>        <span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">255</span><span class="p">),</span>  <span class="c1">-- Para usuarios que no son de la base de datos</span>
+   <span class="n">userid</span>      <span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">128</span><span class="p">),</span>
+   <span class="k">domain</span>      <span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">128</span><span class="p">),</span>
+   <span class="n">active</span>      <span class="nb">CHAR</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>           <span class="k">DEFAULT</span> <span class="s1">&#39;Y&#39;</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+   <span class="k">CONSTRAINT</span> <span class="n">pk_al</span> <span class="k">PRIMARY</span> <span class="k">KEY</span><span class="p">(</span><span class="n">address</span><span class="p">),</span>
+   <span class="k">CONSTRAINT</span> <span class="n">fk_us_al</span> <span class="k">FOREIGN</span> <span class="k">KEY</span><span class="p">(</span><span class="n">userid</span><span class="p">,</span> <span class="k">domain</span><span class="p">)</span> <span class="k">REFERENCES</span> <span class="n">users</span><span class="p">(</span><span class="n">userid</span><span class="p">,</span> <span class="k">domain</span><span class="p">)</span>
+      <span class="k">ON</span> <span class="k">DELETE</span> <span class="k">CASCADE</span> <span class="k">ON</span> <span class="k">UPDATE</span> <span class="k">CASCADE</span>
+<span class="p">);</span>
+</pre></div>
+</div>
+<p>Sea como sea, con el esquema podemos crear la base de datos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> sqlite3 /etc/dovecot/private/users.db &lt; /tmp/dovecot.sql
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Los nombres de los campos en la base de datos son los nombres que
+espera dovecot que tengan los campos de información de usuario. La
+documentación, tan solo, advierte que puede utilizarse «<em>user</em>» como la
+combinación de «<em>userid&#64;domain</em>».</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>El campo <em>quota</em> permite fijar una cuota particular para el usuario.
+Son valores válidos <strong>100K</strong> o <strong>200M</strong> o <strong>2G</strong>. También <strong>0</strong> que implica
+que el usuario no tendrá límite, o <em>NULL</em> que remitirá al valor
+predeterminado de la cuota. La expresión de la cuota, en realidad, debe
+llamarse <em>quota_rule</em>, pero tiene un valor más complicado, así que se ha
+optado por llamar al campo de distinto modo. Vea más adelante cómo se hace la
+consulta a la base de datos para devolver <em>quota_rule</em> y el <a class="reference internal" href="#dovecot-quota"><span class="std std-ref">epígrafe
+dedicado a la cuota</span></a>, que justifica tal consulta.</p>
+</div>
+<p>Para la configuración, debemos editar <code class="file docutils literal notranslate"><span class="pre">conf.d/10-auth.conf</span></code> y descomentar
+y adelantar la línea:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span>!include auth-sql.conf.ext
+!include auth-system.conf.ext
+</pre></div>
+</div>
+<p>de manera que se consulte antes la base de datos que la base de usuarios del
+sistema. El fichero <code class="file docutils literal notranslate"><span class="pre">conf.d/auth-sql.conf.ext</span></code>, ya está preparado
+adecuadamente, aunque podemos añadirle una línea:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>userdb {
+   driver = sql
+<span class="hll">   default_fields = home=/var/spool/vusers/%n gid=2000
+</span>   args = /etc/dovecot/dovecot-sql.conf.ext
+<span class="hll">   result_success = return-ok
+</span>}
+</pre></div>
+</div>
+<p>para establecer los directorios personales que no se hayan fijado en la propia
+base de datos. Además, podemos fijar un <em>GID</em> predeterminado, que puede ser útil
+si queremos que todos los usuarios tengan el mismo grupo principal. Por último,
+es necesario modificar <code class="file docutils literal notranslate"><span class="pre">/etc/dovecot/dovecot-sql.conf.ext</span></code>, que debe
+contener exactamente cómo acceder a los datos de la base <abbr title="Structured Query Language">SQL</abbr>. En nuestro caso<a class="footnote-reference brackets" href="#id17" id="id7">7</a>:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">driver</span> = sqlite
+<span class="nb">connect</span> = <span class="sx">/etc/dovecot/private/users.db</span>
+<span class="nb">password_query</span> = SELECT userid AS <span class="k">user</span>, password \
+                 FROM users WHERE userid = &#39;%n&#39; AND active = &#39;Y&#39;
+<span class="nb">user_query</span> = SELECT home, uid, gid, \
+               CASE WHEN quota IS NOT NULL \
+               THEN &#39;*:storage=&#39; || quota \
+               ELSE NULL END AS quota_rule \
+             FROM users WHERE userid = &#39;%n&#39;
+</pre></div>
+</div>
+<p>en que evitamos el uso del dominio, porque configuramos para un único dominio.
+Reiniciamos el servidor y listo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> invoke-rc.d dovecot restart
+</pre></div>
+</div>
+<p>Por último deberíamos añadir algún usuario virtual, a fin de comprobar que todo
+funciona:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="nb">echo</span> <span class="s2">&quot;INSERT INTO users VALUES (&#39;pepe&#39;,&#39;mail1.org&#39;,&#39;</span><span class="k">$(</span>doveadm pw -p pepe<span class="k">)</span><span class="s2">&#39;, 2000, 2000, NULL, &#39;Y&#39;, &#39;20M&#39;);&quot;</span> <span class="se">\</span>
+   <span class="p">|</span> sqlite3 /etc/dovecot/private/users.db
+</pre></div>
+</div>
+<p>Obsérvese que las contraseñas no se almacenan en claro, por lo que es necesario
+generarlas con <strong class="program">doveadm</strong>.</p>
+<div class="admonition seealso">
+<p class="admonition-title">Ver también</p>
+<p>Para saber más sobre las contraseñas, consulte la <a class="reference external" href="https://wiki2.dovecot.org/Authentication/PasswordSchemes">pagina
+correspondiente en la documentación</a></p>
+</div>
+<p>Hecha la configuración, podemos probar la autenticación con la orden:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> doveadm auth <span class="nb">test</span> pepe pepe
+<span class="go">passdb: pepe auth succeeded</span>
+<span class="go">extra fields:</span>
+<span class="go">  user=pepe</span>
+<span class="gp">#</span> doveadm user pepe
+<span class="go">field   value</span>
+<span class="go">uid     2000</span>
+<span class="go">gid     2000</span>
+<span class="go">home    /var/spool/vhomes/pepe</span>
+<span class="go">mail    maildir:~/Maildir</span>
+<span class="go">quota_rule      *:storage=20M</span>
+</pre></div>
+</div>
+<p id="dovecot-buzon-virtual">Por último, es necesario solucionar el problema de los buzones de correo o, más
+exactamente, el problema de que el directorio personal de los usuarios virtuales
+no exista a priori, lo cual no es problema para los usuarios reales del
+sistema, cuyo directorio suele crearse en el momento de crear el propio usuario.
+En nuestra propuesta los directorios de los usuarios virtuales, se incluyen
+dentro de <code class="file docutils literal notranslate"><span class="pre">/var/spool/mail/vusers</span></code>, que debemos crear a mano:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkdir -p /var/spool/mail/vusers
+</pre></div>
+</div>
+<p>Ahora bien, en el momento de la entrega el servidor asumirá la identidad del
+usuario que recibe correo (esto es, su UID y su GID) y, de no existir, intentará
+crear el buzón (<code class="file docutils literal notranslate"><span class="pre">/var/spool/mail/vusers/pepe/Maildir</span></code> en nuestro caso),
+pero se encontrará con que no puede crear directorios dentro de
+<code class="file docutils literal notranslate"><span class="pre">/var/spool/mail/vusers</span></code> y la entrega se malogrará. Para evitar este
+inconveniente, tenemos dos alternativas:</p>
+<ul>
+<li><p>Crear a mano su directorio cada vez que añadamos un usuario a la
+base de datos y hacer al usuario propietario:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkdir /var/spool/mail/vusers/pepe
+<span class="gp">#</span> chown <span class="m">2000</span>:2000 /var/spool/mail/vusers/pepe
+</pre></div>
+</div>
+</li>
+<li><p>Crear un grupo que sea el grupo principal de todos los usuarios virtuales y
+dar a este grupo permisos de escritura sobre el directorio
+<code class="file docutils literal notranslate"><span class="pre">/var/spool/mail/vusers</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> addgroup --gid <span class="m">2000</span> vmailusers  <span class="c1"># Todos los usuarios tendrá este GID.</span>
+<span class="gp">#</span> chgrp vmailusers /var/spool/mail/vusers
+<span class="gp">#</span> chmod g+w /var/spool/mail/vusers
+</pre></div>
+</div>
+</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Con la configuración propuesta si se crea un usuario en la base de
+datos con el mismo nombre que un usuario del sistema, el usuario virtual
+prevalecerá sobre el del sistema.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="section" id="gestion-de-varios-dominios">
+<span id="dovecot-mul-dom"></span><h2><span class="section-number">7.3.4.6. </span>Gestión de varios dominios<a class="headerlink" href="#gestion-de-varios-dominios" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Puede darse el caso de que un mismo servidor gestione varios dominios de correo
+distintos. Por ejemplo, que el servidor que gestione los correos de los dominios
+<em>mail1.org</em> y <em>mail1bis.org</em> sea la misma máquina. En ese caso, la primera regla es
+tener separados los usuarios según el dominio al que pertenecen, lo que obligará
+a que a la hora de autenticar en el servidor el cliente use como nombre
+de cuenta <em>usuario&#64;dominio</em> y no solamente <em>usuario</em> como hasta ahora.</p>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Cerciórese de que en <code class="file docutils literal notranslate"><span class="pre">conf.d/10-auth.conf</span></code> <strong>no</strong> existe la
+línea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">auth_username_format = %n</span>
+</pre></div>
+</div>
+<p>como se propugnó cuando creábamos un servidor para un único dominio.</p>
+</div>
+<p>La solución que se propone hará que los usuarios reales estén definidos en todos
+los dominios que gestionemos, por lo que se entregaría a <em>usuario</em> tanto
+mensajes a <em>usuario&#64;mail1.org</em> como a <em>usuario&#64;mail1bis.org</em>.</p>
+<div class="section" id="usuarios">
+<h3><span class="section-number">7.3.4.6.1. </span>Usuarios<a class="headerlink" href="#usuarios" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Tomemos como base la configuración propuesta para <a class="reference internal" href="#dovecot-usu-virtual"><span class="std std-ref">soportar usuarios
+virtuales con dovecot</span></a> y usemos como soporte una base de
+datos de <strong class="program">sqlite</strong>. Como dispondremos distintos dominios y puede ser que
+no todos usen el mismo transporte<a class="footnote-reference brackets" href="#id18" id="id8">8</a>, crearemos dos tablas: una para almacenar
+dominios y otra para almacenar usuarios. A estas dos tablas podemos añadir una
+tercera para almacenar también en la base de datos alias (o sea cuentas
+virtuales) de usuario. El <a class="reference download internal" download="" href="../../../_downloads/d86c0115c06b728c3ba87e11ea3d90fb/dovecotMD.sql"><code class="xref download docutils literal notranslate"><span class="pre">esquema</span> <span class="pre">es</span> <span class="pre">el</span> <span class="pre">siguiente</span></code></a>:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">CREATE</span> <span class="k">TABLE</span> <span class="n">domains</span> <span class="p">(</span>
+   <span class="k">domain</span>      <span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">128</span><span class="p">)</span>   <span class="k">PRIMARY</span> <span class="k">KEY</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+   <span class="n">transport</span>   <span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">255</span><span class="p">)</span>
+<span class="p">);</span>
+
+<span class="k">CREATE</span> <span class="k">TABLE</span> <span class="n">users</span> <span class="p">(</span>
+   <span class="n">userid</span>   <span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">128</span><span class="p">)</span>   <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+   <span class="k">domain</span>   <span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">128</span><span class="p">),</span>
+   <span class="n">password</span> <span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">64</span><span class="p">)</span>    <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+   <span class="n">uid</span>      <span class="nb">INTEGER</span><span class="p">,</span>
+   <span class="n">gid</span>      <span class="nb">INTEGER</span><span class="p">,</span>
+   <span class="n">home</span>     <span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">255</span><span class="p">),</span>
+   <span class="n">active</span>   <span class="nb">CHAR</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>        <span class="k">DEFAULT</span> <span class="s1">&#39;Y&#39;</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+   <span class="n">quota</span>    <span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">20</span><span class="p">),</span>   <span class="c1">-- Límite de la cuota: 2G, 100M, 200K.</span>
+   <span class="k">CONSTRAINT</span> <span class="n">pk_us</span>  <span class="k">PRIMARY</span> <span class="k">KEY</span><span class="p">(</span><span class="n">userid</span><span class="p">,</span> <span class="k">domain</span><span class="p">),</span>
+   <span class="k">CONSTRAINT</span> <span class="n">fk_dom</span> <span class="k">FOREIGN</span> <span class="k">KEY</span><span class="p">(</span><span class="k">domain</span><span class="p">)</span> <span class="k">REFERENCES</span> <span class="n">domains</span><span class="p">(</span><span class="k">domain</span><span class="p">)</span>
+      <span class="k">ON</span> <span class="k">DELETE</span> <span class="k">CASCADE</span> <span class="k">ON</span> <span class="k">UPDATE</span> <span class="k">CASCADE</span>
+<span class="p">);</span>
+
+<span class="c1">-- Opcional para almacenar alias de los usuarios</span>
+
+<span class="k">CREATE</span> <span class="k">TABLE</span> <span class="n">aliases</span> <span class="p">(</span>
+   <span class="n">address</span>     <span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">255</span><span class="p">)</span>      <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+   <span class="k">goto</span>        <span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">255</span><span class="p">),</span>  <span class="c1">-- Para usuarios que no son de la base de datos</span>
+   <span class="n">userid</span>      <span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">128</span><span class="p">),</span>
+   <span class="k">domain</span>      <span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">128</span><span class="p">),</span>
+   <span class="n">active</span>      <span class="nb">CHAR</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>           <span class="k">DEFAULT</span> <span class="s1">&#39;Y&#39;</span> <span class="k">NOT</span> <span class="k">NULL</span><span class="p">,</span>
+   <span class="k">CONSTRAINT</span> <span class="n">pk_al</span> <span class="k">PRIMARY</span> <span class="k">KEY</span><span class="p">(</span><span class="n">address</span><span class="p">),</span>
+   <span class="k">CONSTRAINT</span> <span class="n">fk_us_al</span> <span class="k">FOREIGN</span> <span class="k">KEY</span><span class="p">(</span><span class="n">userid</span><span class="p">,</span> <span class="k">domain</span><span class="p">)</span> <span class="k">REFERENCES</span> <span class="n">users</span><span class="p">(</span><span class="n">userid</span><span class="p">,</span> <span class="k">domain</span><span class="p">)</span>
+      <span class="k">ON</span> <span class="k">DELETE</span> <span class="k">CASCADE</span> <span class="k">ON</span> <span class="k">UPDATE</span> <span class="k">CASCADE</span>
+<span class="p">);</span>
+</pre></div>
+</div>
+<p>Debemos, además, cambiar las consultas a la base de datos para tener en cuenta
+que la autenticación y la obtención de la información de cuenta deberán incluir
+no sólo el nombre de usuario, sino también el dominio, porque es el único modo
+de que haya dos usuarios con un mismo nombre en distinto dominio. Por tanto:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">password_query</span> = SELECT userid || &#39;@&#39; || domain AS <span class="k">user</span>, password \
+                 FROM users WHERE userid = &#39;%n&#39; AND domain = &#39;%d&#39; AND active = &#39;Y&#39;
+<span class="nb">user_query</span> = SELECT home, uid, gid, \
+               CASE WHEN quota IS NOT NULL \
+               THEN &#39;*:storage=&#39; || quota \
+               ELSE NULL END AS quota_rule \
+             FROM users WHERE userid = &#39;%n&#39; AND domain = &#39;%d&#39;
+</pre></div>
+</div>
+<p>Para esta base de datos, deberemos añadir cada dominio que gestionemos:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">INSERT</span> <span class="k">INTO</span> <span class="n">domains</span> <span class="k">VALUES</span> <span class="p">(</span><span class="s1">&#39;mail1.org&#39;</span><span class="p">,</span> <span class="k">NULL</span><span class="p">);</span>
+<span class="k">INSERT</span> <span class="k">INTO</span> <span class="n">domains</span> <span class="k">VALUES</span> <span class="p">(</span><span class="s1">&#39;mail1bis.org&#39;</span><span class="p">,</span> <span class="k">NULL</span><span class="p">);</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Si dejamos sin definir el transporte (que es lo que hemos hecho), se
+tomará como transporte el valor de <a class="reference external" href="http://www.postfix.org/postconf.5.html#mailbox_transport">mailbox_transport</a>, que definimos al usar
+<a class="reference internal" href="../02-smtp/03-entrega.html#postfix-dovecot-mda"><span class="std std-ref">dovecot como MDA</span></a>.</p>
+</div>
+<p>y, por supuesto, los usuarios necesarios:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> sqlite3 /etc/dovecot/private/users.db &lt;&lt;EOF
+<span class="go">INSERT INTO users (userid, domain, password, uid) VALUES (&#39;pepe&#39;,&#39;mail1.org&#39;,&#39;$(doveadm pw -p pepe)&#39;, 2000);</span>
+<span class="go">INSERT INTO users (userid, domain, password, uid) VALUES (&#39;paco&#39;,&#39;mail1bis.org&#39;,&#39;$(doveadm pw -p paco)&#39;, 3000);</span>
+<span class="go">EOF</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="configuracion">
+<h3><span class="section-number">7.3.4.6.2. </span>Configuración<a class="headerlink" href="#configuracion" title="Enlazar permanentemente con este título">¶</a></h3>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Recuerde que debe haber instalado <em>dovecot-sqlite</em> en el sistema.</p>
+</div>
+<p>Paralelamente a lo que hacemos para soportar usuarios virtuales con <strong class="program">sqlite</strong>,
+debemos:</p>
+<ol class="arabic">
+<li><p>Alterar <code class="file docutils literal notranslate"><span class="pre">conf.d/10-auth.conf</span></code> para dejarlo como ya propusimos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">!include auth-sql.conf.ext</span>
+<span class="go">!include auth-system.conf.ext</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Nótese que hemos adelantado la autenticación con <abbr title="Structured Query Language">SQL</abbr>.</p>
+</div>
+</li>
+<li><p>Modificamos el fichero <code class="file docutils literal notranslate"><span class="pre">conf.d/auth-sql.conf.ext</span></code> exactamente como
+también propusimos (con un ligero cambio en la ruta del directorio
+personal):</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>userdb {
+   driver = sql
+<span class="hll">   default_fields = home=/var/spool/mail/vusers/%d/%n gid=2000
+</span>   args = /etc/dovecot/dovecot-sql.conf.ext
+<span class="hll">   result_success = return-ok
+</span>}
+</pre></div>
+</div>
+<p>Por supuesto, habrá que resolver <a class="reference internal" href="#dovecot-buzon-virtual"><span class="std std-ref">el problema de los buzones virtuales</span></a>.</p>
+</li>
+<li><p>Dejamos el fichero <code class="file docutils literal notranslate"><span class="pre">dovecot-sql.conf.ext</span></code> así:</p></li>
+</ol>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="n">driver</span> <span class="o">=</span> <span class="n">sqlite</span>
+<span class="k">connect</span> <span class="o">=</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">dovecot</span><span class="o">/</span><span class="n">private</span><span class="o">/</span><span class="n">users</span><span class="p">.</span><span class="n">db</span>
+<span class="n">password_query</span> <span class="o">=</span> <span class="p">...</span> <span class="n">como</span> <span class="n">expresado</span> <span class="n">arriba</span> <span class="p">...</span>
+<span class="n">user_query</span> <span class="o">=</span> <span class="p">...</span> <span class="n">como</span> <span class="n">expresado</span> <span class="n">arriba</span> <span class="p">...</span>
+</pre></div>
+</div>
+<ol class="arabic">
+<li><p>Modificamos <code class="file docutils literal notranslate"><span class="pre">conf.d/auth-system.conf.ext</span></code> para que los usuarios
+del sistema eliminen la información del dominio y puedan reconocerse:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">passdb {</span>
+<span class="go">   driver = static</span>
+<span class="go">   args = user=%n  noauthenticate</span>
+<span class="go">}</span>
+
+<span class="go">passdb {</span>
+<span class="go">   driver = pam</span>
+<span class="go">}</span>
+
+<span class="go">userdb {</span>
+<span class="go">   srive = static</span>
+<span class="go">   args = user=%n</span>
+<span class="go">   result_success = continue</span>
+<span class="go">}</span>
+
+<span class="go">userdb {</span>
+<span class="go">   drive = passwd</span>
+<span class="go">}</span>
+</pre></div>
+</div>
+</li>
+</ol>
+<p>Listo. Reinicie el servidor y compruebe que los usuarios se reconocen y pueden
+autenticarse:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> doveadm auth <span class="nb">test</span> pepe@mail1.org pepe
+<span class="gp">#</span> doveadm user pepe@mail1.org
+</pre></div>
+</div>
+<p>Como puede ver, ahora deben indicarse como nombre de usuario la cuenta al
+completo. Sólo es posible prescindir del dominio, si el usuario es un usuario
+local del sistema.</p>
+</div>
+</div>
+<div class="section" id="filtros-de-clasificacion">
+<span id="dovecot-sieve"></span><h2><span class="section-number">7.3.4.7. </span>Filtros de clasificación<a class="headerlink" href="#filtros-de-clasificacion" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Hasta ahora nos hemos preocupado de que la entrega de mensajes al usuario se
+realice en su buzón de entrada. Sin embargo, un servidor <abbr title="Internet Message Access Protocol">IMAP</abbr> permite a un
+mismo usuario disponer de múltiples buzones en el servidor. Nuestra intención
+ahora es la de habilitar <em class="dfn">filtros de clasificación</em> que, dependiendo de
+distintos criterios, desvíen los mensajes al buzón correspondiente. Por ejemplo,
+un mensaje marcado previamente como <em>spam</em> con la cabeceroa <code class="docutils literal notranslate"><span class="pre">X-Spam-Flag:</span></code>
+durante la recepción, podría derivarse a un buzón específico para <em>spam</em>.</p>
+<p>Estos filtros es muy común que los incluyan los <abbr title="Mail User Agent">MUA</abbr> que usa el cliente y que
+actúen sobre los mensajes que se descargan en la máquina local. La ventaja de
+disponerlos en el servidor es que la labor de clasificación se hace directamente
+sobre el servidor, lo que posibilita que el usuario pueda consultar directamente
+sus mensajes ya clasificados en buzones a través del protocolo <abbr title="Internet Message Access Protocol">IMAP</abbr>, bien
+haciendo uso de un <abbr title="Mail User Agent">MUA</abbr> con soporte para buzones <abbr title="Internet Message Access Protocol">IMAP</abbr>, bien a través de una
+interfaz <em>web</em>. Esto, sin embargo, implica que sea el propio usuario el que pueda
+definir sus filtros, ya que suelen ser distintos para cada usuario.</p>
+<p>El epígrafe, pues, se propone:</p>
+<ul class="simple">
+<li><p>Habilitar a <strong class="program">dovecot</strong> para que realice la entrega atendiendo a estos
+filtros.</p></li>
+<li><p>Permitir que el usuario pueda definir sus propios filtros a través del
+protocolo <abbr title="Internet Message Access Protocol">IMAP</abbr>.</p></li>
+<li><p>Explicar cómo pueden escribirse estos filtros.</p></li>
+</ul>
+<div class="section" id="id9">
+<h3><span class="section-number">7.3.4.7.1. </span>Configuración<a class="headerlink" href="#id9" title="Enlazar permanentemente con este título">¶</a></h3>
+<div class="admonition-todo admonition" id="id10">
+<p class="admonition-title">Por hacer</p>
+<p>Ver cómo actúa el plugin <em>sieve</em> (e <em>imap_sieve</em>) tal como aconseja
+<a class="reference external" href="https://workaround.org/ispmail/jessie/postfix-dovecot">este enlace</a>. En
+principio, puede usarse para que, desde <a class="reference internal" href="../04-misc/04-webmail/index.html#roundcube"><span class="std std-ref">roundcube</span></a>, el
+usuario organice automáticamente sus mensajes en buzones (p.e. <a class="reference external" href="https://www.rosehosting.com/blog/how-to-set-up-server-side-email-filtering-with-dovecot-sieve-and-roundcube-on-a-centos-6-vps/">este artículo</a>).</p>
+</div>
+</div>
+<div class="section" id="filtros">
+<h3><span class="section-number">7.3.4.7.2. </span>Filtros<a class="headerlink" href="#filtros" title="Enlazar permanentemente con este título">¶</a></h3>
+<p class="rubric">Notas al pie</p>
+<dl class="footnote brackets">
+<dt class="label" id="id11"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p><strong class="program">dovecot</strong> trae dentro de <code class="file docutils literal notranslate"><span class="pre">/usr/share/dovecot</span></code> un fichero
+de configuración (<code class="file docutils literal notranslate"><span class="pre">dovecot-openssl.cnf</span></code>) y un <em>script</em>
+(<code class="file docutils literal notranslate"><span class="pre">mkcert.sh</span></code>) para generar los certificados en la ubicación original
+que hemos sustituido. No obstante, es mejor utilizar el autofirmado por
+nosotros o, mejor aún, procurarnos uno de <em>Let’s Encrypt</em>.</p>
+</dd>
+<dt class="label" id="id12"><span class="brackets"><a class="fn-backref" href="#id2">2</a></span></dt>
+<dd><p>Si se observa el resultado de la orden <code class="docutils literal notranslate"><span class="pre">LIST</span></code>, se verá que devuelve dos
+buzones: <strong>INBOX</strong> que es el buzón de correos entrantes que crea el propio
+<strong class="program">dovecot</strong> y otro llamado <strong>OtroBuzon</strong>, que es un correo creado
+<em>ex profeso</em>, creado para que la respuesta tuviera algo más de enjundia.
+Consulte en las <a class="reference internal" href="../02-smtp/03-entrega.html#maildir"><span class="std std-ref">explicaciones del formato maildir</span></a> cómo crear
+estos buzones adicionales.</p>
+</dd>
+<dt class="label" id="id13"><span class="brackets"><a class="fn-backref" href="#id3">3</a></span></dt>
+<dd><p>Un servidor <abbr title="Local Mail Transfer Protocol">LMTP</abbr> es un protocolo semejante al <abbr title="Simple Mail Transfer Protocol">SMTP</abbr> en el que el
+receptor entrega inmediatamente los mensajes en los buzones locales de
+usuario.</p>
+</dd>
+<dt class="label" id="id14"><span class="brackets"><a class="fn-backref" href="#id4">4</a></span></dt>
+<dd><p>Bajo este epígrafe se presenta la configuración como una receta. Si tiene
+curiosidad por entenderla, échele un vistazo a los principios de
+funcionamiento explicados en el <a class="reference internal" href="#dovecot-usu-virtual"><span class="std std-ref">siguiente apartado</span></a>.</p>
+</dd>
+<dt class="label" id="id15"><span class="brackets"><a class="fn-backref" href="#id5">5</a></span></dt>
+<dd><p>Según <a class="reference external" href="https://wiki2.dovecot.org/AuthDatabase/Passwd">su documentación</a>, el driver <code class="docutils literal notranslate"><span class="pre">passwd</span></code> de
+<code class="docutils literal notranslate"><span class="pre">userdb</span></code> usa <abbr title="Name Service Switch">NSS</abbr>, y no sólo <code class="file docutils literal notranslate"><span class="pre">/etc/passwd</span></code> para obtener la
+información.</p>
+</dd>
+<dt class="label" id="id16"><span class="brackets"><a class="fn-backref" href="#id6">6</a></span></dt>
+<dd><p>Tenga en cuenta que si se actúa así, jamás deberías usar
+<strong class="program">dovecot</strong> como <abbr title="Mail Delivery Agent">MDA</abbr> puesto que siempre se entregará correo, incluso
+aunque tal usuario no exista.</p>
+</dd>
+<dt class="label" id="id17"><span class="brackets"><a class="fn-backref" href="#id7">7</a></span></dt>
+<dd><p>Obsérvese que la consulta devuelve el nombre de usuario en el campo
+«<em>user</em>». Esto elimina por completo cualquier mención al dominio, que es lo
+que nos interesa, porque nuestra intención es gestionar un único dominio.</p>
+</dd>
+<dt class="label" id="id18"><span class="brackets"><a class="fn-backref" href="#id8">8</a></span></dt>
+<dd><p>La idea es que en <strong class="program">postfix</strong> el contenido de <a class="reference external" href="http://www.postfix.org/postconf.5.html#transport_maps">transport_maps</a> se
+defina con una consulta a esta misma ase de datos.</p>
+</dd>
+</dl>
+</div>
+</div>
+</div>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../../index.html">Tabla de contenido</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">7.3.4. Servidor <abbr title="Internet Message Access Protocol">IMAP</abbr></a><ul>
+<li><a class="reference internal" href="#instalacion">7.3.4.1. Instalación</a></li>
+<li><a class="reference internal" href="#autenticacion-sasl">7.3.4.2. Autenticación <abbr title="Simple Authentication and Security Layer">SASL</abbr></a></li>
+<li><a class="reference internal" href="#cuotas">7.3.4.3. Cuotas</a></li>
+<li><a class="reference internal" href="#servicio-lmtp-con-dovecot">7.3.4.4. Servicio LMTP con <strong class="program">dovecot</strong></a></li>
+<li><a class="reference internal" href="#usuarios-virtuales">7.3.4.5. Usuarios virtuales</a><ul>
+<li><a class="reference internal" href="#a-traves-de-pam">7.3.4.5.1. A través de <abbr title="Pluggable Authentication Modules">PAM</abbr></a></li>
+<li><a class="reference internal" href="#a-traves-de-dovecot">7.3.4.5.2. A través de <strong class="program">dovecot</strong></a><ul>
+<li><a class="reference internal" href="#principios-de-funcionamiento">7.3.4.5.2.1. Principios de funcionamiento</a></li>
+<li><a class="reference internal" href="#sqlite">7.3.4.5.2.2. SQLite</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#gestion-de-varios-dominios">7.3.4.6. Gestión de varios dominios</a><ul>
+<li><a class="reference internal" href="#usuarios">7.3.4.6.1. Usuarios</a></li>
+<li><a class="reference internal" href="#configuracion">7.3.4.6.2. Configuración</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#filtros-de-clasificacion">7.3.4.7. Filtros de clasificación</a><ul>
+<li><a class="reference internal" href="#id9">7.3.4.7.1. Configuración</a></li>
+<li><a class="reference internal" href="#filtros">7.3.4.7.2. Filtros</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="../02-smtp/05-dns.html"
+                        title="capítulo anterior"><span class="section-number">7.3.3.5. </span>Acreditación del remitente</a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="../04-misc/index.html"
+                        title="próximo capítulo"><span class="section-number">7.3.5. </span>Otros aspectos</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../_sources/07.serre/03.mail/03-imap/index.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="../04-misc/index.html" title="7.3.5. Otros aspectos"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="../02-smtp/05-dns.html" title="7.3.3.5. Acreditación del remitente"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" ><span class="section-number">7. </span>Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" ><span class="section-number">7.3. </span>Correo electrónico</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">7.3.4. </span>Servidor <abbr title="Internet Message Access Protocol">IMAP</abbr></a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor CC BY 4.0, 2016-2021, José Miguel Sánchez Alés.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.2.0.
+    </div>
+  </body>
+</html>

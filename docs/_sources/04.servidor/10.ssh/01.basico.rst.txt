@@ -1,0 +1,280 @@
+Instalación
+===========
+*debian*, descontados adicionales, dispone de tres paquetes relacionados con
+*openssh*:
+
+#. :deb:`openssh-client`, que instala el cliente y que viene de serie incluso en
+   la instalación más básica.
+#. :deb:`openssh-serverp`, que instala el servidor en sí.
+#. El metapaquete :deb:`ssh`, que instala los dos anteriores.
+
+Así pues, basta con hacer::
+
+   # apt-get install ssh
+
+para proceder a la instalación del servidor, la cual, además, dejará el servidor
+en funcionamiento. Como en el caso de cualquier otro servicio, pueden usarse
+tanto :ref:`invoke-rc.d <invoke-rc.d>` como :ref:`systemctl <systemctl>` para
+manipularlo.
+
+Configuración
+=============
+Todo la configuración del servidor se encuentra dentro del directorio
+:file:`/etc/ssh`:
+
+* Las *claves pública y privada* del servidor con nombre :file:`ssh_host_*`. Hay
+  varias parejas porque se generan con varios algoritmos de cifrado\ [#]_.
+
+* El fichero :file:`ssh_config`, que es, en realidad, el fichero general de
+  configuración del cliente.
+
+* El fichero :file:`sshd_config`, que será el que tengamos que editar si
+  queremos alterar la configuración.
+
+El fichero está profusamente comentado y, además, tiene página de manual propia
+por lo que aquí sólo se comentarán algunas directivas que se consideran de
+interés. En este fichero las directivas tienen su valor predeterminado, por lo
+que comentar o dejar descomentada una línea,  tiene el mismo efecto, si no se
+modifica además el valor::
+
+   Port 22
+
+Es el puerto de escucha. Lo habitual es que el servicio |SSH| escuche en el
+puesto <emX22/TCP</emX y que este valor no se cambie. Es posible, sin embargo,
+que este puerto sea inaccesibles desde redes remotas fiscalizadas por un
+cortafuegos\ [#]_::
+
+   PermitEmptyPasswords no
+
+Por razones de seguridad lo habitual es impedir que usuarios con contraseña
+vacía puedan acceder al servidor::
+
+   PermitRootLogin   prohibit-password
+
+Define si el administrador puede directamente ingresar en el servidor. Lo
+aconsejable es impedirlo, porque en cuanto un servidor |SSH| es accesible,
+arreciando los ataques de fuerza bruta y es muy común que uno de los usuarios
+de los que prueben contraseñas sea *root*. El valor predeterminado es que
+el acceso sólo se permita mediante el uso de :ref:`certificado de usuario
+<ssh-cert>`::
+
+   AllowTcpForwarding   yes
+
+*AllowTcpForwarding* habilita la posibilidad de hacer los utilísimos
+:ref:`túneles SSH <tunel-ssh>`::
+
+   ClientAliveInterval 180
+   ClientAliveCountMax 0
+
+Estas líneas provocan que el servidor realice una desconexión automática tras
+tres miinutos de inactividad (180 segundos), lo cual es muy útil para evitar
+que se queden inadvertidamente abiertas sesiones\ [#]_::
+
+   Banner      /etc/ssh/ssh_banner
+
+Define el fichero cuyo contenido se mostrará justamente tras la conexión y antes
+de la autenticación. El valor predeterminado es *none*, o sea, ninguno::
+
+   DenyGroups     vetados
+   AllowGroups    ftpusers administradores
+
+Las directivas *DenyUsers*, *AllowUsers*, *DenyGroups* y *AllowGroups* permiten
+indicar usuarios y groups a los que se les permite (exclusivamente) o niega el
+acceso. El usuario entrante debe cumplir con todas las directivas incluidas en
+el fichero. En el ejemplo, sólo podrán acceder al servidor los usuarios que
+pertenezcan al grupo *ftpusers* o *administradores* y que, además, no
+pertenezcan al grupo *vetados*::
+
+   MaxStartups    3
+
+*MaxStartups* indica el máximo número de conexiones no autenticadas simultáneas
+que admite el servidor\ [#]_. En el ejemplo, por tanto, sólo podrá haber tres
+peticiones de autenticación produciéndose a la vez. Es útil ajustar este valor
+para *minimizar los riesgos de ataques de fuerza bruta*.
+
+.. _ssh-match:
+
+.. code-block:: none
+
+   Match Group    ftpusers
+      X11Forwarding        no
+      AllowTcpForwarding   no
+      ForceCommand         internal-sftp
+
+La directiva *Match* da la posibilidad de sobrescribir la configuración global
+para las conexiones que cumplan los criterios especificados\ [#]_. Por ejemplo,
+en este caso, a los usuarios que pertenecen al grupo *ftpusers* sólo se les
+permite el uso del servidor para transferir ficheros\ [#]_.
+
+.. seealso:: Si el servidor |SSH| se expone en internet, no tardará en recibir
+   ataques de fuerza bruta que persiguen el acceso a la máquina. Siempre es más
+   que recomendable :ref:`configurar algún mecanismo que los inutilice <contra-bruta>`.
+
+Clientes
+========
+Por clientes del servidor entenderemos bajo este epígrafe sólo aquellos
+destinados a la administración interactiva del servidor.
+
+.. _ssh:
+
+OpenSSH
+-------
+Es el cliente habitual en sistemas *unix*. El modo básico de usarlo es el
+siguiente::
+
+   $ ssh usuario_remoto@servidor
+
+es decir, indicar el usuario de que se dispone en el servidor y el nombre o la
+ip del mismo. Si se omite el nombre de usuario, se tomará el mismo que el del
+usuario local. La consecuencia de esta orden es que se abrirá una consola
+interactiva (una sesión de la *shell* predefinida para tal usuario) en el
+servidor, tal como si hubiéramos ingresado en la máquina local. Es posible
+añadir argumentos a la orden, por ejemplo::
+
+   $ ssh -p443 usuario_remoto@servidor
+
+para conectarse al puerto **443** en vez de al **22**, como es habitual. Es
+posible también ejecutar un comando en el servidor sin llegar a usar el nodo
+interactivo simplemente añadiéndolo a continuación::
+
+   $ ssh usuario_remoto@servidor ls -l
+
+Si se prefiere también incluir la orden entre comillas::
+
+   $ ssh usuario_remoto@servidor "ls -l"
+
+.. warning:: Las comillas cobran importancia cuando queremos evitar que el
+   *bash* local haga interpretaciones de la orden (p.e. expanda), porque
+   queremos que estas las haga el servidor remoto.
+
+Este cliente permite incluir configuración dentro de :file:`/etc/ssh/ssh_config`
+(configuración general) y :file:`~/.ssh/config` (configuración personal del
+usuario). Como en el caso de la configuración del servidor, pueden usarse
+directivas globales (que afectan a todas las conexiones) y particulares con
+*Match* o, en este caso, también *Host*. Por ejemplo::
+
+   # Configuración en ~/.ssh/config
+   ServerAliveInterval  120
+   ServerAliveCountMax  0
+
+   Host zipi
+      Hostname    iescdl.es
+      User        perico
+      Port        443
+
+En esta configuración hemos incluido dos directivas globales que fuerzan la
+desconexión del cliente tras dos minutos de inactividad. Son simétricas a las ya
+vistas en el servidor, y en este caso el que se desconecta es el cliente y
+no el servidor. Son útiles si queremos provocar desconexiones automáticas y en
+el servidor no se ha hecho configuración alguna al respecto.
+
+Además se ha definido la conexión a una máquina, de manera que la orden::
+
+   $ ssh zipi
+
+es equivalente a::
+
+   $ ssh -p443 perico@iescdl.es
+
+Lo que no puede hacerse es añadir también la contraseña, porque *openssh*
+obliga a que esta se facilite siempre de manera interactiva. Para evitarlo, es
+necesario :ref:`recurrir a otras estrategias <ssh-agent>`.
+
+`Putty <http://www.putty.org/>`_
+--------------------------------
+Es el cliente más habitual en los sistemas *windows*, aunque las últimas
+versiones de *Windows* traen el :ref:`cliente de OpenSSH <ssh>` para su
+Powershell_. Lo cierto es que es un excelente cliente porque es efectivo, no
+requiere siquiera instalación y, además, soporta otros protocolos como *telnet*
+o *conexión serial*, lo que lo hace utilísimo en muchos casos.
+
+Establecer con este programa una conexión |SSH| básica es bastante sencillo:
+
+* En la pantalla inicial (la sección de ":kbd:`Sesión`") puede definirse la
+  máquina a la que deseamos conectarnos, el puerto, el tipo de conexión (|SSH|
+  en nuestro caso) y poner un nombre a la configuración de la conexión para
+  poder establecer la conexión en otras ocasiones sin necesidad de volver a
+  configurar de cero. Sin embargo, si nuestra intención es afinar más la
+  configuración es mejor acceder al resto de pantallas de configuración y una
+  vez acabadas todas ellas, volver a esta para grabar.
+
+  .. image:: files/putty-sesion.png
+     :alt: Pantalla de sesión
+
+* En la sección ":kbd:`Windows`" es posible cambiar el número de filas y
+  columnas (por ejemplo, a 120x36) lo cual es especialmente útil si decidimos
+  que el tamaño de la fuente cambie al cambiar el tamaño de la ventana (en
+  ":kbd:`Windows>Appearance`").
+
+  .. image:: files/putty-windows.png
+     :alt: Pantalla de ventana
+
+* Como ya se ha dicho, en ":kbd:`Windows>Appearance`" es muy útil hacer que la
+  fuente cambie al cambiar el tamaño de la ventana (sobre todo si se pretende
+  maximizar).
+
+  .. image:: files/putty-appearance.png
+     :alt: Pantalla de apariencia
+
+* Si somos usuarios habituales de *Linux*, en :kbd:`Windows>Selection` es muy
+  conveniente ordenar que la selección se haga como en :program:`XTerm`, esto
+  es, el botón izquierdo para seleccionar y el botón central para pegar.
+
+  .. image:: files/putty-selection.png
+     :alt: Pantalla de selección
+
+* En ":kbd:`Connection>Data`" podemos especificar el nombre del usuario (no la
+  contraseña).
+
+  .. image:: files/putty-data.png
+     :alt: Pantalla de datos
+
+Hay otras configuraciones interesantes relacionadas con un uso más avanzado
+(autenticación con clave, túneles, etc.) que por ese motivo no se citan aquí.
+
+.. rubric:: Notas al pie
+
+.. [#] Las claves se generan al instalar el servidor pero pueden regenerarse
+   simplemente reconfigurando el paquete::
+
+      # dpkg-reconfigure openssh-server
+
+.. [#] En ese caso, lo que suele hacerse es permitir también el acceso desde el
+   puerto 443, aunque dependiendo de las circunstancias esto puede ser más o
+   menos complicado (véase :ref:`el acceso restringido más adelante <redes-restr>`).
+
+.. [#] La explicación de que se necesite fijar los dos valores es sencilla:
+   *ClientAliveInternal* define el tiempo de inactividad tras el cual el
+   servidor enviará un paquete al cliente para comprobar que sigue vivo. Si
+   el cliente responde, el servidor considerará activa la conexión.
+   *ClientAliveCountMax*, por su parte, indica el número de paquetes
+   sin respuesta tras los que el servidor dará por muerta la conexión. Por
+   tanto, mientras no haya problemas de comunicaciones, habrá siempre respuestas
+   y, consecuentemente, el servidor no matará la comunicación. Ahora bien, si el
+   segundo valor se fija a 0, el servidor no dará ninguna oportunidad al cliente
+   de responder y tras el tiempo de respuesta fijado por *ClientAliveInternal*
+   cerrará la conexión sin más.
+
+.. [#] En la página de manual de :manpage:`sshd_config(5)`, se explica que el
+   valor también puede estar constituido por tres números: 10:30:60. El primero
+   indica lo mismo que el número solitario: hasta 10 autenticaciones simultáneas
+   el servidor no provocará error. El segundo indica un porcentaje, el 30%, que
+   indica el porcentaje de rechazo cuando se superan el 10. Ese porcentaje
+   aumenta linealmente hasta las 60 autenticaciones simultáneas, a partir del
+   cuál siempre se rechazan las conexiones.
+
+.. [#] Es conveniente mirar la página de manual para ver cómo expresar los
+   criterios, porque permiten algo más juego del expresado aquí. Por ejemplo::
+
+      Match Group "!wheel,*"
+         X11Forwarding        no
+         AllowTcpForwarding   no
+         ForceCommand         internal-sftp
+
+   se aplica a todos los usuarios que excepto a aquellos que pertenecen al grupo
+   *wheel*.
+
+.. [#] Más adelante se dedicará :ref:`todo un capítulo <ftp>` a ver cómo
+   convertir |SSH| en un servidor de trasnferencia de ficheros.
+
+.. _Powershell: https://docs.microsoft.com/es-es/powershell/scripting/overview?view=powershell-7.1

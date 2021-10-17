@@ -1,0 +1,375 @@
+
+
+
+<!DOCTYPE html>
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>6.4.2.4. Directorios compartidos &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/classic.css" />
+    <link rel="stylesheet" href="../../../../_static/custom.css" type="text/css" />
+    
+    <script data-url_root="../../../../" id="documentation_options" src="../../../../_static/documentation_options.js"></script>
+    <script src="../../../../_static/jquery.js"></script>
+    <script src="../../../../_static/underscore.js"></script>
+    <script src="../../../../_static/doctools.js"></script>
+    <script src="../../../../_static/translations.js"></script>
+    
+    <link rel="index" title="Índice" href="../../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../../search.html" />
+    <link rel="next" title="6.4.2.5. Usuarios y grupos" href="../05.usuarios/index.html" />
+    <link rel="prev" title="6.4.2.3. Clientes" href="../03.clientes/index.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="../05.usuarios/index.html" title="6.4.2.5. Usuarios y grupos"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="../03.clientes/index.html" title="6.4.2.3. Clientes"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" ><span class="section-number">6. </span>Servicios de infraestructura</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../index.html" ><span class="section-number">6.4. </span>Servicio de directorio</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../index.html" accesskey="U"><span class="section-number">6.4.2. </span>Samba</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">6.4.2.4. </span>Directorios compartidos</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="directorios-compartidos">
+<span id="smb-share"></span><h1><span class="section-number">6.4.2.4. </span>Directorios compartidos<a class="headerlink" href="#directorios-compartidos" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>Conocido cómo añadir clientes, toca saber cómo compartir directorios<a class="footnote-reference brackets" href="#id6" id="id1">1</a>. Hay
+dos métodos:</p>
+<ul class="simple">
+<li><p>A través de las <em>POSIX ACL</em>.</p></li>
+<li><p>A través de las <em>ACL</em> de <em>windows</em>.</p></li>
+</ul>
+<div class="section" id="posix-acl">
+<h2><span class="section-number">6.4.2.4.1. </span>POSIX ACL<a class="headerlink" href="#posix-acl" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Para la prueba usaremos el directorio <code class="file docutils literal notranslate"><span class="pre">/srv/samba/poshare</span></code> del <em>controlador
+de dominio</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkdir -p /srv/samba/poshare
+<span class="gp">#</span> ls -ld /srv/samba/poshare
+<span class="go">drwxr-xr-x 2 root root 4096 dic 31 13:28 /srv/samba/poshare/</span>
+<span class="gp">#</span> <span class="nb">echo</span> <span class="s2">&quot;Hola&quot;</span> &gt; /srv/samba/poshare/saludo.txt
+</pre></div>
+</div>
+<p>y añadiremos a <code class="file docutils literal notranslate"><span class="pre">/etc/samba/smb.conf</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[POSIXShare]</span>
+<span class="go">path = /srv/samba/poshare</span>
+<span class="go">read only = No</span>
+</pre></div>
+</div>
+<p>Por ultimo, recargamos la configuración para que tenga efecto:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> invoke-rc.d samba-ad-dc reload
+</pre></div>
+</div>
+<p>Con esto, ya tendríamos compartido el recurso de una manera básica. Obsérvese
+que en el servidor se ha definido que puede acceder al recurso cualquiera, pero
+que solo <em>root</em> puede escribir en él. Por ese motivo, si <strong>desde un cliente</strong>
+usáramos un usuario del dominio<a class="footnote-reference brackets" href="#id7" id="id2">2</a>, para acceder al recurso:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">usuario@clienteL$</span> smbclient //DC/POSIXShare -U zicotropico
+<span class="go">Enter zicotropico&#39;s password:</span>
+<span class="go">Domain=[IESPJM] OS=[Windows 6.1] Server=[Samba 4.5.2-Debian]</span>
+<span class="go">smb: \&gt; ls</span>
+<span class="go">  .                                   D        0  Sat Dec 31 18:13:11 2016</span>
+<span class="go">  ..                                  D        0  Sat Dec 31 13:28:37 2016</span>
+<span class="go">  saludo.txt                          N        5  Sat Dec 31 17:39:11 2016</span>
+
+<span class="go">                1733064 blocks of size 1024. 622044 blocks available</span>
+<span class="go">smb: \&gt; get saludo.txt</span>
+<span class="go">getting file \saludo.txt of size 5 as saludo.txt (1,2 KiloBytes/sec) (average 1,2 KiloBytes/sec)</span>
+</pre></div>
+</div>
+<p>podremos hacerlo e incluso obtener ficheros (si es que estos permitían la
+lectura). Sin embargo, no podremos subir nada, pues no tenemos permisos de
+escritura:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">smb: \&gt; put despedida.txt</span>
+<span class="go">NT_STATUS_ACCESS_DENIED opening remote file \despedida.txt</span>
+</pre></div>
+</div>
+<p>Esto suponiendo que en el cliente tengamos un fichero llamado
+<code class="file docutils literal notranslate"><span class="pre">despedida.txt</span></code>, claro. <em>samba</em>, pues, respeta los permisos definidos en
+el propio servidor. Sin menoscabo de esto, la configuración de <em>samba</em> permite
+negar o permitir el acceso según el usuario, el grupo o la máquina de acceso.
+Por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[POSIXShare]</span>
+<span class="go">path = /srv/samba/poshare</span>
+<span class="go">read only = No</span>
+<span class="go">valid users = @&quot;domain users&quot;</span>
+<span class="go">invalid users = fany</span>
+<span class="go">hosts allow = localhost 192.168.255.0/24</span>
+<span class="go">hosts deny = 192.168.255.253</span>
+</pre></div>
+</div>
+<p>Incluye cuatro directivas relativas a estos accesos:</p>
+<dl class="simple">
+<dt><strong>valid users</strong></dt><dd><p>Permite indicar cuáles son los únicos usuarios a los que se les permite el
+acceso. El signo <kbd class="kbd docutils literal notranslate">&#64;</kbd> indica que se indica el nombre de un grupo. La
+ausencia de esta directiva implica todos los usuarios.</p>
+</dd>
+<dt><strong>invalid users</strong></dt><dd><p>Indica los usuarios (y grupos) con el acceso vetado. Su ausencia implica que
+no haya veto alguna. Tiene preferencia sobre la directiva anterior, de modo
+que en caso de que un usuario tenga permitido y denegado el acceso, se
+denegará.</p>
+</dd>
+<dt><strong>hosts allow</strong></dt><dd><p>Indica las máquinas desde las que se podrá acceder.</p>
+</dd>
+<dt><strong>hosts deny</strong></dt><dd><p>Indica las máquinas desde las que no se podrá acceder.</p>
+</dd>
+</dl>
+<p>Ahora bien, debe tenerse claro que si un usuario no tiene permisos para acceder
+al directorio compartido (y por permisos se entiende los que se ven al hacer un
+<strong class="command">ls</strong>), el usuario no podrá acceder, aunque <em>valid users</em> diga lo
+contrario.</p>
+<p>Por supuesto, podemos dotar al directorio de aquellos permisos que nos parezcan
+más adecuados. Podríamos definir permisos basados en <a class="reference internal" href="../../../../05.discos/02.seguridad/02.acl.html#acls"><span class="std std-ref">listas de control de
+accesos</span></a> o algo más sencillo con el bit pegajoso como:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">root@dc#</span> chmod <span class="m">1777</span> /srv/samba/poshare
+</pre></div>
+</div>
+<p>que permitirá escribir a todo el mundo, pero no borrar lo que no sea de uno
+mismo. Además,</p>
+</div>
+<div class="section" id="windows-acl">
+<span id="smb-wacl"></span><h2><span class="section-number">6.4.2.4.2. </span>Windows ACL<a class="headerlink" href="#windows-acl" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Es el método que recomienda la documentación de <em>samba</em>. Requiere que el sistema
+de ficheros soporte <em>acl</em> y <em>atributos extendidos de usuario</em>, cosa que se
+comprobó al instalar el <em>controladore de dominio</em>. Además, si la máquina sobre
+la que se quieren usar, <strong>no es un controlador de dominio</strong> es necesario añadir
+a <code class="file docutils literal notranslate"><span class="pre">smb.conf</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">vfs objects = acl_xattr</span>
+<span class="go">map acl inherit = yes</span>
+<span class="go">store dos attributes = yes</span>
+</pre></div>
+</div>
+<p>Para poder configurar los permisos de compartición es necesario un usuario que
+tenga el privilegio <em>SeDiskOperatorPrivilege</em><a class="footnote-reference brackets" href="#id8" id="id3">3</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> net rpc rights list privileges -S dc -k <span class="p">|</span> grep SeDiskOperatorPrivilege
+<span class="go">SeDiskOperatorPrivilege  Manage disk shares</span>
+</pre></div>
+</div>
+<p>pero en la instalación predeterminada no hay ningún usuario ni grupo con este
+privilegio:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> net rpc rights list privileges SeDiskOperatorPrivilege -S dc -k
+<span class="go">SeDiskOperatorPrivilege:</span>
+</pre></div>
+</div>
+<p>Así que lo que vamos a hacer es conceder este permiso a los usuario
+pertenecientes al grupo «<em>Domain Admins</em>», que ya existe<a class="footnote-reference brackets" href="#id9" id="id4">4</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> getent group domain_admins
+<span class="go">domain_admins:*:2012:administrator</span>
+</pre></div>
+</div>
+<p>La orden adecuada es la siguiente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> net rpc rights grant <span class="s2">&quot;Domain Admins&quot;</span> SeDiskOperatorPrivilege -S dc -k
+<span class="go">Successfully granted rights.</span>
+</pre></div>
+</div>
+<p>que, efectivamente, no falla. Esto son los privilegios del grupo <em>Domain
+Admins</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> net rpc rights list accounts <span class="s2">&quot;Domain Admins&quot;</span> -S dc -k
+<span class="go">SeDiskOperatorPrivilege</span>
+</pre></div>
+</div>
+<p>o, por verlo de otra forma, estas son las cuentas que poseen ese privilegio (que
+fue la orden que usamos en un principio para comprobar que no había ninguna):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> net rpc rights list privileges  SeDiskOperatorPrivilege -S dc -k
+<span class="go">SeDiskOperatorPrivilege:</span>
+<span class="go">  IESPJM\Domain Admins</span>
+</pre></div>
+</div>
+<p>Ahora podríamos añadir un usuario existente a este grupo (o haber dado a este
+usuario directamente el privilegrio), pero podemos usar el administrador de
+samba, ya que:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> id -Gn Administrator <span class="p">|</span> grep -o domain_admins
+<span class="go">domain_admins</span>
+</pre></div>
+</div>
+<p>pertenece a dicho grupo.</p>
+<p>Con un usuario que puede gestionar las compartición de discos, ya podemos crear
+un directorio a compartir:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkdir -p /srv/samba/winshare
+<span class="gp">#</span> chgrp domain_admins /srv/samba/winshare
+<span class="gp">#</span> chmod <span class="nv">g</span><span class="o">=</span>rwx /srv/samba/winshare
+</pre></div>
+</div>
+<p>y compartirlo a través de <code class="file docutils literal notranslate"><span class="pre">smb.conf</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[WINDOWShare]</span>
+<span class="go">path = /srv/samba/winshare</span>
+<span class="go">read only = No</span>
+</pre></div>
+</div>
+<p>No debemos olvidarnos de recargar la configuración:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> invoke-rc.d samba-ad-dc reload
+</pre></div>
+</div>
+<p>El resto de la configuración debemos hacerla en un cliente <em>windows</em> adherido al
+dominio e identificarnos en él con un usuario con permisos para establecer
+propiedades de compartición.</p>
+<p>Primeramente debemos usar el ítem de <em>Administrar</em> <em>Equipo</em>:</p>
+<img alt="Localización de &quot;Administración&quot; de &quot;Equipo&quot; en windows7." src="../../../../_images/equipo_propiedades.jpg" />
+<p>Esto abrir una aplicación que permite administrar distintos aspectos del
+sistema. Como lo que queremos es administrar el <em>controlador de dominio</em> no el
+equipo local, debemos, situados sobre el ítem <em>Administración de equipos</em>,
+seleccionar <em>Acción</em> en el menú superior y conectar a otro equipo que es <em>DC</em>
+(esto es, el nombre que elegimos para el controlador):</p>
+<img alt="Dónde se puede conectar a otro equipo para administrarlo" src="../../../../_images/conectarotro.jpg" />
+<p>Ya en la administración del <em>controlador de dominio</em> debemos escoger
+<code class="docutils literal notranslate"><span class="pre">Herramientas</span> <span class="pre">del</span> <span class="pre">sistema&gt;Carpetas</span> <span class="pre">compartidas&gt;&gt;Recursos</span> <span class="pre">compartidos</span></code>:</p>
+<img alt="Recursos compartidos del controlador de dominio" src="../../../../_images/carpetas.jpg" />
+<p>para que aparezca qué es lo que comparte el <em>controlador</em> con el dominio. Ahora
+en el menú contextual del recursos <code class="file docutils literal notranslate"><span class="pre">WINDOWShare</span></code>, que es el que nos
+interesa y elegir el ítem <em>Propiedades</em>:</p>
+<img alt="Permisos compartidos para un recurso." src="../../../../_images/shareperms.jpg" />
+<p>En la ventana emergente, hay dos pestañas de interés:</p>
+<dl class="simple">
+<dt><strong>Permisos de los recursos compartidos</strong></dt><dd><p>Que permite indicar quiénes pueden acceder o quiénes no. Su manipulación
+equivale más o menos a las directivas <em>valid users</em> e <em>invalid users</em>, que
+se vieron bajo el epígrafe anterior. En este caso, convendría eliminar el
+grupo <em>Todos</em> y sustituirlo por <em>Domain Users</em>, que son los que deberían
+acceder a este recurso.</p>
+</dd>
+<dt><strong>Seguridad</strong></dt><dd><p>En esta pestaña, se pueden editar los permisos y definir qué puede hacer cada
+usuario o grupo individual. Este proceder equivale a la manipulación de
+permisos directa del directorio en el controlador. De hecho, si hacemos algún
+cambio (p.e. dar <em>Control total</em> a un determinado usuario) y nos vamos al
+<em>controlador</em> veremos que lo que hace <em>samba</em> internamente es definir <em>ACLs</em>
+sobre el directorio, <em>ACLs</em> que nosotros mismos podríamos haber definido
+usando <a class="reference internal" href="../../../../05.discos/02.seguridad/02.acl.html#setfacl"><span class="std std-ref">setfacl</span></a><a class="footnote-reference brackets" href="#id10" id="id5">5</a>.</p>
+</dd>
+</dl>
+<p class="rubric"><strong>Enlaces de interés</strong></p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://wiki.samba.org/index.php/Shares_with_POSIX_ACLs">Shares with POSIX ACLs</a></p></li>
+<li><p><a class="reference external" href="https://wiki.samba.org/index.php/Shares_with_Windows_ACLs">Shares with Windows ACLs</a></p></li>
+</ul>
+<p class="rubric">Notas al pie</p>
+<dl class="footnote brackets">
+<dt class="label" id="id6"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p>Cualquier miembro del dominio puede compartir un directorio, bastará con
+tocar su <code class="file docutils literal notranslate"><span class="pre">smb.conf</span></code> correspondiente, tal como se explica aquí para el
+<em>controlador</em>.</p>
+</dd>
+<dt class="label" id="id7"><span class="brackets"><a class="fn-backref" href="#id2">2</a></span></dt>
+<dd><p>Para crear un usuario, consóltese el <a class="reference internal" href="../05.usuarios/index.html#smb-usr"><span class="std std-ref">epígrafe correspondiente</span></a>. Si se sigue en estricto orden esta guía, aún no tendremos creado
+ninguno, pero aún podremos usar el usuario <em>Administrator</em> (en vez de
+<em>zicotropico</em>) para hacer las pruebas que se sugieren. La diferencia es que
+sí podremos tendremos permisos para subir el fichero <code class="file docutils literal notranslate"><span class="pre">despedida.txt</span></code>.</p>
+</dd>
+<dt class="label" id="id8"><span class="brackets"><a class="fn-backref" href="#id3">3</a></span></dt>
+<dd><p>El comando <strong class="command">net</strong> permite usar autenticación con <em>kerberos</em>
+añadiendo la opción <code class="docutils literal notranslate"><span class="pre">-k</span></code>, que es lo que se ha hecho. Obviamente, esto exige
+<a class="reference internal" href="../02.install-addc/index.html#kinit"><span class="std std-ref">haber obtenido las credenciales antes con kinit</span></a>.</p>
+</dd>
+<dt class="label" id="id9"><span class="brackets"><a class="fn-backref" href="#id4">4</a></span></dt>
+<dd><p>Recuérdese que al configurar <em>sssd</em> (gracias al cual podemos usar
+<a class="reference internal" href="../../../../02.conbas/05.seguridad/05a.usuarios.html#getent"><span class="std std-ref">getent</span></a>) indicamos que queríamos sustituir el espacio por el
+el subrayado, así que en toda operación en la que intervenga <em>nss</em> «<em>Domain
+Admins</em>» será <em>domain_admins</em> (o cualquier otra variante que intercambie
+minúsculas por mayúsculas). Otra forma de haber consultado la existencia del
+grupo habría sido a través de :kbd:samba-tool group list` tal como se hizo
+durante las comprobaciones post-instalación.</p>
+<p>Nótese también que con la configuración de sssd que hemos realizado, este
+inventa todos los datos (excepto el nombre de usuario y la contraseña) que
+necesitan los sistemas para reconocer al usuario. Como consecuencia todos
+los usuarios y grupos son reconocidos por linux. Esto es, claramente, un
+inconveniente.</p>
+</dd>
+<dt class="label" id="id10"><span class="brackets"><a class="fn-backref" href="#id5">5</a></span></dt>
+<dd><p>Además de que sea un poco engorroso y propenso a fallos el definir
+nosotros directamente las <em>ACLs</em>, hay otra dificultad. Los <em>UID</em> y <em>GID</em> que
+se usan para referirse a usuarios y grupos podrían no serán los que viéramos
+al hacer una consulta con <strong class="command">getent</strong>, si se optó por no fijar estos
+identificadores numéricos en el directorio activo, sino los que se obtienen
+del siguiente modo (supongamos que el usuario se llama <em>zicotropico</em>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> wbinfo --sid-to-uid <span class="k">$(</span>wbinfo --name-to-sid zicotropico<span class="k">)</span>
+<span class="go">3000020</span>
+</pre></div>
+</div>
+<p>Para entender todo esto, es conveniente avanzar al siguiente epígrafe.</p>
+</dd>
+</dl>
+</div>
+</div>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../../../index.html">Tabla de contenido</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">6.4.2.4. Directorios compartidos</a><ul>
+<li><a class="reference internal" href="#posix-acl">6.4.2.4.1. POSIX ACL</a></li>
+<li><a class="reference internal" href="#windows-acl">6.4.2.4.2. Windows ACL</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="../03.clientes/index.html"
+                        title="capítulo anterior"><span class="section-number">6.4.2.3. </span>Clientes</a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="../05.usuarios/index.html"
+                        title="próximo capítulo"><span class="section-number">6.4.2.5. </span>Usuarios y grupos</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../../_sources/06.infraestructura/05.directorio/06.samba/04.share/index.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="../05.usuarios/index.html" title="6.4.2.5. Usuarios y grupos"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="../03.clientes/index.html" title="6.4.2.3. Clientes"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" ><span class="section-number">6. </span>Servicios de infraestructura</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../index.html" ><span class="section-number">6.4. </span>Servicio de directorio</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../index.html" ><span class="section-number">6.4.2. </span>Samba</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">6.4.2.4. </span>Directorios compartidos</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor CC BY 4.0, 2016-2021, José Miguel Sánchez Alés.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.2.0.
+    </div>
+  </body>
+</html>

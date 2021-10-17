@@ -1,0 +1,509 @@
+
+
+
+<!DOCTYPE html>
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>4.1.2.4. Personalización &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/classic.css" />
+    <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+    
+    <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/translations.js"></script>
+    
+    <link rel="index" title="Índice" href="../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../search.html" />
+    <link rel="next" title="4.1.2.5. Ejercicios sobre SystemD" href="05.ejercicios.html" />
+    <link rel="prev" title="4.1.2.3. Runlevels" href="03.runlevels.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="05.ejercicios.html" title="4.1.2.5. Ejercicios sobre SystemD"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="03.runlevels.html" title="4.1.2.3. Runlevels"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" ><span class="section-number">4. </span>Gestión del servidor</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" accesskey="U"><span class="section-number">4.1. </span>Gestión de servicios</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">4.1.2.4. </span>Personalización</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="personalizacion">
+<h1><span class="section-number">4.1.2.4. </span>Personalización<a class="headerlink" href="#personalizacion" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>Ya se ha explicado cómo consultar, arrancar y parar servicios y cómo funcionan
+los <em>niveles de ejecución</em> en <em>systemd</em>. Con esto es suficiente para manipular
+de modo básico los servicios. Sin embargo, en algunas ocasiones, es necesario
+manipular la manera en la que arrancan éstos (p.e. añadiendo o eliminando una
+opción a la orden que crea el proceso) o, incluso, crear <em>lanzadores</em> de un
+determinado servicio para <em>systemd</em>.</p>
+<p>Bajo el presente epígrafe se describirá superficialmente cómo está organizado
+<em>systemd</em>, cuál es la estructura de los ficheros que permiten arrancar y parar
+los servicios y cómo pueden modificarse éstos para modificar tales acciones.</p>
+<div class="section" id="preliminares">
+<h2><span class="section-number">4.1.2.4.1. </span>Preliminares<a class="headerlink" href="#preliminares" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Es muy importante tener presente que un servicio no es más que un proceso que
+actúa en segundo plano. Consecuentemente, tal servicio debió originarse cómo
+consecuencia de la invocación de una orden. Por ejemplo, el servicio <a class="reference internal" href="../../10.ssh/01.basico.html#ssh"><span class="std std-ref">ssh</span></a> se crea mediante la ejecución del programa <strong class="program">sshd</strong>, así que si
+nos aseguramos de que el servicio no está corriendo<a class="footnote-reference brackets" href="#id4" id="id1">1</a>, podemos levantar el
+servidor directamente del siguiente modo:</p>
+<div class="highlight-dosini notranslate"><div class="highlight"><pre><span></span><span class="c1"># /usr/sbin/sshd -D</span>
+</pre></div>
+</div>
+<p>La terminal en este caso quedará ocupada y desde otras máquinas podremos acceder
+al servidor. Sin embargo, este manera de proceder sólo es útil cuando nos
+interesa ver mensajes de salida que pueda proporcionar el servidor en caso de
+depuración. Arrancar un servicio de forma adecuada exige más: controlar si el
+servicio está arrancado o no, hacerlo automáticamente, etc. Por este motivo, los
+servicios no se arrancar directamente, sino que el proceso <em>init</em> (en nuestro
+caso particular, <em>systemd</em>) se encarga de ello.</p>
+</div>
+<div class="section" id="estructura">
+<h2><span class="section-number">4.1.2.4.2. </span>Estructura<a class="headerlink" href="#estructura" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Cada servicio<a class="footnote-reference brackets" href="#id5" id="id2">2</a> dispone de una unidad de <em>systemd</em> que describe los
+requisitos, el ejecutable y los parámetros con que tiene que arrancarse.</p>
+<p>En <em>debian</em> los ficheros que representan las unidades se incluyen dentro del
+directorio <code class="file docutils literal notranslate"><span class="pre">/lib/systemd/system</span></code>. Por ejemplo, para el servicio <abbr title="Secure SHell">SSH</abbr> la instalación del paquete <em>openssh-server</em> proporciona un
+fichero llamado <code class="file docutils literal notranslate"><span class="pre">ssh.service</span></code>. En caso de que se desee hacer algún cambio,
+es mejor no tocarlos, ya que dentro del directorio <code class="file docutils literal notranslate"><span class="pre">/etc/systemd/system</span></code>
+se pueden incluir ficheros homónimos que sobrescriben el fichero instalado por
+la distribución.</p>
+<p>A partir de ahora nombraremos como <code class="file docutils literal notranslate"><span class="pre">unidad</span></code> al fichero que representa a la
+unidad. Por tanto, tendremos un fichero proporcionado por la distribución que es
+<code class="file docutils literal notranslate"><span class="pre">/lib/systemd/system/unidad</span></code> que será remplazado por el fichero
+<code class="file docutils literal notranslate"><span class="pre">/etc/systemd/system/unidad</span></code>, si existe.</p>
+<p>Además de estos ficheros, que representan la unidad, hay una serie de subdirectorios
+dentro de <code class="file docutils literal notranslate"><span class="pre">/etc/systemd/system/unidad</span></code> asociados también a ella:</p>
+<ul>
+<li><p><code class="file docutils literal notranslate"><span class="pre">unidad.d</span></code>, que permite incluir ficheros con directivas adicionales al
+fichero de configuración principal. Si una directiva también existe en el
+fichero principal, el valor no se sobreescribirá, sino que pasará a tener ambos
+valores, lo cual puede ser lícito o no. Para sobreescribir el valor es necesario
+incluirla primero con valor vacío y luego con el nuevo calor:</p>
+<div class="highlight-dosini notranslate"><div class="highlight"><pre><span></span><span class="k">[Service]</span>
+<span class="na">ExecStart</span> <span class="o">=</span>
+<span class="na">ExecStart</span> <span class="o">=</span> <span class="s">/usr/sbin/xxxx -p</span>
+</pre></div>
+</div>
+</li>
+<li><p><code class="file docutils literal notranslate"><span class="pre">unidad.wants</span></code>, que contiene enlaces simbólicos a unidades de las que
+depende opcionalmente la unidad.</p></li>
+<li><p><code class="file docutils literal notranslate"><span class="pre">unidad.requires</span></code>, que contiene enlaces simbólicos a unidades de las que
+depende forzosamente la unidad.</p></li>
+</ul>
+<p>Por tanto, la configuración de la unidad que procesa <em>systemd</em>, procede de
+diversas fuentes y a priori es posible que no tengamos muy claro cuál es el
+valor de un determinada directiva de configuración. Para asegurarnos de cuál es
+la configuración final podemos optar por:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> systemctl cat ssh.service
+</pre></div>
+</div>
+<p>que mostrará las directivas contenidas en todos los ficheros involucrados en la
+configuración del servicio, indicando a qué fichero pertenece cada una; o bien:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> systemctl show ssh.service
+</pre></div>
+</div>
+<p>que nos devolverá la configuración resultante para el servicio <em>ssh</em> que incluye
+también las directivas que no se han esc rito pero poseen valor predeterminado.
+Como es larga y puede que nos interese sólo una directiva en particular, podemos
+añadir la opción <code class="docutils literal notranslate"><span class="pre">-p</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> systemctl show -p <span class="s2">&quot;Wants&quot;</span> ssh.service
+<span class="go">Wants=systemd-journald.socket systemd-journald-dev-log.socket system.slice</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="ficheros-de-unidad">
+<h2><span class="section-number">4.1.2.4.3. </span>Ficheros de unidad<a class="headerlink" href="#ficheros-de-unidad" title="Enlazar permanentemente con este título">¶</a></h2>
+<div class="section" id="descripcion">
+<h3><span class="section-number">4.1.2.4.3.1. </span>Descripción<a class="headerlink" href="#descripcion" title="Enlazar permanentemente con este título">¶</a></h3>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>El epígrafe es un descripción muy somera. Para una en mayor
+profundidad puede consultarse <a class="reference external" href="https://www.digitalocean.com/community/tutorials/understanding-systemd-units-and-unit-files">este artículo</a> en inglés.</p>
+</div>
+<p>Los ficheros de configuración de las unidades son un conjunto de parejas
+parámetro-valor agrupadas en distintas secciones:</p>
+<div class="highlight-dosini notranslate"><div class="highlight"><pre><span></span><span class="k">[Seccion1]</span>
+<span class="na">Parametro1</span><span class="o">=</span><span class="s">Valor1</span>
+<span class="c1"># [... otras directivas de esta sección ...]</span>
+
+<span class="k">[Sección2]</span>
+<span class="na">Parametro2</span><span class="o">=</span><span class="s">Valoe2</span>
+<span class="c1"># [... otras directivas de esta sección ...]</span>
+</pre></div>
+</div>
+<p>Las secciones<a class="footnote-reference brackets" href="#id6" id="id3">3</a> posibles son:</p>
+<dl>
+<dt><strong>[Unit]</strong></dt><dd><p>Es una sección para describir la propia unidad y su relación con las
+restantes. Suele situarse al principio del fichero. Algunos de las directivas
+que se pueden definir en ella son:</p>
+<dl>
+<dt><em>Description</em></dt><dd><p>Permite describir brevemente para qué sirve la unidad. Esta descripción,
+por ejemplo, es la que aparece para cada unidad al ejecutar:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> systemctl list-units
+</pre></div>
+</div>
+</dd>
+<dt><em>Documentation</em></dt><dd><p>Permite indicar <abbr title="Uniform Resource Identifier">URI</abbr>s donde
+encontrar información sobre el servicio relacionado con la unidad.</p>
+</dd>
+<dt><em>Wants</em></dt><dd><p>Lista otras unidades necesarias para el servicio, aunque no
+indispensables. Cumple la misma función que el directorio
+<code class="file docutils literal notranslate"><span class="pre">unidad.wants</span></code>.</p>
+</dd>
+<dt><em>Requires</em></dt><dd><p>Lista otras unidades indispensables para el servicio. Si alguna de
+ellas falla, esta unidad también lo hará. Cumple la misma función que el
+directorio <code class="file docutils literal notranslate"><span class="pre">unidad.requires</span></code></p>
+</dd>
+<dt><em>After</em></dt><dd><p>Lista las unidades que deberán estar cargadas cuando se lanza la unidad.
+Sólo implica orden y no requisito.</p>
+</dd>
+<dt><em>Before</em></dt><dd><p>Lista las unidades que requiren cargada la unidad representada por el
+fichero cuando sean lanzadas.</p>
+</dd>
+<dt><em>Condition*</em></dt><dd><p>Familia de directivas que permite indicar condiciones que deben cumplirse
+para lanzar la unidad.  Dependiendo de qué se compruebe, así es el hombre
+exacto de la directiva. Por ejemplo, <em>ConditionPathExists</em> comprueba si
+existe la ruta que se indica como valor. Para saber el nombre del resto
+de directivas de esta familia puede consultarse:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> man systemd.unit
+</pre></div>
+</div>
+</dd>
+</dl>
+</dd>
+<dt><strong>[Install]</strong></dt><dd><p>Contiene directivas relacionadas con acciones que deben realizarse al
+habilitar o deshabilitar la unidad. Suele incluirse al final del fichero.
+Algunas directivas interesantes son:</p>
+<dl>
+<dt><em>WantedBy</em></dt><dd><p>Permite indicar las unidades que requieren la desarrollada en el fichero.
+Que una unidad aparezca aquí (llamémosla <em>otraunidad</em>), implica que al
+habilitarse la unidad del fichero, se creará en el directorio
+<code class="file docutils literal notranslate"><span class="pre">/etc/systemd/system/otraunidad.wants</span></code> un enlace simbólico a la
+unidad del fichero, a fin de que se registre la dependencia y <em>systemd</em> la
+conozca al arrancar los servicios.</p>
+<p>Esta directiva es la complementaria a <em>Wants</em> de la sección <em>Unit</em>, de
+manera que esto en el fichero <em>unidad</em>:</p>
+<div class="highlight-dosini notranslate"><div class="highlight"><pre><span></span><span class="k">[Install]</span>
+<span class="na">WantedBy</span><span class="o">=</span><span class="s">otraunidad</span>
+</pre></div>
+</div>
+<p>provoca el mismo efecto que esto otro en el fichero <em>otraunidad</em>:</p>
+<div class="highlight-dosini notranslate"><div class="highlight"><pre><span></span><span class="k">[Unit]</span>
+<span class="na">Wants</span><span class="o">=</span><span class="s">unidad</span>
+</pre></div>
+</div>
+<p>En cambio, la primera directiva permite mayor versatilidad. Por ejemplo,
+<em>ssh.service</em> es un servicio que se levanta en el modo <em>multi-user.target</em>
+El problema es que muchos otros servicios también se levantan en este
+modo (un servidor <em>ftp</em> o un <em>web</em>, por ejemplo). De la primera forma, no
+hay más que individualmente en la unidad de cada servicio indicar la
+dependencia de <em>multi-user.target</em>. En cambio, de la segunda forma,
+deberíamos tener presentes todos esos servicios al escribir la unidad de
+<em>multi-user.target</em>.</p>
+</dd>
+<dt><em>RequiredBy</em></dt><dd><p>Análoga a <em>WantedBy</em>, pero el requisito es indispensable.</p>
+</dd>
+<dt><em>Alias</em></dt><dd><p>Permite indicar un nombre alternativo para el servicio.</p>
+</dd>
+</dl>
+</dd>
+<dt><strong>[Service]</strong></dt><dd><p>Es una sección que incluye directivas exclusivas de unidades que son
+servicios. Permite muchas directivas:</p>
+<dl class="simple">
+<dt><em>Type</em></dt><dd><p>El tipo de servicio. Son diversos. Consúltese la página recomendada para
+más información.</p>
+</dd>
+<dt><em>EnvironmentFile</em></dt><dd><p>Indica un fichero que define variables que pueden usarse en las directivas
+de esta sección. Consúltese el ejemplo posterior.</p>
+</dd>
+<dt><em>ExecStart</em></dt><dd><p>Orden que arranca el servicio.</p>
+</dd>
+<dt><em>ExecStartPre</em></dt><dd><p>Expresa comandos que deben realizarse antes de la orden que arranca el
+servicio.</p>
+</dd>
+<dt><em>ExecStartPost</em></dt><dd><p>Expresa comandos que deben ejecutarse tras haber arrancado el servicio.</p>
+</dd>
+<dt><em>ExecStop</em></dt><dd><p>Orden para parar el servicio. Si no se indica ninguna, lo que se hace es
+matar el proceso al parar el servicio.</p>
+</dd>
+<dt><em>ExecStopPost</em></dt><dd><p>Expresa comandos a ejecutar después de parar el servicio.</p>
+</dd>
+<dt><em>ExecReload</em></dt><dd><p>Orden que permite recargar la configuración.</p>
+</dd>
+<dt><em>Restart</em></dt><dd><p>Expresa la circunstancia bajo la cual se reiniciará el servicio. Hay
+varias distintas.</p>
+</dd>
+<dt><em>TimeoutSec</em></dt><dd><p>Temporización en segundos después de la cual se marcará como fallado el
+arranque de un servicio o se forzará su parada.</p>
+</dd>
+</dl>
+</dd>
+<dt><strong>[Socket]</strong></dt><dd><p>Directivas para unidades <em>socket</em></p>
+</dd>
+<dt><strong>[Mount]</strong></dt><dd><p>Directivas de unidades <em>mount</em> que gestionan puntos de montaje. Estas
+unidades (y las citadas a continuación= cumplen la función del fichero
+tradicional <code class="file docutils literal notranslate"><span class="pre">/etc/fstab</span></code>. No obstante, <em>systemd</em> tiene un traductor
+que al vuelo traduce el contenido de este fichero a estas unidades, por lo
+que es perfectamente funcional seguir usando este fichero.</p>
+</dd>
+<dt><strong>[Automount]</strong></dt><dd><p>Directivas para las unidades <em>automount</em> que permiten montar automáticamente
+durante el arranque los dispositivos expresados en unidades <em>mount</em>.</p>
+</dd>
+<dt><strong>[Swap]</strong></dt><dd><p>Directivas para unidades <em>swap</em> que permiten configurar la memoria de
+intercambio. Pero esto también sigue siendo posible a través del fichero
+<code class="file docutils literal notranslate"><span class="pre">/etc/fstab</span></code>.</p>
+</dd>
+<dt><strong>[Path]</strong></dt><dd><p>Directivas para unidades <em>path</em> que sirven para definir rutas que se desean
+monitorizar mediante <em>systemd</em>. Puede consultar <cite>este enlace
+&lt;http://www.ocsmag.com/2015/09/02/monitoring-file-access-for-dummies/&gt;</cite>
+para ver cómo se definen y funcionan.</p>
+</dd>
+<dt><strong>[Timer]</strong></dt><dd><p>Directivas para unidades <em>timer</em> cuya utilidad es la misma que la de los
+demonios <a class="reference internal" href="../../07.tareas/01.cronat.html#cron"><span class="std std-ref">cron</span></a> y <a class="reference internal" href="../../07.tareas/01.cronat.html#at"><span class="std std-ref">at</span></a>.</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="analisis">
+<h3><span class="section-number">4.1.2.4.3.2. </span>Análisis<a class="headerlink" href="#analisis" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Expuesto todo lo necesario para manipular de forma muy simple la gestión a
+través de <em>systemd</em>, lo más adecuado es analizar en profundidad un servicio.
+Tomemos a este efecto <code class="file docutils literal notranslate"><span class="pre">ssh.service</span></code>. El fichero de unidad proporcionado
+por el paquete <em>openssh-server</em> se encuentra en <code class="file docutils literal notranslate"><span class="pre">/lib/systemd/system</span></code> y es
+el siguiente:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="linenos"> 1</span><span class="k">[Unit]</span>
+<span class="linenos"> 2</span><span class="na">Description</span><span class="o">=</span><span class="s">OpenBSD Secure Shell server</span>
+<span class="linenos"> 3</span><span class="na">After</span><span class="o">=</span><span class="s">network.target auditd.service</span>
+<span class="linenos"> 4</span><span class="na">ConditionPathExists</span><span class="o">=</span><span class="s">!/etc/ssh/sshd_not_to_be_run</span>
+<span class="linenos"> 5</span>
+<span class="linenos"> 6</span><span class="k">[Service]</span>
+<span class="linenos"> 7</span><span class="na">EnvironmentFile</span><span class="o">=</span><span class="s">-/etc/default/ssh</span>
+<span class="linenos"> 8</span><span class="na">ExecStart</span><span class="o">=</span><span class="s">/usr/sbin/sshd -D $SSHD_OPTS</span>
+<span class="linenos"> 9</span><span class="na">ExecReload</span><span class="o">=</span><span class="s">/bin/kill -HUP $MAINPID</span>
+<span class="linenos">10</span><span class="na">KillMode</span><span class="o">=</span><span class="s">process</span>
+<span class="linenos">11</span><span class="na">Restart</span><span class="o">=</span><span class="s">on-failure</span>
+<span class="linenos">12</span><span class="na">RestartPreventExitStatus</span><span class="o">=</span><span class="s">255</span>
+<span class="linenos">13</span><span class="na">Type</span><span class="o">=</span><span class="s">notify</span>
+<span class="linenos">14</span>
+<span class="linenos">15</span><span class="k">[Install]</span>
+<span class="linenos">16</span><span class="na">WantedBy</span><span class="o">=</span><span class="s">multi-user.target</span>
+<span class="linenos">17</span><span class="na">Alias</span><span class="o">=</span><span class="s">sshd.service</span>
+</pre></div>
+</div>
+<p>En la sección <code class="code docutils literal notranslate"><span class="pre">[Unit]</span></code> vemos la directiva <code class="code docutils literal notranslate"><span class="pre">Description</span></code>, que
+describe qué servicio gestiona la unidad (<em>OpenBSD Secure Shell server</em>) y que
+aparece regularmente en las salidas de <strong class="command">systemctl</strong>. Por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> systemctl status ssh.service
+<span class="go">● ssh.service - OpenBSD Secure Shell server</span>
+<span class="go">[...]</span>
+</pre></div>
+</div>
+<p>La directiva <code class="code docutils literal notranslate"><span class="pre">After</span></code> obliga a que esta unidad levante el servicio después
+de que se hayan activado por completo las unidades <code class="file docutils literal notranslate"><span class="pre">network.target</span></code> y
+<code class="file docutils literal notranslate"><span class="pre">auditd.service</span></code>. Además, se incluye con la directiva
+<code class="code docutils literal notranslate"><span class="pre">ConditionPathExists</span></code> para que el servicio no arranque en caso de que se
+haya creado el fichero <code class="file docutils literal notranslate"><span class="pre">/etc/ssh/sshd_not_to_be_run</span></code>.</p>
+<p>En la sección <code class="code docutils literal notranslate"><span class="pre">[Service]</span></code> encontramos la directiva <code class="code docutils literal notranslate"><span class="pre">EnvironmentFile</span></code>
+que expresa un fichero en que se definen variables de ambiente: <code class="file docutils literal notranslate"><span class="pre">/etC/default/ssh</span></code>:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span><span class="c1"># Default settings for openssh-server. This file is sourced by /bin/sh from</span>
+<span class="c1"># /etc/init.d/ssh.</span>
+
+<span class="c1"># Options to pass to sshd</span>
+<span class="nv">SSHD_OPTS</span><span class="o">=</span>
+</pre></div>
+</div>
+<p>La ubicación del fichero no es caprichosa. Tradicionalmente con <em>SystemV</em>, los
+ficheros de configuración para los <em>scripts</em> de arranque los almacenaba
+<em>debian</em> bajo <code class="file docutils literal notranslate"><span class="pre">/etc/default</span></code>. Estos son ficheros en que se incluyen
+variables de entorno que tales <em>scripts</em> utilizan. Una variable muy comúnmente
+usada es la que define las opciones con las que arrancará el ejecutable que
+proporciona el servicio, como es el caso del ejemplo (variable
+<span class="var">$SSHD_OPTS</span> que se usa luego en la directiva <code class="code docutils literal notranslate"><span class="pre">ExecStart</span></code>). Con
+<em>systemd</em> se puede mantener esta filosofía gracias a la existencia de la
+directiva <code class="code docutils literal notranslate"><span class="pre">EnvironmentFile</span></code>.</p>
+<p>Por último, está la sección <code class="code docutils literal notranslate"><span class="pre">[Install]</span></code> que se aplica al habilitar o
+deshabilitar la unidad. Contiene dos directivas:</p>
+<div class="highlight-dosini notranslate"><div class="highlight"><pre><span></span><span class="na">WantedBy</span><span class="o">=</span><span class="s">multi-user.target</span>
+</pre></div>
+</div>
+<p>que indica que el modo de operación <em>multi-user</em> implica arrancar el servidor
+<em>SSH</em> y:</p>
+<div class="highlight-dosini notranslate"><div class="highlight"><pre><span></span><span class="na">Alias</span><span class="o">=</span><span class="s">sshd.service</span>
+</pre></div>
+</div>
+<p>que provoca que el servicio también pueda llamarse <code class="code docutils literal notranslate"><span class="pre">sshd.service</span></code>. Estas
+dos directivas provocan cambios en el sistema al habilitarse la unidad. La
+primera de las directivas provoca que aparezca un enlace simbólico bajo
+<code class="file docutils literal notranslate"><span class="pre">/etc/systemd/system/multi-user.target</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> readlink /etc/systemd/system/multi-user.target.wants/ssh.service
+<span class="go">/lib/systemd/system/ssh.service</span>
+</pre></div>
+</div>
+<p>La segunda que en <code class="file docutils literal notranslate"><span class="pre">/etc/systemd/system</span></code> aparezca un enlace simbólico con
+nombre <code class="file docutils literal notranslate"><span class="pre">sshd.service</span></code> que apunte hacia <code class="file docutils literal notranslate"><span class="pre">ssh.service</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> readlink /etc/systemd/system/sshd.service
+<span class="go">/lib/systemd/system/ssh.service</span>
+</pre></div>
+</div>
+<p>De hecho, si deshabilitamos la unidad veremos que tales enlaces simbólicos
+desaparacen.</p>
+</div>
+<div class="section" id="edicion">
+<span id="systemd-edicion"></span><h3><span class="section-number">4.1.2.4.3.3. </span>Edición<a class="headerlink" href="#edicion" title="Enlazar permanentemente con este título">¶</a></h3>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Este apartado se refiere únicamente a alterar la configuración con
+la que systemd lanza el servicio. Cada servicio, a su vez, tendrá muy
+probablemente un fichero (o varios) de configuración particular (p.e.
+<a class="reference internal" href="../../10.ssh/01.basico.html#ssh"><span class="std std-ref">ssh</span></a> tiene <code class="file docutils literal notranslate"><span class="pre">/etc/ssh/sshd_config</span></code>). Si lo que se pretende
+es alterar esta configuración, basta con alterar tal fichero y reiniciar el
+servicio:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> systemctl reload-or-restart ssh.service
+</pre></div>
+</div>
+</div>
+<p>Si pretendemos modificar la configuración de arranque de un servicio, podemos
+optar por lo siguiente:</p>
+<ol class="arabic">
+<li><p>Reescribir por completo el fichero dentro de <code class="file docutils literal notranslate"><span class="pre">/etc/systemd/system/</span></code>,
+para lo cual es quizás mejor tomar como plantilla el predeterminado y
+modificar a partir de él:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cp /lib/systemd/system/ssh.service /etc/systemd/system
+<span class="gp">#</span> vim /etc/systemd/system/ssh.service
+</pre></div>
+</div>
+</li>
+<li><p>Redefinir sólo algunas directivas, creando el directorio <code class="file docutils literal notranslate"><span class="pre">unidad.d</span></code>:</p>
+<div class="highlight-dosini notranslate"><div class="highlight"><pre><span></span><span class="c1"># mkdir /etc/systemd/system/ssh.service.d</span>
+<span class="c1"># cat &gt; /etc/systemd/system/ssh.service.d/10_desc.conf</span>
+<span class="k">[Unit]</span>
+<span class="na">Description</span><span class="o">=</span><span class="s">Servidor OpenSSH</span>
+</pre></div>
+</div>
+</li>
+</ol>
+<p>Cuando se modifica la configuración de la unidad, es necesario hacérselo saber a
+<em>systemd</em>, así que si deseáramos reiniciar un servicio ya activo deberíamos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> systemctl stop ssh.service
+<span class="gp">#</span> systemctl daemon-reload
+<span class="gp">#</span> systemctl start ssh.service
+</pre></div>
+</div>
+<p>Es posible conocer los ficheros que parchean la configuración del
+fichero principal:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> systemd-delta --type extended
+</pre></div>
+</div>
+<p class="rubric">Notas al pie</p>
+<dl class="footnote brackets">
+<dt class="label" id="id4"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p>Por ejemplo, haciendo:</p>
+<div class="highlight-dosini notranslate"><div class="highlight"><pre><span></span><span class="c1"># systemctl stop ssh.service</span>
+</pre></div>
+</div>
+</dd>
+<dt class="label" id="id5"><span class="brackets"><a class="fn-backref" href="#id2">2</a></span></dt>
+<dd><p>En realidad, hay más tipos de unidades, no sólo unidades que representan
+servicios, pero para el objetivo de nuestra exposición podemos centrarnos en
+las unidades que representan servicios.</p>
+</dd>
+<dt class="label" id="id6"><span class="brackets"><a class="fn-backref" href="#id3">3</a></span></dt>
+<dd><p>Nos centraremos en las directivas relacionadas con las unidades que
+gestionan servicios</p>
+</dd>
+</dl>
+</div>
+</div>
+</div>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../../index.html">Tabla de contenido</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">4.1.2.4. Personalización</a><ul>
+<li><a class="reference internal" href="#preliminares">4.1.2.4.1. Preliminares</a></li>
+<li><a class="reference internal" href="#estructura">4.1.2.4.2. Estructura</a></li>
+<li><a class="reference internal" href="#ficheros-de-unidad">4.1.2.4.3. Ficheros de unidad</a><ul>
+<li><a class="reference internal" href="#descripcion">4.1.2.4.3.1. Descripción</a></li>
+<li><a class="reference internal" href="#analisis">4.1.2.4.3.2. Análisis</a></li>
+<li><a class="reference internal" href="#edicion">4.1.2.4.3.3. Edición</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="03.runlevels.html"
+                        title="capítulo anterior"><span class="section-number">4.1.2.3. </span><em>Runlevels</em></a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="05.ejercicios.html"
+                        title="próximo capítulo"><span class="section-number">4.1.2.5. </span>Ejercicios sobre SystemD</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../_sources/04.servidor/03.init/systemd/04.personalizacion.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="05.ejercicios.html" title="4.1.2.5. Ejercicios sobre SystemD"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="03.runlevels.html" title="4.1.2.3. Runlevels"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" ><span class="section-number">4. </span>Gestión del servidor</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" ><span class="section-number">4.1. </span>Gestión de servicios</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">4.1.2.4. </span>Personalización</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor CC BY 4.0, 2016-2021, José Miguel Sánchez Alés.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.2.0.
+    </div>
+  </body>
+</html>

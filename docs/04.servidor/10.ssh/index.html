@@ -1,0 +1,201 @@
+
+
+
+<!DOCTYPE html>
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>4.5. Administración remota &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css" />
+    <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+    
+    <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/jquery.js"></script>
+    <script src="../../_static/underscore.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/translations.js"></script>
+    
+    <link rel="index" title="Índice" href="../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../search.html" />
+    <link rel="next" title="4.5.1. Instalación" href="01.basico.html" />
+    <link rel="prev" title="4.4.4.23. pam_sss" href="../09.autenticacion/pam_modules/99.pam_sss.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="01.basico.html" title="4.5.1. Instalación"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="../09.autenticacion/pam_modules/99.pam_sss.html" title="4.4.4.23. pam_sss"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U"><span class="section-number">4. </span>Gestión del servidor</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">4.5. </span>Administración remota</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="administracion-remota">
+<span id="adm-rem"></span><h1><span class="section-number">4.5. </span>Administración remota<a class="headerlink" href="#administracion-remota" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>Es común que el administrador del servidor no se siente físicamente junto a él
+para configurarlo, sino que sus tareas de mantenimiento las realice a distancia
+sentado sobre un ordenador distinto. Ello hace necesario disponer de una
+terminal remota que habilite una sesión interactiva y que ofrezca al
+administrador las mismas posibilidades que la terminal física.</p>
+<p>Tradicionalmente, esta servicio lo vino desempeñando <a class="reference external" href="https://es.wikipedia.org/wiki/Telnet">telnet</a>, hasta que la inseguridad de la red lo
+volvió poco recomendable y fue sustituido por <abbr title="Security SHell">SSH</abbr>, que cifra la comunicación y
+sortea sus problemas de seguridad, amén de tener algunas otras funcionalidades
+muy útiles e interesantes.</p>
+<p>Aunque el servicio sigue estando disponible (el paquete <a class="reference external" href="https://packages.debian.org/stable/telnetd">telnetd</a>) no es en
+absoluto recomendable instalarlo, dado que adolece de dos <strong>problemas
+fundamentales de seguridad</strong>, comunes a todas las comunicaciones no cifradas:</p>
+<dl class="simple">
+<dt><strong>Intercepción</strong> de la comunicación</dt><dd><p>Al establecerse una comunicación no cifrada entre dos extremos, un tercero
+malicioso puede interceptar los paquetes y leerlos, extrayendo la información
+contenida en ellos. Esta información puede, por supuesto, incluir usuario y
+contraseña, que como el resto no van cifrados.</p>
+</dd>
+<dt><strong>Suplantación</strong> de identidad</dt><dd><p>También existe la posibilidad de suplantar la identidad del servidor, de modo
+que el cliente crea que se está conectado al servidor real, cuando en
+realidad se conecta a uno falso. Esto puede permitir al suplantador obtener
+también las claves de acceso al pedírselas al cliente.</p>
+</dd>
+</dl>
+<p>Ambos problemas pueden evitarse mediante técnicas de cifrado híbrido, por lo que
+en 1995, un finlandés llamado <a class="reference external" href="https://es.wikipedia.org/wiki/Tatu_Yl%C3%B6nen">Tatu Ylönen</a> desarrolló la primera versión
+del protocolo <abbr title="Security SHell">SSH</abbr><a class="footnote-reference brackets" href="#id2" id="id1">1</a>, en principio, software libre. Apenas dos años después
+de su creación, en 1997, el protocolo fue propuesto como estándar de la
+<abbr title="nternet Engineering Task Force">IETF</abbr>. La licencia, no obstante, cambio,
+por lo que en 1999 el equipo de <a class="reference external" href="https://es.wikipedia.org/wiki/OpenBSD">OpenBSD</a> comenzó la implementación más habitual
+del servidor, <a class="reference external" href="https://es.wikipedia.org/wiki/OpenSSH">OpenSSH</a>, que es la que
+traen las distribuciones de linux en su sistema de paquetería.</p>
+<p>El protocolo <abbr title="Security SHell">SSH</abbr> ataja los dos problemas de seguridad gracias a su cifrado
+híbrido que supone que:</p>
+<ol class="arabic simple">
+<li><p>Tras el establecimiento de la comunicación, el servidor envía al cliente su
+clave pública para que este pueda cotejarla y comprobar que no exite
+suplantación de identidad. Por supuesto, cotejarla implica conocerla de
+antemano y esto sólo es posible si el cliente se ha conectado anteriomente
+alguna vez. Si es la primera vez (y no media el crédito de ninguna entidad
+certificadora), el cliente tiene que hacer el acto de fe de creer que el
+servidor es quien dice ser, razón por la cual todos los clientes advierten
+del hecho y obligan al usuario a aceptar implícitamente la clave.</p></li>
+<li><p>Con la clave pública del servidor el cliente cifra una clave simétrica de
+sesión, que envía al servidor. Este al recibirla la descifra y, una vez la
+clave de sesión se halla en ambos extremos, puede comenzarse una comunicación
+absolutamente cifrada que impide sacar provecho de la intercepción de la
+comunicación.</p></li>
+<li><p>Asegurado el cifrado, el cliente se identifica en el servidor, bien a través
+de usuario y contraseña, bien a través del uso de certificado.</p></li>
+</ol>
+<p>Nuestro plan de estudio de este servicio <abbr title="Security SHell">SSH</abbr> incluirá los siguientes aspectos:</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="01.basico.html">4.5.1. Instalación</a></li>
+<li class="toctree-l1"><a class="reference internal" href="01.basico.html#configuracion">4.5.2. Configuración</a></li>
+<li class="toctree-l1"><a class="reference internal" href="01.basico.html#clientes">4.5.3. Clientes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="01.basico.html#openssh">4.5.3.1. OpenSSH</a></li>
+<li class="toctree-l2"><a class="reference internal" href="01.basico.html#id7">4.5.3.2. Putty</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="02.certificados.html">4.5.4. Autenticación de clave pública</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="02.certificados.html#claves">4.5.4.1. Claves</a></li>
+<li class="toctree-l2"><a class="reference internal" href="02.certificados.html#certificados">4.5.4.2. Certificados</a></li>
+<li class="toctree-l2"><a class="reference internal" href="02.certificados.html#openssh-y-openssl">4.5.4.3. Open<abbr title="Security SHell">SSH</abbr> y Open<abbr title="Secure Sockets Layer">SSL</abbr></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="03.tuneles.html">4.5.5. Túneles</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="03.tuneles.html#tunel-local">4.5.5.1. Túnel local</a></li>
+<li class="toctree-l2"><a class="reference internal" href="03.tuneles.html#tunel-remoto">4.5.5.2. Túnel remoto</a></li>
+<li class="toctree-l2"><a class="reference internal" href="03.tuneles.html#tunel-dinamico">4.5.5.3. Túnel dinámico</a></li>
+<li class="toctree-l2"><a class="reference internal" href="03.tuneles.html#configuracion-en-putty">4.5.5.4. Configuración en <strong class="program">putty</strong></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="04.adicional.html">4.5.6. Aspectos adicionales</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="04.adicional.html#transferencia-de-ficheros">4.5.6.1. Transferencia de ficheros</a></li>
+<li class="toctree-l2"><a class="reference internal" href="04.adicional.html#trampolin-de-acceso">4.5.6.2. Trampolín de acceso</a></li>
+<li class="toctree-l2"><a class="reference internal" href="04.adicional.html#persistencia-de-claves">4.5.6.3. Persistencia de claves</a></li>
+<li class="toctree-l2"><a class="reference internal" href="04.adicional.html#acceso-no-interactivo">4.5.6.4. Acceso no interactivo</a></li>
+<li class="toctree-l2"><a class="reference internal" href="04.adicional.html#redes-restringidas">4.5.6.5. Redes restringidas</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<p class="rubric">Notas al pie</p>
+<dl class="footnote brackets">
+<dt class="label" id="id2"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p>Existe una segunda versión del protocolo que es la que se usa en la
+actualidad, ya que esta primer adolecía de un grave problema de seguridad y
+usaba algunos algoritmos bajo patente.</p>
+</dd>
+</dl>
+</div>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="../09.autenticacion/pam_modules/99.pam_sss.html"
+                        title="capítulo anterior"><span class="section-number">4.4.4.23. </span><code class="docutils literal notranslate"><span class="pre">pam_sss</span></code></a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="01.basico.html"
+                        title="próximo capítulo"><span class="section-number">4.5.1. </span>Instalación</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/04.servidor/10.ssh/index.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="01.basico.html" title="4.5.1. Instalación"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="../09.autenticacion/pam_modules/99.pam_sss.html" title="4.4.4.23. pam_sss"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" ><span class="section-number">4. </span>Gestión del servidor</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">4.5. </span>Administración remota</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor CC BY 4.0, 2016-2021, José Miguel Sánchez Alés.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.2.0.
+    </div>
+  </body>
+</html>

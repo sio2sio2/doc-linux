@@ -1,0 +1,633 @@
+
+
+
+<!DOCTYPE html>
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>4.4. Autenticación &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css" />
+    <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+    
+    <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/jquery.js"></script>
+    <script src="../../_static/underscore.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/translations.js"></script>
+    
+    <link rel="index" title="Índice" href="../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../search.html" />
+    <link rel="next" title="4.4.4.1. pam_permit" href="pam_modules/01.pam_permit.html" />
+    <link rel="prev" title="4.3.3. Sistema de monitorización (nagios)" href="../08.monitorizacion/03.nagios/index.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="pam_modules/01.pam_permit.html" title="4.4.4.1. pam_permit"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="../08.monitorizacion/03.nagios/index.html" title="4.3.3. Sistema de monitorización (nagios)"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U"><span class="section-number">4. </span>Gestión del servidor</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">4.4. </span>Autenticación</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="autenticacion">
+<span id="pam"></span><h1><span class="section-number">4.4. </span>Autenticación<a class="headerlink" href="#autenticacion" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>La autenticación y, más en general, el ingreso de un usuario al sistema está
+estandarizado en los sistemas <em>Linux</em> gracias a <abbr title="Pluggable Authentication Modules">PAM</abbr>. Es importante que
+sea así, porque el acceso se puede lograr a través de distintos servicios y
+esto facilita que cada servicio no tenga que implementar el mecanismo de acceso,
+sino simplemente pasar las credenciales a <abbr title="Pluggable Authentication Modules">PAM</abbr> y que este se encargue de
+decidir si el usuario debe tener o no acceso.</p>
+<p>Como es probable que distintos servicios establezcan distintas políticas de
+acceso, <abbr title="Pluggable Authentication Modules">PAM</abbr> permite particularizar la configuración según el servicio.</p>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>La configuración de la autenticación es bastante delicada, por
+cuanto una mala configuración puede dejarnos sin acceso al sistema.</p>
+</div>
+<div class="section" id="estructura">
+<h2><span class="section-number">4.4.1. </span>Estructura<a class="headerlink" href="#estructura" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>La configuración de <abbr title="Pluggable Authentication Modules">PAM</abbr>, pues, consiste en definir cuáles son operaciones
+que deberá ejecutar cada servicio que requiere autenticación. Para ello puede
+usarse un único fichero <code class="file docutils literal notranslate"><span class="pre">/etc/pam.conf</span></code>, o una colección contenida en el
+directorio <code class="file docutils literal notranslate"><span class="pre">/etc/pam.d</span></code>. Si existe este segundo directorio, que es lo
+habitual, no se analiza el primer fichero; así que explicaremos este segundo
+método de configuración.</p>
+<p>Si echamos un vistazo al contenido de <code class="file docutils literal notranslate"><span class="pre">/etc/pam.d</span></code> nos toparemos algo
+así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> ls /etc/pam.d
+<span class="go">atd             common-auth                    login     runuser-l</span>
+<span class="go">chfn            common-password                newusers  sshd</span>
+<span class="go">chpasswd        common-session                 other     su</span>
+<span class="go">chsh            common-session-noninteractive  passwd    systemd-user</span>
+<span class="go">common-account  cron                           runuser</span>
+</pre></div>
+</div>
+<p>Se pueden distintiguir tres clases de ficheros:</p>
+<ul class="simple">
+<li><p>Los ficheros <code class="file docutils literal notranslate"><span class="pre">common-*</span></code>, que contienen directivas que suelen usarse
+como base para la autenticación en la mayoría de los servicios (véase
+<a class="reference internal" href="#pam-auth-update"><span class="std std-ref">pam-auth-update</span></a> más adelante). Esto es
+posible debido a que para incluir las directivas de un fichero en otro
+existe la directiva <code class="code docutils literal notranslate"><span class="pre">&#64;include</span></code>).</p></li>
+<li><p>Una serie de ficheros que representan distintos programas que requieren
+autenticación (en el listado antes indicado <code class="file docutils literal notranslate"><span class="pre">passwd</span></code>, <code class="file docutils literal notranslate"><span class="pre">sshd</span></code> o
+<code class="file docutils literal notranslate"><span class="pre">su</span></code>, por ejemplo). Los programas usarán su fichero correspondiente
+en caso de que exista.</p></li>
+<li><p>El fichero <code class="file docutils literal notranslate"><span class="pre">other</span></code> usado por los programas a los que no se les ha
+creado fichero particular.</p></li>
+</ul>
+</div>
+<div class="section" id="funcionamiento">
+<h2><span class="section-number">4.4.2. </span>Funcionamiento<a class="headerlink" href="#funcionamiento" title="Enlazar permanentemente con este título">¶</a></h2>
+<p><abbr title="Pluggable Authentication Modules">PAM</abbr> distingue entre cuatro tipo de tareas:</p>
+<dl class="simple">
+<dt><strong>Autenticación</strong> (<code class="docutils literal notranslate"><span class="pre">auth</span></code>)</dt><dd><p>Determina si las credenciales proporcionadas (habitualmente un nombre y una
+contraseña) pertenecen a un usuario existente y son válidas.</p>
+</dd>
+<dt><strong>Cuenta</strong> (<code class="docutils literal notranslate"><span class="pre">account</span></code>)</dt><dd><p>Determina si el usuario cuya identidad se ha ya comprobado, tiene permiso
+para acceder a la máquina o no (por una limitación horaria, porque no
+pertenezca al grupo adecuado, etc.)</p>
+</dd>
+<dt><strong>Password</strong> (<code class="docutils literal notranslate"><span class="pre">password</span></code>)</dt><dd><p>Relacionado con la modificación de la contraseña de usuario.</p>
+</dd>
+<dt><strong>Sesión</strong> (<code class="docutils literal notranslate"><span class="pre">session</span></code>)</dt><dd><p>Tareas que deben realizarse antes de que el usuario abre la sesión o después
+de que la cierre (por ejemplo, crear un directorio personal, montar sistemas
+de ficheros remotos etc.)</p>
+</dd>
+</dl>
+<p>Una aplicación que utilice <abbr title="Pluggable Authentication Modules">PAM</abbr> puede requerir la realización de uno o varios
+tipos de estas tareas. Cada tipo de tarea se divide en módulos, cada uno de los
+cuales se encarga de realizar algo. Como se ejecutan secuencialmente según el
+orden en el que aparecen en la configuración, todos los módulos de un mismo
+tipo, forman una <em>pila</em> y devuelven un resultado de éxito o error que contribuye
+al resultado global de la pila. Cuando <abbr title="Pluggable Authentication Modules">PAM</abbr> devuelve éxito para todas las pilas
+que la aplicación ha requerido, ésta permitirá el ingreso del usuario.</p>
+</div>
+<div class="section" id="sintaxis">
+<h2><span class="section-number">4.4.3. </span>Sintaxis<a class="headerlink" href="#sintaxis" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Los ficheros de configuración de <abbr title="Pluggable Authentication Modules">PAM</abbr> contienen líneas de tres tipos:</p>
+<ol class="arabic">
+<li><p>Líneas de comentario, que son aquellas que comienzan con almohadilla.</p></li>
+<li><p>Líneas que permiten incluir las directivas de otros ficheros:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">@include common-auth</span>
+</pre></div>
+</div>
+<p>donde <code class="file docutils literal notranslate"><span class="pre">common-auth</span></code> es el fichero del que se desean incluir las
+directivas.</p>
+</li>
+<li><dl>
+<dt>Líneas de directiva, que son aquellas que definen la ejecución de un</dt><dd><p>y que requieren una explicación detallada:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">&lt;tipo&gt; &lt;control&gt; &lt;modulo&gt; [&lt;opciones&gt;]</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+<p>Las líneas de directiva se evalúan en el orden en que se leen y sus
+componentes son los siguientes:</p>
+<dl>
+<dt><strong>Tipo</strong></dt><dd><p>El tipo de módulo del que ya se discutió bajo el epígrafe anterior. Por
+tanto, define la pila en la que se ejecuta el módulo.</p>
+</dd>
+<dt><strong>Control</strong></dt><dd><p>Determina cómo contribuye el resultado de la ejecución del módulo
+al resultado global de la pila.
+directiva y cómo influirá esto en el proceso global de autenticación.
+Hay cuatro indicadores básicos de control:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">required</span></code></dt><dd><p>Exige que tenga éxito la directiva, pero no interrumpe la ejecución
+de la pila de módulos.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">requisite</span></code></dt><dd><p>Como <code class="docutils literal notranslate"><span class="pre">required</span></code>, pero interrumpe la ejecución de la pila
+provocando un error.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">sufficient</span></code></dt><dd><p>Su éxito es suficiente, así que interrumpe la ejecución de la pila
+devolviendo éxito.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">optional</span></code></dt><dd><p>El éxito o fracaso no influye en el resultado de la pila.</p>
+</dd>
+</dl>
+<p>Alternativamente a estos términos, se puede utilizar una sucesión
+de parejas resultado/acción, que permiten un control más preciso. Los
+resultados son muy variados:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 75%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parámetro</p></th>
+<th class="head"><p>Significado</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>abort</p></td>
+<td><p>Error crítico.</p></td>
+</tr>
+<tr class="row-odd"><td><p>acct_expired</p></td>
+<td><p>La cuenta de usuario ha expirado.</p></td>
+</tr>
+<tr class="row-even"><td><p>auth_err</p></td>
+<td><p>Fallo en la autenticación.</p></td>
+</tr>
+<tr class="row-odd"><td><p>authinfo_unavail</p></td>
+<td><p>No puede accederse a la información de autenticación.</p></td>
+</tr>
+<tr class="row-even"><td><p>authtok_disable_aging</p></td>
+<td><p>Authentication token aging disabled.</p></td>
+</tr>
+<tr class="row-odd"><td><p>authtok_err</p></td>
+<td><p>Error en la manipulación del token de autenticación.</p></td>
+</tr>
+<tr class="row-even"><td><p>authtok_expired</p></td>
+<td><p>Token de autenticación caducado.</p></td>
+</tr>
+<tr class="row-odd"><td><p>authtok_lock_busy</p></td>
+<td><p>Ocupado el bloqueo del token de autenticación.</p></td>
+</tr>
+<tr class="row-even"><td><p>authtok_recover_err</p></td>
+<td><p>No puede recuperarse la información de autenticación.</p></td>
+</tr>
+<tr class="row-odd"><td><p>bad_item</p></td>
+<td><p>Item incorrecto.</p></td>
+</tr>
+<tr class="row-even"><td><p>buf_err</p></td>
+<td><p>Error en el <em>buffer</em> de memoria.</p></td>
+</tr>
+<tr class="row-odd"><td><p>conv_again</p></td>
+<td><p>Conversation function is event driven and data is not available yet.</p></td>
+</tr>
+<tr class="row-even"><td><p>conv_err</p></td>
+<td><p>Error en la conversación.</p></td>
+</tr>
+<tr class="row-odd"><td><p>cred_err</p></td>
+<td><p>Error al fijar las credenciales de usuario.</p></td>
+</tr>
+<tr class="row-even"><td><p>cred_expired</p></td>
+<td><p>Credenciales de usuario caducadas.</p></td>
+</tr>
+<tr class="row-odd"><td><p>cred_insufficient</p></td>
+<td><p>Sin acceso a los datos de autenticación por falta de credenciales.</p></td>
+</tr>
+<tr class="row-even"><td><p>cred_unavail</p></td>
+<td><p>Credenciales de usuario no disponibles.</p></td>
+</tr>
+<tr class="row-odd"><td><p>default</p></td>
+<td><p>Cualquier valor no mencionado implícitamente.</p></td>
+</tr>
+<tr class="row-even"><td><p>ignore</p></td>
+<td><p>No considerar el módulo.</p></td>
+</tr>
+<tr class="row-odd"><td><p>incomplete</p></td>
+<td><p>Reiniciar el módulo para que se complete.</p></td>
+</tr>
+<tr class="row-even"><td><p>maxtries</p></td>
+<td><p>Máximo número de intentos.</p></td>
+</tr>
+<tr class="row-odd"><td><p>module_unknown</p></td>
+<td><p>El módulo no existe o no se conoce.</p></td>
+</tr>
+<tr class="row-even"><td><p>new_authtok_reqd</p></td>
+<td><p>Se requiere un nuevo token de autenticación.</p></td>
+</tr>
+<tr class="row-odd"><td><p>no_module_data</p></td>
+<td><p>Módulo sin datos.</p></td>
+</tr>
+<tr class="row-even"><td><p>open_err</p></td>
+<td><p>El módulo no debe cargarse.</p></td>
+</tr>
+<tr class="row-odd"><td><p>perm_denied</p></td>
+<td><p>Permiso denegado.</p></td>
+</tr>
+<tr class="row-even"><td><p>service_err</p></td>
+<td><p>Error de servicio en el módulo.</p></td>
+</tr>
+<tr class="row-odd"><td><p>session_err</p></td>
+<td><p>Error de sesión.</p></td>
+</tr>
+<tr class="row-even"><td><p>success</p></td>
+<td><p>Acaba con éxito</p></td>
+</tr>
+<tr class="row-odd"><td><p>symbol_err</p></td>
+<td><p>Símbolo no encontrado.</p></td>
+</tr>
+<tr class="row-even"><td><p>system_err</p></td>
+<td><p>Error de sistema.</p></td>
+</tr>
+<tr class="row-odd"><td><p>try_again</p></td>
+<td><p>Preliminary check by password service.</p></td>
+</tr>
+<tr class="row-even"><td><p>user_unknown</p></td>
+<td><p>Usuario desconocido.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Los valores que pueden adoptar estos resultados son los siguientes:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 9%" />
+<col style="width: 91%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Valor</p></th>
+<th class="head"><p>Significado</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>ignore</p></td>
+<td><p>El resultado del módulo no afecta al resultado global del proceso.</p></td>
+</tr>
+<tr class="row-odd"><td><p>bad</p></td>
+<td><p>El resultado supone fallo del módulo.</p></td>
+</tr>
+<tr class="row-even"><td><p>die</p></td>
+<td><p>Como el anterior, pero no se siguen comprobando módulos.</p></td>
+</tr>
+<tr class="row-odd"><td><p>ok</p></td>
+<td><p>El módulo acaba con éxito.</p></td>
+</tr>
+<tr class="row-even"><td><p>done</p></td>
+<td><p>Se acaba con éxito y no se siguen comprobando más módulos.</p></td>
+</tr>
+<tr class="row-odd"><td><p>reset</p></td>
+<td><p>Se resetea el resultado global del proceso de autenticación.</p></td>
+</tr>
+<tr class="row-even"><td><p>N</p></td>
+<td><p>Número de directivas siguientes que se saltarán.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Los indicadores básicos de control equivalen a lo siguiente:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">required</span></code>: <code class="code docutils literal notranslate"><span class="pre">[success=ok</span> <span class="pre">new_authtok_reqd=ok</span> <span class="pre">ignore=ignore</span> <span class="pre">default=bad]</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">requisite</span></code>: <code class="code docutils literal notranslate"><span class="pre">[success=ok</span> <span class="pre">new_authtok_reqd=ok</span> <span class="pre">ignore=ignore</span> <span class="pre">default=die]</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sufficiente</span></code>: <code class="code docutils literal notranslate"><span class="pre">[success=done</span> <span class="pre">new_authtok_reqd=done</span> <span class="pre">default=ignore]</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">optional</span></code>: <code class="code docutils literal notranslate"><span class="pre">[success=ok</span> <span class="pre">new_authtok_reqd=ok</span> <span class="pre">default=ignore]</span></code></p></li>
+</ul>
+<p>Obsérvese que los valores se ajustan a la definición que se ha dado de
+los indicadores. Por ejemplo, un módulo con el indicador <code class="docutils literal notranslate"><span class="pre">requisite</span></code>
+acaba inmediatamente la ejecución de la pila. Esto es debido a que el
+valor predeterminado es <em>die</em>.</p>
+<p>En el caso de que se use como valor un número, este indicará el número
+e directivas de <abbr title="Pluggable Authentication Modules">PAM</abbr> que se saltarán. Es importante tener en cuenta
+que no se verá afectado el resultado de la línea: si acabó con éxito la
+línea contribuirá al resultado global de la autenticación con un éxito;
+y, si acabó con fracasó, contribuirá con un frcaso. Este valor es
+bastante útil cuando tenemos varias fuentes para la obtención de las
+credenciales. Por ejemplo, un servicio <abbr title="Lightweight Directory Access Protocol">LDAP</abbr> y los ficheros locales ya vistos
+(<code class="file docutils literal notranslate"><span class="pre">/etc/passwd</span></code>, etc.). Como es obvio que para que el usuario sea
+válido sólo debe estar en una de las fuentes, podemos encontrarnos con
+configuraciones como la que sigue:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">auth     [success=2 default=ignore]    pam_unix.so nullok_secure</span>
+<span class="go">auth     [success=1 default=ignore]    pam_ldap.so use_first_pass minimum_uid=1000 debug</span>
+<span class="go">auth     requisite            pam_deny.so</span>
+<span class="go">auth     required          pam_permit.so</span>
+</pre></div>
+</div>
+<p>O sea, si el usuario es local y la autenticación ha tenido éxito, se
+saltan las dos siguientes directivas y se ejecuta la cuarta, que
+incluye un módulo que, simplemente, tiene siempre éxito. Si falla, en
+cambio, nos descuidamos del fallo (<code class="code docutils literal notranslate"><span class="pre">default=ignore</span></code>) y se analiza
+si el usuario está definido en la base <em>ldap</em> y sus credenciales son
+correctas. SI es así, saltamos una directiva, con lo que acabaremos en
+el módulo <em>promiscuo</em> que siempre permite acceso. Por contra, si falla,
+desatendemos el error (<code class="code docutils literal notranslate"><span class="pre">default=ignore</span></code>), pero caemos en la
+siguiente directiva, que siempre falla y, además, está como <em>requisite</em>,
+con lo que la autenticación fallará inmediatamente.</p>
+</dd>
+<dt><strong>Módulo</strong></dt><dd><p>Módulo que se usa en la directiva. <abbr title="Pluggable Authentication Modules">PAM</abbr> está constituido por un
+conjunto de módulos, cada uno de los cuales se encarga de un aspecto
+distinto. Por ejemplo, <code class="file docutils literal notranslate"><span class="pre">pam_unix.so</span></code> es el módulo que se
+encarga de hacer comprobaciones usando la información de
+<code class="file docutils literal notranslate"><span class="pre">/etc/passwd</span></code> y <code class="file docutils literal notranslate"><span class="pre">/etc/shadow</span></code>.</p>
+<p>Bajo el epígrafe siguiente describiremos el uso de los más habituales.</p>
+</dd>
+<dt><strong>Opciones</strong></dt><dd><p>Opciones con las que se ejecuta el módulo. Por ejemplo
+<code class="file docutils literal notranslate"><span class="pre">pam_unix.so</span></code> no permite acceder al servicio si el usuario tiene
+una contraseña vacía. Sin embargo, si se incluye la opcion
+<kbd class="kbd docutils literal notranslate">nullok</kbd>, sí podrá.</p>
+</dd>
+</dl>
+</li>
+</ol>
+<div class="admonition warning" id="pam-auth-update">
+<p class="admonition-title">Advertencia</p>
+<p>A pesar de que la configuración consiste en escribir apropiadamente
+las líneas para que el proceso de autenticación sea el adecuado, las
+distribuciones derivadas de <em>Debian</em> tienen un <span class="target" id="index-0"></span>programa llamado <strong class="program">pam-auth-update</strong> que permite mediante
+menú generar automáticamente las líneas de los ficheros <code class="file docutils literal notranslate"><span class="pre">common-*</span></code>. De
+esta forma, la instalación de servicios que aportan usuarios y grupos al
+sistema (como <a class="reference internal" href="../../06.infraestructura/05.directorio/06.samba/index.html#samba"><span class="std std-ref">samba</span></a> u <a class="reference internal" href="../../06.infraestructura/05.directorio/05.ldap/index.html#openldap"><span class="std std-ref">openldap</span></a>).  es
+bastante sencilla<a class="footnote-reference brackets" href="#id4" id="id1">1</a>. Por ello, es conveniente no modificar los archivos
+<code class="file docutils literal notranslate"><span class="pre">common-*</span></code>, por cuanto se regeneran con <strong class="command">pam-auth-update</strong>. Por lo
+general, añadir alguna directiva al final es posible sin que
+<strong class="command">pam-auth-update</strong> plantee problemas. Ahora bien, si lo que se desea
+es modificar argumentos de líneas que genera la utilidad, entonces es
+conveniente modificar los ficheros de los perfiles de
+<strong class="command">pam-auth-update</strong> (en <code class="file docutils literal notranslate"><span class="pre">/usr/share/pam-configs</span></code>).</p>
+</div>
+</div>
+<div class="section" id="modulos">
+<h2><span class="section-number">4.4.4. </span>Módulos<a class="headerlink" href="#modulos" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Hay muchos módulos para <abbr title="Pluggable Authentication Modules">PAM</abbr>. Bajo este epígrafe sólo se comentarán los más
+habituales y se explicarán brevemente algunos de sus argumentos. Suelen tener
+página de manual, así que es recomendable consultarla.</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="pam_modules/01.pam_permit.html">4.4.4.1. <code class="docutils literal notranslate"><span class="pre">pam_permit</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="pam_modules/02.pam_deny.html">4.4.4.2. <code class="docutils literal notranslate"><span class="pre">pam_deny</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="pam_modules/03.pam_unix.html">4.4.4.3. <code class="docutils literal notranslate"><span class="pre">pam_unix</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="pam_modules/04.pam_cracklib.html">4.4.4.4. <code class="docutils literal notranslate"><span class="pre">pam_cracklib</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="pam_modules/05.pam_nologin.html">4.4.4.5. <code class="docutils literal notranslate"><span class="pre">pam_nologin</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="pam_modules/06.pam_access.html">4.4.4.6. <code class="docutils literal notranslate"><span class="pre">pam_access</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="pam_modules/07.pam_mail.html">4.4.4.7. <code class="docutils literal notranslate"><span class="pre">pam_mail</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="pam_modules/08.pam_limits.html">4.4.4.8. <code class="docutils literal notranslate"><span class="pre">pam_limits</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="pam_modules/09.pam_env.html">4.4.4.9. <code class="docutils literal notranslate"><span class="pre">pam_env</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="pam_modules/10.pam_umask.html">4.4.4.10. pam_umask</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pam_modules/11.pam_time.html">4.4.4.11. <code class="docutils literal notranslate"><span class="pre">pam_time</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="pam_modules/12.pam_succeed.html">4.4.4.12. <code class="docutils literal notranslate"><span class="pre">pam_succeed_if</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="pam_modules/13.pam_wheel.html">4.4.4.13. <code class="docutils literal notranslate"><span class="pre">pam_wheel</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="pam_modules/14.pam_userdb.html">4.4.4.14. <code class="docutils literal notranslate"><span class="pre">pam_userdb</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="pam_modules/15.pam_groups.html">4.4.4.15. <code class="docutils literal notranslate"><span class="pre">pam_group</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="pam_modules/16.pam_motd.html">4.4.4.16. <code class="docutils literal notranslate"><span class="pre">pam_motd</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="pam_modules/17.pam_issue.html">4.4.4.17. <code class="docutils literal notranslate"><span class="pre">pam_issue</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="pam_modules/18.pam_mkhomedir.html">4.4.4.18. <code class="docutils literal notranslate"><span class="pre">pam_mkhomedir</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="pam_modules/19.pam_mount.html">4.4.4.19. <code class="docutils literal notranslate"><span class="pre">pam_mount</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="pam_modules/20.pam_exec.html">4.4.4.20. <code class="docutils literal notranslate"><span class="pre">pam_exec</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="pam_modules/21.pam_listfile.html">4.4.4.21. <code class="docutils literal notranslate"><span class="pre">pam_listfile</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="pam_modules/22.pam_ssh.html">4.4.4.22. <code class="docutils literal notranslate"><span class="pre">pam_ssh</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="pam_modules/99.pam_sss.html">4.4.4.23. <code class="docutils literal notranslate"><span class="pre">pam_sss</span></code></a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="politica-de-contrasenas">
+<h2><span class="section-number">4.4.5. </span>Política de contraseñas<a class="headerlink" href="#politica-de-contrasenas" title="Enlazar permanentemente con este título">¶</a></h2>
+<div class="admonition seealso">
+<p class="admonition-title">Ver también</p>
+<p>Consulte los <a class="reference internal" href="../../guias/02.seg/02.entorno/02.acceso.html#politica-contrasenas"><span class="std std-ref">criterios para establecer las contraseñas</span></a>.</p>
+</div>
+</div>
+<div class="section" id="ejemplo-ilustrativo">
+<h2><span class="section-number">4.4.6. </span>Ejemplo ilustrativo<a class="headerlink" href="#ejemplo-ilustrativo" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>El mejor método para entender cómo actúa <abbr title="Pluggable Authentication Modules">PAM</abbr> es tomar algunos de sus ficheros
+de configuración reales y analizarlos.</p>
+<p>Empecemos con los ficheros <em>comunes</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> /etc/pam.d/common-auth
+
+<span class="go">auth	[success=1 default=ignore]	pam_unix.so nullok_secure</span>
+<span class="go">auth	requisite			pam_deny.so</span>
+<span class="go">auth	required			pam_permit.so</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> /etc/pam.d/common-password
+
+<span class="go">password	[success=1 default=ignore]	pam_unix.so obscure sha512</span>
+<span class="go">password	requisite			pam_deny.so</span>
+<span class="go">password	required			pam_permit.so</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> /etc/pam.d/common-account
+
+<span class="go">account	[success=1 new_authtok_reqd=done default=ignore]	pam_unix.so </span>
+<span class="go">account	requisite			pam_deny.so</span>
+<span class="go">account	required			pam_permit.so</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> /etc/pam.d/common-session
+
+<span class="go">session	[default=1]			pam_permit.so</span>
+<span class="go">session	requisite			pam_deny.so</span>
+<span class="go">session	required			pam_permit.so</span>
+<span class="go">session	required	pam_unix.so </span>
+</pre></div>
+</div>
+<p>Los ficheros los genera automáticamente <a class="reference internal" href="#pam-auth-update"><span class="std std-ref">pam-auth-update</span></a>, de ahí que sean algo más complicados de lo que podrían ser.
+Los grupos <em>auth</em> y <em>password</em> tienen una estructura que hace que se prueben
+sucesivamente distintos mecanismos de manera que si se tiene éxito se salta al
+módulo <em>pam_permit</em> y si no se tiene se prueba con el siguiente. El fallo de
+todos ellos hace que se acabe entrando en <em>pam_deny</em>, que malogra la
+autenticación.</p>
+<p>Por su parte, <code class="file docutils literal notranslate"><span class="pre">/etc/pam.d/sshd</span></code> tiene este contenido:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">@include common-auth</span>
+<span class="go">account    required     pam_nologin.so</span>
+<span class="go">@include common-account</span>
+<span class="go">session [success=ok ignore=ignore module_unknown=ignore default=bad]        pam_selinux.so close</span>
+<span class="go">session    required     pam_loginuid.so</span>
+<span class="go">session    optional     pam_keyinit.so force revoke</span>
+<span class="go">@include common-session</span>
+<span class="go">session    optional     pam_motd.so  motd=/run/motd.dynamic</span>
+<span class="go">session    optional     pam_motd.so noupdate</span>
+<span class="go">session    optional     pam_mail.so standard noenv # [1]</span>
+<span class="go">session    required     pam_limits.so</span>
+<span class="go">session    required     pam_env.so # [1]</span>
+<span class="go">session    required     pam_env.so user_readenv=1 envfile=/etc/default/locale</span>
+<span class="go">session [success=ok ignore=ignore module_unknown=ignore default=bad]        pam_selinux.so open</span>
+<span class="go">@include common-password</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="nss">
+<span id="nsswitch"></span><span id="id2"></span><h2><span class="section-number">4.4.7. </span>NSS<a class="headerlink" href="#nss" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>El servicio <abbr title="Name Service Switch">NSS</abbr> es una herramienta que permite
+resolver nombres (de usuarios, de grupos, de máquinas, etc.) a través de
+distintos mecanismos. Por ejemplo, en un sistema básico, gracias a este servicio
+se obtiene la información sobre usuarios y grupos de los ficheros
+<code class="file docutils literal notranslate"><span class="pre">/etc/passwd</span></code>, <code class="file docutils literal notranslate"><span class="pre">/etc/group</span></code> y <code class="file docutils literal notranslate"><span class="pre">/etc/shadow</span></code>. También gracias a
+él se resuelven los nombres de máquinas acudiendo primero a <code class="file docutils literal notranslate"><span class="pre">/etc/hosts</span></code> y
+a continuación a un servidor <em>dns</em>, si esta disponible. De hecho, el comando
+<a class="reference internal" href="../../02.conbas/05.seguridad/05a.usuarios.html#getent"><span class="std std-ref">getent</span></a> usa este servicio para devolver sus resultados:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> getent passwd usuario
+<span class="go">usuario:x:1000:1000:Usuario pedestre,,,:/home/usuario:/bin/bash</span>
+<span class="gp">$</span> getent hosts choquereta
+<span class="go">127.0.1.1       minilleta.domus minilleta choquereta.domus choquereta</span>
+<span class="gp">$</span> getent hosts www.iescdl.es
+<span class="go">80.32.8.158     www.iescdl.es</span>
+</pre></div>
+</div>
+<p>No forma parte en absoluto de <abbr title="Pluggable Authentication Modules">PAM</abbr> ni de la autenticación, pero está ligado
+en la medida en que permite resolver cualquier nombre del sistema. De no
+existir, el sistema sería incapaz de saber quiénes somos una vez dentro.</p>
+<p>Su configuración se hace a través del fichero <code class="file docutils literal notranslate"><span class="pre">/etc/nsswitch.conf</span></code> que
+tiene este aspecto:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span># /etc/nsswitch.conf
+#
+# Example configuration of GNU Name Service Switch functionality.
+# If you have the `glibc-doc-reference&#39; and `info&#39; packages installed, try:
+# `info libc &quot;Name Service Switch&quot;&#39; for information about this file.
+
+passwd:         compat
+group:          compat
+shadow:         compat
+gshadow:        files
+
+hosts:          files dns
+networks:       files
+
+protocols:      db files
+services:       db files
+ethers:         db files
+rpc:            db files
+
+netgroup:       nis
+</pre></div>
+</div>
+<p>Obsérvese que se declaran los <em>objetos</em> (a la izquierda) y de dónde se obtendrá
+su información (a la derecha). Para el caso de los usuarios (<em>passwd</em>, <em>group</em>,
+etc.) la fuente son únicamente los ficheros locales<a class="footnote-reference brackets" href="#id5" id="id3">2</a>, pero esta fuente no
+tiene por qué ser única. Este es un sistema básico, pero incluso en un sistema
+básico la resolución de nombres de máquinas tiene una doble fuente: el fichero
+:<cite>/etc/hosts</cite> y el servicio <em>dns</em>. Por ese motivo, vemos la línea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">hosts:          files dns</span>
+</pre></div>
+</div>
+<p>El orden es importante. En este caso se mirará primero en los ficheros (o sea,
+en <code class="file docutils literal notranslate"><span class="pre">/etc/hosts</span></code>) y si no existe en ellos, se pasará a intentar resolver a
+través del servicio <em>dns</em>.</p>
+<p class="rubric">Notas al pie</p>
+<dl class="footnote brackets">
+<dt class="label" id="id4"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p>Para la configuración <strong class="command">pam-auth-update</strong> usa <em>perfiles</em> que se
+activan o desactivan a través del menú. Estos perfiles configuran distintos
+aspectos de la configuración. Por ejemplo, la <em>autenticación unix</em> o la
+<em>autenticación con LDAP</em> son perfiles distintos, de manera que si activamos
+ambos, usaremos ambas fuentes para obtener usuarios válidos. La definición de
+los perfiles se realiza a través de sendos ficheros contenidos en
+<code class="file docutils literal notranslate"><span class="pre">/usr/share/pam-configs</span></code>.</p>
+</dd>
+<dt class="label" id="id5"><span class="brackets"><a class="fn-backref" href="#id3">2</a></span></dt>
+<dd><p>La razón de que diga <code class="code docutils literal notranslate"><span class="pre">compat</span></code> y no <code class="code docutils literal notranslate"><span class="pre">files</span></code> es la <em>compat</em>ilibidad con una sintaxis particular de los ficheros <code class="file docutils literal notranslate"><span class="pre">/etc/passwd</span></code>,
+etc. que permite añadir a los usuarios y grupos locales los definidos a
+través de un servidor <a class="reference external" href="https://es.wikipedia.org/wiki/Network_Information_Service">NIS</a>.  Sin embargo,
+esto mismo se puede lograr con <code class="code docutils literal notranslate"><span class="pre">files</span> <span class="pre">nis</span></code> sin necesidad de tal sintaxis
+y, además, este servidor ha caído en desuso ante soluciones como <em>LDAP</em> o <em>samba</em>.</p>
+</dd>
+</dl>
+</div>
+</div>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../index.html">Tabla de contenido</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">4.4. Autenticación</a><ul>
+<li><a class="reference internal" href="#estructura">4.4.1. Estructura</a></li>
+<li><a class="reference internal" href="#funcionamiento">4.4.2. Funcionamiento</a></li>
+<li><a class="reference internal" href="#sintaxis">4.4.3. Sintaxis</a></li>
+<li><a class="reference internal" href="#modulos">4.4.4. Módulos</a></li>
+<li><a class="reference internal" href="#politica-de-contrasenas">4.4.5. Política de contraseñas</a></li>
+<li><a class="reference internal" href="#ejemplo-ilustrativo">4.4.6. Ejemplo ilustrativo</a></li>
+<li><a class="reference internal" href="#nss">4.4.7. NSS</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="../08.monitorizacion/03.nagios/index.html"
+                        title="capítulo anterior"><span class="section-number">4.3.3. </span>Sistema de monitorización (nagios)</a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="pam_modules/01.pam_permit.html"
+                        title="próximo capítulo"><span class="section-number">4.4.4.1. </span><code class="docutils literal notranslate"><span class="pre">pam_permit</span></code></a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/04.servidor/09.autenticacion/index.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="pam_modules/01.pam_permit.html" title="4.4.4.1. pam_permit"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="../08.monitorizacion/03.nagios/index.html" title="4.3.3. Sistema de monitorización (nagios)"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" ><span class="section-number">4. </span>Gestión del servidor</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">4.4. </span>Autenticación</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor CC BY 4.0, 2016-2021, José Miguel Sánchez Alés.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.2.0.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,321 @@
+.. _backuppc:
+
+BackupPC
+********
+:program:`BackupPC` es un sistema de creación y gestión de copias de seguridad
+de sistemas *Linux*, *Windows* y *MacOs* en red. Es capaz de llevar a cabo el
+respaldo de múltiples clientes sin necesidad de instalar *software* adicional en
+estos, ya que se vale de programas que muy probablemente tenga ya instalado éste
+(|SSH|, :ref:`rsync <rsync>`, |CIFS|, etc.). En principio, su instalación y
+configuración es más sencilla que la de alternativas como Bacula_.
+
+.. _backuppc-install:
+
+Instalación
+===========
+La gestión de copias se lleva a cabo a través de una interfaz web, por lo que es
+necesario habilitar un servidor *web* para ello. Utilizaremos :ref:`nginx
+<n-ginx>` para ello.
+
+Básica
+------
+Lo indispensable es instalar el servidor web con capacidad para ejecutar
+*scripts* |CGI|::
+
+   # apt install nginx-light fcgiwrap backuppc
+
+Esa línea basta para instalar todo lo necesario y evitar que se instale como
+servidor web :program:`apache`.
+
+.. warning:: :program:`BackupPC` también envía mensajes de correo a ciertos
+   usuarios, por lo que requiere e instala automáticamente un agente de
+   transporte de correo. Antes de ejecutar la orden anterior, :ref:`lea este
+   punto referido a los usuarios y el correo <backuppc-warning-mail>`.
+
+.. seealso:: Para profundizar en la instalación del servidor web debería echar
+   un vistazo al :ref:`epígrafe dedicado al servicio web <web>`.
+
+Una primera configuración que permite el uso de :program:`backuppc` es la
+siguiente:
+
+.. literalinclude:: files/backuppc
+   :language: nginx
+
+En la que se ha supuesto que el acceso es local y se hace a través de
+*http://backuppc.example.net*. La configuración, no obstante, (véase
+:file:`/etc/backuppc/config.pl`) está pensada para que la aplicación se
+encuentre dentro del directorio :file:`/backuppc/` del servidor, de ahí que la
+directiva *location* para las imágenes se escriba como se escriba. Ello evita
+cambiar la configuración predeterminada de debian.
+
+Seguridad
+---------
+La configuración anterior funciona, pero es un poco deficiente en lo referente a
+la seguridad, puesto que:
+
+* No se usa :ref:`comunicación cifrada <https>`.
+* No hay autenticación de usuarios y, en consecuencia, el que acceda a la
+  interfaz, tendrá control absoluto sobre las copias. La aplicación utiliza la
+  autenticación |HTTP|, de modo que debemos definir los usuarios en el propio
+  servidor.
+
+Si generamos un certificado digital para el servidor y habilitamos la
+autenticación, nos quedará una configuración como la siguiente:
+
+.. literalinclude:: files/backuppc.seg
+   :language: nginx
+   :emphasize-lines: 4,16-23,29
+
+Es indispensable, al menos, crear el usuario administrador que en el fichero
+preconfigurado por la instalación se llama *backuppc*. En consecuencia::
+
+   # echo "backuppc:$(openssl passwd -apr1 "contraseña-dificl")" >> /etc/nginx/backuppc.users
+   # chgrp www-data /etc/nginx/backuppc.users
+   # chmod 640 /etc/nginx/backuppc.users
+
+Almacen de copias
+-----------------
+Las copias de seguridad se almacén dentro del directorio
+:file:`/var/lib/backuppc` que es, además, el directorio personal del usuario
+*backuppc* que crea la aplicación para su ejecución. Dado que los respaldos
+pueden llevar a ocupar mucho espacio de disco lo más prudente es montar este
+directorio en un sistema de ficheros aparte.
+
+Clientes
+========
+.. warning:: Hasta completar la configuración en los clientes, pare el
+   servicio.
+
+Para conectar a los clientes, :program:`BackupPC` no usa un cliente específico,
+sino que permite el uso de alternativas instaladas en el propio cliente:
+
+- :ref:`rsync <rsync>`, o sobre :ref:`ssh <ssh>`, o configurando
+  :command:`rsync` como demonio.
+- :ref:`tar <tar>` sobre :ref:`ssh <ssh>`.
+- |CIFS|.
+- |FTP|.
+
+El último método está desaconsejado en cualquier caso, y entre los tres
+restantes deberá escogerse según sea el sistema operativo del cliente. Para un
+cliente *Windows* lo más sencillo es usar |CIFS| ya que no requiere ninguna
+instalación adicional; y para un cliente *linux*, a menos que sea un sistema de
+escritorio en el que se haya instalado samba para compartir con otros clientes
+*Windows*, la opción más inmediata es usar :command:`tar` (que vendrá
+instalado) sobre :program:`ssh`, cuyo servidor sí habrá que instalar.
+
+.. _backuppc-register:
+
+Registro
+--------
+Es preciso registrar los clientes de los que se hará respaldo en el servidor.
+Puede llevarse a cabo a través de la interfaz web o modificando directamente
+:file:`/etc/backuppc/hosts`. Cada línea se compone de cuatro columnas:
+
+.. code-block:: none
+
+   nombre_maquina    0     usuario     usuario2,usuario3
+
+La primera es el nombre de máquina, que tendrá que coincidir con un nombre
+*Netbios* o un nombre de red resoluble por el servidor; la segunda se recomienda
+dejarla a 0; la tercera es el usuario al que se advertirá vía correo electrónico
+de la ejecución de las copias de seguridad y tendrá permisos para manipular la
+configuración y los respaldos de la máquina a través de la interfaz web. Los
+últimos son usuarios secundarios que no será advertidos, pero tienen potestad
+para manipular la máquina a través de la interfaz web.
+
+Al respecto de los usuarios ha de precisarse que:
+
+.. _backuppc-warning-mail:
+
+- Para que el usuario de la primera columna reciba correo, :program:`BackupPC`
+  espera encontrar un agente de transporte (|MTA|), que en la configuración
+  predeterminada es::
+
+   # grep Sendmail /etc/backuppc/config.pl
+   $Conf{SendmailPath} = '/usr/sbin/sendmail';
+
+  Como el agente de transporte es dependencia en *debian*, se instalará
+  automáticamente *exim4*, que no es probablemente lo que queramos. Si nuestra
+  intención es montar un servidor de correo completo, podemos instalar en su
+  lugar :ref:`postfix <smtp>`; y, si sólo queremos tener la posibilidad de
+  enviar mensajes haciendo uso de un servidor externo, es mejor algo más
+  sencillo como :command:`ssmtp` o :command:`msmtp-mta`, para el cual nos
+  servirá lo referido para :ref:`msmtp <msmtp>`.
+
+- En la configuración no se añade el dominio para este usuario, sino que o se
+  hace en el archivo de configuración (*EMailUserDestDomain*) o se deja en
+  blanco para que el servidor de correo se encargue de añadir el adecuado.
+
+- Todos los usuarios (también los de la tercera columna) son usuarios definidos
+  para la :ref:`autenticación en el servidor web <nginx-auth>` y definirlos en
+  el archivo :file:`backuppc.users` como ya se hizo con el usuario *backuppc*.
+  les da acceso a la interfaz para que tengan control sobre las copias sobre las
+  máquinas clientes.
+
+.. note:: En caso de que no queramos definir usuario adicional alguno, podemos
+   dejar en blanco las dos últimas columnas.
+
+Linux
+-----
+Sin perjuicio de que se pueda usar otro método, para el acceso a los clientes se
+usará |SSH| y se generará la copia con :ref:`tar <tar>`. Eso supone que en cada
+cliente linux:
+
+- Deberá estar instalado :command:`tar` y un servidor |SSH|.
+- Se debe permitir que el servidor de copias acceda por |SSH| como administrador
+  y sin necesidad de contraseña.
+
+Esto segundo puede lograrse generando un par de claves para el usuario
+*backuppc* del servidor de copias y subiéndolas al perfil de *root* de cada
+cliente.
+
+.. rubric:: En el servidor
+
+Generamos el par de claves, dejando vacía la contraseña de paso::
+
+   # runuser -u backuppc -- ssh-keygen -t rsa
+
+.. rubric:: Para cada cliente
+
+Debemos subir la clave pública al cliente. Suponiendo que exista un usuario con
+acceso llamado *usuario*::
+
+   servidor# scp /var/lib/backuppc/.ssh/id_rsa.pub usuario@cliente:/tmp
+
+Y ya en el cliente (suponemos que la |IP| del servidor de copias sea
+*192.168.0.10*)::
+
+   cliente# mkdir ~/.ssh
+   cliente# { printf 'from="192.168.0.10" '; cat /tmp/id_rsa.pub; } > ~/.ssh/authorized_keys2
+   cliente# rm -f /tmp/id_rsa.pub
+
+lo que permite el acceso al cliente como *root* sin contraseña exclusivamente
+desde el servidor de copias, porque es en este donde está la clave privada
+asociada y porque, además, se restringe la validez de las claves para la |IP|
+del servidor de copias. Sin embargo, la primera vez que accedamos al cliente se
+nos pedirá que confirmemos la validez de la clave, por lo que es necesario
+acceder manualmente a fin de que el servidor no se tope con ello y no consiga
+conectar::
+
+   servidor# runuser -u backuppc -- ssh root@cliente
+
+.. note:: Para que se pueda acceder directamente como administrador a un
+   servidor |SSH|, la directiva *PermitirRootLogin* **no** debe tener el valor
+   *no*. Por defecto, su valor es *without-password*, lo cual impide el acceso
+   con contraseña, pero no con clave pública.
+
+Windows
+-------
+Para los clientes *Windows*, en cambio, lo más cómodo es compartir aquello que
+se desea copiar con |CIFS|.
+
+.. todo:: Por escribir.
+
+Configuración
+=============
+La configuración del programa puede llevarse a cabo tanto a través de la
+interfaz web (mucho más cómodo) como a través del archivo de configuración
+:file:`/etc/backuppc/config.pl`. Los principales aspectos a personalizar son:
+
++ ¿Qué método se utilizará para realizar las copias? Ya hemos fijado que para
+  clientes *UNIX*, :command:`tar` sobre :program:`ssh`; y, para clientes
+  *Windows*, |CIFS|.
++ ¿Qué contenido quiere copiarse de los clientes?
++ ¿Qué política de copias quiere implementarse?
+
+Es importante tener presente que en :file:`config.pl` se define una
+configuración global, aplicable a todos los clientes para los que no se haya
+definido una configuración particular. Desgraciadamente, el programa no permite
+hacer definiciones para grupos de máquinas, por lo que si queremos dos
+configuraciones distintas (como es el caso de tener clientes *Linux* y
+*Windows*), podemos incluir en :file:`config.pl` la configuración para el grupo
+mayoritario y, para cada máquina del grupo minoritario, habrá que hacer una
+configuración particular, todas iguales entre sí.
+
+Una configuración particular puede hacerse a través de la interfaz web, o
+creando un archivo :file:`/etc/backuppc/cliente1.pl`, siende *cliente1* el
+nombre de la máquina cliente (el nombre incluido en el :ref:`registro
+<backuppc-register>`.) e incluyendo él sólo las variables que desean
+sobreescribirse.
+
+Método de copia
+---------------
+Se define a través de la variable:
+
+.. code-block:: perl
+
+   $Conf{XferMethod} = 'smb';
+
+En *debian*, el valor es *smb*, esto es, |CIFS|.
+
+Contenido
+---------
+La variable que define qué se copiará es:
+
+.. code-block:: perl
+
+   $Conf{BackupFilesOnly} = {}
+
+En principio, está pensada para que se defina el nombre del recurso compartido
+(recuérdese |CIFS|) y a los archivos y directorios se quieren copiar dentro de
+este recurso. Por ejemplo:
+
+.. code-block:: perl
+
+   $Conf{BackupFilesOnly} = {
+      "Recurso1" => [ "/ab/c", "/importante" ],
+      "Recurso2" => [ "/MisDocumentos" ]
+   }
+
+SI se usa como nombre de recurso :kbd:`"*"`, se entiende que se quiere copiar la
+lista de archivos u directorios para todos los archivos compartidos. En el caso,
+de que se use :command:`tar`, en vez de |CIFS| la documentación recomienda usar
+también esta variable y dejar :kbd:`$Conf{TarShareName}` como :kbd:`/`. Por
+ejemplo, para copiar el directorio personal del usuario *pepe*:
+
+.. code-block:: perl
+
+   $Conf{BackupFilesOnly} = {
+      "*" => [ "/home/pepe" ]
+   }
+   $Conf{TarShareName} = "/"
+
+Política de copias
+------------------
+La política de copias predeterminada es hacer una copia completa cada semana y
+copias incrementales cada día. También puede definirse la política de
+rotaciones. Échele un ojo a :file:`config.pl` donde está profusamente explicado.
+
+Restauración
+============
+Para la restauración de un respaldo, lo más cómodo es utilizar la interfaz web
+pinchando sobre la copia que se quiere restaurar. Cuando una copia es
+incremental, no es necesario restaurar las copias anteriores (como nos indica la
+teoría), ya que :program:`BackupPC` incluye en las copias incrementales enlaces
+duros a los archivos que se encuentran en las copias anteriores. Por tanto, la
+aplicación se basta con la copia incremental para restaurar el estado completo.
+
+Problemas
+=========
++ *Buster* tiene `un bug
+  <https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=945142>`_ que imposibilita
+  recargar el servicio con *reload*.
++ Durante las pruebas, también nos hemos topado con `este otro bug
+  <https://sourceforge.net/p/backuppc/mailman/message/27867348/>`_, que se ha
+  resuelto tal como propone el mensaje.
++ Al menos cuando se llevan a cabo una restauración con :command:`tar` siguiendo
+  las recomendaciones indicadas, si se restauran todos los ficheros, también se
+  restaurarán :file:`/` y toda la ruta necesaria hasta el directorio que hayamos
+  indicado en *BackupFilesOnly*. Sin embargo, de esta ruta no se hace copia de
+  sus atributos (propietario, permisos, etc.) con lo que la restauración
+  estropea el sistema final y toca repararlos reajustando los permisos
+  manualmente. En estos casos, la restauración debe hacerse no de todos los
+  ficheros, sino de todos los ficheros bajo la ruta que indicamos en
+  *BackupFilesOnly*.
+
+.. https://victorroblesweb.es/2013/11/04/backups-red-bacula-funcionamiento/
+
+.. _Bacula: https://www.bacula.org
+.. |CIFS| replace:: :abbr:`CIFS (Common Internet File System)`
+.. |CGI| replace:: :abbr:`CGI (Common Gateway Interface)`
+.. |MTA| replace:: :abbr:`MTA (Mail Transport Agent)`

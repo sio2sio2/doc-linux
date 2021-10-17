@@ -1,0 +1,1046 @@
+
+
+
+<!DOCTYPE html>
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>7.3.3.1. Instalación y configuración &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/classic.css" />
+    <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+    
+    <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+    <script src="../../../_static/jquery.js"></script>
+    <script src="../../../_static/underscore.js"></script>
+    <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/translations.js"></script>
+    
+    <link rel="index" title="Índice" href="../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../search.html" />
+    <link rel="next" title="7.3.3.2. Aceptación de mensajes" href="02-accept.html" />
+    <link rel="prev" title="7.3.3. Servidor SMTP" href="index.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="02-accept.html" title="7.3.3.2. Aceptación de mensajes"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="7.3.3. Servidor SMTP"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" ><span class="section-number">7. </span>Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" ><span class="section-number">7.3. </span>Correo electrónico</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="index.html" accesskey="U"><span class="section-number">7.3.3. </span>Servidor <abbr title="Simple Mail Transfer Protocol">SMTP</abbr></a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">7.3.3.1. </span>Instalación y configuración</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="instalacion-y-configuracion">
+<h1><span class="section-number">7.3.3.1. </span>Instalación y configuración<a class="headerlink" href="#instalacion-y-configuracion" title="Enlazar permanentemente con este título">¶</a></h1>
+<div class="section" id="preliminares">
+<span id="pre-smtp"></span><h2><span class="section-number">7.3.3.1.1. </span>Preliminares<a class="headerlink" href="#preliminares" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Antes de proceder a la instalación de cualquier servidor <abbr title="Simple Mail Transfer Protocol">SMTP</abbr> es necesario que
+la máquina en la que se instale sea identificada como tal por el <abbr title="Domain Name Server">DNS</abbr>. En
+nuestro caso, necesitamos un sistema de resolución de nombres que propicie que en
+las máquinas que formarán parte de nuestras pruebas (tanto servidores como
+clientes), ocurra esto para el dominio de pruebas (p.e. <em>mail1.org</em>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> host mail1.org
+<span class="go">mail1.org mail is handled by 1 mail.mail1.org.</span>
+<span class="gp">$</span> host smtp.mail1.org
+<span class="go">smtp.mail1.org is an alias for mail.mail1.org.</span>
+<span class="go">mail.mail1.org has address 192.168.255.1</span>
+<span class="gp">$</span> host imap.mail1.org
+<span class="go">imap.mail1.org is an alias for mail.mail1.org.</span>
+<span class="go">mail.mail1.org has address 192.168.255.1</span>
+</pre></div>
+</div>
+<p>Ahora bien, un servidor de correo se utiliza para enviar mensaje a otros
+servidores de correo y es obvio que si montamos uno en una máquina virtual con
+un dominio inventado o que no nos pertenece, ningún servidor de correo serio en internet,
+aceptará nuestros mensajes. Eso obliga a que tengamos que montar un segundo
+servidor a fin de que puedan intercambiarse los mensajes entre sí. Por tanto,
+requeriremos una segunda máquina que gestione el correo de un segundo dominio
+(p.e. <em>mail2.org</em>) y que el servicio <abbr title="Domain Name Server">DNS</abbr> también defina el registro <strong>MX</strong>
+para este segundo dominio:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> host mail2.org
+<span class="go">mail2.org mail is handled by 1 mail.mail2.org.</span>
+<span class="gp">$</span> host smtp.mail2.org
+<span class="go">smtp.mail2.org is an alias for mail.mail2.org.</span>
+<span class="go">mail.mail2.org has address 192.168.255.129</span>
+<span class="gp">$</span> host imap.mail1.org
+<span class="go">imap.mail2.org is an alias for mail.mail2.org.</span>
+<span class="go">mail.mail2.org has address 192.168.255.129</span>
+</pre></div>
+</div>
+<p>Para resolver esto, podemos optar por la solución que deseemos. Posiblemente la
+más rápida y sencilla sea instalar un servidor <abbr title="Domain Name Server">DNS</abbr> en la primera de las
+máquinas que resuelve ambas dominios. Por otra parte, el fichero de definición
+de zona tendrá que tener al menos los siguientes registros (aparte del registro
+<em>SOA</em>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">@     IN    NS       ns</span>
+<span class="go">      IN    MX       10 mail</span>
+<span class="go">ns    IN    A        192.168.255.1</span>
+<span class="go">mail  IN    A        192.168.255.1</span>
+<span class="go">smtp  IN    CNAME    mail</span>
+<span class="go">imap  IN    CNAME    imap</span>
+</pre></div>
+</div>
+<p>Además, conviene que el dominio de los servidores que obtenemos con
+<strong class="command">dnsdomain</strong> o <strong class="command">hostname</strong> sea coherente<a class="footnote-reference brackets" href="#id11" id="id1">1</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> dnsdomain
+<span class="go">mail1.org</span>
+<span class="gp">$</span> hostname -d
+<span class="go">mail1.org</span>
+</pre></div>
+</div>
+<p>y lo mismo debería ocurrir en el otro servidor (<em>mail2.org</em>).</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>La definición de la máquina que se encarga de gestionar el correo del
+dominio, que es lo visto más arriba, es lo mínimo indispensable para que
+funcione nuestro servidor. Ahora bien, si el servidor se coloca en internet,
+son recomendables <a class="reference internal" href="05-dns.html#smtp-acreditacion"><span class="std std-ref">algunos otros registros que se presentan como
+consejos más adelante</span></a>.</p>
+</div>
+<p class="rubric">Consejos</p>
+<p>Para montar la <strong>práctica</strong> puede usarse:</p>
+<ul class="simple">
+<li><p>Una primera máquina virtual con dos interfaces de red, una en la red real y
+otra en una red interna (192.168.255.0/24). En la red interna puede tener
+dirección 192.168.225.1/24.</p></li>
+<li><p>Esta primera máquina contendrá el servidor de correo del dominio <em>mal1.org</em> y
+el servidor <abbr title="Domain Name Server">DNS</abbr> encargado de gestionar los dominios <em>mail1.org</em> y
+<em>mail2.org</em>. El primer domimio podemos asociarlo a 192.168.255.0/25 y el
+segundo a 192.168.255.128/25.</p></li>
+<li><p>Una segunda máquina virtual con una interfaz de red en la misma red interna
+que la máquina anterior y dirección 192.168.255.129/24. En ella se alojará el
+servidor de correo del dominio <em>mail2.org</em>.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Si se usa <strong class="program">bind</strong> para configurar el servidor <abbr title="Domain Name Server">DNS</abbr> puede ser
+bastante más laborioso usar subredes. En ese caso, podríamos hacer que la red
+interna sea 192.168.254.0/23 y los dos dominios estén asociados a las redes
+192.168.254.0/24 y 192.168.255.0/24, respectivamente.</p>
+</div>
+</div>
+<div class="section" id="instalacion">
+<span id="postfix-inst"></span><h2><span class="section-number">7.3.3.1.2. </span>Instalación<a class="headerlink" href="#instalacion" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Dado que trataremos <strong class="command">postfix</strong>, instalar<a class="footnote-reference brackets" href="#id12" id="id2">2</a> consiste en:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt-get install postfix
+</pre></div>
+</div>
+<p>La instalación, nos invita a realizar una configuración previa del servidor
+mediante menús de <a class="reference internal" href="../../../03.scripts/06.misc/05.whiptail.html#whiptail"><span class="std std-ref">whiptail</span></a>. Sin embargo, es mejor elegir la
+opción de dejar sin configurar el paquete y, acabada, arrancar nosotros a mano
+esta configuración<a class="footnote-reference brackets" href="#id13" id="id3">3</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> rm -f /etc/aliases
+<span class="gp">#</span> dpkg-reconfigure postfix
+</pre></div>
+</div>
+<p>que nos planteará la siguientes preguntas:</p>
+<ol class="arabic">
+<li><p>Tipo de servidor:</p>
+<img alt="../../../_images/postfix1-tipo.png" src="../../../_images/postfix1-tipo.png" />
+<p>La respuesta determina cómo funcionará el servidor:</p>
+<ul>
+<li><p><strong>Sitio de internet</strong>: es la opción que debemos elegir, ya que hace que
+nuestro servidor se comporte como un servidor de correo que se comunica
+con el resto de servidores de correo de la forma en que hemos ya descrito.</p></li>
+<li><p><strong>Internet con smarthost</strong>: en este caso, el servidor se oonfigura como
+cliente de otro servidor de correo, de manera que se le facilita un usuario
+y contraseña para que se valide en ese otro servidor y envío los mensajes
+haciendo uso de él.</p></li>
+<li><p><strong>Sistema satélite</strong>: es un servidor de correo adicional que recibe
+mensajes y los envía al servidor que realmente almacena los mensajes. Si
+para el dominio hubiera varios servidores de correo alternativos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> host mail1.org
+<span class="go">mail1.org mail is handled by 1 mail.mail1.org.</span>
+<span class="go">mail1.org mail is handled by 10 otromail.mail1.org.</span>
+</pre></div>
+</div>
+<p>Los servidores con menos prioridad  (<em>otromail.mail1.org</em> en el ejemplo)
+deberían ser configurados como sistemas satélite.</p>
+</li>
+<li><p><strong>Sólo correo local</strong>: el servidor no necesita conexión de red y se limita
+a entregar correo local en la propia máquina. Es la configuración que debe
+utilizarse cuando no se quiere mnontar un servidor de correo, sino permitir
+a las apliaciones que usan el correo como método de comunicación con el
+administrador, efectuar sus comunicacnoes.</p></li>
+</ul>
+</li>
+<li><p>Nombre del sistema de correo:</p>
+<img alt="../../../_images/postfix2-nombre.png" src="../../../_images/postfix2-nombre.png" />
+<p>En este campo introducimos el nombre del dominio que gestionamos, que pasará
+a constituir el contenido del fichero <code class="file docutils literal notranslate"><span class="pre">/etc/mailname</span></code>.</p>
+</li>
+<li><p>Usuario receptor de los mensajes de administración:</p>
+<img alt="../../../_images/postfix3-usuario.png" src="../../../_images/postfix3-usuario.png" />
+<p>El administrador (las cuentas <em>root</em> y <em>postmaster</em>) no recibe mensajes de
+correo, sino que estos son derivados a otro usuario sin permisos de
+administrador. Este cuadro de diálogo pide el nombre de tal usuario para
+incluirlo como destinatario dentro de <code class="file docutils literal notranslate"><span class="pre">/etc/aliases</span></code>, de modo que su
+contenido quedará así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">postmaster:    root</span>
+<span class="go">root:    usuario</span>
+</pre></div>
+</div>
+<p>En realidad, como su nombre indica, este fichero es un fichero de <em>alias</em> y
+podemos modificarlo o añadir más entradas posteriormente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="nb">echo</span> <span class="s1">&#39;mailadmin:    root&#39;</span> &gt;&gt; /etc/aliases
+<span class="gp">#</span> newaliases       <span class="c1"># Obligatorio regenerar aliases.db después de su modificación</span>
+</pre></div>
+</div>
+<div class="admonition seealso">
+<p class="admonition-title">Ver también</p>
+<p>Se ofrece algo más de información sobre este fichero <a class="reference internal" href="03-entrega.html#postfix-aliases"><span class="std std-ref">algo
+más adelante</span></a>.</p>
+</div>
+</li>
+<li><p>Dominios del servidor:</p>
+<img alt="../../../_images/postfix4-dominio.png" src="../../../_images/postfix4-dominio.png" />
+<p>Deben indicarse, separados por comas, los dominios que el servidor de correo
+considera que gestiona él. Dicho de otra forma, si un mensaje de correo esta
+destinado a una cuenta de las incluidas en la lista, el servidor se quedará
+con él, mientras que, si no es así, buscará qué servidor gestiona el correo
+de ese dominio para pasárselo. En este caso, basta con indicar el dominio
+(<em>mail1.org</em>) y también <em>localhost</em> para que programas como <strong class="command">cron</strong>
+sean capaces de comunicarse con el administrador.</p>
+</li>
+<li><p>Actualizaciones síncronas:</p>
+<img alt="../../../_images/postfix5-sincr.png" src="../../../_images/postfix5-sincr.png" />
+</li>
+<li><p>Redes locales:</p>
+<img alt="../../../_images/postfix6-local.png" src="../../../_images/postfix6-local.png" />
+<p>El cuadro de diálogo permite establecer cuáles son las redes que el servidor
+definirá como locales. Tiene importancia porque éste permite tratarlas de
+distintos modo y, por ejemplo, no exigir la validación del cliente que lo
+usa. Por lo general, se fija como red local la de <em>loopback</em>; así los
+programas locales que deseen enviar correo lo hará sin problema. Eliminamos
+las redes IPv6, porque más adelante configuraremos para sólo usar IPv4.</p>
+</li>
+<li><p>Límite del buzón de correo para cada usuario:</p>
+<img alt="../../../_images/postfix7-tambox.png" src="../../../_images/postfix7-tambox.png" />
+</li>
+<li><p>Carácter para definir extensiones de correo local:</p>
+<img alt="../../../_images/postfix8-ext.png" src="../../../_images/postfix8-ext.png" />
+<p>Esto significa que para el nombre de cuenta se ignorarán todos los caracteres
+despúes de un signo «<strong>+</strong>«, de modo que un mensaje a la cuenta
+<em>manolo+esto.no.sirve&#64;mail1.org</em>, se entregará a <em>manolo</em>.</p>
+</li>
+<li><p>Protocolo soportado:</p>
+<img alt="../../../_images/postfix9-ipv4.png" src="../../../_images/postfix9-ipv4.png" />
+</li>
+</ol>
+<p>La configuración principal de <strong class="command">postfix</strong> se guarda en
+<code class="file docutils literal notranslate"><span class="pre">/etc/postfix/main.cf</span></code>, por lo que este proceso equivale a añadir las
+siguientes líneas a tal fichero<a class="footnote-reference brackets" href="#id14" id="id4">4</a>:</p>
+<div class="highlight-apache notranslate" id="postfix-conf-bas-main-cf"><div class="highlight"><pre><span></span><span class="nb">smtpd_relay_restrictions</span> = permit_mynetworks permit_sasl_authenticated defer_unauth_destination
+<span class="hll"><span class="nb">myhostname</span> = m1.mail1.org
+</span><span class="nb">alias_maps</span> = hash:/etc/aliases
+<span class="nb">alias_database</span> = hash:/etc/aliases
+<span class="nb">myorigin</span> = <span class="sx">/etc/mailname</span>
+<span class="nb">mydestination</span> = mail1.org, localhost
+<span class="nb">relayhost</span> =
+<span class="nb">mynetworks</span> = <span class="m">127.0.0.0/8</span>
+<span class="nb">mailbox_size_limit</span> = <span class="m">0</span>
+<span class="nb">recipient_delimiter</span> = +
+<span class="nb">inet_interfaces</span> = <span class="k">all</span>
+<span class="nb">inet_protocols</span> = ipv4
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>No es necesario, en este caso, recargar la configuración, porque
+<strong class="command">dpkg-recofigure</strong> se encarga de ello.</p>
+</div>
+<p>Conviene modificar el nombre de la máquina expresado en la configuración (la
+línea resaltada) a <em>smtp.mail1.org</em>, de modo que podemos editar el fichero o
+bien:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> postconf -e <span class="s1">&#39;myhostname = smtp.mail1.org&#39;</span>
+<span class="gp">#</span> invoke-rc.d postfix reload    <span class="c1"># Obviamente, esto también si se edita.</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="cifrado">
+<span id="postfix-ssl"></span><h2><span class="section-number">7.3.3.1.3. </span>Cifrado<a class="headerlink" href="#cifrado" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>El protocolo <abbr title="Simple Mail Transfer Protocol">SMTP</abbr> es bastante antiguo (el <span class="target" id="index-0"></span><a class="rfc reference external" href="https://tools.ietf.org/html/rfc821.html"><strong>RFC 821</strong></a> data de 1982) así que es
+absolutamente inseguro. Para asegurarlo se utiliza <abbr title="Transport Layer Security">TLS</abbr> mediante dos técnicas:</p>
+<ol class="arabic simple">
+<li><p>Envolverlo, de manera que antes de cualquier comunicación <abbr title="Simple Mail Transfer Protocol">SMTP</abbr> se establece
+el canal seguro, como se hace con otros protocolos como <abbr title="HyperText Transfer Protocol">HTTP</abbr>s. Es la técnica
+que se usa al escuchar en el puerto <strong>465</strong>.</p></li>
+<li><p>Negociar si hay cifrado o no al comienzo de la comunicación <abbr title="Simple Mail Transfer Protocol">SMTP</abbr>
+(<em>STARTTLS</em>), que es lo recomendado y lo que se usa tanto el el puerto <strong>25</strong>
+como en el <strong>587</strong>.</p></li>
+</ol>
+<p>Para la segunda técnica, la directiva encargada de activar el cifrado es
+<a class="reference external" href="http://www.postfix.org/postconf.5.html#smtpd_tls_security_level">smtpd_tls_security_level</a>, cuyo valor predeterminado es <em>may</em>, que anuncia la
+posibilidad de cifrado al cliente y deja a este la decisión de cifrar o no. La
+primera técnica, en cambio, exige:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="na">smtpd_tls_wrappermode</span> <span class="o">=</span> <span class="s">yes</span>
+</pre></div>
+</div>
+<p>que inhabilita cualquier valor que se haya indicado en
+<a class="reference external" href="http://www.postfix.org/postconf.5.html#smtpd_tls_security_level">smtpd_tls_security_level</a>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>No use esta configuración, salvo para escuchar en el puerto <strong>465</strong>, ya
+que esta técnica no es la que usan los servidores de correo para intercambiar
+sus mensajes.</p>
+</div>
+<p>Otro aspecto importantísimo del cifrado es preparar las clave pública y privado
+para llevar a cabo el cifrado. Si se echa un vistazo a la configuración de
+<strong class="program">postfix</strong>, se comprobará que el fichero ya trae definidas unas claves
+pública y privada:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> egrep <span class="s1">&#39;(cert|key)_file&#39;</span> /etc/postfix/main.cf
+<span class="go">smtpd_tls_cert_file=/etc/ssl/certs/ssl-cert-snakeoil.pem</span>
+<span class="go">smtpd_tls_key_file=/etc/ssl/private/ssl-cert-snakeoil.key</span>
+</pre></div>
+</div>
+<p>Y, además, la instalación de <strong class="command">postfix</strong>, instala a su vez <em>ssl-cert</em> que
+genera ese par de claves.  Si se revisa el epígrafe dedicado a la <a class="reference internal" href="../../02.web/02.nginx/02.avanz/07.https.html#auto-cert"><span class="std std-ref">generación
+del par de claves autofirmadas</span></a><a class="footnote-reference brackets" href="#id15" id="id5">5</a>, se sabrá que este par de claves se
+generan con el nombre cualificado de la máquina. Como es conveniente  que
+el par de claves sirva para cuando el cliente se conecta a través de los nombres
+<em>smtp.mail1.org</em> o <em>imap.mail1.org</em>, es mejor regenerar el par de claves
+haciendo que se haga referencia a <em>*.mail1.org</em>, tal como se aconseja en el
+epígrafe señalado. Por tanto:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> /usr/sbin/make-ssl-cert /usr/share/ssl-cert/ssleay.cnf keycert.pem
+<span class="gp">#</span> sed <span class="s1">&#39;1,/-END PRIVATE KEY-/d&#39;</span> keycert.pem &gt; /etc/ssl/certs/ssl-cert-snakeoil.pem
+<span class="gp">#</span> sed <span class="s1">&#39;/-END PRIVATE KEY-/q&#39;</span> keycert.pem &gt; /etc/ssl/private/ssl-cert-snakeoil.key
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Por supuesto, en un servidor real en producción debemos disponer de un
+<a class="reference internal" href="../../02.web/02.nginx/02.avanz/07.https.html#certbot"><span class="std std-ref">certificado acreditado por Let’s Encrypt</span></a>.</p>
+</div>
+<p>Por último, añadiremos algunos parámetros de <abbr title="Transport Layer Security">TLS</abbr><a class="footnote-reference brackets" href="#id16" id="id6">6</a> a
+<code class="file docutils literal notranslate"><span class="pre">/etc/postfix/main.cf</span></code>:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="c"># TLS</span>
+<span class="nb">smtpd_tls_loglevel</span> = <span class="m">1</span>
+<span class="nb">smtpd_tls_received_header</span> = yes
+<span class="nb">smtp_use_tls</span> = yes
+</pre></div>
+</div>
+</div>
+<div class="section" id="autenticacion">
+<h2><span class="section-number">7.3.3.1.4. </span>Autenticación<a class="headerlink" href="#autenticacion" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>La autenticación se logra en <strong class="program">postfix</strong> mediante <abbr title="Simple Authentication and Security Layer">SASL</abbr>. Ahora bien,
+<strong class="program">postfix</strong> en sí no lo implementa, por lo que requiere el uso de
+<em>software</em> externo. En sus versiones modernas soporta dos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> postconf -a
+<span class="go">cyrus</span>
+<span class="go">dovecot</span>
+</pre></div>
+</div>
+<p>o sea, <a class="reference external" href="https://www.cyrusimap.org/sasl/">Cyrus SASL</a> o <a class="reference external" href="https://wiki.dovecot.org/Sasl">Dovecot SASL</a>, aunque la predeterminada, y la única que
+se soportaba en versiones antiguas, es:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> postconf -d smtpd_sasl_type
+<span class="go">smtpd_sasl_type = cyrus</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Se aconseja autenticar con <a class="reference external" href="https://wiki.dovecot.org/Sasl">Dovecot SASL</a> en caso de que acabe
+instalando de todas formas <strong class="program">dovecot</strong> como servidor <abbr title="Internet Message Access Protocol">IMAP</abbr>.</p>
+</div>
+<div class="section" id="cyrus-sasl">
+<h3><span class="section-number">7.3.3.1.4.1. </span><a class="reference external" href="https://www.cyrusimap.org/sasl/">Cyrus SASL</a><a class="headerlink" href="#cyrus-sasl" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Usa el servicio <em>smtp</em> de <a class="reference internal" href="../../../04.servidor/09.autenticacion/index.html#pam"><span class="std std-ref">PAM</span></a>. La instalación del paquete puede
+llevarse a cabo del siguiente modo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt-get install sasl2-bin
+</pre></div>
+</div>
+<p>y configurarlo a través del fichero <code class="file docutils literal notranslate"><span class="pre">/etc/default/saslauthd</span></code>, lo cual
+exige modificar dos líneas:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">START=yes</span>
+</pre></div>
+</div>
+<p>y una al final del fichero, ya que <strong class="program">postfix</strong> en <em>debian</em> se ejecuta
+enjaulado:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">OPTIONS=&quot;-c -m /var/spool/postfix/var/run/saslauthd&quot;</span>
+</pre></div>
+</div>
+<p>Hay, además, que configurar <strong class="program">postfix</strong> para que lo use, por lo que
+habrá que crear el fichero <code class="file docutils literal notranslate"><span class="pre">/etc/postfix/sasl/smtpd.conf</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> cat &gt; /etc/postfix/sasl/smtpd.conf
+<span class="go">pwcheck_method: saslauthd</span>
+<span class="go">mech_list: PLAIN LOGIN</span>
+</pre></div>
+</div>
+<p>y modificar <code class="file docutils literal notranslate"><span class="pre">/etc/postfix/main.cf</span></code> para añadir soporte para <em>sasl</em>:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="c"># Autenticación con SASL</span>
+<span class="nb">smtpd_sasl_auth_enable</span> = yes
+<span class="nb">smtpd_sasl_path</span> = smtpd
+<span class="nb">smtpd_sasl_local_domain</span> =
+<span class="nb">smtpd_sasl_security_options</span> = noanonymous
+<span class="nb">broken_sasl_auth_clients</span> = yes
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Un valor en <code class="docutils literal notranslate"><span class="pre">smtpd_sasl_local_domain</span></code> provoca que al nombre de
+usuario se añada el dominio expresado. Por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">smtpd_sasl_local_domain =  $mydomain</span>
+</pre></div>
+</div>
+<p>provocaría que el usuario identificado como «pepe» sea reconocido como el
+usuario «<a class="reference external" href="mailto:pepe&#37;&#52;&#48;mail1&#46;org">pepe<span>&#64;</span>mail1<span>&#46;</span>org</a>». ¡Ojo! Hablamos de usuario y no de cuenta. La cuenta
+que posee este usuario (se reconozca como <em>pepe</em> o <em>pepe&#64;mail1.org</em>) es
+<em>pepe&#64;mail1.org</em>).</p>
+</div>
+<p id="postfix-auth-restrict">Además, es conveniente modificar nuestra política de aceptación de mensajes
+para hacer el servidor más seguro frente al <em>spam</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> Políticas de recepción de mensajes
+<span class="go">smtpd_recipient_restrictions = permit_mynetworks,</span>
+<span class="go">                               permit_sasl_authenticated,</span>
+<span class="go">                               reject_unauth_destination,</span>
+<span class="go">                               reject_unknown_client_hostname,</span>
+<span class="go">                               reject_rbl_client zen.spamhaus.org</span>
+</pre></div>
+</div>
+<p>la cual actúa de esta forma:</p>
+<ol class="arabic simple">
+<li><p>Aceptaremos recibir mensajes que sean enviados desde nuestras redes (en
+nuestra configuracióon, sólo la propia máquina en la que está el servidor).</p></li>
+<li><p>En caso contrario, aceptaremos recibir mensaje de conexiones autenticadas.</p></li>
+<li><p>En caso contrario, rechazaremos los correos que no vayan destinados a
+nosotros mismos (o que no vayan destinados a dominios que hayamos autorizado,
+pero no hemos autorizado ninguno).</p></li>
+<li><p>En caso contrario, rechazaremos mensajes de clientes cuya <abbr title="Internet Protocol">IP</abbr> no se resuelva
+a un nombre.</p></li>
+<li><p>En caso contrario, comprobamos que el cliente nos parezca fiable, para lo
+cual nos basamos en una base de datos externa.</p></li>
+</ol>
+<div class="admonition seealso">
+<p class="admonition-title">Ver también</p>
+<p>Para profundizar en la política de aceptación de mensajes,
+<a class="reference internal" href="02-accept.html#postfix-accept"><span class="std std-ref">consulte más adelante</span></a>.</p>
+</div>
+<p>El último paso es añadir el usuario <em>postfix</em> al grupo <em>sasl</em> y reiniciar los
+servicios:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> adduser postfix sasl
+<span class="gp">#</span> invoke-rc.d postfix restart
+<span class="gp">#</span> invoke-rc.d saslauthd restart
+</pre></div>
+</div>
+<p>Con esta configuración, ya tenemos dispuesto un <abbr title="Mail Transmission Agent">MTA</abbr> que escucha exclusivamente
+en el puerto <strong>25</strong> y permite a través de él la conexión de un <abbr title="Mail Submission Agent">MSA</abbr> para que,
+autenticándose, envíe mensajes a cuentas del propio servidor o a cuentas ajenas;
+o bien, la conexión de otro <abbr title="Mail Transmission Agent">MTA</abbr> para que le entregue mensajes para sus propias
+cuentas. Esta configuración es ya absolutamente funcional, pero <a class="reference internal" href="#postfix-25-465-587"><span class="std std-ref">mas
+adelante</span></a> se tratará cómo habilitar la escucha en los
+puertos <strong>25</strong>, <strong>465</strong> y <strong>587</strong>, según se describió <a class="reference internal" href="../00-proto/index.html#smtp-proto-puertos"><span class="std std-ref">al tratar el protocolo</span></a>.</p>
+</div>
+<div class="section" id="dovecot-sasl">
+<span id="postfix-dovecot-sasl"></span><h3><span class="section-number">7.3.3.1.4.2. </span><a class="reference external" href="https://wiki.dovecot.org/Sasl">Dovecot SASL</a><a class="headerlink" href="#dovecot-sasl" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>La alternativa al método anterior es usar <strong class="program">dovecot</strong>. En puridad basta
+con instalar el paquete <em>dovecot-core</em>, aunque si pretendemos proporcionar
+también un servidor <abbr title="Internet Message Access Protocol">IMAP</abbr> es mejor, directamente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt-get install dovecot-imapd
+</pre></div>
+</div>
+<p>Después basta con seguir las <a class="reference internal" href="../03-imap/index.html#dovecot-sasl"><span class="std std-ref">instrucciones referidas en este epígrafe de
+la sección sobre IMAP</span></a> y, finalmente, establecer <a class="reference internal" href="#postfix-auth-restrict"><span class="std std-ref">las
+política de aceptación de mensajes del epígrafe anterior</span></a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>La ventaja no es solamente la de no instalar software extra, sino
+también el hecho de que los <a class="reference internal" href="04-usuarios.html#postfix-usu-virtual-dovecot"><span class="std std-ref">usuarios exclusivos que habilitemos en
+dovecot</span></a>, también los reconocerá
+<strong class="program">postfix</strong>. Ahora bien, si añadimos usuarios exclusivos, nos veremos
+obligados a usar <a class="reference internal" href="03-entrega.html#postfix-dovecot-mda"><span class="std std-ref">dovecot para la entrega</span></a>.</p>
+</div>
+</div>
+<div class="section" id="comprobaciones">
+<span id="postfix-auth-check"></span><h3><span class="section-number">7.3.3.1.4.3. </span>Comprobaciones<a class="headerlink" href="#comprobaciones" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Para comprobar que haya ido bien, la configuración anterior lo más directo es
+emular lo que haría un cliente que se conecta al puerto <strong>25</strong>. Podríamos usar
+<strong class="command">telnet</strong> lo que equivaldría a una conexión no segura, pero
+utilizaremos, en cambio, <strong class="command">openssl</strong> para la conexión, ya que nos permite
+a la vez probar que marcha bien el cifrado. La conexión manual, sin embargo,
+requiere primero saber cómo transmitir nuestra identidad al servidor<a class="footnote-reference brackets" href="#id17" id="id7">7</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> <span class="nb">printf</span> <span class="s1">&#39;usuario\0usuario\0password&#39;</span> <span class="p">|</span> base64
+<span class="go">dXN1YXJpbwB1c3VhcmlvAHBhc3N3b3Jk</span>
+<span class="gp">$</span> openssl s_client -connect localhost:smtp -starttls smtp -quiet
+<span class="go">depth=0 CN = mail.mail1.org</span>
+<span class="go">verify error:num=18:self signed certificate</span>
+<span class="go">verify return:1</span>
+<span class="go">depth=0 CN = mail.mail1.org</span>
+<span class="go">verify return:1</span>
+<span class="go">250 SMTPUTF8</span>
+<span class="hll"><span class="go">EHLO soy.yo</span>
+</span><span class="go">250-m1.mail1.org</span>
+<span class="go">250-PIPELINING</span>
+<span class="go">250-SIZE 10240000</span>
+<span class="go">250-VRFY</span>
+<span class="go">250-ETRN</span>
+<span class="go">250-STARTTLS</span>
+<span class="go">250-AUTH PLAIN LOGIN</span>
+<span class="go">250-AUTH=PLAIN LOGIN</span>
+<span class="go">250-ENHANCEDSTATUSCODES</span>
+<span class="go">250-8BITMIME</span>
+<span class="go">250-DSN</span>
+<span class="go">250 SMTPUTF8</span>
+<span class="hll"><span class="go">AUTH PLAIN dXN1YXJpbwB1c3VhcmlvAHBhc3N3b3Jk</span>
+</span><span class="go">235 2.7.0 Authentication successful</span>
+<span class="hll"><span class="go">QUIT</span>
+</span><span class="go">221 2.0.0 Bye</span>
+</pre></div>
+</div>
+<p>El último paso de la comprobación sería enviar un mensaje a través de este
+servidor al otro después de haberlo configurado también. La forma más
+sencilla es usar el ejecutable <strong class="command">sendmail</strong> y comprobar que el mensaje se
+envía y, en el otro servidor se aloja en el buzón de usuario:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> /usr/sbin/sendmail -t
+<span class="go">From: usuario@mail1.org</span>
+<span class="go">To: usuario@mail2.org</span>
+<span class="go">Subject: Prueba de envio...</span>
+
+<span class="go">s/t</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>La prueba de que nuestro intento ha obtenido buen suceso es comprobar
+los registros de ambos servidores y consultar el buzón del usuario del
+segundo servidor que, por ahora, se encuentra en <code class="file docutils literal notranslate"><span class="pre">/var/mail/usuario</span></code>.</p>
+</div>
+<p>Para esta comprobación, no obstante, no se usa la autenticación, ya que hemos
+configurado el servidor para que no sea necesaria ésta, si la conexión es local,
+como es el caso. Si quisiéramos enviar un mensaje, autenticándonos, además,
+podríamos instalar <a class="reference internal" href="../04-misc/02-cliente/02-msa.html#msmtp"><span class="std std-ref">msmtp</span></a>, que es un pequeño <abbr title="Mail Submission Agent">MSA</abbr>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt-get install msmtp
+</pre></div>
+</div>
+<p>y crear para el usuario emisor del mensaje el fichero <code class="file docutils literal notranslate"><span class="pre">~/.msmtprc</span></code><a class="footnote-reference brackets" href="#id18" id="id8">8</a>:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="c"># Valores comunes a todas las cuentas.</span>
+<span class="nb">defaults</span>
+   <span class="nb">logfile</span> ~/.msmtp.log
+   <span class="nb">syslog</span> <span class="k">on</span>
+   <span class="nb">tls</span> <span class="k">on</span>
+   <span class="c"># Como es autofirmado, deshabilitamos la comprobación del certificado</span>
+   <span class="nb">tls_certcheck</span> <span class="k">off</span>
+   <span class="nb">from</span> usuario@mail1.org
+   <span class="nb">host</span> smtp.mail1.org
+   <span class="nb">user</span> usuario
+   <span class="c"># No la indicamos y nos la pedirá interactivamente</span>
+   <span class="c">#password usuario</span>
+   <span class="nb">maildomain</span> mail1.org
+
+<span class="c"># Acceso por el puerto 25 (el único por ahora)</span>
+<span class="nb">account</span> vm25
+   <span class="c"># Habilitamos autenticación con contraseña</span>
+   <span class="nb">auth</span> plain
+   <span class="c"># Cifrada, pero con negociación</span>
+   <span class="nb">tls_starttls</span> <span class="k">on</span>
+
+<span class="nb">account</span> default: vm25
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Si nuestro anfitrión es un linux, es recomedable que instalemos el
+<abbr title="Mail Submission Agent">MSA</abbr> en el propio anfitrión para que simulemos que el cliente que envía
+mensajes se encuentra en una máquina que no pertenece a <code class="docutils literal notranslate"><span class="pre">$mynetworks</span></code>.
+Ahora bien, en ese caso <strong class="command">msmtp</strong> deberá saber cuál es la máquina
+<em>smtp.mail1.org</em>, cuya definición la conoce el <abbr title="Domain Name Server">DNS</abbr> de la primera máquina
+virtual. La solución más sencilla, apra no hacer cambios en la configuración
+del anfitrión, es usar directamente la dirección <abbr title="Internet Protocol">IP</abbr> en el valor de <em>host</em>.</p>
+</div>
+<p>Hecha la configuración podemos comprobar, las características del servidor<a class="footnote-reference brackets" href="#id19" id="id9">9</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> msmtp -a vm25 -S
+<span class="go">[... Información del servidor ...]</span>
+</pre></div>
+</div>
+<p>Y enviar un correo así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> msmtp -a vm25 -t
+<span class="go">From: usuario@mail1.org</span>
+<span class="go">To: usuario@mail2.org</span>
+<span class="go">Subject: Prueba de envio de mail1 a mail2</span>
+
+<span class="go">s/t</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Si queremos ver el diálogo <abbr title="Simple Mail Transfer Protocol">SMTP</abbr> entre el <abbr title="Mail Submission Agent">MSA</abbr> y el <abbr title="Mail Transmission Agent">MTA</abbr> podemos
+añadir la opción <code class="docutils literal notranslate"><span class="pre">-v</span></code>.</p>
+</div>
+</div>
+</div>
+<div class="section" id="puertos-de-escucha">
+<span id="postfix-25-465-587"></span><h2><span class="section-number">7.3.3.1.5. </span>Puertos de escucha<a class="headerlink" href="#puertos-de-escucha" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Aunque el servidor ya es completamente funcional en lo referente al envío y
+recepción de correo, la intención de este epígrafe es habilitar la escucha en
+cada uno de los tres puertos dependiendo de cuál sea la intención del emisor:</p>
+<dl class="simple">
+<dt><strong>25</strong></dt><dd><p>Para recepción de mensajes a nuestras cuentas transmitidos por otro <abbr title="Mail Transmission Agent">MTA</abbr>.
+Deshabilitando la autenticación se logra este propósito, ya que por nuestras
+políticas de recepción, rechazamos todo mensaje sin autenticación cuyo
+destino no sea una de nuestras cuentas.</p>
+</dd>
+<dt><strong>465</strong></dt><dd><p>Para ique se conecte a él un <abbr title="Mail Submission Agent">MSA</abbr> y, tras autenticación, envíe mensajes
+usando el protocolo <abbr title="Simple Mail Transfer Protocol">SMTP</abbr>s.</p>
+</dd>
+<dt><strong>587</strong></dt><dd><p>Ídem, pero se usa <abbr title="Simple Mail Transfer Protocol">SMTP</abbr> seguro con negociación.</p>
+</dd>
+</dl>
+<p>Para ellos, sustituiremos el <a class="reference external" href="http://www.postfix.org/postconf.5.html#smtpd_recipient_restrictions">smtpd_recipient_restrictions</a> anterior por lo
+siguiente:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="na">smtpd_recipient_restrictions</span> <span class="o">=</span> <span class="s">permit_mynetworks,</span>
+<span class="s">                               permit_sasl_authenticated,</span>
+<span class="s">                               reject</span>
+
+<span class="na">port25_recipient_restrictions</span> <span class="o">=</span> <span class="s">permit_mynetworks,</span>
+<span class="s">                                reject_unauth_destination,</span>
+<span class="s">                                reject_unknown_client_hostname,</span>
+<span class="s">                                reject_rbl_client zen.spamhaus.org</span>
+</pre></div>
+</div>
+<p>Nuestra estrategia en este caso, es aplicar el valor de tal directiva a los
+puertos <strong>465</strong> y <strong>587</strong> que son los que destinamos a la conexión de los <abbr title="Mail Submission Agent">MSA</abbr>
+y, por tanto, requerirán autenticación. La otra directiva es, en realidad, un
+nombre inventado que aplicaremos a la configuración del puerto <strong>25</strong> editando
+el fichero <code class="file docutils literal notranslate"><span class="pre">/etc/postfix/master.cf</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">smtp      inet  n       -       y       -       -       smtpd</span>
+<span class="go">   -o smtpd_sasl_auth_enable=no</span>
+<span class="go">   -o smtpd_recipient_restrictions=$port25_recipient_restrictions</span>
+<span class="go">urd       inet  n       -       y       -       -       smtpd</span>
+<span class="go">   -o smtpd_tls_wrappermode=yes</span>
+<span class="go">submission inet n       -       y       -       -       smtpd</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>En el <code class="file docutils literal notranslate"><span class="pre">master.cf</span></code> original sólo la línea del servicio <abbr title="Simple Mail Transfer Protocol">SMTP</abbr>
+está habilitada y sin añadir configuración lo que quiere decir que se tomará
+aquella escrita en <code class="file docutils literal notranslate"><span class="pre">main.cf</span></code>.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p><em>urd</em>, y no <abbr title="Simple Mail Transfer Protocol">SMTP</abbr>s, es el servicio asociado al puerto <strong>465</strong> según
+el fichero <code class="file docutils literal notranslate"><span class="pre">/etc/services</span></code>. Esto se debe a que <abbr title="Simple Mail Transfer Protocol">SMTP</abbr>s se abandonó en
+el estándar en favor del uso de <em>STARTTLS</em>, así que tal puerto se asoció
+posteriormente a <a class="reference external" href="http://ftp.ipsyn.net/pub/mirrors/cisco/ftpeng.cisco.com/ipmulticast/ssm/">otro servicio distinto</a>.</p>
+</div>
+<p>Como vemos, en el puerto <strong>25</strong>, deshabilitamos la autenticación, ya que no es
+nuestro propósito que lo usen los <abbr title="Mail Submission Agent">MSA</abbr>, y usamos como restricciones las que
+definimos en <code class="file docutils literal notranslate"><span class="pre">main.cf</span></code> anteriormente. En el puerto <strong>465</strong> lo que hacemos
+es usar <abbr title="Secure Sockets Layer">SSL</abbr> directamente sin negociación previa. Finalmente, en el puerto
+<strong>587</strong> usamos la configuración tal como está definida en <code class="file docutils literal notranslate"><span class="pre">main.cf</span></code>.</p>
+<p>Para probar esta nueva configuración podemos modificar la configuración de
+<strong class="command">msmtp</strong> y añadir estas dos entradas:</p>
+<div class="highlight-apache notranslate"><div class="highlight"><pre><span></span><span class="nb">defaults</span>
+   <span class="c"># [ ... La configuración anterior ...]</span>
+
+<span class="nb">account</span> vm25
+   <span class="c"># Por el 25, hemos deshabilitado la autenticación</span>
+   <span class="nb">auth</span> <span class="k">off</span>
+   <span class="nb">tls_starttls</span> <span class="k">on</span>
+
+<span class="nb">account</span> vm465
+   <span class="nb">port</span> <span class="m">465</span>
+   <span class="nb">auth</span> <span class="k">on</span>
+   <span class="nb">tls_starttls</span> <span class="k">off</span>
+
+<span class="nb">account</span> vm587
+   <span class="nb">port</span> <span class="m">587</span>
+   <span class="nb">auth</span> <span class="k">on</span>
+   <span class="nb">tls_starttls</span> <span class="k">on</span>
+</pre></div>
+</div>
+<p>Cada cuenta prueba <strong class="program">postfix</strong> en uno de los puertos de escucha:</p>
+<ul>
+<li><p>En el <strong>25</strong>, si intentamos mandar mensajes autenticándonos nos rechazará (de
+ahí que hayamos cambiado <code class="docutils literal notranslate"><span class="pre">auth</span></code>), pero. deshabilitando la autenticación, si
+intentamos mandar mensajes al servidor <em>mail2.org</em>, nos rechazará porque el
+destino no es una cuenta de <em>mail1.org</em>. Si, finalmente, intentamos mandar un
+correo a <em>postmaster&#64;mail1.org</em> u otra cuenta del propio servidor, nos
+rechazará a menos que la <abbr title="Internet Protocol">IP</abbr> del anfitrión se resuelva a algún nombre (lo
+cual probablemente no ocurrirá).</p>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Si queremos que el segundo servidor pueda entregar mensajes,
+deberemos asegurarnos que su <abbr title="Internet Protocol">IP</abbr> es resoluble, lo que implica que hayamos
+habilitado la resolución inversa en el <abbr title="Domain Name Server">DNS</abbr>.</p>
+</div>
+</li>
+<li><p>En el <strong>465</strong> podremos enviar correo perfectamente autenticándonos y la
+conexión se tunelizará directamente mediante <abbr title="Secure Sockets Layer">SSL</abbr>.</p></li>
+<li><p>En el <strong>587</strong> tampoco habrá problemas y la conexión será segura, pero con
+negociación previa.</p></li>
+</ul>
+</div>
+<div class="section" id="configuracion">
+<h2><span class="section-number">7.3.3.1.6. </span>Configuración<a class="headerlink" href="#configuracion" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Ya se ha dicho que el principal fichero de configuración de <strong class="program">postfix</strong>
+es <code class="file docutils literal notranslate"><span class="pre">/etc/postfix/main.cf</span></code>, de modo que consultando o editando este
+fichero, puede revisarse o modificarse la configuración. No obstante, se dispone
+de la utilidad <strong class="command">postconf</strong>, que permite realizar ambas acciones:</p>
+<ol class="arabic">
+<li><p>Consultar la configuración:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> postconf -n
+</pre></div>
+</div>
+<p>La opción <code class="docutils literal notranslate"><span class="pre">-n</span></code> provoca que sólo se muestren las directivas incluidas en el
+fichero <code class="file docutils literal notranslate"><span class="pre">/etc/postfix/main.cf</span></code>. Si se prescinde de ella, se mostrarán
+todas, tambíen aquellas que no se relacionan en el fichero y conservan, por
+tanto, su valor predeterminado.</p>
+<p>Si se quiere consultar un valor concreto, puede indicarse como argumento la
+directiva:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> postconf myhostname
+<span class="go">m1.mail1.org</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Cuando se consultan valores, puede usarse <code class="docutils literal notranslate"><span class="pre">-f</span></code> para formatear
+las líneas largas y que resulten legibles.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Es posible, también, incluir varias directivas en sendos
+parámetros.</p>
+</div>
+</li>
+<li><p>Consultar los valores predeterminados:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> postconf -d
+</pre></div>
+</div>
+<p>Como en el caso anterior, es posible consultar valores concretos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> postconf -d myhostname
+</pre></div>
+</div>
+</li>
+<li><p>Añadir o modificar el valor de una directiva<a class="footnote-reference brackets" href="#id20" id="id10">10</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> postconf -e <span class="s1">&#39;message_size_limit = 20480000&#39;</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Pueden indicarse varias directivas en sendos parámetros.</p>
+</div>
+</li>
+<li><p>Comentar una directiva presente en el fichero:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> postfix -# home_mailbox
+</pre></div>
+</div>
+<p>Si se usa la opción <code class="docutils literal notranslate"><span class="pre">-X</span></code> en vez de esta, la directiva desaparece.</p>
+</li>
+</ol>
+</div>
+<div class="section" id="funcionamiento">
+<h2><span class="section-number">7.3.3.1.7. </span>Funcionamiento<a class="headerlink" href="#funcionamiento" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Las gestiones que realiza <strong class="program">postfix</strong> desde que recibe un mensaje hasta
+que se deshace de él son muchas y su documentación oficial ofrece un <a class="reference external" href="http://www.postfix.org/OVERVIEW.html">texto
+explicatorio</a>. Aquí expondremos un
+modelo muy, muy simplificado con abundantes omisiones (p.e. ni siquiera aparecen
+las colas de mensajes), pero que nos servirá para entender por qué funciona toda
+la configuración propuesta más adelante.</p>
+<img alt="../../../_images/postfix.png" src="../../../_images/postfix.png" />
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Este epígrafe sirve de guía para conocer en qué momento se aplican las
+configuraciones que se ilustrarán a partir de ahora. Una lectura previa puede
+resultar algo críptica o indigesta, pero puede probar a regrerar aquí
+mientras lee los contenidos siguiente o a su término: sin duda entederá todo
+mucho mejor.</p>
+</div>
+<dl>
+<dt>Fase de <strong>recepción</strong></dt><dd><ol class="arabic simple">
+<li><p><strong class="program">postfix</strong> recibe mensajes de correo por diversos medios,
+principalmente:</p>
+<ul class="simple">
+<li><p>A través del protocolo <abbr title="Simple Mail Transfer Protocol">SMTP</abbr> procedente de otros servidores o un
+cliente de correo (de un <abbr title="Mail Submission Agent">MSA</abbr>, en definitiva).</p></li>
+<li><p>A través del ejecutable <strong class="program">sendmail</strong> instalado en la propia
+máquina.</p></li>
+</ul>
+</li>
+<li><p>En esta fase de recepción del mensaje, si se recibe a través del protocolo
+<abbr title="Simple Mail Transfer Protocol">SMTP</abbr>, actúan diversas restricciones (<a class="reference internal" href="02-accept.html#postfix-accept"><span class="std std-ref">vea el epígrafe
+correspondiente</span></a>) en distintos momentos. También se lleva
+a cabo una <a class="reference internal" href="02-accept.html#postfix-vrf-recipient"><span class="std std-ref">verificación de la cuenta de destino</span></a>.</p></li>
+<li><p>Mientras se reciben los datos del mensaje actúan las comprobaciones de
+cabeceras (<a class="reference external" href="http://www.postfix.org/postconf.5.html#header_checks">header_checks</a>) y cuerpo (<a class="reference external" href="http://www.postfix.org/postconf.5.html#body_checks">body_checks</a>), que se <a class="reference internal" href="02-accept.html#postfix-access-body"><span class="std std-ref">tratarán
+donde corresponde</span></a> `</p></li>
+<li><p>Al término del envío de datos pueden establecerse filtros de correo,
+<em>milters</em>, capaces de manipular el mensaje (añadiendo cabeceras, por ejemplo)
+o incluso rechazarlo. Para las posibles nuevas acabeceras añadidas
+existe una ulterior comprobación de cabecera (<a class="reference external" href="http://www.postfix.org/postconf.5.html#milter_header_checks">milter_header_checks</a>).</p></li>
+</ol>
+</dd>
+<dt>Fase de <strong>entrega</strong></dt><dd><ol class="arabic">
+<li><p>Admitido el correo, pueden modificarse los remitentes y destinatarios tanto
+del sobre como del mensaje <a class="reference internal" href="03-entrega.html#postfix-rewrite"><span class="std std-ref">a través de directivas *canonical_maps</span></a>.</p></li>
+<li><p>Después de ello, pueden aún redirigirse los mensajes a <a class="reference internal" href="03-entrega.html#postfix-cue-virt"><span class="std std-ref">cuentas
+distintas a las que indica su dirección del sobre</span></a>, pero
+sin que se altere ninguna dirección a diferencia de lo que ocurre en el punto
+anterior. De ello se encarga <a class="reference external" href="http://www.postfix.org/postconf.5.html#virtual_alias_maps">virtual_alias_maps</a>.</p></li>
+<li><p>Completado lo anterior, <strong class="program">postfix</strong> toma la decisión de encaminar el
+mensaje para lo cual puede usar distintos <strong>transportes</strong>:</p>
+<dl>
+<dt><strong>local</strong></dt><dd><p>Reservado a aquellas cuentas pertenecientes a usuarios que
+<strong class="program">postfix</strong> considera locales. Para definir los dominios asociados
+a cuentas locales se consulta <a class="reference external" href="http://www.postfix.org/postconf.5.html#mydestination">mydestination</a> y para obtener la relación de
+usuarios, el valor de la directiva <a class="reference external" href="http://www.postfix.org/postconf.5.html#local_recipient_maps">local_recipient_maps</a>. Por defecto, se
+usa como agente para este transporte el agente indicado con <a class="reference external" href="http://www.postfix.org/postconf.5.html#local_transport">local_transport</a>,
+que por defecto es el agente de entrega <a class="reference external" href="http://www.postfix.org/local.8.html">local</a>.</p>
+<p>Usando este agente, cualquier mensaje dirigido a cuenta de uno de esos
+dominios, cuyo usuario no esté referido en esta directiva, se rechazará
+con un error:</p>
+<blockquote>
+<div><p>550 5.1.1 &lt;<a class="reference external" href="mailto:noexiste&#37;&#52;&#48;dominio_local">noexiste<span>&#64;</span>dominio_local</a>&gt; User doesn’t exist</p>
+</div></blockquote>
+<p>Además, la entrega será comúnmente en el buzón local del usuario, pero esto
+puede cambiar mediante tres directivas:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="http://www.postfix.org/postconf.5.html#alias_maps">alias_maps</a>, que permite redirigir el mensaje incluso a cuentas externas
+(véase la <a class="reference internal" href="03-entrega.html#postfix-aliases"><span class="std std-ref">explicacion sobre tablas aliases</span></a>).</p></li>
+<li><p><a class="reference external" href="http://www.postfix.org/postconf.5.html#mailbox_transport">mailbox_transport</a>, que permite definir un nuevo transporte para todas
+las cuentas locales, en vez de hacer la entrega en el buzón del usuario.</p></li>
+<li><p><a class="reference external" href="http://www.postfix.org/postconf.5.html#mailbox_transport_maps">mailbox_transport_maps</a>, para lo mismo que lo anterior pero
+mediante una tabla que permite definir el transporte para cada cuenta.
+Las que no se incluyen en la tabla aplicarán, si existe, el transporte
+de la directiva anterior</p></li>
+</ul>
+</dd>
+<dt><strong>virtual</strong></dt><dd><p>Reservado para cuentas cuya entrega será local, pero los usuarios
+virtuales. Pueden definirse los dominios de estos usuarios virtuales con
+la directiva <a class="reference external" href="http://www.postfix.org/postconf.5.html#virtual_mailbox_domains">virtual_mailbox_domains</a>. El agente para este tipo de entrega
+viene definido por <a class="reference external" href="http://www.postfix.org/postconf.5.html#virtual_transport">virtual_transport</a>, cuyo valor predeterminado es el
+agente de entrega <a class="reference external" href="http://www.postfix.org/virtual.8.html">virtual</a>.</p>
+<p>Con este agente, como la entrega se hace en un buzón local, es necesario
+definir cuál es el buzón para cada cuenta mediante <a class="reference external" href="http://www.postfix.org/postconf.5.html#virtual_mailbox_maps">virtual_mailbox_maps</a>.
+Si se envía un mensaje a alguna cuenta de los dominios anteriores que no
+tiene definido buzón mediante esta última directiva, se rechazará el
+mensaje con un error:</p>
+<blockquote>
+<div><p>550 5.1.1 &lt;<a class="reference external" href="mailto:noexiste&#37;&#52;&#48;dominio_virtual">noexiste<span>&#64;</span>dominio_virtual</a>&gt;: Recipient address rejected: User unknown in virtual mailbox table</p>
+</div></blockquote>
+</dd>
+<dt><strong>pipe</strong></dt><dd><p>Es un transporte que cede el mensaje mediante una <a class="reference internal" href="../../../02.conbas/08.redirecciones/01basica.html#pipeline"><span class="std std-ref">tubería</span></a> a un programa externo para que este se encargue de su entrega.
+<a class="reference internal" href="../04-misc/06-maillist/index.html#mlmmj"><span class="std std-ref">mlmmj</span></a> es un ejemplo de programa externo que usa este tipo de
+transporte para gestionar los mensajes.</p>
+<p>También usan este transporte todos los mensajes que tengan definido un
+filtro a través de la directiva <a class="reference external" href="http://www.postfix.org/postconf.5.html#content_filter">content_filter</a>. Se supone que el filtro
+realizará las modificaciones oportunas en el mensaje y volverá a
+inyectarlo en <strong class="program">postfix</strong> a través de <strong class="program">sendmail</strong>. Esta
+segunda vez el sistema considerará el mensaje ya filtrado y usará el
+transporte que debería haber usado en caso de no haberse definido ningún
+filtro.</p>
+</dd>
+<dt><strong>smtp</strong>/<strong>lmtp</strong></dt><dd><p>Son dos transportes que usan servidores <abbr title="Simple Mail Transfer Protocol">SMTP</abbr> y <abbr title="Local Mail Transfer Protocol">LMTP</abbr> respectivamente a
+lo que ceden los mensajes para su entrega. Lo habitual es que el servidor
+<abbr title="Simple Mail Transfer Protocol">SMTP</abbr> sea externo y el servidor <abbr title="Local Mail Transfer Protocol">LMTP</abbr> esté en la propia máquina y los
+entregue en buzones locales. Como <strong class="program">postfix</strong> tiene definido como
+valor de <a class="reference external" href="http://www.postfix.org/postconf.5.html#default_transport">default_transport</a> el agente <a class="reference external" href="http://www.postfix.org/smtp.8.html">smtp</a> (que es un cliente
+<abbr title="Simple Mail Transfer Protocol">SMTP</abbr>/<abbr title="Local Mail Transfer Protocol">LMTP</abbr>), cualquier mensaje a cuenta de un dominio que no sea local
+o virtual usará este agente.</p>
+</dd>
+</dl>
+</li>
+<li><p>Para alterar los agentes predefinidos de transporte, puede usarse
+<a class="reference external" href="http://www.postfix.org/postconf.5.html#transport_maps">transport_maps</a>, que permite definir para cuentas o dominios indivduales qué
+transporte se usará. Por ejemplo, si el dominio <em>mail1.org</em> está listado en
+<a class="reference external" href="http://www.postfix.org/postconf.5.html#mydestination">mydestination</a> debería usar el agente definido en <a class="reference external" href="http://www.postfix.org/postconf.5.html#local_transport">local_transport</a>; pero si
+le definimos otro agente distinto en <a class="reference external" href="http://www.postfix.org/postconf.5.html#transport_maps">transport_maps</a> pasará a usar éste.</p>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Si usa <a class="reference external" href="http://www.postfix.org/postconf.5.html#transport_maps">transport_maps</a> tenga presente que la verificación de la
+existencia de la cuenta se efectúa durante la recepción y, en
+consecuencia, se verificará la existencia de una cuenta perteneciente a un
+dominio local (o virtual) antes de que esta directiva provoque que se use
+otro agente en vez del agente local (o virtual) de transporte.</p>
+</div>
+</li>
+</ol>
+</dd>
+</dl>
+<div class="admonition seealso">
+<p class="admonition-title">Ver también</p>
+<p>Una lectura muy interesante sobre el funcionamiento de
+<strong class="program">postfix</strong> es <a class="reference external" href="https://www.linuxjournal.com/article/9454">este artículo de Linux Journal</a>.</p>
+</div>
+<p class="rubric">Notas al pie</p>
+<dl class="footnote brackets">
+<dt class="label" id="id11"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p>Véanse los <a class="reference internal" href="../../../06.infraestructura/03.dns/03.dnsmasq.html#pre-dns"><span class="std std-ref">preliminares de la configuración DNS</span></a>.</p>
+</dd>
+<dt class="label" id="id12"><span class="brackets"><a class="fn-backref" href="#id2">2</a></span></dt>
+<dd><p>En <em>debian</em> el servidor de correo predeterminado (asociado al paquete
+<em>default-mta</em>) es <strong class="command">exim4</strong> y hasta <em>wheezy</em> o <em>jessie</em> se instalaba
+con la instalación mínima. Este hecho no es raro, porque en los sistemas
+<em>UNIX</em> hay algunos programas básicos que usan el servicio de correo para
+informar al usuario (p.e. <strong class="command">apt-get</strong> o <strong class="command">cron</strong>)</p>
+</dd>
+<dt class="label" id="id13"><span class="brackets"><a class="fn-backref" href="#id3">3</a></span></dt>
+<dd><p>Aunque se deja sin configurar en primera instancia el servidor, el
+<em>script</em> llega a crear el fichero <code class="file docutils literal notranslate"><span class="pre">/etc/aliases</span></code>, lo que provoca que,
+auunque se responda a la pregunta durante la próxima configuración, éste no
+se toque y, en consecuencia, nunca se llegue a escribir en él qué usuario
+recibirá los correos de <em>root</em>. La manera más sencilla de evitarlo, que es la
+que se propone es borrar primero el fichero. También puede optarse por
+realizar la configuración y, después, añadir a mano la línea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">root: nombre_usuario</span>
+</pre></div>
+</div>
+<p>para acabar por generar la base de datos que es realmente lo que maneja
+<strong class="program">postfix</strong>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> newaliases
+</pre></div>
+</div>
+</dd>
+<dt class="label" id="id14"><span class="brackets"><a class="fn-backref" href="#id4">4</a></span></dt>
+<dd><p>El hecho de que el nombre de la máquina sea <em>m1.mail1.org</em> se debe a que
+se llamó <em>m1</em> con <strong class="command">hostname</strong></p>
+</dd>
+<dt class="label" id="id15"><span class="brackets"><a class="fn-backref" href="#id5">5</a></span></dt>
+<dd><p>Por supuesto, también se pueden usar claves generadas con <em>Let’s
+Encrypt</em>. De hecho, es más recomendable.</p>
+</dd>
+<dt class="label" id="id16"><span class="brackets"><a class="fn-backref" href="#id6">6</a></span></dt>
+<dd><p>La última línea nada tiene que ver con postfix como servidor, sino con
+postfix cuando se conecta a otro servidor smtp como cliente. Por ejemplo,
+cuando lo configuramos como smarthost.</p>
+</dd>
+<dt class="label" id="id17"><span class="brackets"><a class="fn-backref" href="#id7">7</a></span></dt>
+<dd><p>La cadena repite dos veces el nombre de usuario (<em>usuario</em>) y una vez la
+contraseña (<em>password</em> en el ejemplo). Esta es la forma de autenticarse
+usando el método «<em>AUTH PLAIN</em>». Con el método «<em>AUTH LOGIN</em>», debemos meter
+primero el usuario y luego la contraseña, ambos codificados en <em>base64</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> <span class="nb">echo</span> -n <span class="s2">&quot;usuario&quot;</span> <span class="p">|</span> base64
+<span class="go">dXN1YXJpbw==</span>
+<span class="gp">$</span> <span class="nb">echo</span> -n <span class="s2">&quot;password&quot;</span> <span class="p">|</span> base64
+<span class="go">cGFzc3dvcmQ=</span>
+<span class="gp">$</span> openssl s_client -connect localhost:smtp -starttls smtp -quiet
+<span class="go">[...]</span>
+<span class="go">250 SMTPUTF8</span>
+<span class="hll"><span class="go">EHLO soy.yo</span>
+</span><span class="go">[...]</span>
+<span class="go">250 SMTPUTF8</span>
+<span class="hll"><span class="go">AUTH LOGIN</span>
+</span><span class="go">334 VXNlcm5hbWU6</span>
+<span class="hll"><span class="go">dXN1YXJpbw==</span>
+</span><span class="go">334 UGFzc3dvcmQ6</span>
+<span class="hll"><span class="go">cGFzc3dvcmQ=</span>
+</span><span class="go">235 2.7.0 Authentication successful</span>
+<span class="go">QUIT</span>
+<span class="go">221 2.0.0 Bye</span>
+</pre></div>
+</div>
+</dd>
+<dt class="label" id="id18"><span class="brackets"><a class="fn-backref" href="#id8">8</a></span></dt>
+<dd><p>El fichero puede o no incluir la contraseña. Si la incluye, no la pedirá
+al enviar el correo, pero será necesario cambiar los permisos del fichero
+para que sólo pueda ser leído por el usuario:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> chmod <span class="m">600</span> ~/.msmtprc
+</pre></div>
+</div>
+</dd>
+<dt class="label" id="id19"><span class="brackets"><a class="fn-backref" href="#id9">9</a></span></dt>
+<dd><p>La opción <code class="docutils literal notranslate"><span class="pre">-a</span></code> podemos ahorrárnoslas, puesto que la cuenta <em>vm25</em> la
+hemos definido como la predeterminada.</p>
+</dd>
+<dt class="label" id="id20"><span class="brackets"><a class="fn-backref" href="#id10">10</a></span></dt>
+<dd><p>La directiva de ejemplo limita el tamaño máximo de mensaje de correo a
+aproximadamente <em>20MB</em>. Este valor, por defecto, es 10MB.</p>
+</dd>
+</dl>
+</div>
+</div>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../../index.html">Tabla de contenido</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">7.3.3.1. Instalación y configuración</a><ul>
+<li><a class="reference internal" href="#preliminares">7.3.3.1.1. Preliminares</a></li>
+<li><a class="reference internal" href="#instalacion">7.3.3.1.2. Instalación</a></li>
+<li><a class="reference internal" href="#cifrado">7.3.3.1.3. Cifrado</a></li>
+<li><a class="reference internal" href="#autenticacion">7.3.3.1.4. Autenticación</a><ul>
+<li><a class="reference internal" href="#cyrus-sasl">7.3.3.1.4.1. Cyrus SASL</a></li>
+<li><a class="reference internal" href="#dovecot-sasl">7.3.3.1.4.2. Dovecot SASL</a></li>
+<li><a class="reference internal" href="#comprobaciones">7.3.3.1.4.3. Comprobaciones</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#puertos-de-escucha">7.3.3.1.5. Puertos de escucha</a></li>
+<li><a class="reference internal" href="#configuracion">7.3.3.1.6. Configuración</a></li>
+<li><a class="reference internal" href="#funcionamiento">7.3.3.1.7. Funcionamiento</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="index.html"
+                        title="capítulo anterior"><span class="section-number">7.3.3. </span>Servidor <abbr title="Simple Mail Transfer Protocol">SMTP</abbr></a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="02-accept.html"
+                        title="próximo capítulo"><span class="section-number">7.3.3.2. </span>Aceptación de mensajes</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../_sources/07.serre/03.mail/02-smtp/01-inst.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="02-accept.html" title="7.3.3.2. Aceptación de mensajes"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="7.3.3. Servidor SMTP"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" ><span class="section-number">7. </span>Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" ><span class="section-number">7.3. </span>Correo electrónico</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="index.html" ><span class="section-number">7.3.3. </span>Servidor <abbr title="Simple Mail Transfer Protocol">SMTP</abbr></a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">7.3.3.1. </span>Instalación y configuración</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor CC BY 4.0, 2016-2021, José Miguel Sánchez Alés.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.2.0.
+    </div>
+  </body>
+</html>

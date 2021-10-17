@@ -1,0 +1,262 @@
+
+
+
+<!DOCTYPE html>
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>7.2.2.3.10. DMS &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/classic.css" />
+    <link rel="stylesheet" href="../../../../_static/custom.css" type="text/css" />
+    
+    <script data-url_root="../../../../" id="documentation_options" src="../../../../_static/documentation_options.js"></script>
+    <script src="../../../../_static/jquery.js"></script>
+    <script src="../../../../_static/underscore.js"></script>
+    <script src="../../../../_static/doctools.js"></script>
+    <script src="../../../../_static/translations.js"></script>
+    
+    <link rel="index" title="Índice" href="../../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../../search.html" />
+    <link rel="next" title="7.2.2.4. Chuleta" href="../04.chuleta/index.html" />
+    <link rel="prev" title="7.2.2.3.9. MRBS" href="07.mrbs.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="../04.chuleta/index.html" title="7.2.2.4. Chuleta"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="07.mrbs.html" title="7.2.2.3.9. MRBS"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" ><span class="section-number">7. </span>Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../index.html" ><span class="section-number">7.2. </span>Web</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../index.html" ><span class="section-number">7.2.2. </span>nginx</a> &#187;</li>
+          <li class="nav-item nav-item-4"><a href="index.html" accesskey="U"><span class="section-number">7.2.2.3. </span>Recetas</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">7.2.2.3.10. </span><abbr title="Document Management System">DMS</abbr></a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="dms">
+<span id="id1"></span><h1><span class="section-number">7.2.2.3.10. </span><abbr title="Document Management System">DMS</abbr><a class="headerlink" href="#dms" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>Un <abbr title="Document Management System">DMS</abbr> (es castellano, <em class="dfn">Sistema de gestión documental</em>) es una aplicación
+dedicada de la clasificación, gestión y ordenación de documentos. Para el caso
+que nos ocupa usaremos un <abbr title="Document Management System">DMS</abbr> web llamando <a class="reference external" href="https://www.seeddms.org/index.php?id=2">SeedDMS</a>.</p>
+<div class="section" id="preliminares">
+<h2><span class="section-number">7.2.2.3.10.1. </span>Preliminares<a class="headerlink" href="#preliminares" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Partiremos de disponer ya de un servidor web accesible a través del nombre
+<em>docs.example.net</em> y con <a class="reference internal" href="../02.avanz/06.dynamic.html#nginx-php"><span class="std std-ref">soporte para php y msql</span></a>.</p>
+<p>Para <strong class="program">seeddms</strong>, además, requeriremos la instalación previa de los
+siguientes paquetes:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt install php-<span class="o">{</span>gd,mbstring,log,http-webdav-server,pear<span class="o">}</span> imagemagick poppler-utils catdoc id3
+</pre></div>
+</div>
+<p>También es necesario el <em>framework</em> <a class="reference external" href="https://framework.zend.com/">zend</a>, pero
+la versión <strong>1</strong>, que es la que soporta <strong class="program">seeddms</strong>, por lo que no lo
+instalaremos a través del paquete (<em>stretch</em> trae la versión <strong>2</strong> y <em>buster</em> la
+<strong>3</strong>), sino de <strong class="command">pear</strong>, que acabamos de instalar:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> pear channel-discover pear.dotkernel.com/zf1/svn
+<span class="gp">#</span> pear install zend/zend
+</pre></div>
+</div>
+</div>
+<div class="section" id="configuracion-de-nginx">
+<h2><span class="section-number">7.2.2.3.10.2. </span>Configuración de <strong class="program">nginx</strong><a class="headerlink" href="#configuracion-de-nginx" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Basta la más básica poara la ejecución de una aplicación <abbr title="PHP Hypertext Preprocessor">PHP</abbr>:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">server</span> <span class="p">{</span>
+   <span class="kn">listen</span>  <span class="mi">80</span><span class="p">;</span>
+   <span class="kn">listen</span> <span class="mi">443</span> <span class="s">ssl</span><span class="p">;</span>
+
+   <span class="kn">server_name</span> <span class="s">docs.example.net</span><span class="p">;</span>
+
+   <span class="kn">root</span> <span class="s">/srv/www/seeddms</span><span class="p">;</span>
+   <span class="kn">try_files</span> <span class="nv">$uri</span> <span class="nv">$uri/</span> <span class="p">=</span><span class="mi">404</span><span class="p">;</span>
+   <span class="kn">index</span> <span class="s">index.php</span><span class="p">;</span>
+
+   <span class="kn">include</span> <span class="s">snippets/snakeoil.conf</span><span class="p">;</span>
+
+   <span class="c1"># Redirección al sitio seguro</span>
+   <span class="kn">if</span> <span class="s">(</span><span class="nv">$https</span> <span class="s">!=</span> <span class="s">&quot;on&quot;)</span> <span class="p">{</span>
+      <span class="kn">return</span> <span class="mi">301</span> <span class="s">https://</span><span class="nv">$host$request_uri</span><span class="p">;</span>
+   <span class="p">}</span>
+
+   <span class="c1"># Aquí almacenaremos los documentos</span>
+   <span class="c1"># que gestiona la aplicación.</span>
+   <span class="kn">location</span> <span class="s">^~</span> <span class="s">/data</span> <span class="p">{</span>
+      <span class="kn">return</span> <span class="mi">404</span><span class="p">;</span>
+   <span class="p">}</span>
+
+   <span class="kn">location</span> <span class="p">~</span> <span class="sr">\.php$</span> <span class="p">{</span>
+      <span class="kn">include</span> <span class="s">snippets/fastcgi-php.conf</span><span class="p">;</span>
+      <span class="kn">fastcgi_pass</span> <span class="s">php</span><span class="p">;</span>
+   <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Como vemos, presuponemos que la aplicación se instalará dentro del directorio
+<code class="file docutils literal notranslate"><span class="pre">/srv/www/seeddms</span></code>.</p>
+</div>
+<div class="section" id="instalacion">
+<h2><span class="section-number">7.2.2.3.10.3. </span>Instalación<a class="headerlink" href="#instalacion" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>A través de la página principal de <a class="reference external" href="https://www.seeddms.org/index.php?id=2">SeedDMS</a> podemos llegar a los enlaces de
+descarga de la última versión estable<a class="footnote-reference brackets" href="#id5" id="id2">1</a>. Es necesario descargar cuatro
+ficheros y tratarlos del siguiente modo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> pear install SeedDMS_Core-5.1.9.tgz
+<span class="gp">#</span> pear install SeedDMS_Preview-5.1.9.tgz
+<span class="gp">#</span> pear install SeedDMS_Lucene-5.1.9.tgz
+<span class="gp">#</span> mkdir /srv/www/seeddms
+<span class="gp">#</span> tar -C /srv/www/seeddms -axvf seeddms-5.1.9.tar.gz --strip-component<span class="o">=</span><span class="m">1</span>
+</pre></div>
+</div>
+<p>Además debemos preparar el directorio dónde se alojarán los documentos que
+gestionará <strong class="program">seeddms</strong> y advertirle de que la próxima vez que lo
+arranquemos nuestra intención es configurarlo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkdir -p /srv/www/seeddms/<span class="o">{</span>conf,data/<span class="o">{</span>staging,lucene,cache<span class="o">}}</span>
+<span class="gp">#</span> chown -R www-data:www-data /srv/www/seeddms/<span class="o">{</span>conf,data<span class="o">}</span>
+<span class="gp">#</span> touch /srv/www/seeddms/conf/ENABLE_INSTALL_TOOL
+</pre></div>
+</div>
+<p>Por último, podemos entrar en el entorno de <strong class="program">mysql</strong> y crear el usuario
+con permisos para escribir en la base de datos:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">CREATE</span> <span class="k">DATABASE</span> <span class="n">seeddms</span><span class="p">;</span>
+<span class="k">GRANT</span> <span class="k">ALL</span> <span class="k">PRIVILEGES</span> <span class="k">ON</span> <span class="n">seeddms</span><span class="p">.</span><span class="o">*</span> <span class="k">TO</span> <span class="s1">&#39;seeddms&#39;</span><span class="o">@</span><span class="s1">&#39;localhost&#39;</span> <span class="n">IDENTIFIED</span> <span class="k">BY</span> <span class="s1">&#39;contraseña&#39;</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>Listo, entramos en:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">http://docs.example.net/install</span>
+</pre></div>
+</div>
+<p>y completamos la instalación. El acceso se hará a través del usuario «<em>admin</em>»
+con contraseña «<em>admin</em>».</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>En la instalación sólo hay que definir:</p>
+<ul class="simple">
+<li><p>El directorio de la aplicación (<code class="file docutils literal notranslate"><span class="pre">/srv/www/seeddms</span></code>), que debería
+haberse averiguado bien.</p></li>
+<li><p>La ruta (<code class="file docutils literal notranslate"><span class="pre">/</span></code>, en nuestro caso), que también debería estar bien.</p></li>
+<li><p>Los subdirectorios que almacenarán los ficheros subidos, que sí deberemos
+cambiar, puesto que la aplicación los sugerirá a partir de
+<code class="file docutils literal notranslate"><span class="pre">/srv/www/seeddms/../data</span></code>, es decir, de un directorio fuera del
+directorio de la aplicación, mientras que nosotros lo hemos incluido
+dentro<a class="footnote-reference brackets" href="#id6" id="id3">2</a>.</p></li>
+<li><p>Los datos referentes a la conexión a la base de datos. Asegúrese de marcar
+que deben generarse las tablas, ya que no lo hemos hecho a mano.</p></li>
+</ul>
+</div>
+</div>
+<div class="section" id="postinstalacion">
+<h2><span class="section-number">7.2.2.3.10.4. </span>Postinstalación<a class="headerlink" href="#postinstalacion" title="Enlazar permanentemente con este título">¶</a></h2>
+<ol class="arabic simple">
+<li><p>Es bastante probable que, si no ha realizado ninguna modificación en la
+configuración de <abbr title="PHP Hypertext Preprocessor">PHP</abbr> y <strong class="program">nginx</strong>, el tamaño máximo de fichero sean
+unos escasos 2MB. Para ampliar este límite, <a class="reference internal" href="04.moodle.html#nginx-php-filesize"><span class="std std-ref">consulte la explicación
+dada en la instalación de moodle</span></a>.</p></li>
+<li><p>¡¡Recuerde cambiar la contraseña del administrador!! Existe otro usuario
+invitado (<em>guest</em>) que, para que pueda usarse, necesita que se le fije una
+contraseña.</p></li>
+<li><p>En la <em>Administración</em> necesita generar un «índice de texto completo» para
+que la «búsqueda de texto completo» funcione<a class="footnote-reference brackets" href="#id7" id="id4">3</a>.</p></li>
+</ol>
+<p class="rubric">Notas al pie</p>
+<dl class="footnote brackets">
+<dt class="label" id="id5"><span class="brackets"><a class="fn-backref" href="#id2">1</a></span></dt>
+<dd><p>La <strong>5.1.9</strong> en el momento de la escritura de estas notas.</p>
+</dd>
+<dt class="label" id="id6"><span class="brackets"><a class="fn-backref" href="#id3">2</a></span></dt>
+<dd><p>Observe que para evitar el acceso al directorio a través del servidor (lo
+cual sería un grave problema de seguridad) nos hemos segurado en la
+configuración de <strong class="program">nginx</strong> que eso jamás ocurra.</p>
+</dd>
+<dt class="label" id="id7"><span class="brackets"><a class="fn-backref" href="#id4">3</a></span></dt>
+<dd><p>En la versión instalada si se prueba una búsqueda antes de la generación
+del índice, la ejecución del <em>script</em> falla y se genera en <strong class="program">nginx</strong>
+un error <em>500</em>. Debe de ser un <em>bug</em>.</p>
+</dd>
+</dl>
+</div>
+</div>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../../../index.html">Tabla de contenido</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">7.2.2.3.10. <abbr title="Document Management System">DMS</abbr></a><ul>
+<li><a class="reference internal" href="#preliminares">7.2.2.3.10.1. Preliminares</a></li>
+<li><a class="reference internal" href="#configuracion-de-nginx">7.2.2.3.10.2. Configuración de <strong class="program">nginx</strong></a></li>
+<li><a class="reference internal" href="#instalacion">7.2.2.3.10.3. Instalación</a></li>
+<li><a class="reference internal" href="#postinstalacion">7.2.2.3.10.4. Postinstalación</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="07.mrbs.html"
+                        title="capítulo anterior"><span class="section-number">7.2.2.3.9. </span><abbr title="Meeting Room Booking System">MRBS</abbr></a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="../04.chuleta/index.html"
+                        title="próximo capítulo"><span class="section-number">7.2.2.4. </span>Chuleta</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../../_sources/07.serre/02.web/02.nginx/03.misc/08.dms.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="../04.chuleta/index.html" title="7.2.2.4. Chuleta"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="07.mrbs.html" title="7.2.2.3.9. MRBS"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" ><span class="section-number">7. </span>Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../index.html" ><span class="section-number">7.2. </span>Web</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../index.html" ><span class="section-number">7.2.2. </span>nginx</a> &#187;</li>
+          <li class="nav-item nav-item-4"><a href="index.html" ><span class="section-number">7.2.2.3. </span>Recetas</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">7.2.2.3.10. </span><abbr title="Document Management System">DMS</abbr></a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor CC BY 4.0, 2016-2021, José Miguel Sánchez Alés.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.2.0.
+    </div>
+  </body>
+</html>

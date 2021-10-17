@@ -1,0 +1,293 @@
+.. _nginx--moodle:
+
+Moodle
+======
+`moodle <https://moodle.org>`_ es una plataforma educativa de software libre muy
+extendida. Este tipo de *software* recibe el nombre de |LMS| y, en el mundo del
+*software* existen otras alternativas moderadamente extendidas como:
+
+* `edX <https://open.edx.org/>`_.
+* `Chamilo <https://chamilo.org/>`_ (con `documentación en castellano
+  <https://docs.chamilo.org/es/>`_).
+
+Para la instalación de :program:`moodle` consideraremos que disponemos del
+nombre `moodle.example.net` y de que ya hemos levantado un servidor :ref:`nginx
+<n-ginx>` instalado con :ref:`soporte comprobado para php y mysql <nginx-php>`.
+
+Preliminares
+------------
+Para :program:`moodle`, además del |PHP| instalado, necesitamos::
+
+   # apt-get install php-{gd,curl,zip,xml{,rpc},soap,intl,mbstring}
+
+.. note:: Es posible que para algunas conversiones sea necesario el paquete
+   *ghostscript*::
+
+      # apt-get install ghostscript
+
+Crearemos dos directorios: uno para albergar la aplicación y otro para contener
+los datos\ [#]_::
+
+   # mkdir -p /srv/www/moodle
+   # mkdir -m700 /srv/www/data
+   # chown www-data /srv/www/{data,moodle}
+
+Finalmente, debemos configurar adecuadamente :program:`mariadb`::
+
+   # cat > /etc/mysql/conf.d/moodle.cnf
+   [mysqld]
+   innodb_file_per_table = 1
+   innodb_large_prefix = 1
+   innodb_file_format = Barracuda
+   # invoke-rc.d mysql restart
+
+y, como en otras aplicaciones,  crear la base de datos y el usuario para
+:program:`moodle`::
+
+   # mysql
+   mysql> CREATE DATABASE moodle;
+   mysql> GRANT ALL ON moodle.* TO 'moodle'@'localhost' IDENTIFIED BY 'contraseñadificil';
+
+Por último, debemos hacernos con la última versión estable de :program:`moodle`
+disponible en su página web y descomprimir el contenido dentro de
+:file:`/srv/www/moodle`::
+
+   # runuser -u www-data -- tar -C /srv/www/moodle -axvf /tmp/moodle-3.6.2.tgz --strip-components=1
+
+Configuración de :program:`nginx`
+---------------------------------
+Es conveniente que la aplicación corra en un sitio seguro, ya que contiene
+contraseñas y datos sensibles (notas, por ejemplo). Supuesto todo esto,
+:download:`una configuración apropiada puede ser esta <files/site-moodle>`:
+
+.. literalinclude:: files/site-moodle
+   :language: nginx
+
+.. note:: La configuración usa el *snippet* :ref:`robotsoff.conf
+   <nginx-robotsoff>` que se usó también para :program:`wordpress`.
+
+Instalación
+-----------
+Basta con escribir la dirección del sitio en un navegador y seguir los pasos.
+
+.. _timeout-php:
+
+.. warning:: Algún paso de la instalación puede ser exageradamente lento hasta
+   el punto de que el servidor temporice durante la ejecución de algún *script*
+   y la instalación de malogre. Si ese es el caso, puede probar a aumentar el
+   tiempo de temporización añadiendo al bloque que se encarga de la ejecución de
+   |PHP|:
+
+   .. code-block:: nginx
+      :emphasize-lines: 4
+      
+      location ~ \.php$ {
+         include snippets/fastcgi-php.conf;
+         fastcgi_pass php;
+         fastcgi_read_timeout 600s;
+      }
+
+   Durante la utilización de :program:`moodle` es posible que no volvamos a
+   tener este problema, así que podremos eliminar la línea tras la instalación.
+
+Completada la instalación web, debemos:
+
+#. Cambiar los permisos a :file:`/srv/www/moodle`::
+
+      # chown -R root:root /srv/www/moodle
+      # chgrp www-data /srv/www/moodle/config.php
+
+#. Mover el directorio de datos dentro de :file:`/srv/www/moodle` y cambiar la
+   configuración para hacer efectivo el cambio::
+
+      # mv /srv/www/{,moodle/}data
+      # sed -ri 's:/srv/www/data:/srv/www/moodle/data:' /srv/www/moodle/config.php
+
+Postinstalación
+---------------
+Debería al menos cuidarse de hacer cuatro cosas:
+
+* Añadir al cron del usuario *www-data* la ejecución cada minuto del *script*
+  que incluye moodle para ello::
+
+   # crontab -e -u www-data
+
+  y en el editor escribir la línea::
+
+   */1 * * * * /usr/bin/php /srv/www/moodle/admin/cli/cron.php > /dev/null
+
+* *moodle* usa para el envío de mensajes de correo a sus usuaros el módulo
+  interno de |PHP|. Esto, sin embargo, hará poco fiables tales mensajes para los
+  servidores de correo destinatarios que pueden rechazarlos directamente o
+  mandarlos al buzón de *spam*. Lo mejor para evitarlo es ir a ``Administración
+  del Sitio > Servidor > Correo electrónico > Configuración de correo saliente``
+  y:
+  
+  - o bien, utilizar el servidor de correo del propio servidor, si es que
+    existe y lo hemos configurado para que gestione correctamente el correo del
+    dominio
+  - o bien usar una cuenta de correo de un servidor |SMTP| de terceros.
+
+  E el segundo caoo, es conveniente asegurarse de que el envío funciona
+  utlizando como ayuda `una extensión que lo pruebe
+  <https://moodle.org/plugins/local_mailtest>`_.
+
+.. _nginx-php-filesize:
+
+* Es habitual que tanto profesores como alumnos suban ficheros al servidor. El
+  límite en el tamaño de estos ficheros viene determinado por:
+
+  - La limitación que se defina para la tarea en cuestión o para un
+    curso en particular. En el primer caso, de forma predeterminada, se entiende
+    que la limitación es la máxima que se impone para el curso; y en el segundo
+    caso, que la limitación es la máxima para *moodle* en su conjunto.
+
+  - La limitación que hayamos definido dentro de la configuración general del
+    propio *moodle* (``Administración del sitio>Seguridad>Políticas del
+    sitio``). Su valor predeterminado es que se utilice el límite definido por
+    la configuración de |PHP|, de modo que no suele hacer falta tocarlo.
+
+  - La limitación que haya definida en la configuración de |PHP| que se
+    encuentra en :file:`/etc/php/7.0/fpm/php.ini` y de modo predeterminado es
+    **2**\ MB. Suele ser demasiado pequeña, así que conviene cambiarla a un
+    valor mayor, por ejemplo::
+
+      post_max_size = 20M
+      upload_max_filesize = 20M
+   
+  - La limitación impuesta en la configuración de *nginx* a través de la
+    directiva `client_max_body_size
+    <http://nginx.org/en/docs/http/ngx_http_core_module.html#client_max_body_size>`_.
+    Para cambiarla lo más limpio es crear un fichero de configuración dentro de
+    :file:`/etc/nginx/conf.d`::
+
+      # echo "client_max_body_size 20m;" > /etc/nginx/conf.d/max_body.conf
+
+  .. note:: Para colgar ficheros excepcionalmente grandes, no es necesario
+     aumentar indiscriminadamente el límite. Podemos valernos del concepto de
+     `Repositorio <https://docs.moodle.org/all/es/Repositorios>`_ y definir un
+     repositorio que sea `un directorio del sistema de ficheros del propio
+     servidor <https://docs.moodle.org/all/es/Repositorio_sistema_de_archivo>`_.
+     Puede añadir un repositorio de este tipo, habilitándolo en ``Administración
+     del sitio>Extensiones>Repositorios>Gestionar repositorios`` y agregándolo
+     después en ``Administración del sitio>Extensiones>Repositorios>Sistema de
+     archivos``.
+
+* Para mantener controlado el espacio que ocupa cada curso es bastante útil la
+  extensión `Course size <https://moodle.org/plugins/report_coursesize>`_. Tras
+  instalarla, el desglose de cuánto ocupa cada disco será accesible a través de
+  ``Administración del sitio>Informes>Tamaño de curso``, aunque sólo para el
+  administrador del sitio.
+
+* Las últimas versiones de :program:`moodle` traen como tema predeterminado
+  para el dispositivo "Default" (en esta categoría entra un navegador ejecutado
+  desde |PC|), un tema llamado *Boost*. Anteriormente traía por defecto el tema
+  *Clean*. Si está más acostumbrado a la interfaz de éste, aún puede usarlo
+  a través de ``Administración del sitio>Apariencia>Temas>Selector de temas``.
+
+* Puede ser interesante habilitar el autoregistro, lo cual exige dos acciones:
+
+  + En ``Administración del sitio>Extensiones>Identificación``, tener habilitada
+    la "Identificación basada en Email" y en los *Ajustes comunes* de esa propia
+    página tener fijadas las dos claves que proporciona Google_ para su
+    `servicio de captchas <https://www.google.com/recaptcha>`_.
+
+  + En ``Administración del sitio>Extensiones>Identificación>Identificación basada en Email``
+    debe habilitarse el elemento *reCAPTCHA*.
+
+* Puede llegar a ser interesante habilitar la autenticación a través de
+  servicios como el de *Google*. Para ello debe hacerse lo siguiente:
+
+  - Habilitar la autenticacación `OAuth2
+    <https://www.digitalocean.com/community/tutorials/una-introduccion-a-oauth-2-es>`_ en
+    ``Administación del sitio>Extensiones>Identificación``.
+
+  - Crear unas credenciales adecuadas en Google (véase, por ejemplo, `este
+    enlace <https://docs.moodle.org/37/en/OAuth_2_Google_service>`_).
+
+  - Crear un servicio de autenticación con *Google* a través de ``Administación
+    del sitio>Extensiones>Identificación>Servicios OAuth2``.
+
+  .. note:: Lo habitual es que se habilite esta autenticación si nuestra
+     organización dispone de dominio propio y ha contratado con *Google* un plan
+     como `G-Suite for Education
+     <https://edu.google.com/intl/es-419/products/gsuite-for-education/>`_. En
+     ese caso, lo lógico es que:
+
+     * Sólo se permita la autenticación para las cuentas de nuestro propio
+       dominio, lo cual puede lograrse incluyendo el nombre del dominio en el
+       campo :code:`Login domains`.
+
+     * Se quiera que si se indica un nombre de usuario sin especificar el
+       dominio, el usuario sea el de nuestro dominio y no el de *gmail.com*.
+       Para ello, en el campo :code:`Additional parameters included in a login
+       request.` puede incluirse el valor :kbd:`hd=midominio.com`.
+
+.. warning:: Para instalar extensiones es bastante probable que tenga que dar
+   temporalmente permisos de escritura a *www-data* sobre algún subdirectorio.
+
+Actualización
+-------------
+**Antes** de proceder a ella, es conveniente realizar una copia de seguridad de la base de datos::
+
+   # mysqldump moodle | xz -9c > /tmp/moodle.sql.xz
+
+y, además, poner el sitio en mantenimiento para impedir el acceso::
+
+   # php /srv/ww/moodle/admin/cli/maintenance.php --enable
+
+Cumplidos estos preliminares, podemos bajar al servidor la última versión
+estable y proceder del siguiente modo:
+
+#. Mover los ficheros de la aplicacion a otra ubicación distinta::
+
+      # mv /srv/www/moodle{,.old}/
+
+   .. warning:: No se le ocurra volcar la nueva versión sobre la antigua.
+
+#. Volcar la versión descargada dentro de :file:`/srv/www/moodle`::
+
+      # runuser -u www-data -- tar -C /srv/www/moodle -axvf /tmp/moodle-3.7.tgz --strip-components=1
+
+#. Mover el directorio de datos dentro de la nueva aplicación::
+
+      # mv /srv/www/moodle{,.old}/data
+
+#. Copiar la antigua configuración al nuevo sitio::
+
+      # cp -p /srv/www/moodle{,.old}/config.php
+
+#. Deshabilitar el modo mantenimiento::
+
+   # php /srv/ww/moodle/admin/cli/maintenance.php --disable
+
+#. Entrar en la aplicación y actualizar la base de datos y los plugins:
+
+#. Corregir los permisos::
+
+      # chown -R root:root /srv/www/moodle
+      # chown -R www-data /srv/www/moodle/data
+      # chgrp www-data /srv/www/moodle/config.php
+
+#. Comprobar el correcto funcionamiento de la aplicación.
+
+#. Borrar :file:`/srv/www/moodle.old`::
+
+      # rm -rf /srv/www/moodle.old
+
+.. rubric:: Notas al pie
+
+.. [#] La documentación e instalación oficial de :program:`moodle` sugiere
+   que el directorio de datos sea :file:`/srv/www/moodledata`, es decir, un
+   directorio hermano, que no hijo, de :file:`/srv/www/moodle` a fin de que no
+   sea accesible a través del servicio *web*. Por pulcritud, nuestra intención
+   es meter este directorio de datos dentro de :file:`/srv/www/moodle` y en la
+   configuración del servicio impedir el acceso, pero la instalación lo impide,
+   así que instalaremos de este modo y, tras instalar, modificaremos para lograr
+   el objetivo.
+
+.. |PHP| replace:: :abbr:`PHP (PHP Hypertext Preprocessor)`
+.. |LMS| replace:: :abbr:`LMS (Learning Management System)`
+.. |PC| replace:: :abbr:`PC (Personal Computer)`
+
+.. _Google: https://www.google.com

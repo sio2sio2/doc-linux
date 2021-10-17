@@ -1,0 +1,392 @@
+Contenido dinámico
+******************
+:program:`nginx` no ejecuta directamente código para generar el contenido
+dinámico, sino que actúa de *proxy* hacia el intérprete adecuado. Esta es una
+gran diferencia respecto a :program:`apache` que suele tener módulos para
+la ejecución de los distintos lenguajes.
+
+.. _nginx-php:
+
+PHP
+===
+
+Instalación
+-----------
+Para dar soporte a aplicaciones escritas en |PHP| y que hagan uso de bases de
+datos *MySQL*\ [#]_ combinación muy frecuente es necesario como mínimo lo
+siguiente\ [#]_::
+
+   # apt-get install php-{fpm,mysql} mariadb-{server,client}
+
+Esta es una instalación muy mínima y cualquier aplicación |PHP| medianamente
+seria requerirá algún paquete más. Como *alternativa*, podemos instalar lo siguiente::
+
+   # apt-get install php{,-mysql} libapache2-mod-php7.3- mariadb-{server,client}
+
+.. note:: En este caso, *php* instala librerías muy comunes y que muy
+   probablemente las necesite alguna aplicación que instalemos después. Sin
+   embargo, *php* prefiere como dependencia :program:`apache`, así que evitamos
+   su instalación.
+
+   Aunque no usemos este segundo método de instalación, sino el primero, el
+   truco de evitar explícitamente la dependencia de :program:`apache` es válido
+   cuando, al instalar una aplicación web desde repositorios (p.e.
+   :ref:`roundcube <roundcube>`), *debian* nos pretenda instalar también este
+   servidor.
+
+Configuración del sitio
+-----------------------
+Resueltas las dependencias, hay que configurar :program:`nginx`. Lo más sencillo
+es crear el siguiente fichero:
+
+.. code-block:: nginx
+
+   # cat /etc/nginx/conf.d/php.conf
+   upstream php {
+      server unix:/var/run/php/php7.3-fpm.sock;
+   }
+
+.. note:: En *buster* la versión de |PHP| es la versión *7.3*; mientras que en
+   *stretch*, la *7.0*. Este hecho debe tenerse en cuenta a la hora de nombrar
+   ciertos ficheros (como el anterior) o instalar paquetes.
+
+y habilitar el uso del intérprete para los *scripts* de |PHP|, por ejemplo,
+así:
+
+.. code-block:: nginx
+   :emphasize-lines: 8-13
+
+   server {
+      listen 80;
+
+      server_name _;
+
+      root /srv/www;
+      try_files $uri $uri/ =404;
+      index  index.php;
+
+      location ~ \.php$ {
+         include snippets/fastcgi-php.conf;
+         fastcgi_pass php;
+      }
+   }
+
+.. note:: Tenga en cuenta que esto ejecuta como |PHP| cualquier fichero cuyo
+   extensión sea *.php*. Si la aplicación permite subir ficheros, esto provocará
+   un agujero de seguridad, ya que podría permitir subir un *script* al servidor
+   y ejecutarlo luego. Sería conveniente excluir el directorio de subidas para
+   evitarlo. Suponiendo que este se llame :file:`/wp-content/uploads/`::
+
+      location ~ ^((?!/wp-content/uploads/).)*\.php$ {
+         include snippets/fastcgi-php.conf;
+         fastcgi_pass php;
+      }
+
+   o bien dejarlo como estaba en un principio y añadir::
+
+      location ^~ /wp-content/uploads/ {
+      }
+
+   que evitará que aplicar el bloque de la localización anterior cuando la ruta
+   esté dentro de :file:`/wp-content/uploads`.
+
+Comprobación
+------------
+La prueba más sencilla para comprobar si se interpreta |PHP| es crear un fichero
+:file:`index.php`::
+
+   # echo '<?php phpinfo(); ?>' > /srv/www/index.php
+
+que devuelve la actual configuración del intérprete |PHP|. Si, además, queremos
+probar el acceso a la base de datos podemos :download:`descargar esta prueba muy
+simple <files/prueba-php.tar.gz>` con un *script* que crea una tabla |HTML| a
+partir de los datos almacenados en una base de datos. Basta con colocar el
+*script* en una localización en que se ejecute y volcar el guión |SQL| en la
+base de datos::
+
+   # mysql < guion.sql
+
+.. _nginx-fastcgi-cache:
+
+Optimización por cacheo
+-----------------------
+El servicio de páginas dinámicas es muy costoso en la medida en que su petición
+exige la generación al vuelo del código |HTML|. Por ello, una muy buena
+optimización es que el servidor cachee la página generada, de suerte que
+posteriores peticiones no generen la página, sino que entreguen la página ya
+generada. Es obvio que si el contenido es dinámico se debe a que cambia y
+que, en consecuencia, cachear es muy peligroso en la medida en que, si la
+configuración no es la adecuada, estaremos remitiendo al cliente contenido
+obsoleto.
+
+.. warning:: Hay que estudiar muy concienzudamente cómo, cuándo y durante cuánto
+   tiempo se cacheará a fin de que los clientes no reciban contenido cacheado
+   obsoleto. 
+
+Antes de empezar, no obstante, es muy útil crear una página dinámica por la que
+conozcamos de un vistazo si la página, de petición a petición, cambia o no:
+
+.. code-block:: php
+
+   <?php
+      header('Content-type: text/plain; charset=utf-8');
+      echo 'Página generada en el momento '.time();
+   ?>
+
+.. Fin>
+
+que podemos colocar como archivo :file:`index.php` y nos servirá para hacer
+pruebas. Es obvio que, si no cacheamos, cada vez que pidamos la página
+obtendremos una página que devuelve un `tiempo UNIX
+<https://es.wikipedia.org/wiki/Tiempo_Unix>`_ distinto.
+
+Para cachear el |PHP| hay que crear primero un directorio de caché::
+
+   # mkdir -m700 /var/cache/nginx/wp-cache
+   # chown www-data /var/cache/nginx/wp-cache
+
+y, luego, una configuración de este estilo para :program:`nginx` (remarcamos
+los cambios respecto a la configuración que no cachea):
+
+.. code-block:: nginx
+   :emphasize-lines: 1-4, 19-26
+
+   fastcgi_cache_path /var/cache/nginx/wp-cache
+                      levels=1:2
+                      keys_zone=wp-cache:100m
+                      inactive=7m;
+
+   server {
+      listen 80;
+
+      server_name _;
+
+      root /srv/www;
+      try_files $uri $uri/ =404;
+      index  index.php;
+
+      location ~ \.php$ {
+         include snippets/fastcgi-php.conf;
+         fastcgi_pass php;
+
+         fastcgi_cache wp-cache;
+         fastcgi_no_cache $http_authorization;
+         fastcgi_cache_valid 1m;
+         fastcgi_cache_bypass $http_pragma;  # Evita la cache con Ctrl+F5 (Pragma: no-cache)
+         fastcgi_cache_key "$scheme$host$request_uri";
+         fastcgi_cache_use_stale updating error timeout invalid_header http_500;
+         fastcgi_ignore_headers Cache-Control Expires Set-Cookie;
+         add_header X-RunCloud-Cache $upstream_cache_status;
+      }
+   }
+
+Esta configuración supone:
+
+* Mediante fastcgi_cache_path_ se define como directorio de caché, el
+  directorio :file:`/var/cache/nginx/wp-cache` antes creado. A esta caché
+  dedicarenos 100MB y nos referiremos a ella como *wp-cache*, según se determina
+  con ``keys_zone``. Además, determinamos que, a los 7 minutos de haber cacheado
+  una página, ésta desaparezca de la caché.
+
+* En la *location* para |PHP| añadimos que se cachee usando la caché anterior
+  y, además:
+
+  - fastcgi_no_cache_ permite definir cuándo no se quiere cachear en absoluto.
+    No se cacheará cuando la variable tenga algún valor y este no sea **0**.
+    Pueden añadirse varias, en cuyo caso bastará con que alguna tenga un valor
+    distinto a **0**.
+
+  - Fijamos que los contenidos cacheados tienen una validez de **1** minuto.
+    Como la línea es esta::
+
+         fastcgi_cache_valid 1m;
+
+    y no se ha expresado código de respuesta alguno, sólo se cachean durante un
+    minuto las respuestas correctas (código **200**) y las redirecciones
+    (códigos **301** y **302**). Cualquier otro código, no es cacheado. Pueden,
+    por supuesto, cachearse otros códigos, incluso todos usando la palabra *any*::
+
+      fastcgi_cache_valid any 1m;
+
+   o varios con distinto tiempo usando varias veces la directiva::
+
+      fastcgi_cache_valid 200 301 302 307 1m;
+      fastcgi_cache_valid 404 30s;
+
+    .. note:: El tiempo apropiado, por supuesto, dependerá de cuál sea la
+       la aplicación web y cuál la situación que queremos resolver.
+
+  - Evitamos los contenidos cacheados (fastcgi_cache_bypass_) cuando el
+    cliente envía una cabecera::
+
+        Pragma: no-cache
+
+    lo cual ocurre cuando desde un navegador se refresca la página pulsando
+    Ctrl+F5. Es importante notar que, al puentear la caché, se vuelve a generar
+    el contenido, lo que supone no solamente que obtenegamos el nuevo contenido,
+    sino que se renueve la caché.
+
+  - Hacemos que se identifique cada recurso cacheado con la cadena
+    "$scheme$host$request_uri". Esto significa que si una nueva petición
+    construye una cadena exactamente igual a la que construyó una petición
+    anterior, :program:`nginx` devolverá el cacheo de esta petición anterior.
+
+  - Con fastcgi_cache_use_stale_ definimos bajo qué circunstancias es
+    permisible devolver una respuesta obsoleta cacheada. En el ejemplo, si al
+    hacer una petición se obtiene un error **500**, pero la caché conservaba una
+    respuesta obsoleta (recordemos que las respuestas caducan al minuto, pero
+    que no se borrar hasta pasados 7), entonces en vez de devolver tal error,
+    :program:`nginx` devolverá la respuesta obsoleta.
+    También es posible obtener una respuesta obsoleta, si se recibe una petición
+    durante el tiempo de actualización de la caché (debido al parámetro
+    ``updating`` incluido).
+
+  - No atendemos campos en la cabecera de respuesta (*Cache-Control*, *Expires*,
+    *Set-Cookie*) que podrían alterar nuestra política de cacheo. De hecho, es
+    bastante común que las aplicaciones web incluyan este tipo de cabeceras para
+    evitar que *proxies* intermedios cacheen contenido que es dinámico.
+
+  - Por último, incluimos añadimos una cabecera que informa al cliente de si el
+    contenido está cacheado o no: un valor de *MISS* significa que el contenido
+    se generó para nuestra solicitud y uno de *HIT* que se obtuvo de la caché.
+
+Podemos hacer pruebas con un navegador, pero si disponemos de *linux* en nuestra
+máquina cliente, es bastante más cómodo usar :command:`wget`:
+
+#. Generamos contenido por primera vez (y, de paso, miramos las cabeceras)::
+
+      $ wget -qSO - http://www.example.net
+        HTTP/1.1 200 OK
+        Server: nginx/1.10.3
+        Date: Thu, 08 Nov 2018 15:41:51 GMT
+        Content-Type: text/plain; charset=utf-8
+        Transfer-Encoding: chunked
+        Connection: keep-alive
+        X-RunCloud-Cache: MISS
+      Hola, me ejecuto con PHP: 1541691711
+
+#. Volvemos a pedir la página, sin esperar a que pase el minuto::
+
+      $ wget -qSO - http://www.example.net
+        HTTP/1.1 200 OK
+        Server: nginx/1.10.3
+        Date: Thu, 08 Nov 2018 15:42:30 GMT
+        Content-Type: text/plain; charset=utf-8
+        Transfer-Encoding: chunked
+        Connection: keep-alive
+        X-RunCloud-Cache: HIT
+      Hola, me ejecuto con PHP: 1541691711
+
+#. Pedimos de nuevo el contenido (deberá regenerarse)::
+
+      $ wget -qSO - http://www.example.net
+        HTTP/1.1 200 OK                                                                                                                         
+        Server: nginx/1.10.3
+        Date: Thu, 08 Nov 2018 15:45:56 GMT
+        Content-Type: text/plain; charset=utf-8
+        Transfer-Encoding: chunked
+        Connection: keep-alive
+        X-RunCloud-Cache: EXPIRED
+      Hola, me ejecuto con PHP: 1541691984
+
+#. Emulamos el refresco con *Ctrl+F5*::
+
+      $ wget -qSO - --header "Pragma: no-cache" http://www.example.net
+        HTTP/1.1 200 OK
+        Server: nginx/1.10.3
+        Date: Thu, 08 Nov 2018 15:46:21 GMT
+        Content-Type: text/plain; charset=utf-8
+        Transfer-Encoding: chunked
+        Connection: keep-alive
+        X-RunCloud-Cache: BYPASS
+      Hola, me ejecuto con PHP: 1541692253
+
+.. rubric:: Purgando la caché
+
+:program:`nginx` dispone directivas para purgar de forma manual la caché, pero
+forman parte de la versión de pago. *debian*, sin embargo, permite la
+instalación del módulo `ngx_cache_purge <https://github.com/phusion/passenger_apt_automation/tree/master/debian_specs/nginx/modules/nginx-cache-purge>`_ que habilita precisamente eso::
+
+   # apt install libnginx-mod-http-cache-purge
+
+Las directivas de purga (``fastcgi_cache_purge`` en nuestro caso no pueden
+usarse dentro de un directiva ``if``), por lo que una argucia para poder purgar
+sería la siguiente configuración:
+
+.. code-block:: nginx
+   :emphasize-lines: 15-25, 35
+
+   fastcgi_cache_path /var/cache/nginx/wp-cache
+                      levels=1:2
+                      keys_zone=wp-cache:100m
+                      inactive=7m;
+
+   server {
+      listen 80;
+
+      server_name _;
+
+      root /srv/www;
+      try_files $uri $uri/ =404;
+      index  index.php;
+
+      if ($request_method = "PURGE") {
+         rewrite ^ /purge$request_uri last;
+      }
+
+      location ~ /purge(/.*)$ {
+         internal;
+         allow 127.0.0.0/8;
+         deny all;
+
+         fastcgi_cache_purge wp-cache $request_uri;
+      }
+
+      location ~ \.php$ {
+         include snippets/fastcgi-php.conf;
+         fastcgi_pass php;
+
+         fastcgi_cache wp-cache;
+         fastcgi_no_cache $http_authorization;
+         fastcgi_cache_valid 1m;
+         fastcgi_cache_bypass $http_pragma;  # Evita la cache con Ctrl+F5 (Pragma: no-cache)
+         fastcgi_cache_key $request_uri;
+         fastcgi_cache_use_stale updating error timeout invalid_header http_500;
+         fastcgi_ignore_headers Cache-Control Expires Set-Cookie;
+         add_header X-RunCloud-Cache $upstream_cache_status;
+      }
+
+   }
+
+Con esta configuración podremos purgar de la caché usando el método *PURGE*,
+pero sólo desde el propio servidor. Por tanto, si obtenemos así, la página::
+
+   $ wget -qSO - http://www.example.net
+
+podremos purgar desde el propio servidor de este modo::
+
+   $ wget -qSO - --method=PURGE "http://localhost"
+
+Otros lenguajes
+===============
+
+.. todo:: Por escribir
+
+.. rubric:: Notas al pie
+
+.. [#] En las distribuciones linux modernas :program:`mysql` es, en realidad,
+   `mariadb <https://mariadb.org/>`_, el `derivado
+   <https://es.wikipedia.org/wiki/Bifurcaci%C3%B3n_(desarrollo_de_software)>`_
+   de :program:`mysql` a raíz de su adquisición por *Oracle*.
+
+.. [#] En realidad, *mysql-client* no es necesario, pero suele ser muy útil
+   poder acceder directamente al servidor *MySQL*.
+
+.. |PHP| replace:: :abbr:`PHP (PHP Hypertext Preprocessor)`
+.. |HTML| replace:: :abbr:`HTML (HyperText Markup Language)`
+.. |SQL| replace:: :abbr:`SQL (Structured Query Language)`
+
+.. _fastcgi_cache_path: http://nginx.org/en/docs/http/ngx_http_fastcgi_module.html#fastcgi_cache_path
+.. _fastcgi_no_cache: http://nginx.org/en/docs/http/ngx_http_fastcgi_module.html#fastcgi_no_cache
+.. _fastcgi_cache_bypass: http://nginx.org/en/docs/http/ngx_http_fastcgi_module.html#fastcgi_cache_bypass
+.. _fastcgi_cache_use_stale: http://nginx.org/en/docs/http/ngx_http_fastcgi_module.html#fastcgi_cache_use_stale

@@ -1,0 +1,248 @@
+.. _sh-gnu-args:
+
+Tratamiento de argumentos
+=========================
+Ya se explicó :ref:`cómo acceder a los argumentos <sh-args>` de un *script*. Sin
+embargo, si se quiere escribir uno en que estos argumentos sean variados y
+algunos opcionales, usar argumentos posicionales es absolutamente
+desaconsejable. Lo más apropiado es crear *scripts* que usen para sus argumentos
+el :ref:`estilo POSIX <ordenar>`. Por ejemplo, algo así\ [#]_::
+
+   $ ./args.sh -h
+   args.sh: Ilustra el procesamiento de las opciones de un script.
+
+   Opciones:
+    -h, --help                      Muestra esta misma ayuda.
+    -f, --file <FICHERO>            Fichero de entrada...
+    -p, --password [<PASSWORD>]     Permite indicar la contraseña.
+                                    Si no se indica, se pedirá interactivamente.
+    -v, --verbose                   Ofrece información adicional
+
+.. _getopts:
+.. index:: getopts
+
+Artesanalmente, es relativamente sencillo programar una solución que se acerque al estilo
+*POSIX* y se deja un ejemplo de ello en :download:`este ejemplo <files/args_artesanal.sh>`.
+La solución soporta opciones cortas, opciones largas y fusión de opciones
+largas. Tan sólo no permite el uso de opciones largas con la sintaxis :kbd:`--larga=valor`,
+sino que habrá que :kbd:`--larga valor`.
+
+Sin embargo, el estádar\ [#]_ proporciona la orden interna :command:`getopts`,
+para el tratamiento de argumentos. Esta orden recibe dos argumentos:
+
+* La cadena que declara cuáles son las opciones (cortas) admisibles y si
+  admiten o no argumento.  
+* Un nombre para la variable que almacenará el nombre de la opción.
+
+En el ejemplo referido :command:`getopts` se podría usar así::
+
+   getopts ":hvf:p:" opt
+
+Como los dos puntos (``:``) indican que la opción requiere argumento, resulta
+que declaramos dos opciones (``-h`` y ``-v``) que no necesitan ninguno; y otras
+dos opciones (``-f`` y ``-p``) que sí lo necesitan. Los dos puntos con que se
+abre la cadena, le indican a :command:`getopts` que no muestre mensajes de error
+cuando procesa los argumentos.
+
+Ante este orden :command:`getopts` comienza a analizar ``$@`` y parará su
+análisis cuando encuentre la primera opción. Por ejemplo, si escribimos::
+
+   $ args.sh -v -f fichero.txt -p password
+
+hallará la opción ``-v`` y como esta no requiere argumento parará.
+:command:`getopts` almacena en la variable ``OPTIND`` cuál es el próximo
+parámetro posicional que debe analizar. Antes del análisis era **1** y, después
+de ejecutarse, valdrá **2**. Además, almacena en la variable que le hemos pasado
+(``opt``) el nombre de la variable (*v*, en esta pasada) y en la variable
+``OPTARG``, el valor del argumento, que en este caso no tiene sentido porque
+``-v`` no admite argumento. Si queremos seguir analizando, debemos volver a
+ejecutar otra vez la orden::
+
+   getopts ":hvf:p:" opt
+
+Ahora, lo que :command:`getopts` encuentra es ``-f``, pero como tal opción
+requiere un argumento toma también el siguiente parámetro posicional
+(*fichero.txt*), con lo que ``opt`` valdrá *f*, ``OPTARG`` *fichero.txt* y 
+``OPTIND`` **4**. Mientras :command:`getopts` encuentra argumentos posicionales
+devuelve **0** y solamente deja de devolverlo cuando:
+
+#. Se acaban los argumentos posicionales.
+#. Se encuentra con el parámetro ``--``, que significa fin de las opciones.
+#. Se encuentra con un argumento que no está asociado a ninguna opción. Por
+   ejemplo::
+
+      $ args.sh -v hola -f fichero.txt -p password
+
+   haría que sólo se analizara :code:`-v` y que el resto quedara sin analizar,
+   puesto que *hola* no está asociado a ninguna opción.
+
+Cuando :command:`getopt` encuentra algo que no debe, no devuelve error (o sea,
+un valor distinto de **0**), sino que altera los valores de ``opt`` y ``OPTARG``
+del siguiente modo:
+
+============================= ============= ===================
+Error                            ``opts``    ``OPTARG``
+============================= ============= ===================
+La opción no existe            ``?``         Valor de la opción
+----------------------------- ------------- -------------------
+Falta argumento de la opción   ``:``         Valor de la opción
+============================= ============= ===================
+
+Con todo este conocimiento, el análisis de los argumentos puede hacerse así:
+
+.. code-block:: bash
+
+   while getopts ":hv:f:p:" opt; do
+      case $opt in
+         h)
+            help  # Función "help" que tenemos definida antes.
+            exit 0
+            ;;
+         v)
+            VERBOSE=1
+            ;;
+         f)
+            ENTRADA=$OPTARG
+            ;;
+         p) PASSWORD=$OPTARG
+            ;;
+         \?)
+            echo "-$OPTARG: La opción no existe" >&2
+            exit 2
+            ;;
+         :)
+            echo "-$OPTARG requiere argumento" >&2
+            exit 2
+            ;;
+      esac
+   done
+   shift $((OPTIND-1))
+
+Como consecuencia de ello, el programa generará un error y saldrá con código
+**2**, si no se introdujeron bien los parámetros; o, en caso contrario,
+tendremos disponible en distintas variables (``ENTRADA``, ``PASSWORD`` y
+``VERBOSE``)\ [#]_ la información que introdujo el usuario. Además, el último
+:command:`shift` elimina todos los parámetros revisados por ``getopts`` con lo
+que en ``$@`` quedarán los argumentos no asociados a opciones. En caso de que
+estos no fueran válidos, podríamos haber añadido:
+
+.. code-block:: bash
+
+   if [ $# -gt 0 ]; then
+      echo "$1: Argumento sin sentido" >&2
+      exit 2
+   fi
+
+A todo esto, y las opciones largas, ¿dónde están? La respuesta es en ningún
+sitio, porque :command:`getopts` no las soporta (en principio). Lo cierto es que 
+el uso de esta orden tiene algunas limitaciones:
+
+#. Los argumentos no asociados a opciones tienen que situarse siempre al final
+   de la orden.
+
+#. No pueden definirse opciones con argumentos opcionales.
+
+#. La orden::
+  
+       $ ./args.sh -f -v
+
+   se procesa sin errores puesto que
+   :command:`getopts` no entiende que a la opción ``-f`` le falte argumento,
+   sino que el argumento de ``-f`` es *-v*; y que la opción ``-v`` no se ha
+   indicado. De hecho, hay programas que se comportan así.
+
+#. No hay opciones largas.
+
+.. note:: Si estamos satisfechos con la solución, no hay más que hacer; pero
+   es posible solventar las limitaciones *2*, *3* y *4*, creando tres funciones
+   independientes que modifiquen el comportamiento de :command:`getopts`. Aunque
+   se proporcionan justamente más abajo estas tres funciones, en caso de querer
+   este comportamiento, es más apropiado recurrir a la solución artesanal
+   expuesta al comienzo del epígrafe: es bastante más sencilla y sólo deja sin
+   soporte una de las sintaxis posibles de las opciones largas.
+
+.. rubric:: Parcheando getopts
+
+Basta descargar las :download:`funciones para el parcheo
+<files/patch_getopts.sh>` y tener presente que:
+
+* *path_lo* añade soporte para opciones largas.
+
+  .. note:: La función usa la argucia\ [#]_ de añadir como opción válida el
+     guión y que este requira argumento. De este modo todas las opciones largas
+     se identificarán con la opción corta ``--``\ [#]_.
+
+* *patch_optarg* añade soporte para opciones con argumentos opcionales.
+* *patch_dash* evita que que una opción posterior sea tomada como argumento de
+  la precedente\ [#]_.
+* No es necesario usar las tres (p.e. podemos dejar de usar *patch_optarg* si no
+  queremos opciones con argumentos opcionales), pero debemos aplicarlas en el
+  orden en que se han citado.
+
+Veamos cómo usarlas con un ejemplo:
+
+.. code-block:: bash
+   :emphasize-lines: 2-4
+
+   while getopts ":hvf:p:-:" opt; do
+      patch_lo "help verbose file:password:" opt "$@"
+      patch_optarg "p password" opt
+      patch_dash
+      case $opt in
+         h|help)
+            help
+            exit 0
+            ;;
+         \?)
+            echo "-$OPTARG: Opción inválida."
+            exit 2
+            ;;
+         :)
+            echo "-$OPTARG requiere un argumento"
+            exit 2
+            ;;
+         f|file)
+            FICHERO=$OPTARG
+            ;;
+         p|password)
+            PASSWORD=$OPTARG
+            ;;
+         v|verbose)
+            VERBOSE=1
+            ;;
+      esac
+   done
+   shift $((OPTIND-1))
+
+El ejemplo completo del programa de prueba hecho con :command:`getopts`, se
+:download:`puede descargar también <files/args.sh>`.
+
+.. warning:: Con :program:`dash` sólo es posible usar la forma
+   :kbd:`--opt=valor` y no :kbd:`--opt valor`
+
+.. rubric:: Notas al pie
+
+.. [#] El argumento de la opción ``-p``/``--password``, se muestra como
+   opcional. En la solución artesanal es posible implementar este tipo de
+   opciones con argumento opcional; en la solución basada en :command:`getopts`,
+   no; por lo que para ella se considerará esta opción con argumento
+   obligatorio. En cualquier caso, las opciones con argumento opcional no son
+   muy comunes, por lo que no supone una gran pérdida.
+
+.. [#] Hay un tutorial interesante en `bash-hackers.org
+   <http://wiki.bash-hackers.org/howto/getopts_tutorial>`_.
+
+.. [#] Es obvio que si no nos importa usar extensiones de :command:`bash`, lo más
+   conveniente es usar un diccionario: ``${params['entrda']}``,
+   ``${params['password']}``, etc.
+
+.. [#] Argucia tomada de `esta respuesta en stackoverflow
+   <https://stackoverflow.com/a/7680682>`_
+
+.. [#] Recuérdese que, como se soporta la fusión, :code:`--opción-larga` equivale
+   a :code:`-- opcion-larga`, si es que ``--`` es una opción con argumento, como
+   se ha definido.
+
+.. [#] En realidad, se impide que el argumento de la opción empiece por un
+   guión, sea cual sea, lo cual podría ser un problema en algunos casos. Téngalo
+   presente.

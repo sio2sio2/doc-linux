@@ -1,0 +1,728 @@
+.. _https:
+
+Conexión segura
+***************
+El protocolo |HTTP| no es seguro para la transmisión de contraseñas y otros
+datos confidenciales, puesto que toda la información viaja en claro. La
+solución, como en el caso de otros protocolos no seguros, es encapsularlo dentro
+del protocolo criptográfico |SSL|/|TLS|\ [#]_, a fin de que el protocolo viaje
+cifrado. Al |HTTP| encapsulado dentro de |TLS| es a lo que se denomina |HTTPs|
+Por lo general, el puerto reservado para comunicación |HTTPs| es el *443/TCP*.
+
+Consecuentemente, hacer que un servidor ofrezca páginas seguras se limita a:
+
+* Obtener un certificado que permita el cifrado |TLS|.
+* Desarrollar la configuración que hace que el servidor escuche en el puerto
+  **443** tal como se hace cuando sirve |HTTP|, pero indicando que en este caso
+  debe usar el certificado anterior para cifrar.
+
+.. note:: Encapsular el tráfico |HTTP| dentro de |TLS| supone que todos los
+   paquetes viajan cifrados y que, en consecuencia, todo el contenido |HTTP|,
+   incluida la cabecera, está cifrado. Esto inutiliza cualquier cacheo de
+   contenido o cualquier filtrado web que se base en la |URL| o el propio
+   contenido.\ [#]_
+   
+.. note:: Estos certificados no son exclusivos para el servicio web. Son
+   certificados que se usan con el protocolo |TLS| y, en consecuencia, sirven
+   para cualquier protocolo que se cifre con él. Por ejemplo, también son
+   válidos para usados con los protocolos |SMTP| o |IMAP|.
+
+.. _tls-cert:
+.. _auto-cert:
+
+Certificados autofirmados
+=========================
+.. warning:: Jamás haga esto en un servidor real en producción: un certificado
+   autofirmado no ofrece garantías al cliente sobre la identidad del servidor y,
+   por ello, todos los navegadores alertan de la invalidez del certificado y
+   sugieren al navegante que no accede a la página. En fase de pruebas, en
+   cambio, sí nos puede ser muy útil utilizar certificados de estas
+   características y por ello incluimos este epígrafe en la guía.
+
+.. _make-ssl-cert:
+.. index:: make-ssl-cert
+
+Crear un certificado autofirmado puede hacerse, simplemente, con openssle\ [#]_,
+pero es aún más sencillo usar :command:`make-ssl-cert`::
+
+   # apt install ssl-cert
+
+La postinstalación genera directamente la clave private en
+:file:`/etc/ssl/private/ssl-cert-snakeoil.key` y la pública en
+:file:`/etc/ssl/certs/ssl-cert-snakeoil.pem` y crea un certificado para el
+nombre completo de la máquina\ [#]_. Si nuestra intención es que el certificado
+sirva para distintos nombres (por ejemplo, porque tenemos definidos varios
+dominios virtuales), entonces es necesario volver a generar los certificados::
+
+   # make-ssl-cert /usr/share/ssl-cert/ssleay.cnf keycert.pem
+
+Así, mediante una interfaz amigable hecha en :ref:`whiptail <whiptail>`, podemos
+generar otro distinto. La manera más sencilla de obtener un certificado válido
+para cualquier nombre del domino es contestar a la primera pregunta con
+:kbd:`*.example.net`. La segunda podemos dejarla en blanco. La orden genera un
+único fichero con las claves pública y privada. Para separarlas y dejarlas en su
+ubicación predeterminada::
+
+   # sed '1,/-END PRIVATE KEY-/d' keycert.pem > /etc/ssl/certs/ssl-cert-snakeoil.pem
+   # sed '/-END PRIVATE KEY-/q' keycert.pem > /etc/ssl/private/ssl-cert-snakeoil.key
+
+.. note:: Si no queremos usar *software* adicional, podemos crear un certificado
+   autofirmado directamente con :ref:`openssl <openssl>` con la siguiente orden::
+
+      $ openssl req -newkey rsa:2048 -nodes -x509 -days 365 -subj '/CN=info.iescastillodeluna.es' \
+         -keyout /etc/ssl/private/ssl-cert-snakeoil.key \
+         -out /etc/ssl/certs/ssl-cert-snakeoil.pem
+
+Y ¡listo! Ya tenemos un certificado no fiable para crear conexiones |SSL|. Ahora
+resta configurar :program:`nginx` para que lo use:
+
+.. _nginx-autofirmado:
+
+.. code-block:: nginx
+   :emphasize-lines: 2, 9
+
+   server {
+      listen   443 ssl;
+
+      server_name _;
+
+      root /srv/www;
+      try_files $uri $uri/ =404;
+
+      include snippets/snakeoil.conf;
+   }
+
+O sea, advertimos que la conexión por el puerto **443** es segura y referimos el
+archivo :file:`/etc/nginx/snippets/snakeoil.conf` que a su vez, incluye las
+directivas de :program:`nginx` necesarias para saber dónde se encuentran las
+claves. No hace falta escribir el archivo puesto que el paquete de *Debian* ya
+lo ha escrito por nosotros. Si le echamos un vistazo veremos que contiene dos
+directivas que refieren los archivos que generamos con :ref:`make-ssl-cert
+<make-ssl-cert>`:
+
+.. code-block:: nginx
+
+   ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;
+   ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;
+
+Además, debemos incluir un archivo :file:`/etc/nginx/conf.d/ssl.conf`\ [#]_ con
+algunas directivas relativas al cifrado cuyo contenido es :download:`éste
+<files/ssl.auto.conf>`.
+
+.. _nginx-https+http:
+
+La configuración del sitio es muy simple y crea un servidor que sólo responde a
+peticiones seguras. Esto no es lo más apropiado ya que probablemente algún
+cliente nos haga una petición no segura por el puerto **80** y se encuentre con
+que el servidor, aparentemente, no existe. Así, pues, cambiemos la
+configuración:
+
+.. code-block:: nginx
+   :emphasize-lines: 2, 2, 10, 12-14
+
+   server {
+      listen   80;
+      listen   443 ssl;
+
+      server_name _;
+
+      root /srv/www;
+      try_files $uri $uri/ =404;
+
+      include snippets/snakeoil.conf;
+
+      if ($https != "on") {
+         return 301 https://$host$uri$is_args$args;
+      }
+   }
+
+.. warning:: El ``if`` provoca que, si el tráfico es no seguro, se repita la
+   petición por el puerto seguro. Si queremos permitir ambos tráficos podemos
+   eliminar este bloque.
+
+.. Hablar de:
+   + Las tres formas de certificar la propiedad (inbcluido el protocolo ACME).
+     certbot implementa el protocolo ACME.
+   + Las alternativas gratuitas: Ley's encrypt y zerossl.
+   + Probar el script puramente escrito en la shell.
+   + Enlaces:
+
+     https://tools.ietf.org/html/rfc8555
+     https://en.wikipedia.org/wiki/Automated_Certificate_Management_Environment
+     https://github.com/acmesh-official/acme.sh
+
+.. _nginx-https:
+
+Certificados acreditados
+========================
+.. seealso:: Si quiere profundizar en los conceptos teóricos detrás de los
+   certificados, échele un ojo a la :ref:`explicación sobre certificados
+   digitales <cert-digital>`.
+
+Para que un certificado de servidor cumpla con uno de sus objetivos, la
+identificación fehaciente del propio servidor\ [#]_, es indispensable que una
+autoridad de certificación ampliamente reconocida lo firme. Eso, por lo general,
+supone:
+
+- Acreditar ante la |CA|, que somos los dueños del dominio.
+- Pagar para la generación y renovación de los certificados.
+
+Lo segundo provocó que en *Internet* durante mucho tiempo proliferaran los
+certificados autofirmados y que toparnos con uno, si la página no era la de un
+banco, no produjera demasiadas sospechas. Sin embargo con la aparición de `Let's Encrypt`_ 
+y el patrocinio de muchas empresas del sector tecnológico y las comunicaciones
+que han apostado por hacer definitivamente la web segura y la sufragan, la
+situación ha cambiado: ahora es muy sencillo y totalmente gratuito obtener
+certificados válidos y es absolutamente injustificable haber generados
+certificados autofirmados en un servidor público en producción.
+
+En la actualidad, hay algunas alternativas para obtener certificados gratuitos:
+
+* `Let's Encrypt`_
+* ZeroSSL_
+* BuyPass_.
+
+.. ¿Y SSLforFree?
+
+Otro aspecto a tener en cuenta, además de quién nos proporcione el certificado,
+es cómo se acredita ante el certificador la propiedad del dominio. Los métodos
+son esencialmente tres:
+
+#. Mediante **correo electrónico**, que consiste en que la autoridad nos envía un
+   mensaje de confirmación a una dirección de correo electrónico muy concreta
+   del dominio que hayamos afirmado que es nuestro, como ``admin@example.net``
+   o ``webmaster@example.net``. Los nombres de las cuentas son tales que sólo
+   podremos poseerlos si realmente somos los propietarios.
+#. Mediante |DNS|, que consiste en que la autoridad nos pide que incluyamos en
+   la zona de nuestro dominio un registro (generalmente ``TXT`` o ``CNAME``) muy
+   particular, cuya posterior consulta sirve a la autoridad para confirmar que
+   somos los propietarios.
+#. Mediante el protocolo |ACME|, inicialmente propuesto como estándar por `Let's
+   Encrypt`_ que consiste en correr un cliente en la máquina del servidor web
+   que envía un anuncio al servidor |ACME| (la autoridad de certificación)
+   instándole a comprobar la propiedad del dominio. Esta comprobación se lleva a
+   cabo por una de estas dos alternativas llamadas :dfn:`desafíos`.
+
+   .. _desafios-acme:
+
+   :dfn:`Desafío HTTP`
+      Consiste en que el servidor |ACME| entrega al cliente un *token*, para que
+      este se lo haga accesible a través del protocolo |HTTP|. A continuación
+      conectará con el cliente a través de estew protocolo usando el nombre
+      (p.e. ``www.example.net``) con el fin de acreditar que el cliente es
+      realmente la máquina de tal nombre. Si la comprobación tiene éxito,
+      se entrega el certificado firmado al cliente. Si se quieren acreditar
+      varios nombres en un mismo certificado, entonces el desafío consistirá en
+      hacer sendas pruebas para cada uno de los nombres deseados; y sólo si
+      todas tienen buen suceso, se entregará el certificado.
+
+   :dfn:`Desafío DNS`
+      En este caso, el cliente utiliza el *token* para crear un registro ``TXT``
+      en la zona del dominio que se desea acreditar para que la autoridad
+      compruebe a continuación la existencia de tal registro. En este caso, dado
+      que se puede acreditar la propiedad sobre todo el dominio, se pueden generar
+      certificados comodín (o sea, un certificado para ``*.example.net`` que servirá
+      para cualquier nombre de máquina del dominio).
+
+   .. seealso:: Para más información consulte las `explicaciones más prolijas
+      de Let's Encrypt sobre desafíos <acme.sh_0.1-2_amd64.deb>`_
+
+Como los certificados tienen un tiempo de vigencia (p.e. los certificados
+gratuitos de las dos primeras autoridades reseñadas, 90 días; y el de la última,
+180), lo adecuado es utilizar un mecanismo que habilite las renovaciones
+automáticas lo cual es posible si hacemos uso de clientes |ACME|. Las tres
+autoridades soportan este protocolo, así que lo que necesitamos es un cliente
+|ACME| solvente. Hay varios (certbot_, dehydrated_, etc), pero nos centraremos
+en el *script* `acme.sh`_ porque presenta algunas ventajas:
+
++ Está enteramente escrito en *POSIX shell*, lo que evita la necesidad de
+  dependencias más allá de las estrictamente necesarias (:command:`openssl` y
+  :command:`wget` o :command:`curl`) que de todas maneras ya tendremos
+  instaladas.
++ Soporta las tres autoridades referidas que permiten obtener certificados
+  gratuitos.
+
+En cambio, no tiene paquete oficial en *Debian*, pero podemos suplir esto de un
+modo bastante sencillo.
+
+.. rubric:: Instalación de :command:`acme.sh`
+
+El propio *script* proporciona un método de instalación, pero es más
+conveniente que procuremos crear un paquete de *Debian*, Para ello, existe
+`otro repositorio <https://github.com/mdbraber/acme.sh-debian>`_ que nos
+permite generar el paquete que deseamos. Basta con descargar el repositorio
+(por ejemplo el :kbd:`zip`) y::
+
+   # unzip acme.sh-debian-master.zip
+   # cd acme.sh-debian-master
+
+El *script* genera el paquete a partir de una copia del repositorio oficial que
+puede estar desfasada, así que antes de generarlo es conveniente editar :file:`debian/rules`:
+
+.. code-block:: bash
+
+   GITHUBUSER = acmesh-official
+   BRANCH = master
+
+y, hecha la modificación, ya se puede generar el paquete::
+
+   # make debian
+
+que generará en el directorio padre el paquete listo para ser instalado::
+
+   # cd ..
+   # apt install ./acme.sh_0.1-2_amd64.deb
+
+.. warning:: El paquete, no obstante, tiene **un par de defectos** que es imprescindible
+   corregir:
+
+   * Para las renovaciones automáticas de certificados, el *script* original
+     añade una línea al :ref:`cron <cron>` de *root* para que comprueba diariamente
+     si es preciso renovar alguno::
+
+      11 0 * * * "/usr/lib/acme.sh"/acme.sh --cron --home /usr/lib/acme.sh > /dev/null
+
+     donde **11** es un minuto aleatorio. Esto tal vez funcione, si se usa
+     directamente el *script* sin demasiada personalización. Sin embargo, el
+     paquete guarda la configuración en :file:`/etc/acme.sh` y es dentro de ese
+     directorio donde se encuentran los certificados, por lo que la renovación
+     automática fallará. La solución es alterar esa línea para que se carguen las
+     variables de ambiente::
+
+      11 0 * * * . /etc/acme.sh/acme.sh.env ; "/usr/lib/acme.sh"/acme.sh --cron > /dev/null
+
+   * No incluye ningún script de desinstalación :file:`prerm`, por lo que ni se
+     elimina el trabajo de :ref:`cron <cron>` ni la línea que se creó en
+     :file:`/root/.bashrc` por lo que habrá que hacer ambas acciones a mano.
+
+.. rubric:: Generación del certificado
+
+Proponemos lo más sencillo\ [#]_ (y que en muchos casos nos será suficiente):
+
++ Con `Let's Encrypt`_, puesto que no requiere ningún tipo de registro y,
+  además, es la autoridad con la que por defecto genera certificados el *script*. 
++ El :ref:`desafío HTTP <desafios-acme>`.
+
+  .. warning:: No obstante, si pretende albergar múltiples sitios en el mismo
+     servidor web, sopese la posibilidad de generar :ref:`un certificado comodín
+     con el desafío DNS <dns-challenge>`.
+
++ Ya tenemos creado el servidor *web*, aunque no seguro porque carecemos aún de
+  certificado\ [#]_. Por ejemplo:
+
+  .. code-block:: nginx
+
+   server {
+      listen   80;
+
+      server_name example.net
+                  www.example.net;
+
+      root /srv/www/default;
+      try_files $uri $uri/ =404;
+   }
+
+Si la resolución |DNS| de esos dos nombres conduce a nuestro servidor *web*,
+generar un certificado para esos nombres se lleva a cabo con::
+
+   # acme.sh --issue -d example.net -d www.example.net -w /srv/www/default
+
+donde :kbd:`-d` introduce los nombres de máquina y :kbd:`-w` el directorio raíz
+para ese servidor virtual. 
+
+.. note:: Podemos en un mismo certificado asociar varios nombres a distintos
+   directorios raíz, para lo cual debemos expresar cada directorio raíz
+   inmediatamente después de cada nombre::
+
+      # acme.sh --issue -d example.net -w /srv/www/default \
+                        -d www.example.net -w /srv/www/default \
+                        -d moodle.example.net -w /srv/www/moodle
+
+Una vez generado el certificado, debemos instalarlo para que pueda usarlo
+nuestro servidor :program:`nginx`\ [#]_::
+
+
+   # acme.sh --install-cert -d example.net --key-file /etc/ssl/private/letsencrypt-example.net.key \
+      --fullchain-file /etc/ssl/certs/letsencrypt-fullchain-example.net.cer --reloadcmd "systemctl force-reload nginx"
+
+Esta orden toma las claves, la copia en la localización que indicamos y reinicia
+el servidor por lo que ya es funcional el certificado y, además, se renovará
+automáticamente sin necesidad de que demos la orden expresa o tengamos que
+reiniciar el servidor manualmente.
+
+.. note:: Una línea como la anterior es útil cuando el servidor que usa el
+   certificado mantiene por separado la(s) clave(s) pública(s) de la privada. No
+   hay, sin embargo, ninguna opción que copie juntas en un mismo archivo todas
+   las claves, por lo que si el servidor que usa el certificado requiere esto
+   (p.e. el *proxy* inverso :ref:`haproxy`) entonces tenemos que recurrir a
+   generar el archivo dentro de la orden que expresa :kbd:`--reloadcmd`::
+
+      # acme.sh --install-cert -d example.net \
+                --reloadcmd 'cat $CERT_KEY_PATH $CERT_FULLCHAIN_PATH > /etc/haproxy/keycert.pem && systemctl restart haproxy'
+
+Nos pueden interesar algunas órdenes adicionales, como la que nos permite
+listar todos los certificados gestionados por el *script*::
+
+   # acme.sh --list
+
+o la que permite revocar y borrar alguno de los certificados::
+
+   # acme.sh --revoke -d example.net
+   # acme.sh --remove -d example.net
+
+El certificado, aunque ya no esté activo (no aparecerá al usar :kbd:`--list`),
+no se borrará del directorio :file:`/etc/acme.sh/cert/example.net`. Esta operación deberemos hacerla a mano.
+
+.. warning:: Si ha configurado el servidor de manera que :ref:`la conexión no segura
+   redirige a la segura <nginx-https+http>` (lo cual es muy habitual), la
+   revocación no funcionará, así que, antes de revocar comprueba, asegurese de
+   inhabilitarlo temporalmente.
+
+.. rubric:: Configuración
+
+La configuración es prácticamente idéntica a la :ref:`propuesta para los
+certificados autofirmados <nginx-autofirmado>`:
+
+.. code-block:: nginx
+   :emphasize-lines: 9, 11, 12
+
+   server {
+      listen   443 ssl;
+
+      server_name _;
+
+      root /srv/www;
+      try_files $uri $uri/ =404;
+
+      include snippets/cert.conf;
+
+      # Cabecera HSTS
+      add_header Strict-Transport-Security "max-age=15768000; includeSubdomains; preload";
+   }
+
+La última línea de la configuración (opcional) añade una cabecera |HSTS| a las
+respuestas que obliga al cliente a usar siempre |HTTP|\ s y a no aceptar tras la
+primera visita a la página bajo ningún concepto un certificado no fiable. (p.e.
+uno autofirmado)\ [#]_. Para más información, consulte :ref:`el epígrafe
+dedicado al ataque SSLstrip <sslstrip>`.
+
+Por su parte, :file:`cert.conf` (que cumple el papel de :file:`snakeoil.conf` y
+en esta ocasión sí tendremos que crear) tiene el siguiente contenido:
+
+.. code-block:: nginx
+
+   ssl_certificate /etc/ssl/certs/letsencrypt-fullchain-example.net.cer;
+   ssl_certificate_key /etc/ssl/private/letsencrypt-example.net.key;
+   ssl_trusted_certificate /etc/ssl/certs/letsencrypt-fullchain-example.net.cer;
+
+.. note:: Es posible que deseemos que el tráfico sea exclusivamente seguro y
+   evitar que el usuario se comunique a través del puerto **80**. Eso podemos
+   lograrlo con la cabecera |HSTS| o incluyendo la :ref:`redirección con el if
+   comentada anteriormente <nginx-autofirmado>`.
+
+Además, debemos definir un archivo para configurar algunas directivas
+relacionadas con el |SSL| en :file:`/etc/nginx/conf.d/ssl.conf` con
+:download:`este contenido <files/ssl.certbot.conf>`:
+
+.. literalinclude:: files/ssl.certbot.conf
+   :language: nginx
+
+Aspectos adicionales
+====================
+Múltiples dominios virtuales
+----------------------------
+Cuando el servidor define varios dominios virtuales y dos o más de ellos usan
+tráfico seguro debe tenerse en cuenta que, en principio, el servidor web conoce
+cuál es el nombre de máquina usado en la petición a través del comando
+:kbd:`GET` o las cabeceras |HTTP|. Al ser el tráfico cifrado, el acceso
+a esta información no es accesible hasta que no se use el certificado
+correspondiente para descifrarla. Esa es la razón por la que, en principio, el
+certificado debería ser común a todos los dominios virtuales. Para subsanar esta
+limitación el protocolo |SSL| ideó la :ref:`extensión SNI <sni>`, que soportan
+la mayor parte de los navegadores modernos y, muy probablemente la versión de
+:program:`nginx` que se esté utilizando::
+
+   # nginx -V
+
+En caso de que :program:`nginx` soporte |SNI|, puede definirse un certificado
+diferente en cada sitio a través de :kbd:`ssl_certificate` y
+:kbd:`ssl_certificate_key`. Para los sitios seguros en que no se defina un
+certificado, se usará el declarado en el servidor predeterminado\ [#]_. Una
+configuración posible puede ser esta:
+
+   .. code-block:: nginx
+
+      server {
+         listen   80       default_server;
+         listen   443 ssl  default_server;
+
+         server name _;
+
+         include snippets/letsencrypt.conf;
+
+         # Resto de configuración.
+      }
+
+      server {
+         listen 80;
+         listen 443;  # Nótese que no hace falta ni usar ssl.
+
+         server_name  moodle.example.net;
+
+         # Configuración para moodle
+      }
+
+      server  {
+         listen 80;
+         listen 443 ssl;
+
+         server_name  alt.example.net;
+
+         include snippets/zerossl.conf;
+
+         # Configuración para este sitio.
+      }
+
+Con esta configuración, el sitio *moodle.example.net* usará el mismo certificado
+que el sitio predeterminado (el incluido en :file:`snippets/letsencrypt.conf`,
+mientras que el sitio *alt.example.net* utiliza un certificado distinto definido
+en :file:`snippets/zerossl.conf`. Podemos cerciorarnos de que esto realmente
+funciona haciendo una consulte con el navegador y consultando los certificados,
+o desde la consola con :command:`openssl` al servidor::
+
+   $ openssl s_client -servername alt.example.net -connect alt.example.net:https < /dev/null | grep 'CN ='
+
+.. warning:: :command:`openssl` no usa |SNI| a menos que se use la opción
+   :kbd:`-servername`, de modo que haga las pruebas incluyéndola.
+
+.. _zerossl-cert:
+
+Certificados con ZeroSSL_
+-------------------------
+ZeroSSL_ es una buena alternativa a `Let's Encrypt`_, aunque requiere un
+registro previo que puede hacerse desde la propia línea de órdenes::
+
+   # acme.sh  --server zerossl --register-account -m micorreo@example.net
+
+.. note:: Si ya estábamos registrados, sígase la `documentación oficial de acme.sh sobre
+   `certificados de ZeroSSL
+   <https://github.com/acmesh-official/acme.sh/wiki/ZeroSSL.com-CA>`_
+
+Hecho el registro, la generación de certificados con :kbd:`--issue` es
+exactamente igual excepto pòr la salvedad de que deberermos añadir
+:kbd:`--server zerossl`::
+
+   # acme.sh --server zerossl --issue -d zero.iescdl.es -w /srv/www/zero1 \
+      -d zero2.iescdl.es -w /srv/www/zero2
+
+Obviamente, además habrá que instalar el certificado.
+
+.. note:: En realidad la operativa es exactamente la misma que con `Let's
+   Encrypt`_ con la salvedad de que requerirá indicar con :kbd:`--server` cual
+   es la |CA| en aquellas operaciones que requieren conexión con el servidor
+   como :kbd:`--issue` o :kbd:`--revoke`.
+
+.. seealso:: Échele un vistazo a la `documentación oficial de acme.sh sobre
+   `certificados de ZeroSSL
+   <https://github.com/acmesh-official/acme.sh/wiki/ZeroSSL.com-CA>`_
+
+.. _dns-challenge:
+
+Desafío |DNS|
+-------------
+Cuando en un servidor web disponemos distintos sitios (*blogs* con *wordpress*,
+*moodle*, aplicaciones diversas), el certificado tendrá que contenemos muchos
+nombres y se tendrán que llevar a cabo pruebas en muchos directorios raíz. Si,
+además, ampliamos los servicios y creamos un nuevo sitio con un nuevo nombre,
+tendremos que regenerar el certificado para incluirlo. Para evitarlo, lo mejor
+es generar un certificado comodín y esto sólo se puede hacer utilizando el
+:ref:`desafío DNS <desafios-acme>`. Su única dificultad es que durante la
+generación y renovación del certificado, requiere la creación dinámica del
+registro ``TXT`` en nuestra zona |DNS| y que se pueda realmente hacer y cómo
+depende de cuál sea nuestro proveedor de |DNS|\ [#]_.
+
+La documentación de acme.sh_ tiene un `documento donde repasa cómo usar con
+acmes.sh las API de distintos proveedores de DNS
+<https://github.com/acmesh-official/acme.sh/wiki/dnsapi>`_. Si se siguen las
+instrucciones para nuestro proveedor, la obtención del certificado usando el
+:ref:`desafío DNS <desafios-acme>` se limita a::
+
+   # acme.sh --issue -d example.net -d '*.example.net' --dns dns_ovh
+
+.. note:: El argumento de :kbd:`--dns` depende del proveedor.
+
+.. _certbot:
+
+El cliente :command:`certbot`
+-----------------------------
+.. warning:: Este epígrafe se incluye, exclusivamente, por haber sido escrito su
+   contenido con anterioridad a gran parte de la exposición sobre certificados
+   digitales. Es más aconsejable utilizar acme.sh_, como se ha propuesto en el
+   resto del texto, puesto que :program:`certbot` está escrito en *Python* y
+   requiere dependencias que muy probable sólo necesite para su ejecución
+
+Tiene paquete en *debian*, así que su instalación es sumamente sencilla::
+
+   # apt install certbot
+
+Como los certificados obtenidos se pueden usar luego con distinto *software*,
+:command:`certbot` tiene distintos *plugins* para, además de crear o renovar el
+certificado, proceder a su instalación en ellos. Nosotros, no obstante, sólo
+repararemos en dos:
+
+* **standalone**, que debe usarse si prevemos que no tendremos ocupado nunca el
+  puerto **80**. Con este *plugin*, el propio :command:`certboot` levanta
+  temporalmente un servidor web en el proceso de creación o renovación. No debe
+  usarse si montamos un servidor web, porque en ese caso, la renovación fallará
+  levantando el servidor web temporal al encontrar ocupado el puerto.
+
+* **webroot**, que implica tener un servidor web instalado e indicarle a
+  :command:`certboot` cuál es el directorio raíz del mismo.
+
+Nosotros usaremos este último, suponiendo que ya tenemos listo el servidor web y
+que nuestro directorio raíz es :file:`/srv/www`, Tras ello, podemos lanzar la
+generación del certificado así::
+
+   # certbot certonly --webroot -w /srv/www -d www.example.net \
+      --non-interactive --agree-tos --email licencias@iesmiravent.es \
+      --post-hook "/etc/letsencrypt/posthook.sh"
+
+Como resultado de la orden tendremos dentro de
+:file:`/etc/letsencrypt/live/www.example.net` las claves generadas y, además,
+justamente tras la generación, se habrá ejecutado el *script* que pasemos con la
+opción ``--post-hook``\ [#]_.  Lo que realmente haya que hacer para que la nueva
+clave sea efectiva dependerá de cómo se tenga configurado el servidor. La gracia
+de incluir el *script* es que *certboot* viene con un *timer* de
+:program:`systemd` para intentar diariamente la renovación del *script* y que
+este proceso de renovación también lanza el *script*. Por tanto, podremos
+olvidarnos por completo de estar al tanto de la actualización.
+
+En una configuración simple en que el propio :program:`nginx` se encarga del
+cifrado y utilizamos la configuración propuesta en el próximo epígrafe, basta
+con que el *script* se limite a reiniciar :program:`nginx`. Por tanto:
+
+.. code-block:: bash
+
+   #!/bin/sh
+
+   systemctl reload-or-restart nginx.service
+
+Para casos más complejos, como cuando del cifrado se encarga :ref:`haproxy`, es
+necesario juntar las claves pública y privada (:file:`fullchain.pem` y
+:file:`privkey.pem`) en un único fichero. :download:`Este script
+<files/posthook.sh>` se encarga de ello.
+
+.. note:: Es posible también generar un certificado asociados a varios nombres
+   repitiendo las opciones ``-w`` y ``-d``, de modo que las opciones ``-d``
+   harán referencia al ``-w`` que las precede. Por ejemplo::
+
+      # certbot certonly --webroot -w /srv/www/main -d example.net -d www.example.net \
+         -w /srv/www/blog -d blog.example.net --non-interactive --agree-tos \
+         --email licencias@iesmiravent.es --post-hook "/etc/letsencrypt/posthook.sh"
+
+Es común que en algún momento añadamos un nuevo sitio al servidor y necesitemos
+que este sitio también use cifrado. Podemos ampliar el uso del mismo
+certificado al nuevo sitio usando la opción ``--expand``::
+
+   # certbot certonly --webroot --expand -w /srv/www -d www.example.net \
+      -w /srv/www/moodle -d moodle.example.net \
+      --non-interactive --agree-tos --email licencias@iesmiravent.es \
+      --post-hook "/etc/letsencrypt/posthook.sh"
+
+Hay, eso sí, que enumerar todos los dominios a los que ya estaba asociado el
+servidor y añadir los nuevos.
+
+La configuración es :ref:`idéntica a la ya propuesta <nginx-autofirmado>`,
+aunque cambian las rutas a los archivos de claves, por lo que tendremos que
+cambiar el contenido de :file:`snippets/cert.conf`:
+
+.. code-block:: nginx
+
+   ssl_certificate /etc/letsencrypt/live/www.example.net/fullchain.pem;
+   ssl_certificate_key /etc/letsencrypt/live/www.example.net/privkey.pem;
+   ssl_trusted_certificate /etc/letsencrypt/live/www.example.net/fullchain.pem;
+
+
+.. rubric:: Notas al pie
+
+.. [#] |TLS| es simplemente la evolución de la versión 3 de |SSL|. A menudo
+   suele decirse |SSL| para referirse también a |TLS|.
+
+.. [#] En principio, establecer un filtrado de sitios web para clientes sólo
+   puede hacerse manipulando la resolución |DNS|, que sí que no está cifrada.
+
+.. [#] Por ejemplo, para generar un certificado cuya validez sea de diez
+   años::
+
+      # openssl req -x509 -nodes -days 3650 -newkey rsa:2048 -keyout /etc/ssl/private/ssl-cert-snakeoil.key \
+         -out /etc/ssl/certs/ssl-cert-snakeoil.pem
+
+.. [#] O sea, el que se obtiene así::
+
+      $ hostname -f
+
+.. [#] Las únicas directivas relativas al cifrado que se encuentran en
+      :file:`nginx.conf` son estas::
+
+         ssl_protocols TLSv1 TLSv1.1 TLSv1.2; # Dropping SSLv3, ref: POODLE
+         ssl_prefer_server_ciphers on
+
+      de ahí que no se hayan incluido en nuestra propia configuración.
+
+.. [#] El otro objetivo es garantizar la privacidad, esto es, propiciar el
+   cifrado.
+
+.. [#] Más adelante, como conocimiento adicional, explicaremos cómo :ref:`obtener
+   certificados con ZeroSSL <zerossl-cert>` o :ref:`ejecutar el desafío DNS
+   <dns-challenge>`.`
+
+.. [#] En puridad no necesitamos aún el servidor puesto que el *script*,
+   añadiendo la opción ``--standalone``, es capaz de ponerse a escuchar en el
+   puerto **80** y atender la petición del servidor |ACME|. Si generamos el
+   certificado para un servidor no web (p.e. un servidor de correo), la
+   posibilidad es recomendable, pero si nuestra intención es dar servicio *web*
+   es preferible ya tener montado el servidor, ya que a la postre tendremos que
+   levantarlo y, sobre todo, porque en producción este servidor ocupará el
+   puerto **80** y el *script* no podrá escuchar en él.
+
+.. [#] Para más información sobre esta cabecera, consulte :ref:`el ataque
+   SSLstrip <sslstrip>`.
+
+.. [#] Desgraciadamente, no hay ninguna opción para copiar la clave privada y el
+   certificado en un mismo archivo que es lo que requieren servidores como
+   :ref:`haproxy <haproxy>`. Para el caso de estos programas es posible generar
+   el archivo único incluyéndolo en :kbd:`--reloadcmd`::
+
+      # acme.sh --install-cert -d aulas.iescastillodeluna.es --reloadcmd \
+         'cat $CERT_KEY_PATH $CERT_FULLCHAIN_PATH > /etc/haproxy/keycert.pem && systemctl restart haproxy/etc/haproxy/keycert.pem'
+
+   Para acciones más complicadas, es posible usar ganchos (:kbd:`--pre-hook`,
+   :kbd:`--post-hook`).
+
+.. [#] Lo cual no es ningún problema, puesto que un certificado digital se puede
+   asociar a varios nombres.
+
+.. [#] Lo habitual es que el agente registrador del dominio nos ofrezca el
+   servicio |DNS|, y dependiendo de cuál sea que nos ofrezca o no la
+   posibilidad de generar registros dinámicamente. Si la ofrece, es obvio que
+   se requerirá algún tipo de identificación para llevarla a cabo y eso es
+   probable que requiera un registro previo en ese servicio. Lo mejor es
+   consultar la documentación del proyecto acme.sh_
+
+.. [#] También hay una opción ``-pre-hook`` para ejecutar antes.
+
+.. |SSL| replace:: :abbr:`SSL (Secure Socket Layer)`
+.. |TLS| replace:: :abbr:`TLS (Transport Layer Security)`
+.. |HTTPs| replace:: :abbr:`HTTPs (HTTP seguro)`
+.. |PHP| replace:: :abbr:`PHP (PHP Hypertext Preprocessor)`
+.. |URL| replace:: :abbr:`URL (Uniform Resource Locator)`
+.. |HSTS| replace:: :abbr:`HSTS (HTTP Strict Transport Security)`
+.. |SNI| replace:: :abbr:`SNI (Server Name Indication)`
+.. |CA| replace:: :abbr:`CA (Certification Authority)`
+.. |ACME| replace:: :abbr:`ACME (Automated Certificate Management Environment)`
+
+.. _Let's Encrypt: https://letsencrypt.org/es`
+.. _ZeroSSL: https://zerossl.com
+.. _BuyPass: https://www.buypass.com/ssl/products/acme
+.. _dehydrated: https://github.com/dehydrated-io/dehydrated
+.. _acme.sh: https://github.com/acmesh-official/acme.sh

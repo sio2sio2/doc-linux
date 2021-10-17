@@ -1,0 +1,687 @@
+
+
+
+<!DOCTYPE html>
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>6.2.3. DNS con dnsmasq &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css" />
+    <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+    
+    <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/jquery.js"></script>
+    <script src="../../_static/underscore.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/translations.js"></script>
+    
+    <link rel="index" title="Índice" href="../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../search.html" />
+    <link rel="next" title="6.3. Servicio de hora" href="../04.ntp/index.html" />
+    <link rel="prev" title="6.2.2. bind" href="02.isc.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="../04.ntp/index.html" title="6.3. Servicio de hora"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="02.isc.html" title="6.2.2. bind"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" ><span class="section-number">6. </span>Servicios de infraestructura</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="index.html" accesskey="U"><span class="section-number">6.2. </span>DNS</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">6.2.3. </span>DNS con <strong class="program">dnsmasq</strong></a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="dns-con-dnsmasq">
+<span id="dnsmasq-dns"></span><h1><span class="section-number">6.2.3. </span>DNS con <strong class="program">dnsmasq</strong><a class="headerlink" href="#dns-con-dnsmasq" title="Enlazar permanentemente con este título">¶</a></h1>
+<p><strong class="program">dnsmasq</strong> más que un servidor <abbr title="Domain Name Server">DNS</abbr> es un proxy <abbr title="Domain Name Server">DNS</abbr> que al responder
+a la petición de un cliente la cachea, a fin de que para la siguiente respuesta
+no sea necesaria la consulta remota. Por este motivo, algunas distribuciones lo
+incluyen en sus instalaciones para equipos de escritorio.</p>
+<p>Sin embargo, permite también de forma limitada la definición de registros <abbr title="Domain Name Server">DNS</abbr>
+por lo que puede usarse como tal, si nuestras pretensiones son modestas. En lo
+referente a este servicio sus limitaciones más evidentes son:</p>
+<ul class="simple">
+<li><p>El tratamiento de varios dominios puede ser confuso y engorroso.</p></li>
+<li><p>Tiene limitado el soporte <abbr title="Domain Name System SECurity extensions">DNSSEC</abbr>: es capaz de validar registros de
+servidores externos o no hacerlo y pasar a los clientes el registro de
+firma (véase <cite>más adelantee &lt;dnsmasq-dnssec&gt;</cite>), pero no puede firmar
+automáticamente los registros propios, como sí hace <a class="reference internal" href="02.isc.html#bind"><span class="std std-ref">bind</span></a>.</p></li>
+</ul>
+<p>Para discutir sobre la configuración supongamos que el servidor tiene por
+dirección <em>192.168.255.1</em> y que deseamos que nuestra red sea el dominio
+<em>example.net</em>.</p>
+<div class="admonition seealso">
+<p class="admonition-title">Ver también</p>
+<p>Para saber cómo están estructurados los ficheros de configuración,
+revise lo comentado en <a class="reference internal" href="../02.dhcp/03.dnsmasq.html#dnsmasq-dhcp-confbas"><span class="std std-ref">la configuración para DHCP</span></a>.</p>
+</div>
+<div class="section" id="preliminares">
+<span id="pre-dns"></span><h2><span class="section-number">6.2.3.1. </span>Preliminares<a class="headerlink" href="#preliminares" title="Enlazar permanentemente con este título">¶</a></h2>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Esta preparación del sistema es aplicable a la instalación de
+cualquier otro servidor <abbr title="Domain Name Server">DNS</abbr>.</p>
+</div>
+</div>
+<div class="section" id="principos-de-funcionamiento">
+<h2><span class="section-number">6.2.3.2. </span>Principos de funcionamiento<a class="headerlink" href="#principos-de-funcionamiento" title="Enlazar permanentemente con este título">¶</a></h2>
+<p><strong class="program">dnsmasq</strong> por defecto:</p>
+<ol class="arabic">
+<li><p>Levanta el servidor <abbr title="Domain Name Server">DNS</abbr>, así que éste funcionará a menos que lo
+deshabilitemos incluyendo la directiva:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">port=0</span>
+</pre></div>
+</div>
+</li>
+<li><p>En principio, se usan como servidores de consulta, los servidores incluidos
+en <code class="file docutils literal notranslate"><span class="pre">/etc/resolv.conf</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Advierta que por ello la propia máquina en que está instalado
+<strong class="program">dnsmasq</strong> no puede usarlo como servidor <abbr title="Domain Name Server">DNS</abbr>, puesto que eso
+exigiría colocar en tal fichero <em>127.0.0.1</em> y el resultado es que
+<strong class="program">dnsmasq</strong> se preguntaría a sí mismo. Ya veremos como solucionar
+esto.</p>
+</div>
+</li>
+<li><p>Hay dos fuentes principales para la definición de registros propios:</p>
+<ul class="simple">
+<li><p>Las definiciones hechas en <code class="file docutils literal notranslate"><span class="pre">/etc/hosts</span></code>, de modo que si queremos
+definir un registro de tipo <strong>A</strong>, basta con incluir una línea en este
+fichero.</p></li>
+<li><p>Si se ha habilitado el servicio <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> y <a class="reference internal" href="../02.dhcp/03.dnsmasq.html#dnsmasq-host-decl"><span class="std std-ref">se han declarado máquinas
+con nombre</span></a>, se asignará dinámicamente este nombre en
+el servicio <abbr title="Domain Name Server">DNS</abbr>.</p></li>
+</ul>
+</li>
+</ol>
+<p>En conclusión, que con solo instalar el paquete podremos hacer que el resto de
+máquinas de la red sean capaces de usar ésta cono servidor <abbr title="Domain Name Server">DNS</abbr>. Además, las
+definiciones que hayamos hecho en <code class="file docutils literal notranslate"><span class="pre">/etc/hosts</span></code> también serán resolubles.</p>
+</div>
+<div class="section" id="servidores-de-consulta">
+<h2><span class="section-number">6.2.3.3. </span>Servidores de consulta<a class="headerlink" href="#servidores-de-consulta" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Puede interesarnos usar otros servidores de consulta distintos a las nombreado
+en <code class="file docutils literal notranslate"><span class="pre">/etc/resolv.conf</span></code>. La razón principal puede ser que queramos usar
+<strong class="program">dnsmasq</strong> como el servidor <abbr title="Domain Name Server">DNS</abbr> para la propia máquina lo que nos
+obligaría a crear así <code class="file docutils literal notranslate"><span class="pre">/etC/resolv.conf</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> /etc/resolv.conf
+<span class="go">domain example.net</span>
+<span class="go">search exameple.net</span>
+<span class="go">namserver 127.0.0,1</span>
+</pre></div>
+</div>
+<p>Si no tocáramos nada más, esto supondría que <strong class="program">dnsmasq</strong> se preguntara a
+sí mismo y acabáramos por no obtener ninguna resolución. Para sustituir la
+lectura de este fichero por la de otro podemos crear un fichero
+<code class="file docutils literal notranslate"><span class="pre">/etc/dnsmasq.d/dns.conf</span></code> con la siguiente configuración:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> /etc/dnsmasq.d/dns.conf
+
+<span class="go">resolv-file=/etc/resolv.dnsmasq.conf</span>
+</pre></div>
+</div>
+<p>e incluir dentro del fichero referido por <code class="code docutils literal notranslate"><span class="pre">resolv-file</span></code> los servidores de
+consulta:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> /etc/resolv.dnsmasq.conf
+
+<span class="go">nameserver 1.1.1.1</span>
+<span class="go">nameserver 1.0.0.1</span>
+</pre></div>
+</div>
+<p>Ahora sí podríamos alterar <code class="file docutils literal notranslate"><span class="pre">/etc/resolv.conf</span></code> para que incluya como
+servidor de nombres <em>127.0.0.1</em>.</p>
+<p>Una alternativa a esto es impedir que se lea <code class="file docutils literal notranslate"><span class="pre">/etc/resolv.conf</span></code> y definir
+dentro de la propia configuración los servidores de consulta:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">no-resolv</span>
+<span class="go">server=1.1.1.1</span>
+<span class="go">server=1.0.0.1</span>
+<span class="go">server=/google.com/8.8.8.8</span>
+</pre></div>
+</div>
+<p>en este caso puede usarse la directiva <em>server</em> varias veces para definir varios
+servidores de consulta y, además, puede restringirse el servidor de consulta a
+un dominio (o varios) exclusivamente. En el ejemplo, todas las resoluciones se
+hacen con <em>1.1.1.1</em> y <em>1.0.0.1</em>, excepto los nombres del dominio <em>google.com</em>
+para los cuales se usará el servidor <em>8.8.8.8</em>.</p>
+</div>
+<div class="section" id="definicion-estatica-de-nombres">
+<h2><span class="section-number">6.2.3.4. </span>Definición estática de nombres<a class="headerlink" href="#definicion-estatica-de-nombres" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Ya se ha dicho que <strong class="program">dnsmasq</strong> comparte las definición incluidas en
+<code class="file docutils literal notranslate"><span class="pre">/etc/hosts</span></code>, lo que significa que una definición dentro de ese fichero
+como esta:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">192.168.255.1     ns.example.net    ns</span>
+<span class="go">192.168.255.5     mail.example.net  mail</span>
+</pre></div>
+</div>
+<p>provoca que todos las máquinas que usen nuestro servidor sean capaces de hacer
+la resolución directa de tales nombres:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> host mail.example.net
+<span class="go">mail.example.net has address 192.168.255.10</span>
+</pre></div>
+</div>
+<p>Además, es posible añadir otros ficheros como fuente de registros:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">no-hosts</span>
+<span class="go">addn-hosts=/etc/hosts.d/example.net</span>
+</pre></div>
+</div>
+<p>Como puede verse estas definiciones se corresponden, exclusivamente, con
+registros de tipo <strong>A</strong>. Este mismo tipo de registros también puede
+añadirse dentro de la propia configuración con la directiva <code class="code docutils literal notranslate"><span class="pre">host-record</span></code>.
+Por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">host-record=mail.example.net,192.168.255.5</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>La diferencia entre añadir directamente la definición en la
+configuración o usar ficheros aparte (el primer caso) no es sólo de
+pulcritud: para releer la configuración es necesario reiniciar el servidor
+mientras que los ficheros aparte de definición de máquinas se releen
+simplemente con madar una señal <em>SIGHUP</em> al servidor (o sea, haciendo un
+<code class="code docutils literal notranslate"><span class="pre">kill</span> <span class="pre">-1</span></code>).</p>
+</div>
+<p>Cuando la interfaz posee una <abbr title="Internet Protocol">IP</abbr> dinámica, es posible también hacer esta
+definición:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">interface-name=ext.example.net,eth0</span>
+</pre></div>
+</div>
+<p>que calcula la <abbr title="Internet Protocol">IP</abbr> consultando cuál es la que tiene asignada la interfaz
+suministrada.</p>
+<p>Cualquier otro tipo de registro, sólo es posible incluirlo dentro de la
+configuración y no en fichero aparte con la directiva adecuada. Un registro
+<strong>MX</strong> podemos añadirlo así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">mx-host=example.net,mail.example.net</span>
+</pre></div>
+</div>
+<p>suponiendo que ya tengamos definida la máquina con nombre <em>smtp</em>. También es
+posible definir alias:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cname=smtp.example.net,mail.example.net</span>
+</pre></div>
+</div>
+<p>y ahorrarnos el dominio del objetivo (<em>mail.example.net</em> en este caso), si
+coincide:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cname=smtp.example.net,mail</span>
+</pre></div>
+</div>
+<div class="admonition seealso">
+<p class="admonition-title">Ver también</p>
+<p>Para otro tipo de registros, consulte la <a class="reference external" href="http://www.thekelleys.org.uk/dnsmasq/docs/dnsmasq-man.html">página del manual</a>.</p>
+</div>
+</div>
+<div class="section" id="definicion-de-zonas">
+<h2><span class="section-number">6.2.3.5. </span>Definición de zonas<a class="headerlink" href="#definicion-de-zonas" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Ya hemos apuntado en el apartado anterior cómo definir máquinas, y éstas se
+pueden definir de una forma anárquica, ya que <strong class="program">dnsmasq</strong> permite asociar
+nombres e <abbr title="Internet Protocol">IP</abbr> sin importar a que dominio pertenezcan estos nombres. Por
+ejemplo, si en <code class="file docutils literal notranslate"><span class="pre">/etc/hosts</span></code> añadimos lo siguiente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">192.168.255.2     www.facebook.com</span>
+<span class="go">192.168.255.2     www.twitter.com</span>
+<span class="go">192.168.255.2     www.instagram.com</span>
+</pre></div>
+</div>
+<p>los clientes que resuelvan nombres con nuestro servidor obtendrán esa <abbr title="Internet Protocol">IP</abbr> al
+intentar acceder a cualquiera de esos sitios web. Como se ve, a diferencia de lo
+que hacemos en <strong class="program">bind</strong> no definimos una zona en concreto. Esa es una de
+las virtudes de <strong class="program">dnsmasq</strong> que propicia que se use, por ejemplo, como
+<a class="reference internal" href="#dnsmasq-bloqueo"><span class="std std-ref">sumidero DNS</span></a>.</p>
+<p>Ahora bien, si planteamos dar nombres <abbr title="Domain Name Server">DNS</abbr> a los ordenadores de una <abbr title="Local Area Network">LAN</abbr> y
+usar <strong class="program">dnsmasq</strong> para ello, lo que nos interesa es poder emular la
+filosofía de <strong class="program">bind</strong> y crear zonas. O dicho de otro modo, supongamos que
+con <strong class="program">bind</strong> tenemos esta configuración<a class="footnote-reference brackets" href="#id6" id="id1">1</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> /etc/bind9/named.conf.local
+<span class="go">zone &quot;example.net&quot; {</span>
+<span class="go">   type master;</span>
+<span class="go">   file &quot;db.example.net&quot;;</span>
+<span class="go">   forwarders {};</span>
+<span class="go">}</span>
+
+<span class="gp">#</span> /var/cache/bind/db.example.net
+<span class="gp">#</span> Definición del registro SOA...
+<span class="go">@        IN    NS       ns</span>
+<span class="go">               MX       1 mail</span>
+<span class="go">ns       IN    A        192.168.255.1</span>
+<span class="go">mail     IN    A        192.168.255.1</span>
+<span class="go">smtp     IN    CNAME    mail</span>
+<span class="go">imap     IN    CNMAE    smtp</span>
+</pre></div>
+</div>
+<p>porque nuestro servidor tiene una red externa a la que accede a través de la
+interfaz <em>eth0</em> y otra interna conectada a <em>eth1</em> (<em>192.168.255.1</em>) y cuya red
+es la <em>192.168.255.0/24</em>. Esta red interna es la que se quiere asociar al
+dominio <em>example.net</em>.</p>
+<p>Sabemos qye una configuración así tiene este efecto:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> host -t ns example.net
+<span class="go">example.net name server ns.example.net</span>
+<span class="gp">$</span> host ns.example.net
+<span class="go">ns.example.net has address 192.168.255.1</span>
+<span class="gp">$</span> host smtp.example.net
+<span class="go">smtp.example.net is an alias for mail.example.net.</span>
+<span class="go">mail.example.net has address 192.168.255.1</span>
+</pre></div>
+</div>
+<p>Para lograr lo propio podemos escribir un fichero
+<code class="file docutils literal notranslate"><span class="pre">/etc/dnsmasq.d/dns.conf</span></code> con esta configuración general:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Puede descomentarse para depuración.</span>
+<span class="c1">#log-queries</span>
+
+no-hosts  <span class="c1"># No queremos consultar /etc/hosts (opcional)</span>
+expand-hosts
+</pre></div>
+</div>
+<p>y <code class="file docutils literal notranslate"><span class="pre">/etc/dnsmasq.d/example.conf</span></code> que defina la zona <em>example.net</em>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>auth-zone<span class="o">=</span>example.net,eth1
+auth-server<span class="o">=</span>ns.example.net,eth1
+<span class="nv">domain</span><span class="o">=</span>example.net,192.168.255.0/24
+
+addn-hosts<span class="o">=</span>/etc/hosts.d/eth1   <span class="c1"># Aquí podemos meter registros A.</span>
+
+<span class="c1"># Registro MX</span>
+mx-host<span class="o">=</span>example.net,mail.example.net
+
+<span class="c1"># CNAMEs</span>
+<span class="nv">cname</span><span class="o">=</span>smtp.example.net,mail
+<span class="nv">cname</span><span class="o">=</span>imap.example.net,mail
+</pre></div>
+</div>
+<p>Por último podemos crear los registros <strong>A</strong> en <code class="file docutils literal notranslate"><span class="pre">/etc/hosts.d/eth1</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">192.168.255.1  ns    mail</span>
+</pre></div>
+</div>
+<p>La justificación de esta configuración es la siguiente:</p>
+<ul>
+<li><p>En <code class="file docutils literal notranslate"><span class="pre">dns.conf</span></code> hemos añadido configuración general relativa al
+servicio <abbr title="Domain Name Server">DNS</abbr>, esto es, configuración común a todas las zonas que
+pretendiéramos definir.</p></li>
+<li><p>En <code class="file docutils literal notranslate"><span class="pre">eth1.conf</span></code> hemos incluido configuración referente únicamente
+al dominio <em>example.net</em> correspondiente a la interfaz <em>eth1</em> y la red
+<em>192.168.255.0/24</em>. Si tuviéramos otros dominios, otras interfaces
+internas y otras redes, podríamos escribir ficheros con contenido análogo.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">expand-hosts</span></code> evita tener que añadir el dominio constantemente en el
+fichero <code class="file docutils literal notranslate"><span class="pre">/etc/hosts.d/eth1</span></code>. Sin la directiva tendríamos que haber
+escrito:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">192.168.255.1  ns.example.net    mail.example.net</span>
+</pre></div>
+</div>
+<p>Esta directiva, no obstante, sólo añade el dominio en las máquinas declaradas
+en ficheros <em>hosts</em> y no registros incluidos dentro de la propia
+configuración.</p>
+<p>Por otro lado, para que esta directiva tenga efecto es necesario añadir
+también la directiva <code class="docutils literal notranslate"><span class="pre">domain</span></code>, aunque esta está relacionada con el servicio
+<abbr title="Dynamic Host Configuration Protocol">DHCP</abbr>.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">auth-zone</span></code> convierte a nuestro servidor <strong class="command">dnsmasq</strong> en el servidor
+autoritario del dominio <em>example.net</em>, lo que implica que jamás se resolverán
+máquinas de este dominio recurriendo a los servidores externos de internet que
+hayamos configurado. Dicho de otro modo. <em>www.example.net</em> es una máquina que
+existe en internet. Si no incluimos esta directiva y no definimos nosotros la
+máquina <em>www</em>, <strong class="program">dnsmasq</strong> nos devolverá la <abbr title="Internet Protocol">IP</abbr> pública asociada a
+este nombre, porque la consultará al servidor externo. Con la directiva en
+cambio, devolverá un error de registro no encontrado.</p>
+<p>Hemos añadido, además, la interfaz <em>eth1</em>, lo que tiene el efecto de que
+<em>dnsmasq</em> calcule a partir de la configuración de esta interfaz cuál es la red
+asociada (<em>192.168.255.0/24</em>). De hecho, podríamos haber escrito directamente
+la red. Este segundo parámetro es opcional, pero al incluirlo y relacionar el
+dominio con la red, <strong class="program">dnsmasq</strong> habilitará la resolución inversa. Por
+tanto:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> host <span class="m">192</span>.168.255.1
+<span class="go">1.255.168.192.in-addr.arpa domain name pointer ns.example.net.</span>
+</pre></div>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">auth-server</span></code> es la directiva encargada de definir el registro <em>NS</em> de la
+zona que estamos definiendo. Por tanto, tiene el efecto de generar este
+registro:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">@     IN    NS    ns.example.net.</span>
+</pre></div>
+</div>
+<p>Obviamente este nombre debe tener asociado alguna <abbr title="Internet Protocol">IP</abbr>.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Cuando queramos definir con <strong class="program">dnsmasq</strong> una zona
+resoluble desde internet, es necesario incluir obligatoriamente esta
+directiva. Esta directiva, además, hace que para las peticiones referidas
+por la interfaz indicada, <strong class="program">dnsmasq</strong> no permita consultas
+recursivas, esto es, consultas que no pregunten por nombres de la propia
+zona. Es, pues, bastante probable que se quiera incluir esta directiva
+cuando la interfaz se trata de una interfaz externa. Para más información,
+consúltese <a class="reference external" href="http://lists.thekelleys.org.uk/pipermail/dnsmasq-discuss/2015q1/009326.html">esta respuesta en la lista de distribución del programa</a></p>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">addn-hosts</span></code> nos permite indicar cuál será el fichero donde incluyamos los
+registros <strong>A</strong>.</p></li>
+<li><p>El resto del fichero <code class="file docutils literal notranslate"><span class="pre">eth1.conf</span></code> define registros de otro tipo: uno
+<strong>MX</strong> y dos <strong>CNAME</strong>.</p></li>
+</ul>
+<p class="rubric"><abbr title="Dynamic Host Configuration Protocol">DHCP</abbr></p>
+<p>Como estamos configurando el dominio para una <abbr title="Local Area Network">LAN</abbr> y lo hemos asociado a una
+red (<em>192.168.255.0/24</em>) es probable que también nos interese ofrecer <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> con
+el propio <strong class="program">dnsmasq.conf</strong>. En ese caso bastaría con incluir un fichero
+<code class="file docutils literal notranslate"><span class="pre">/etc/dnsmasq.d/dhcp.conf</span></code> con la siguiente configuración general:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-autoritative</span>
+<span class="gp">#</span> log-dhcp           <span class="c1"># Descomentarlo en caso de querer depurar.</span>
+</pre></div>
+</div>
+<p>y dentro de <code class="file docutils literal notranslate"><span class="pre">/etc/dnsmasq.d/example.conf</span></code>, añadir al final del archivo la
+configuración que deseemos para <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-range=192.168.255.64,192.168.255.127,10m</span>
+
+<span class="gp">#</span> Configuración adicional referente al DHCP
+</pre></div>
+</div>
+<p class="rubric">Vistas</p>
+<p><strong class="program">dnsmasq</strong> dispone de <code class="docutils literal notranslate"><span class="pre">localise-queries</span></code> para que el caso de que si
+un mismo nombre está asociado a distintas <abbr title="Internet Protocol">IP</abbr>, no se devuelvan todas sino que
+se devuelva aquella que pertenece a la red de la interfaz por la que se recibe
+la petición. Sin embargo, la directiva no se lleva bien con <code class="docutils literal notranslate"><span class="pre">auth-server</span></code>.</p>
+</div>
+<div class="section" id="gestion-de-una-zona-de-internet">
+<h2><span class="section-number">6.2.3.6. </span>Gestión de una zona de internet<a class="headerlink" href="#gestion-de-una-zona-de-internet" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Bajo el epígrafe expondremos cuál es una configuración apropiada para la gestión
+de una zona de internet que poseamos, partiendo de las siguientes suposiciones:</p>
+<ul>
+<li><p>Hemos contratado un <abbr title="Virtual Private Server">VPS</abbr> o un servidor dedicado con una dirección <abbr title="Internet Protocol">IP</abbr>v4,
+que se encuentra asociada a su interfaz <em>eth0</em>.</p></li>
+<li><p>Deseamos gestionar en dicha máquina el subdominio <em>vps.example.net</em> para lo
+cual en la zona <em>example.net</em> habrá declarado lo siguiente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">mi-vps      IN       NS    vps</span>
+<span class="go">                      A    IPv4.DE.MI.VPS</span>
+</pre></div>
+</div>
+</li>
+<li><p>No tiene por qué ser así, pero lo habitual es que todos los nombres resuelvan
+a la <abbr title="Internet Protocol">IP</abbr> de la máquina, que es la <abbr title="Internet Protocol">IP</abbr> de la interfaz.</p></li>
+</ul>
+<p>Obsérvese que nuestro servidor gestionará la zona <em>vps.example.net</em>, pero en
+absoluto controlamos nuestra <abbr title="Internet Protocol">IP</abbr> (que, simplemente, nos es concedida por nuestro
+proveedor como parte de su servicio) y mucho menos disponemos de la subred en
+que se incluye nuestra <abbr title="Internet Protocol">IP</abbr>. En este contexto, es absurdo que nuestro
+<strong class="program">dnsmasq</strong> pretenda encargarse de resolución inversa alguna<a class="footnote-reference brackets" href="#id7" id="id2">2</a>.</p>
+<p>La configuración puede ser esta:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/dnsmasq/dns.conf</span>
+<span class="n">no</span><span class="o">-</span><span class="n">resolv</span>
+<span class="n">server</span><span class="o">=</span><span class="mf">1.1</span><span class="o">.</span><span class="mf">1.1</span>
+<span class="n">server</span><span class="o">=</span><span class="mf">1.0</span><span class="o">.</span><span class="mf">0.1</span>
+
+<span class="n">no</span><span class="o">-</span><span class="n">hosts</span>
+
+<span class="n">auth</span><span class="o">-</span><span class="n">zone</span><span class="o">=</span><span class="n">vps</span><span class="o">.</span><span class="n">example</span><span class="o">.</span><span class="n">net</span>
+<span class="n">auth</span><span class="o">-</span><span class="n">server</span><span class="o">=</span><span class="n">mi</span><span class="o">-</span><span class="n">vps</span><span class="o">.</span><span class="n">example</span><span class="o">.</span><span class="n">net</span><span class="p">,</span><span class="n">eth0</span>
+
+<span class="c1"># Nombres asociados a la propia máquina</span>
+<span class="n">interface</span><span class="o">-</span><span class="n">name</span><span class="o">=</span><span class="n">www</span><span class="o">.</span><span class="n">vps</span><span class="o">.</span><span class="n">example</span><span class="o">.</span><span class="n">net</span><span class="p">,</span><span class="n">eth0</span>
+<span class="n">interface</span><span class="o">-</span><span class="n">name</span><span class="o">=</span><span class="n">mail</span><span class="o">.</span><span class="n">vps</span><span class="o">.</span><span class="n">example</span><span class="o">.</span><span class="n">net</span><span class="p">,</span><span class="n">eth0</span>
+
+<span class="c1"># Nombres asociados a otros máquinas</span>
+<span class="n">addn</span><span class="o">-</span><span class="n">hosts</span><span class="o">=/</span><span class="n">etc</span><span class="o">/</span><span class="n">hosts</span><span class="o">.</span><span class="n">d</span><span class="o">/</span><span class="n">vps</span><span class="o">.</span><span class="n">example</span><span class="o">.</span><span class="n">net</span>
+
+<span class="c1"># MX</span>
+<span class="n">mx</span><span class="o">-</span><span class="n">host</span><span class="o">=</span><span class="n">vps</span><span class="o">.</span><span class="n">example</span><span class="o">.</span><span class="n">net</span><span class="p">,</span><span class="n">mail</span><span class="o">.</span><span class="n">vps</span><span class="o">.</span><span class="n">example</span><span class="o">.</span><span class="n">net</span>
+
+<span class="c1"># CNAMEs</span>
+<span class="n">cname</span><span class="o">=</span><span class="n">smtp</span><span class="o">.</span><span class="n">vps</span><span class="o">.</span><span class="n">example</span><span class="o">.</span><span class="n">net</span><span class="p">,</span><span class="n">mail</span>
+<span class="n">cname</span><span class="o">=</span><span class="n">imap</span><span class="o">.</span><span class="n">vps</span><span class="o">.</span><span class="n">example</span><span class="o">.</span><span class="n">net</span><span class="p">,</span><span class="n">mail</span>
+</pre></div>
+</div>
+<p>que presenta algunas diferencias respecto a la propuesta para la definición de
+una zona:</p>
+<ul class="simple">
+<li><p>No añadimos red o interfaz a la directiva <code class="docutils literal notranslate"><span class="pre">auth-zone</span></code>, porque no pretendemos
+realizar ninguna resolución inversa, al no ser dueños de ninguna subred.</p></li>
+<li><p>No añadimos la directiva <code class="docutils literal notranslate"><span class="pre">domain</span></code> ni <code class="docutils literal notranslate"><span class="pre">expand-host</span></code> porque no somos dueños
+de ninguna subred.</p></li>
+<li><p>Aunque la <abbr title="Internet Protocol">IP</abbr> pública es fija (más nos vale), preferimos  leerla de la
+interfaz (con <code class="docutils literal notranslate"><span class="pre">interface-name</span></code>), en vez de incluirla en la configuración
+(p.e. dentro del fichero :file: <cite>/etc/hosts.d/vps.example.net</cite>).</p></li>
+<li><p>El fichero :file: <cite>/etc/hosts.d/vps.example.net</cite> lo creamos por si deseamos
+proporcionar nombre de nuestra zona a otras máquinas distintas de la de
+nuestro servidor, por ejemplo, otro <abbr title="Virtual Private Server">VPS</abbr> en el que no disponemos ningún
+servidor <abbr title="Domain Name Server">DNS</abbr>, pero en el que configuramos algún servicio para el que
+queremos asignar un nombre del dominio <em>vps.example.net</em>.</p></li>
+</ul>
+</div>
+<div class="section" id="gestion-de-una-zona-interna">
+<h2><span class="section-number">6.2.3.7. </span>Gestión de una zona interna<a class="headerlink" href="#gestion-de-una-zona-interna" title="Enlazar permanentemente con este título">¶</a></h2>
+<div class="admonition-todo admonition" id="id3">
+<p class="admonition-title">Por hacer</p>
+<p>Por escribir</p>
+</div>
+</div>
+<div class="section" id="dnssec">
+<span id="dnsmasq-dnssec"></span><h2><span class="section-number">6.2.3.8. </span><abbr title="Domain Name System SECurity extensions">DNSSEC</abbr><a class="headerlink" href="#dnssec" title="Enlazar permanentemente con este título">¶</a></h2>
+<p><strong class="program">dnsmasq</strong> tiene un soporte parcial para <abbr title="Domain Name System SECurity extensions">DNSSEC</abbr>, ya que es capaz de
+comprobar la validez de un registro a través de su registro de firma para las
+consultas que haga a los servidores que tenga definidos; pero, sin embargo, no
+es capaz de generar registros automáticos de firma para los registros que el
+mismo gestiona (<em>example.net</em> en nuestro ejemplo).</p>
+<p>Con respecto a <abbr title="Domain Name System SECurity extensions">DNSSEC</abbr>, <strong class="program">dnsmasq</strong> puede actuar de tres formas:</p>
+<ol class="arabic">
+<li><p>Sin configuración específica, pasa la respuesta de su servidor de consulta,
+pero eliminado los datos referentes a <abbr title="Domain Name System SECurity extensions">DNSSEC</abbr>, por lo que se perderá el bit
+<abbr title="Authenticated Data">AD</abbr> y, en consecuencia, el cliente no sabrá si la respuesta está verificada
+o no.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>En este caso, si el servidor de consulta no realiza comprobaciones
+no se obtendrá error jamás, mientras que se obtendrá un <em>SERVFAIL</em> si el
+servidor realiza comprobaciones y la verificación falla.</p>
+</div>
+</li>
+<li><p>Si se añade la directiva:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">proxy-dnssec</span>
+</pre></div>
+</div>
+<p>se actúa como en el caso anterior, pero se transmite el bit <abbr title="Authenticated Data">AD</abbr> al cliente,
+por lo que este podrá saber si se realizó verificación o no.</p>
+</li>
+<li><p>Si se desea que el propio <strong class="program">dnsmasq</strong> se encargue de la verificación,
+lo cual es útil, si el servidor de consulta no la realiza o no nos fiamos de
+él, podemos configurar del siguiente modo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dnssec</span>
+<span class="go">dnssec-check-unsigned</span>
+<span class="go">conf-file=/usr/share/dnsmasq-base/trust-anchors.conf</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>El fichero contiene los registros <abbr title="Delegation Signer">DS</abbr> para la zona «.» que
+<a class="reference external" href="https://data.iana.org/root-anchors/root-anchors.xml">publica la IANA</a>.</p>
+</div>
+</li>
+</ol>
+</div>
+<div class="section" id="bloqueo-dns">
+<span id="dnsmasq-bloqueo"></span><h2><span class="section-number">6.2.3.9. </span>Bloqueo DNS<a class="headerlink" href="#bloqueo-dns" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Es habitual que necesitemos evitar el acceso a determinados sitios web. Para
+ello existen proxies web, pero cuando el tráfico es seguro (y esto es ya lo
+más frecuente), la cabecera <abbr title="HyperText Transfer Protocol">HTTP</abbr> está cifrada. Puede aún seguirse filtrado
+mediante <em>proxy</em> usando la <a class="reference internal" href="../../09.apendice/01.cryto/03.aplicaciones/04.ssl.html#sni"><span class="std std-ref">SNI</span></a>, pero una solución alternativa
+bastante más ligera y sencilla, es a través de la petición <abbr title="Domain Name Server">DNS</abbr> que se
+hace con la resolución<a class="footnote-reference brackets" href="#id8" id="id4">3</a> previa.</p>
+<p><strong class="program">dnsmasq</strong> puede permitir el bloqueo de estos sitios, haciendo que la
+resolución de las máquinas o los dominios indeseados se haga a una <abbr title="Internet Protocol">IP</abbr>
+inexistente o a la <abbr title="Internet Protocol">IP</abbr> de una máquina en la que dispongamos un servidor web que
+devuelva una página con el aviso de prohibición.</p>
+<p>Para lograrlo podemos crear un fichero <code class="file docutils literal notranslate"><span class="pre">/etc/dnsmasq.d/filter.conf</span></code> con un
+contenido como éste:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/dnsmasq.d/filter.conf</span>
+<span class="nv">address</span><span class="o">=</span>/facebook.com/0.0.0.0      <span class="c1"># No se puede acceder a máquinas del dominio completo</span>
+addn-hosts<span class="o">=</span>/etc/hosts.banned.conf  <span class="c1"># Para incluir máquinas individuales.</span>
+</pre></div>
+</div>
+<p>Con la configuración anterior, cualquier máquina del dominio <em>facebook.com</em> se
+resolverá a <em>0.0.0.0</em> con lo que el acceso será imposible y, además, se dispone
+un fichero para incluir direcciones de máquinas individuales. Podemos repetir
+tantas veces como deseemos la opción <kbd class="kbd docutils literal notranslate">address</kbd>, así que podremos bloquear
+tantos dominios como deseemos.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Está técnica recibe el nombre de <em class="dfn">sumidero de DNS</em> y es muy
+empleada para evitar los sitios dedicados a albergar anuncios. Un ejemplo de
+<em>software</em> que se basa en esta técnica y usa al propio <strong class="program">dnsmasq</strong> es
+<a class="reference external" href="https://pi-hole.net/">pi-hole</a>.</p>
+</div>
+</div>
+<div class="section" id="dns-dinamico">
+<span id="dnsmasq-ddns"></span><h2><span class="section-number">6.2.3.10. </span>DNS dinámico<a class="headerlink" href="#dns-dinamico" title="Enlazar permanentemente con este título">¶</a></h2>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Es importante que definamos dominios para las redes a las
+que brindemos servicio <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-range=192.168.255.128,192.168.255.191,8h</span>
+<span class="go">domain=aula.ies,192.168.255.0/24</span>
+</pre></div>
+</div>
+</div>
+<p>En <strong class="program">dnsmasq</strong>, podemos lograr la inclusión dinámica en su <strong>propio</strong>
+<abbr title="Domain Name Server">DNS</abbr> de las máquinas que reciben configuración de red, pero un soporte
+personalizado requiere algo de configuración.</p>
+<p>En principio, todas las máquinas que tengan asociado un nombre pasan al <abbr title="Domain Name Server">DNS</abbr>.
+Esto es aplicable a aquellas a las que en la configuración se les haya definido
+un nombre:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-host=00:11:22:33:44:55,profesor</span>
+</pre></div>
+</div>
+<p>pero también a aquellas cuyo cliente envía su propio nombre. Para estas
+segundas, no obtante, podemos evitar la inclusión incluyendo la directiva:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-ignore-names</span>
+</pre></div>
+</div>
+<p>El problema, pues, son aquellas que no se incluyen automáticamente. La razón,
+obviamente, es que <strong class="program">dnsmasq</strong> no tiene nombre para ellas. Para
+resolverlo, <strong class="program">dnsmasq</strong> implementa la directiva <code class="docutils literal notranslate"><span class="pre">dhcp-generate-names</span></code>
+que asigna como nombre de máquina a aquellas que no lo tienen la dirección <abbr title="Media Access Control">MAC</abbr>
+en que se sustituyen los dos puntos por guiones<a class="footnote-reference brackets" href="#id9" id="id5">4</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dhcp-generate-names</span>
+</pre></div>
+</div>
+<p>La desventaja de este método es que no podemos elegir el formato del nombre. Si
+nuestra intención es personalizar el formato, entonces la directiva anterior es
+inútil y no hay más solución que utilizar <code class="docutils literal notranslate"><span class="pre">dhcp-script</span></code> que permite definir
+el <em>script</em> que se ejecutará cada vez que haya un cambio en las asignaciones
+del <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr>. La idea es que este <em>script</em> cree el nombre dinámico para las
+máquinas que no disponen de él, según el formato que definamos denhtro de él y
+gestione el contenido de un fichero <em>hosts</em>, en donde iremos metiendo y sacando
+equipos según obtengan o revoquen direcciones.</p>
+<p>En tal caso para la configuración de <strong class="program">dnsmasq</strong>, podemos crear un
+fichero <code class="file docutils literal notranslate"><span class="pre">/etc/dnsmasq.d/ddns.conf</span></code> con el siguiente contenido:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">addn-hosts=/tmp/dynamic.hosts</span>
+<span class="go">dhcp-scripts=/var/lib/dnsmasq/ddns.sh</span>
+<span class="go">dhcp-ignore-names  # Opcional</span>
+</pre></div>
+</div>
+<p>y añadir en su ruta correspondiente el <em>script</em> <a class="reference download internal" download="" href="../../_downloads/9598e1bcc8adfa206bb587e022312bc8/ddns.sh"><code class="xref download docutils literal notranslate"><span class="pre">ddns.sh</span></code></a>.</p>
+<p class="rubric">Notas al pie</p>
+<dl class="footnote brackets">
+<dt class="label" id="id6"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p>También podríamos definir una zona para la resolución inversa.</p>
+</dd>
+<dt class="label" id="id7"><span class="brackets"><a class="fn-backref" href="#id2">2</a></span></dt>
+<dd><p>De hecho, si queremos que ls <abbr title="Internet Protocol">IP</abbr> resuelva a alguno de nuestro nombres
+(p.e. <em>mi-vps.example.net</em>) lo más probable es que necesitemos hablar con el
+provedor para que realice él el cambio en sus servidores.</p>
+</dd>
+<dt class="label" id="id8"><span class="brackets"><a class="fn-backref" href="#id4">3</a></span></dt>
+<dd><p>Obviamente, que se realice una petición <abbr title="Domain Name Server">DNS</abbr> no implica que el tráfico
+subsiguiente seá tráfico web, pero lo habitual es que si alguien quiere
+conectar al dominio <a class="reference external" href="http://www.youtube.com">youtube.com</a> lo que pretenda es
+establecer una conexión web.</p>
+</dd>
+<dt class="label" id="id9"><span class="brackets"><a class="fn-backref" href="#id5">4</a></span></dt>
+<dd><p>Aunque la página de manual dice que es obligatorio asociar esta directiva
+a una etiqueta, parece funcionar sin especificar ninguna.</p>
+</dd>
+</dl>
+</div>
+</div>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../index.html">Tabla de contenido</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">6.2.3. DNS con <strong class="program">dnsmasq</strong></a><ul>
+<li><a class="reference internal" href="#preliminares">6.2.3.1. Preliminares</a></li>
+<li><a class="reference internal" href="#principos-de-funcionamiento">6.2.3.2. Principos de funcionamiento</a></li>
+<li><a class="reference internal" href="#servidores-de-consulta">6.2.3.3. Servidores de consulta</a></li>
+<li><a class="reference internal" href="#definicion-estatica-de-nombres">6.2.3.4. Definición estática de nombres</a></li>
+<li><a class="reference internal" href="#definicion-de-zonas">6.2.3.5. Definición de zonas</a></li>
+<li><a class="reference internal" href="#gestion-de-una-zona-de-internet">6.2.3.6. Gestión de una zona de internet</a></li>
+<li><a class="reference internal" href="#gestion-de-una-zona-interna">6.2.3.7. Gestión de una zona interna</a></li>
+<li><a class="reference internal" href="#dnssec">6.2.3.8. <abbr title="Domain Name System SECurity extensions">DNSSEC</abbr></a></li>
+<li><a class="reference internal" href="#bloqueo-dns">6.2.3.9. Bloqueo DNS</a></li>
+<li><a class="reference internal" href="#dns-dinamico">6.2.3.10. DNS dinámico</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="02.isc.html"
+                        title="capítulo anterior"><span class="section-number">6.2.2. </span>bind</a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="../04.ntp/index.html"
+                        title="próximo capítulo"><span class="section-number">6.3. </span>Servicio de hora</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/06.infraestructura/03.dns/03.dnsmasq.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="../04.ntp/index.html" title="6.3. Servicio de hora"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="02.isc.html" title="6.2.2. bind"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" ><span class="section-number">6. </span>Servicios de infraestructura</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="index.html" ><span class="section-number">6.2. </span>DNS</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">6.2.3. </span>DNS con <strong class="program">dnsmasq</strong></a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor CC BY 4.0, 2016-2021, José Miguel Sánchez Alés.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.2.0.
+    </div>
+  </body>
+</html>

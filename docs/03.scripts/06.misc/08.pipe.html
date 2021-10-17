@@ -1,0 +1,259 @@
+
+
+
+<!DOCTYPE html>
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3.6.9. Código de salida en tuberías &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css" />
+    <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+    
+    <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/jquery.js"></script>
+    <script src="../../_static/underscore.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/translations.js"></script>
+    
+    <link rel="index" title="Índice" href="../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../search.html" />
+    <link rel="next" title="3.6.10. Trucos y consejos" href="99.consejos.html" />
+    <link rel="prev" title="3.6.8. Bitácora de sucesos" href="07.logs.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="99.consejos.html" title="3.6.10. Trucos y consejos"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="07.logs.html" title="3.6.8. Bitácora de sucesos"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" ><span class="section-number">3. </span>Programación de <em>scripts</em></a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="index.html" accesskey="U"><span class="section-number">3.6. </span>Otros aspectos</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">3.6.9. </span>Código de salida en tuberías</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="codigo-de-salida-en-tuberias">
+<h1><span class="section-number">3.6.9. </span>Código de salida en tuberías<a class="headerlink" href="#codigo-de-salida-en-tuberias" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>Cuando la <em>shell</em> ejecuta una tubería:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>orden1 <span class="p">|</span> orden2
+</pre></div>
+</div>
+<p>el código de salida (el que podemos consultar con <em>$?</em>) es siempre el código de
+la orden derecha:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> <span class="nb">true</span> <span class="p">|</span> <span class="nb">false</span>
+<span class="gp">$</span> <span class="nb">echo</span> <span class="nv">$?</span>
+<span class="go">1</span>
+<span class="gp">$</span> <span class="nb">false</span> <span class="p">|</span> <span class="nb">true</span>
+<span class="gp">$</span> <span class="nb">echo</span> <span class="nv">$?</span>
+<span class="go">0</span>
+</pre></div>
+</div>
+<p>Que no podamos acceder al código de salida de la primera orden puede suponernos,
+en ocasiones, un problema. Por ejemplo, supongamos que creamos dos funciones:
+una se encarga de procesar datos y generar los resultados (o sea, se encarga de
+la lógica del problema), mientras que la otra, simplemente, coge los resultados
+y los formatea adecuadamente. Por ejemplo, supongamos que creamos una función
+a la que le damos un rango de números y nos devuelve los caracteres imprimibles
+correspondientes, suponiendo que los números son códigos ASCII:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Obtiene los caracteres imprimibles correspondientes</span>
+<span class="c1"># a un rango de códigos ASCII</span>
+get_chars<span class="o">()</span> <span class="o">{</span>
+   <span class="nb">local</span> <span class="nv">ini</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$1</span><span class="s2">&quot;</span> <span class="nv">fin</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">2</span><span class="k">:-</span><span class="nv">255</span><span class="si">}</span><span class="s2">&quot;</span>
+
+   <span class="c1"># Posibles errores.</span>
+   <span class="o">[</span> <span class="nv">$ini</span> -le <span class="nv">$fin</span> <span class="o">]</span> <span class="o">||</span> <span class="k">return</span> <span class="m">1</span>  <span class="c1"># Rango invertido.</span>
+   <span class="o">[</span> <span class="nv">$ini</span> -ge <span class="m">32</span> -a <span class="nv">$fin</span> -le <span class="m">255</span> <span class="o">]</span> <span class="o">||</span> <span class="k">return</span> <span class="m">1</span>  <span class="c1"># Valores fuera de rango.</span>
+
+   <span class="k">for</span> i in <span class="k">$(</span>seq <span class="nv">$ini</span> <span class="nv">$fin</span><span class="k">)</span><span class="p">;</span> <span class="k">do</span>
+      /usr/bin/printf <span class="s2">&quot;%d \x</span><span class="k">$(</span><span class="nb">printf</span> %x <span class="nv">$i</span><span class="k">)</span><span class="s2">\n&quot;</span> <span class="nv">$i</span>
+   <span class="k">done</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+<p>que al ejecutarse con argumentos <strong>60</strong> y <strong>65</strong> devuelve esto:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">60 &lt;</span>
+<span class="go">61 =</span>
+<span class="go">62 &gt;</span>
+<span class="go">63 ?</span>
+<span class="go">64 @</span>
+<span class="go">65 A</span>
+</pre></div>
+</div>
+<p>La función puede fallar, si incluimos múmeros fuera del rango 32-255 que son
+los caracteres imprimibles. Esta función, no obstante, no se encarga de crear
+una salida bonita, sólo de resolver el problema en sí. Podríamos hacer que la
+propia función formateara, pero supongamos que preferimos hacerlo en una función
+aparte para separar la lógica de la presentación. En consecuencia creamos esta
+función:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>formatea<span class="o">()</span> <span class="o">{</span>
+   <span class="k">while</span> <span class="nb">read</span> -r code char<span class="p">;</span> <span class="k">do</span>
+      <span class="nb">printf</span> <span class="s2">&quot;%.25s %s\n&quot;</span> <span class="s2">&quot;</span><span class="nv">$code</span><span class="s2">.......................................&quot;</span> <span class="s2">&quot;</span><span class="nv">$char</span><span class="s2">&quot;</span>
+   <span class="k">done</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+<p>que obrará el cambio: al ejecutarse así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">get_chars 60 65 | formatea</span>
+</pre></div>
+</div>
+<p>de modo que generará una salida más agradable:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">60....................... &lt;</span>
+<span class="go">61....................... =</span>
+<span class="go">62....................... &gt;</span>
+<span class="go">63....................... ?</span>
+<span class="go">64....................... @</span>
+<span class="go">65....................... A</span>
+</pre></div>
+</div>
+<p>El problema de esta solución es que si en el programa en que incluimos estas
+funciones, queremos saber si la operación falló, nos será imposible puesto que
+la segunda función siempre devolverá éxito, incluso cuando no tenga nada que
+formatear.</p>
+<p><strong class="program">bash</strong> soluciona de forma muy sencilla esto de dos formas:</p>
+<ol class="arabic">
+<li><p>Consultando el array <em>PIPESTATUS</em> que almacena los estados de todos los
+programas que intervienen en la tubería. En el ejemplo <em>${PIPESTATUS[0]}</em>,
+almacena el código de salida de <em>get_chars</em> y <em>${PIPESTATUS[1]}</em> el de
+<em>formatea</em>.</p></li>
+<li><p>Usando la opción <em>pipefail</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">set -o pipefail</span>
+</pre></div>
+</div>
+<p>que provoca que se devuelva el código de salida del programa más a la derecha
+que falló<a class="footnote-reference brackets" href="#id4" id="id1">1</a> y sólo se devuelva <strong>0</strong>, si no falló ningún programa.</p>
+</li>
+</ol>
+<p>Pero estas facilidades no existen en el estándar <em>POSIX</em>. Por ello, hay que
+buscarle las vueltas al problema. Una solución no demasiado compleja es la
+siguiente<a class="footnote-reference brackets" href="#id5" id="id2">2</a>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="o">{</span> <span class="o">{</span> <span class="o">{</span> get_chars <span class="m">60</span> <span class="m">65</span> <span class="m">3</span>&gt;<span class="p">&amp;</span>- <span class="m">4</span>&gt;<span class="p">&amp;</span>-<span class="p">;</span> <span class="nb">echo</span> <span class="nv">$?</span> &gt;<span class="p">&amp;</span><span class="m">3</span><span class="p">;</span> <span class="o">}</span> <span class="p">|</span> formatea &gt;<span class="p">&amp;</span><span class="m">4</span><span class="p">;</span> <span class="o">}</span> <span class="m">3</span>&gt;<span class="p">&amp;</span><span class="m">1</span> <span class="p">|</span> <span class="o">{</span> <span class="nb">read</span> XC<span class="p">;</span> <span class="nb">exit</span> <span class="nv">$XC</span><span class="p">;</span> <span class="o">}</span> <span class="o">}</span> <span class="m">4</span>&gt;<span class="p">&amp;</span><span class="m">1</span>
+</pre></div>
+</div>
+<p>que consiste en jugar con las redirecciones para lograr que el código de salida
+de <em>get_chars</em> sea leído por la orden <a class="reference internal" href="../../02.conbas/08.redirecciones/02avanzada.html#read"><span class="std std-ref">read</span></a>. Como este
+<strong class="command">read</strong> está en el último miembro de la tubería, y salimos de él con el
+código leído, logramos que el código de salida resultante sea el código de
+salida del miembro izquierdo.</p>
+<p>Como es un poco engorroso contruir la expresión y, además, se ofusca mucho la
+tubería, podemos crear una función que equivalga a lo anterior:</p>
+<div class="admonition-todo admonition" id="id3">
+<p class="admonition-title">Por hacer</p>
+<p>Generalizar la solución</p>
+</div>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1">#</span>
+<span class="c1"># En una tubería simple de dos meimbros devuelve</span>
+<span class="c1"># el código de salida de la orden izquierda.</span>
+<span class="c1">#</span>
+pf<span class="o">()</span> <span class="o">{</span>
+   <span class="nb">local</span> XC run
+
+   <span class="k">while</span> <span class="o">[</span> <span class="nv">$#</span> -gt <span class="m">0</span> <span class="o">]</span><span class="p">;</span> <span class="k">do</span>
+      <span class="k">if</span> <span class="o">[</span> <span class="s2">&quot;</span><span class="nv">$1</span><span class="s2">&quot;</span> <span class="o">=</span> <span class="s2">&quot;|&quot;</span> <span class="o">]</span><span class="p">;</span> <span class="k">then</span>
+         <span class="nv">run</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$run</span><span class="s2"> &quot;</span><span class="s1">&#39;3&gt;&amp;- 4&gt;&amp;-; echo $? &gt;&amp;3; } &#39;</span>
+         <span class="nb">break</span>
+      <span class="k">else</span>
+         <span class="nv">run</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$run</span><span class="s2"> &#39;</span><span class="nv">$1</span><span class="s2">&#39;&quot;</span>
+      <span class="k">fi</span>
+      <span class="nb">shift</span>
+   <span class="k">done</span>
+
+   <span class="nb">eval</span> <span class="s2">&quot;{ { { &quot;</span> <span class="nv">$run</span> <span class="s2">&quot;</span><span class="nv">$@</span><span class="s2">&quot;</span> <span class="s1">&#39;&gt;&amp;4; } 3&gt;&amp;1 | { read XC; return $XC; } } 4&gt;&amp;1&#39;</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+<p>Con ella podemos ejecutar así la tubería:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pf get_chars <span class="m">60</span> <span class="m">65</span> <span class="se">\|</span> formatea
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Observe que hay que proteger la tubería para que la <em>shell</em> no la interprete.</p>
+</div>
+<p class="rubric">Notas al pie</p>
+<dl class="footnote brackets">
+<dt class="label" id="id4"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p>Obsérvese que se pueden anidar varias tuberías:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">orden1 | orden2 | orden3</span>
+</pre></div>
+</div>
+<p>de modo que no particularicemos para dos.</p>
+</dd>
+<dt class="label" id="id5"><span class="brackets"><a class="fn-backref" href="#id2">2</a></span></dt>
+<dd><p>Véase <a class="reference external" href="https://unix.stackexchange.com/questions/14270/get-exit-status-of-process-thats-piped-to-another">esta respuesta en unix.stackexchange.com</a>.</p>
+</dd>
+</dl>
+</div>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="07.logs.html"
+                        title="capítulo anterior"><span class="section-number">3.6.8. </span>Bitácora de sucesos</a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="99.consejos.html"
+                        title="próximo capítulo"><span class="section-number">3.6.10. </span>Trucos y consejos</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/03.scripts/06.misc/08.pipe.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="99.consejos.html" title="3.6.10. Trucos y consejos"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="07.logs.html" title="3.6.8. Bitácora de sucesos"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" ><span class="section-number">3. </span>Programación de <em>scripts</em></a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="index.html" ><span class="section-number">3.6. </span>Otros aspectos</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">3.6.9. </span>Código de salida en tuberías</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor CC BY 4.0, 2016-2021, José Miguel Sánchez Alés.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.2.0.
+    </div>
+  </body>
+</html>

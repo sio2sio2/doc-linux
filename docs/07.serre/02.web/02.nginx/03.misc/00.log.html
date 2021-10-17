@@ -1,0 +1,171 @@
+
+
+
+<!DOCTYPE html>
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>7.2.2.3.1. Registros con systemd &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/classic.css" />
+    <link rel="stylesheet" href="../../../../_static/custom.css" type="text/css" />
+    
+    <script data-url_root="../../../../" id="documentation_options" src="../../../../_static/documentation_options.js"></script>
+    <script src="../../../../_static/jquery.js"></script>
+    <script src="../../../../_static/underscore.js"></script>
+    <script src="../../../../_static/doctools.js"></script>
+    <script src="../../../../_static/translations.js"></script>
+    
+    <link rel="index" title="Índice" href="../../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../../search.html" />
+    <link rel="next" title="7.2.2.3.2. Caché de paquetes" href="01.dpkg-cache.html" />
+    <link rel="prev" title="7.2.2.3. Recetas" href="index.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="01.dpkg-cache.html" title="7.2.2.3.2. Caché de paquetes"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="7.2.2.3. Recetas"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" ><span class="section-number">7. </span>Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../index.html" ><span class="section-number">7.2. </span>Web</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../index.html" ><span class="section-number">7.2.2. </span>nginx</a> &#187;</li>
+          <li class="nav-item nav-item-4"><a href="index.html" accesskey="U"><span class="section-number">7.2.2.3. </span>Recetas</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">7.2.2.3.1. </span>Registros con systemd</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="registros-con-systemd">
+<span id="nginx-systemd"></span><h1><span class="section-number">7.2.2.3.1. </span>Registros con systemd<a class="headerlink" href="#registros-con-systemd" title="Enlazar permanentemente con este título">¶</a></h1>
+<p><strong class="program">nginx</strong> escribe directamente sus registros en el fichero que indiquemos
+en las directivas <a class="reference internal" href="../01.conf.html#nginx-logs"><span class="std std-ref">access_log y error_log</span></a>. Ahora bien,
+también da la posibilidad de pasárselos al gestor de registros
+(<strong class="program">systemd</strong> en las versiones modernas de <em>debian</em>) y que éste se
+encargue. Para ello podemos crear el siguiente fichero:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/nginx/conf.d/logging.conf</span>
+<span class="k">log_format</span>  <span class="s">journald</span>  <span class="s">&#39;</span><span class="nv">$host[$remote_addr]</span> <span class="s">-</span> <span class="nv">$request</span> <span class="s">-</span> <span class="nv">$status</span> <span class="nv">$body_bytes_sent</span> <span class="s">&quot;</span><span class="nv">$http_user_agent&quot;&#39;</span><span class="p">;</span>
+<span class="k">access_log</span>  <span class="s">syslog:server=unix:/dev/log,facility=local7,severity=info,nohostname</span> <span class="s">journald</span><span class="p">;</span>
+<span class="k">error_log</span>   <span class="s">syslog:server=unix:/dev/log,facility=local7,severity=error,nohostname</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Además, habra qué comentar las directivas correspondientes
+presentes en <code class="file docutils literal notranslate"><span class="pre">/etc/nginx/nginx.conf</span></code>, porque de lo contrario seguirán
+escribiéndose registros en los ficheros ahí definidos:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="c1">##</span>
+<span class="c1"># Logging settings</span>
+<span class="c1">##</span>
+
+<span class="c1">#access_log /var/log/nginx/access.log;</span>
+<span class="c1">#error_log /var/log/nginx/access.log;</span>
+</pre></div>
+</div>
+</div>
+<p>De este modo, los registros de acceso y error aparecerían al ejecutar:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> journalctl -u nginx
+</pre></div>
+</div>
+<p>Para los de acceso se ha redefinido el formato, a fin de que aparezca el nombre
+del dominio al que se accede (por si manejamos varios dominios virtuales) y no
+la hora y fecha, ya que de esto último se encarga el propio gestor.
+Desgraciadamente para los de error no es posible.</p>
+<p>Si además queremos que los registros en su formato tradicional no se apunten
+en <code class="file docutils literal notranslate"><span class="pre">/var/log/syslog</span></code>, sino en otro fichero, entonces debemos crear el
+fichero <code class="file docutils literal notranslate"><span class="pre">/etc/rsyslog.d/nginx.conf</span></code> con el siguiente contenido:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cat &gt; /etc/rsyslog.d/nginx.conf
+<span class="go">local7.=info    /var/log/nginx/access.log</span>
+<span class="go">local7.err      /var/log/nginx/error.log</span>
+<span class="go">local7.*        &amp;</span>
+<span class="gp">#</span> invoke-rc.d rsyslog restart
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Como las líneas contienen el nombre del dominio, los registros de
+acceso es posible separarlos en distintos archivos dependiendo tal nombre.
+Véase <a class="reference external" href="http://www.rsyslog.com/doc/v8-stable/configuration/filters.html">cómo escribir las reglas para rsyslog</a></p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Como hemos colocado los registros dentro de <code class="file docutils literal notranslate"><span class="pre">/var/log/nginx</span></code> que
+es donde <em>debian</em> espera encontrar los logs de <strong class="program">nginx</strong>, no tenemos
+que preocuparnos de las rotaciones, ya que existe
+<code class="file docutils literal notranslate"><span class="pre">/etc/logrotate.d/nginx</span></code> que se encarga de ello.</p>
+</div>
+</div>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="index.html"
+                        title="capítulo anterior"><span class="section-number">7.2.2.3. </span>Recetas</a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="01.dpkg-cache.html"
+                        title="próximo capítulo"><span class="section-number">7.2.2.3.2. </span>Caché de paquetes</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../../_sources/07.serre/02.web/02.nginx/03.misc/00.log.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="01.dpkg-cache.html" title="7.2.2.3.2. Caché de paquetes"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="7.2.2.3. Recetas"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" ><span class="section-number">7. </span>Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../index.html" ><span class="section-number">7.2. </span>Web</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../index.html" ><span class="section-number">7.2.2. </span>nginx</a> &#187;</li>
+          <li class="nav-item nav-item-4"><a href="index.html" ><span class="section-number">7.2.2.3. </span>Recetas</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">7.2.2.3.1. </span>Registros con systemd</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor CC BY 4.0, 2016-2021, José Miguel Sánchez Alés.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.2.0.
+    </div>
+  </body>
+</html>

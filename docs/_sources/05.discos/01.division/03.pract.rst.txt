@@ -1,0 +1,771 @@
+Aplicacion práctica
+*******************
+Vistas las bases del particionado y el arranque, podemos ahora poner en práctica
+los conceptos teóricos. Las principales aplicaciones de particionado en *LInux*
+son:
+
+.. table:: Herramientas de particionado
+   :class: herr-part
+
+   +---------+------------+---------------+------------------------------+
+   | Suite   | Ejecutable | Soporte       | Interfaz                     |
+   |         |            +-------+-------+                              |
+   |         |            | |DOS| | |GPT| |                              |
+   +=========+============+=======+=======+==============================+
+   | fdisk   | fdisk      |  Sí   |  Sí   | Interactiva con menús.       |
+   |         +------------+-------+-------+------------------------------+
+   |         | sfdisk     |  Sí   |  Sí   | Desasistida.                 |
+   |         +------------+-------+-------+------------------------------+
+   |         | cfdisk     |  Sí   |  Sí   | Interactiva con ncurses.     |
+   +---------+------------+-------+-------+------------------------------+
+   | |gdisk| | gdisk      |  Sí   |  Sí   | Interactiva con menús.       |
+   |         +------------+-------+-------+------------------------------+
+   |         | sgdisk     |  Sí   |  Sí   | Desasistida.                 |
+   |         +------------+-------+-------+------------------------------+
+   |         | cgdisk     |  Sí   |  Sí   | Interactiva con ncurses.     |
+   +---------+------------+-------+-------+------------------------------+
+   | parted_ | parted     |  Sí   |  Sí   | Interactiva, desasistida.    |
+   |         +------------+-------+-------+------------------------------+
+   |         | gparted    |  Sí   |  Sí   | Gráfica.                     |
+   +---------+------------+-------+-------+------------------------------+
+
+Particionado |DOS|
+==================
+Para llevar a cabo el particionado de disco con *Linux*, podemos usar distintas
+herramientas:
+
+* :command:`fdisk`, que es la herramienta tradicional interactiva para interfaz
+  de texto. Es bastante sencilla de utilizar.
+* :command:`sfdisk`. otra herramienta para línea de órdenes que permite su uso
+  desasistido y, en consecuencia, se presta a su inclusión en *scripts*.
+* parted_, que puede ser usada desde línea de órdenes, pero que habitualmente
+  se utiliza a través de su interfaz para |GTK| gparted_. No la trataremos en
+  esta guía.
+
+.. rubric:: Preliminares
+
+.. _truncate:
+.. index:: truncate
+
+Es probable que, para hacer pruebas, no deseemos usar un disco real. En ese
+caso, lo más cómodo es crear un fichero y trabajar sobre él\ [#]_. Por ejemplo::
+
+   $ truncate -s 20G 0.disk
+
+Esto creará un `fichero disperso
+<https://es.wikipedia.org/wiki/Archivo_disperso>`_ de 20G, que ocupa de forma
+efectiva sólo el espacio que ocupe su contenido (en principio, nada).
+
+Otro aspecto a tener presente son los permisos de los dispositivos.
+Habitualmente son estos::
+
+   $ ls -l /dev/sda
+   brw-rw---- 1 root disk 8, 0 nov 17 11:49 /dev/sda
+
+En consecuencia, sólo el administrador o un usuario que pertenezca al grupo
+*disk* será capaz de leer y escribir directamente sobre ellos.
+
+.. warning:: Para ilustrar el uso de las órdenes usaremos un usuario sin
+   privilegios y el fichero creado anteriormente y no un dispositivo de
+   almacenamiento. Tenga presente que lo habitual es usar :file:`/dev/sda`,
+   :file:`/dev/sdb`, etc. y que esta labor la lleve a cabo directamente el
+   administrador.
+
+.. rubric:: Consulta
+
+.. note:: Las herramientas son también válidas, aunque utilicemos particionado
+   |GPT|.
+
+Antes de manipular los dispositivos, es útil saber qué herramientas de consulta
+tenemos para conocer cómo se encuentra dividido el disco. Es preciso, además,
+hacer una aclaración: el sistema carga las particiones en memoria y procura
+actualizarlas cuando se produce un cambio. En ocasiones, esta actualización no
+se produce, bien porque el sistema es incapaz de hacerla, bien porque se ha
+llevado a cabo de una manera poco ortodoxa, como por ejemplo, copiando con
+:ref:`dd <dd>` el |MBR| de otro disco.
+
+La primera de ellas es, simplemente, consultar cuáles son las particiones
+registradas en el fichero :file:`/proc/particions`::
+
+   $ cat /proc/particions
+   major minor  #blocks  name
+
+      8        0  117220824 sda
+      8        1      32098 sda1
+      8        2   62109696 sda2
+      8        3          1 sda3
+      8        5   20971520 sda5
+      8        6    2097152 sda6
+      8        7   32006616 sda7
+      8       16  976762584 sdb
+      8       17  976759808 sdb1
+
+La consulta puede llevarla a cabo cualquier usuario y muestra las particiones
+físicas (no los volúmenes lógicos) registrados por el sistema.
+
+.. _lsblk:
+.. index:: lsblk
+
+Una alternativa es :command:`lsblk` que muestra más información e incluye
+volúmenes lógicos y el punto de montaje, en caso de que su sistema de ficheros
+esté montado::
+
+   $ /sbin/lsblk /dev/sda
+   NAME              MAJ:MIN RM   SIZE RO TYPE MOUNTPOINT
+   sda                 8:0    0 111,8G  0 disk 
+   ├─sda1              8:1    0  31,4M  0 part /boot/grub
+   ├─sda2              8:2    0  59,2G  0 part 
+   ├─sda3              8:3    0     1K  0 part 
+   ├─sda5              8:5    0    20G  0 part /
+   ├─sda6              8:6    0     2G  0 part [SWAP]
+   └─sda7              8:7    0  30,5G  0 part /home
+
+.. _blkid:
+.. index:: blkid
+
+También puede usarse, aunque como administrador, :command:`blkid` que sirve para
+obtener más información de los sistemas de ficheros de cada división::
+
+   # blkid /dev/sda*
+   /dev/sda: PTUUID="b94dda9b" PTTYPE="dos"
+   /dev/sda1: LABEL="GRUB" UUID="0bdcc04e-e267-4aa4-b8ec-1bea18e83f87" TYPE="ext4" PARTUUID="b94dda9b-01"
+   /dev/sda2: UUID="B0007B1D007AEA2C" TYPE="ntfs" PARTUUID="b94dda9b-02"
+   /dev/sda3: PTTYPE="dos" PARTUUID="b94dda9b-03"
+   /dev/sda5: LABEL="BASE" UUID="38c84f19-da83-4132-9c0c-e8dbd0763d7c" TYPE="ext4" PARTUUID="b94dda9b-05"
+   /dev/sda6: UUID="4b34fe7e-f7fb-4fd5-8e64-49d0d7f9418a" TYPE="swap" PARTUUID="b94dda9b-06"
+   /dev/sda7: LABEL="HOME" UUID="2bee799a-740b-4106-90ad-d9a155d85afe" TYPE="ext4" PARTUUID="b94dda9b-07"
+
+Si no se especifican las divisiones, mostrará todos. La orden, además, permite
+filtrar por valores y manipular la salida. Por ejemplo, la orden::
+
+   # blkid -t TYPE=ext4 -s LABEL -o value /dev/sda*
+   GRUB
+   BASE
+   HOME
+
+muestra de los dispositivos formateados en *ext4*, el valor de su etiqueta.
+Consulte la página del manual para más información.
+
+.. _blockdev:
+.. index:: blockdev
+
+Complementaria de las anteriores es :command:`blockdev`::
+
+   # blockdev --report /dev/sda*
+   RO    RA   SSZ   BSZ   PrimerSec           Tam.   Dispo.
+   rw   256   512  4096          0    120034123776   /dev/sda
+   rw   256   512  1024         63        32868864   /dev/sda1
+   rw   256   512  4096      65536     63600328704   /dev/sda2
+   rw   256   512  1024  124286974            1024   /dev/sda3
+   rw   256   512  4096  124286976     21474836480   /dev/sda5
+   rw   256   512  4096  166232064      2147483648   /dev/sda6
+   rw   256   512  4096  170428416     32774774784   /dev/sda7
+
+que, como la anterior, permite definir la salida. Por ejemplo::
+
+   # blockdev --getsize64 /dev/sda
+   120034123776
+
+devuelve el tamaño del disco en *bytes*. También es útil para forzar al kernel
+a releer la tabla de particiones del dispositivo\ [#]_::
+
+   # blockdev --rereadpt /dev/sda
+
+La última posibilidad es usar las herramientas de manipulación de la tabla de
+particiones (:ref:`fdisk <fdisk>` o :ref:`gdisk <gdisk.i>`) para leerla:
+
+.. code-block:: console
+   :emphasize-lines: 7, 12
+
+   # fdisk -l /dev/sda
+   Disco /dev/sda: 111,81 GiB, 120034123776 bytes, 234441648 sectores
+   Modelo de disco: Intenso  SSD Sat
+   Unidades: sectores de 1 * 512 = 512 bytes
+   Tamaño de sector (lógico/físico): 512 bytes / 512 bytes
+   Tamaño de E/S (mínimo/óptimo): 512 bytes / 512 bytes
+   Tipo de etiqueta de disco: dos
+   Identificador del disco: 0xb94dda9b
+
+   Disposit.  Inicio  Comienzo     Final  Sectores Tamaño Id Tipo
+   /dev/sda1                63     64259     64197  31,4M 83 Linux
+   /dev/sda2  *          65536 124284927 124219392  59,2G  7 HPFS/NTFS/exFAT
+   /dev/sda3         124286974 234441647 110154674  52,5G  5 Extendida
+   /dev/sda5         124286976 166230015  41943040    20G 83 Linux
+   /dev/sda6         166232064 170426367   4194304     2G 82 Linux swap / Solaris
+   /dev/sda7         170428416 234441647  64013232  30,5G 83 Linux
+
+con la que podemos comprobar que :file:`sda` utliza particionado |DOS|.
+
+.. _fdisk:
+.. index:: fdisk
+
+.. rubric:: fdisk
+
+:command:`fdisk` es la orden tradicional para el particionado de discos. Es
+interactiva y exige que el usuario vaya escogiendo qué acción en la que quiere
+hacer. Pese a ello, se puede consultar directamente la tabla de particiones sin
+entrar en su entorno::
+
+   $ /sbin/fdisk -l 0.disk
+   Disco 0.disk: 20 GiB, 21474836480 bytes, 41943040 sectores
+   Unidades: sectores de 1 * 512 = 512 bytes
+   Tamaño de sector (lógico/físico): 512 bytes / 512 bytes
+   Tamaño de E/S (mínimo/óptimo): 512 bytes / 512 bytes
+
+Nuestro disco (disco-fichero, en realidad) está completamente vacío, por lo que
+no dispone siquiera de una tabla de particiones.
+
+Para manipular las particiones (crearlas en este caso) basta con indicar el
+disco sobre el que se quiere actuar::
+
+   $ /sbin/fdisk 0.disk
+   [...]
+   Orden (m para obtener ayuda):
+
+El uso es bastante sencillo, ya que es totalmente guiado. Creemos una única
+partición que ocupe todo el disco:
+
+.. raw:: html
+
+   <script id="asciicast-89vbH0bhb6NmVsoh7ctooVxIO"
+   src="https://asciinema.org/a/89vbH0bhb6NmVsoh7ctooVxIO.js" async></script>
+
+.. _sfdisk:
+.. index:: sfdisk
+
+.. rubric:: sfdisk
+
+A diferencia de la orden anterior, :command:`sfdisk` se usa directamente
+incorporando argumentos en línea o pasando la tabla de particiones por la
+entrada estándar. Para consultar la tabla de particiones, se utiliza la misma
+sintaxis que :ref:`fdisk <fdisk>`::
+
+   $ /sbin/sfdisk -l 0.disk
+
+La forma más sencilla de crear una tabla de particiones es copiar una ya
+existente de otro disco::
+
+   # sfdisk -d /dev/sda | sfdisk /dev/sdb
+
+Es posible también crear una tabla *ex novo*. Para ello basta con saber que se
+puede incluir líneas iniciales que indican las características del particionado
+y líneas posteriores que definen cada partición. Las iniciales tienen el formato
+"campo: valor"; y las siguientes, cuatro campos separados por espacios o comas:
+
+.. code-block:: none
+
+   sector_inicial,tamaño_en_sectores,codigo_tipo_ficheros,[*|-]
+
+El valor predeterminado para el sector inicial es utilizar el primer sector
+disponible; el del tamaño, ocupar el máximo posible; el valor para el tipo, "L"
+(un alias para partición tipo linux); y el valor para activa, que no lo sea. Por
+ejemplo::
+
+   $ /sbin/sfdisk 0.disk <<EOF
+   label: dos
+   ,$((32*1024**2/512)),L,*
+   ,,E
+   ,$((2*1024**3/512)),7
+   ,$((1*1024**3/512)),82
+   ,,L
+   EOF
+
+Lo que hemos hecho es:
+
+* Generar una primera partición de 32MB de tipo *Linux* que es la activa. Como
+  la alineación es de 1MB y no se ha especificado el sector inicial, este será el
+  2048, que deja justamente 1MB antes.
+* A continuación, se crea una partición extendida ("E" es un alias para el código
+  correspondiente) que ocupa el resto del disco.
+* Lo siguiente es una partición lógica de 2GB de tipo NTFS.
+
+  .. note:: Para saber cuáles son los códigos de los tipos de partición puede
+     hacerse::
+
+      $ /sbin/sfdisk -TXdos
+
+* Una partición de 1GB para swap.
+* Una partición de *Linux* que ocupa el resto de la extendida (o sea, el resto
+  del disco).
+
+La salida de la orden nos debería mostrar las particiones resultantes.
+
+Además, de crear tablas completas, podemos modificar la ya existente gracias a
+la opción :kbd:`-N`. Por ejemplo, la orden::
+
+   $ echo ",,L,-" | /sbin/sfdisk -N1 0.disk
+
+deja todo como está, pero desactivando la partición. También es posible añadir
+más particiones usando como argumento de :kbd:`-N` índices de particiones que no
+existan.
+
+.. note:: Como las últimas versiones de las órdenes :command:`*fdisk` soportan
+   particionado |GPT|, :command:`sfdisk` puede usarse también para crear una
+   tabla de particiones de este tipo::
+
+      $ /sbin/sfdisk 0.disk <<EOF
+      label: gpt
+      ,$((50*1024**2/512)),U,
+      ,$((2*1024**3/512)),L,
+      ,$((1*1024**3/512)),0657FD6D-A4AB-43C4-84E5-0933C84B4F4F,
+      ,,EBD0A0A2-B9E5-4433-87C0-68B6B72699C7,
+      EOF
+   
+   Ciertamente los códigos en particiones |GPT| son bastante complicados. No
+   daremos más explicaciones porque aún no hemos discutido cómo son estas
+   particiones.
+
+.. note:: En las operaciones anteriores de modificación de la tabla de particiones,
+   podemos incluir la opción ``-b`` para hacer una copia de los sectores
+   afectados por nuestras modificaciones. Si algo saliera mal, podríamos volver
+   al estado anterior con :ref:`dd <dd>`\ [#]_.
+
+.. _gdisk.i:
+
+Particionado |GPT|
+==================
+
+Aplicaciones de terminal
+------------------------
+
+.. warning:: Las particiones "*UNO*", "*DOS*", "*TRES*" que aparecen en los
+   ejemplos son absolutamente inútiles en un sistema real y sirven tan sólo para
+   ilustrar el uso de las herramiestas. Más allá de las particiones de arranque,
+   deberá ser usted quién decida cómo debe particionar el sistema. Una propuesta
+   se encuentra el el epígrafe dedicado a la :ref:`instalación del servidor
+   <inst-servidor>`.
+
+Para manejar |GPT| usaremos las herramientas de las suite :program:`gdisk`,
+aunque desde hace un tiempo las de la suite :program:`fdisk` también son
+compatibles.
+
+.. index:: gdisk
+
+.. rubric:: gdisk
+
+La herramienta es prácticamente clónica de :ref:`fdisk <fdisk>`, aunque incluye
+algunas posibilidades más para |GPT| en las opciones avanzadas.
+
+.. _sgdisk:
+
+.. index:: sgdisk
+
+.. rubric:: sgdisk
+
+El programa permite la creación y manipulación de tablas de particiones
+utilizando argumentos en la línea de órdenes, por lo que su filosofia es la
+misma que la de :ref:`sfdisk <sfdisk>`. Pese a ello, tiene una sintaxis
+totalmente distinta.
+
+Para ilustrar su uso, recrearemos tres veces la tabla de particiones que hicimos
+con :ref:`sfdisk <sfdisk>`, aunque con algunas variantes:
+
+- Una primera vez, prepararemos el disco para que sea arrancable mediante
+  |BIOS|. Para ello añadiremos una primera partición de tipo "BIOS Boot
+  Particion" para que pueda instalarse |GRUB|.  Por supuesto, no tiene sentido
+  la marca de activa, ni la partición extendida.
+
+- La segunda vez, prepararemos el disco para |UEFI| con lo que también tendremos
+  que añadir una primera partición, pero |EFI| en este caso.
+
+- La ultima la tabla de particiones está preparada tanto para arrancar en modo
+  |BIOS| como en modo |UEFI|, lo cual exige presentar ambas particiones.
+
+.. table::
+   :class: tipos-arranques
+
+   ========== =========== ==========
+   Tipo        BIOS Boot   |ESP|
+   ========== =========== ==========
+   |BIOS|         Sí        No
+   |UEFI|         No        Sí
+   Híbrido        Sí        Sí
+   ========== =========== ==========
+
+Empecemos, simplemente, por consultar la tabla de particiones\ [#]_::
+
+   $ /sbin/sgdisk -p /tmp/0.disk
+   Creating new GPT entries in memory.
+   Disk /tmp/0.disk: 41943040 sectors, 20.0 GiB
+   Sector size (logical): 512 bytes
+   Disk identifier (GUID): 97F6B136-94D6-4393-9348-47F3F5DB70F6
+   Partition table holds up to 128 entries
+   Main partition table begins at sector 2 and ends at sector 33
+   First usable sector is 34, last usable sector is 41943006
+   Partitions will be aligned on 2048-sector boundaries
+   Total free space is 41942973 sectors (20.0 GiB)
+
+   Number  Start (sector)    End (sector)  Size       Code  Name
+
+El disco no tiene aún ninguna tabla, por lo que aparece vacía. Es interesante de
+la información lo siguiente:
+
+- :command:`sgdisk` de crear una tabla la crearía del modo estándar que
+  describimos anteriormente por lo que será capaz de describir 128 particiones.
+- Teóricamente el primer sector para incluirlo dentro de una partición es el 34,
+  ya que eso deja 17KiB por delante que es lo necesario para almacenar el |MBR|
+  (512 *bytes*), la cabecera |GPT| (otros 512 *bytes*) y la propia |GPT|
+  (16KiB)::
+
+   $ /sbin/sgdisk -f /tmp/0.disk
+   Creating new GPT entries in memory.
+   34
+
+
+- La alineación si no se cambia, será de 1MiB (2048 sectores)::
+
+   $ /sbin/sgdisk -D /tmp/0.disk
+   Creating new GPT entries in memory.
+   2048
+ 
+  lo que determina que en realidad la primera partición empiece en el sector
+  2048::
+
+   $ /sbin/sgdisk -F /tmp/0.disk
+   Creating new GPT entries in memory.
+   2048
+
+En un dispositivos que queremos que sea arrancable, se nos pueden presentar tres
+casos de particionado:
+
+a. |GPT| exclusivamente compatible con |BIOS|, que podemos definir así::
+
+      $ /sbin/sgdisk -a 8 -n "0:40:2047" -t "0:0xef02" -c "0:BOOTBIOS" \
+                     -a 2048 -n "0:+0:+32M" -c "0:UNO" \
+                             -n "0:+0:+2G" -t "0:0x0700" -c "0:DOS" \
+                             -n "0:+0:+1G" -c "0:TRES" /tmp/0.disk
+
+   en donde:
+
+   * Creamos la primera partición en el espacio entre el final de la |GPT| y
+     la segunda partición que realmente necesitamos y que sí estará
+     convenientemente alineada. Sólo se leerá esta primera partición al arrancar el
+     disco y se escribirá al reinstalar |GRUB| con lo cual no es muy importante su
+     alineamiento. Aún así la hacemos cumpliendo la alineación de 4KiB. Para
+     cambiar la alineación usamos la opción :kbd:`-a`.
+
+   * Se definen las particiones añadiendo sendas opciones :kbd:`-n` para indicar el
+     comienzo y fin de la partición, :kbd:`-c` para indicar un nombre de etiqueta
+     y, si la partición no es *Linux* (*0x8300*), :kbd:`-t`.
+
+   * Las opciones anteriores necesitan que se especifique el número de la
+     partición, pero "0" representa el primer número disponible.
+
+   * Los números para comienzos y finales sin indicar unidad son sectores; y es
+     lícito anteponerles un signo "+" para representar número relativos al
+     anterior.
+
+   * Las definiciones no sobreescriben una tabla anterior, de modo que si
+     hiciéramos::
+
+      $ /sbin/sgdisk -N 0 -c "5:RESTO"
+
+     añadiríamos a continuación una quinta partición que ocuparía lo que quede de
+     disco, ya que :kbd:`-N` tiene el efecto de ocupar el espacio restante. Ahora
+     bien, si utilizamos el número de una partición existente, entonces
+     redefiniremos esa partición::
+
+      $ /sbin/sgdisk -c "3:TERCERA" -t "3:0x0700" /tmp/0.disk
+
+   .. warning:: Sopese utilizar el esquema propuesto para que sea compatible
+      también con |UEFI|, por si se produce un cambio en el *hardware*.
+
+#. Tabla de particiones |GPT| exclusivamente compatible con |UEFI|::
+
+      $ /sbin/sgdisk -n "0:2048:+100M" -t "0:0xef00" -c "0:EFI" \
+                     -n "0:+0:+32M" -c "0:UNO" \
+                     -n "0:+0:+2G" -t "0:0x0700" -c "0:DOS" \
+                     -n "0:+0:+1G" -c "0:TRES" /tmp/0.disk
+
+   En este caso, la partición |EFI| debe ser lo suficientemente grande para
+   albergar los arranques de los sistemas operativos que pretendeamos instalar. En
+   principio, con 50M o 100M debería bastar. Dado el tamaño de esta partición, no
+   nos molestamos siquiera en aprovechar el espacio anterior al sector 2048.
+
+#. Tabla de particiones |GPT| compatible tanto con |BIOS| como con |UEFI|::
+
+      $ /sbin/sgdisk -a 8 -n "0:40:2047" -t "0:0xef02" -c "0:BOOTBIOS" \
+                     -a 2048 -n "0:2048:+100M" -t "0:0xef00" -c "0:EFI" \
+                             -n "0:+0:+32M" -c "0:UNO" \
+                             -n "0:+0:+2G" -t "0:0x0700" -c "0:DOS" \
+                             -n "0:+0:+1G" -c "0:TRES" /tmp/0.disk
+
+   En este caso, la finalidad no es tanto que el sistema sea capaz de arrancar
+   con ambos *firmwares* (cosa que también se puede hacer) como que arrancando
+   en |BIOS| pueda hacer una migración sencilla a arranque |UEFI|. Para lograr
+   esto último, consulte el :ref:`último apartado sobre migración a UEFI
+   <bios-uefi>`.
+
+Otras acciones recurrentes con :command:`sgdisk` son:
+
+#. Borrar una partición::
+   
+      $ /sbin/sgdisk -d 5 /tmp/0.disk
+
+#. Intercambiar la entrada de una partición por la de otra::
+
+      $ /sbin/sgdisk -r 1:3 /tmp/0.disk
+
+   En este caso la partición primera partición pasa a estar definida en la
+   tercera entrada de la |GPT|, y la tercera, en la primera.
+
+#. Copiar la |GPT| al final del disco, que puede sernos útil cuando hacemos una
+   copia cruda de un disco más pequeño en uno mayor::
+
+      $ /sbin/sgdisk -e /tmp/0.disk
+
+#. Copiar la tabla de particiones en un nuevo disco::
+
+      $ /sbin/sgdisk -R /tmp/1.disk /tmp/0.disk
+      $ /sbin/sgdisk -G /tmp/1.disk
+
+   La segunda instrucción es necesaria para que cambien los UIDs de las
+   particiones en el segundo disco, ya que la copia que se hace de la |GPT| es
+   exacta.
+
+#. Copiar la |GPT| en un fichero llamado :file:`GPT`::
+
+      $ /sbin/sgdisk -b GPT /tmp/0.disk
+
+   Y si se quiere restaurar en disco::
+
+      $ /sbin/sgdisk -l GPT /tmp/0.disk
+
+#. Borrar la tabla de particiones y la cabecera |GPT|, pero
+   respetando el |MBR|::
+
+      $ /sbin/sgdisk -z /tmp/0.disk
+
+   o sin siquiera respetarlo::
+
+      $ /sbin/sgdisk -Z /tmp/0.disk
+
+   .. note:: En caso de que quisiéramos redefinir una tabla de particiones de cero,
+      sobre un disco que ya tuviera definidas particiones, :kbd:`-z` podría ser
+      la primera opción antes de las demás que definan la nueva tabla.
+
+#. Convertir de |DOS| a |GPT|::
+
+      $ /sbin/sgdisk -g /tmp/dos.disk
+
+#. Convertir de |GPT| a |DOS|::
+
+      $ /sbin/sgdisk -m 3:4:5 /tmp/0.disk
+
+   En este caso, sólo se pasan la definición de las particiones 3, 4 y 5.
+
+.. _bios-uefi:
+
+Migración a |UEFI|
+------------------
+Remataremos la exposición sobre particionado, describiendo cómo convertir
+nuestro arranque |BIOS| en arranque |UEFI| si tuvimos la previsión desde un
+principio de crear particiones |GUID| e incluimos tanto la partición
+"BIOS Boot Partiticion" como la |ESP|\ [#]_. Si no fue así, tendremos que
+preparar nuestro particionado para llegar a este punto, lo cual muy
+probablemente incluya:
+
+- La conversión de un particionado en otro (tanto :ref:`gdisk <gdisk.i>` como
+  :ref:`sgdisk <sgdisk>` lo permiten).
+- La creación de la |ESP|, lo cual, suponga hacer hueco redimensinando alguna de
+  las particiones.
+
+Sea como sea, llegamos al punto en que disponemos de un particionado |GPT| con
+particiones "Bios Boot Partition" (la cual supondremos :file:`sda1`) y |EFI|
+(:file:`sda2`) y un sistema que se instaló en modo |BIOS| y, en consecuencia,
+tiene inoperativa aún la partición |EFI|.
+
+Un procedimiento medianmente sencillo para lograr hacer que el sistema arranque
+en modo |EFI| es el siguiente:
+
+#. Arrancar el sistema en modo |BIOS| para:
+
+   a. Preparar la |ESP|::
+
+      # apt install dosfstools
+      # mkfs.fat -F32 /dev/sda2
+      # mkdir /boot/efi
+      # echo "/dev/sda2 /boot/efi vfat defaults 0 2" >> /etc/fstab
+
+   #. Instalar el grub compatible con |EFI|::
+
+      # apt install grub-efi
+
+#. Reiniciar en modo |UEFI| usando un instalador moderno de debian y obtener una
+   consola:
+
+   a. Escoger "Opciones avanzadas" y dentro de ellas "Rescate".
+   #. Contestar las distintas preguntas y al llegar a la de elegir el sistema de
+      ficheros raíz, contestar que ninguno.
+   #. Escoger la opción para abrir la terminal.
+
+#. Hacer un :ref:`chroot <chroot>` a la debian instalada en el disco duro,
+   preparando previamente el sistema:
+
+   a. Si es necesario para nuestro sistema, preparar |RAID|\ s, cargar volúmenes
+      lógicos, descrifar sistemas cifrados, etc. En caso de que hayamos seguido
+      las recomendaciones para la :ref:`instalación de un servidor
+      <inst-servidor>`, deberemos hacer lo siguiente::
+
+         # mdadm --assemble /dev/md0 /dev/sda3
+         # vgchange -ay VGbuster
+
+   #. Montar al menos el sistema raíz y la |ESP|::
+
+         # mount /dev/VGbuster/rauz /mnt
+         # mount /dev/sda2 /mnt/boot/efi
+
+      Si nuestro sistema se compone de otras particiones, podemos montarlas
+      también, aunque no es imprescindible. Por ejemplo, para nuestra propuesta
+      de servidor::
+
+         # mount /dev/VGbuster/log /mnt/var/log
+         # mount /dev/VGbuster/mysql /mnt/var/lib/mysql
+         # mount /dev/VGbuster/srv /mnt/srv
+         # mount /dev/VGbuster/home /mnt/home
+
+   #. Montar los sistemas especiales sobre el sistema de disco::
+
+         # mount -t devtmpfs udev /mnt/dev
+         # mount -t devpts devpts /mnt/dev/pts
+         # mount -t proc proc /mnt/proc
+         # mount -t sysfs sysfs /mnt/sys
+
+   #. Entrar en la jaula::
+
+         # chroot /mnt bash
+
+#. Instalar grub para el arranque |EFI|::
+
+      # grub-install --recheck
+
+   Al estar montada la |ESP| en :file:`/boot/efi`, :program:`grub` será capaz de
+   usarla sin necesidar de especiar nada más.
+
+#. Comprobar que la entrada para |GRUB| aparece como primera opción de
+   arranque::
+
+      # efibootmgr
+
+#. Salir y reiniciar\ [#]_::
+
+      # exit
+      # reboot
+
+.. _efi-entradas-grub:
+
+Entradas
+--------
+Una instalación estándar de *debian* instala, simplemente, su |GRUB| dentro de
+:file:`/EFI/debian` y añade una entrada a la secuencia de arranque del
+*firmware* con el identificado "*debian*". Podemos alterar la leyenda de la
+secuencia de arranque, borrando la actual entrada "*debian*" y creando otra
+distinta::
+
+   # efibootmgr        # Y miramos cuál es índice de la entrada (p.e. 7)
+   # efibootmgr -Bb7
+   # efibootmgr -cgL "Grub menu" -d /dev/sda -p 2 -l "/EFI/debian/shimx64.efi"
+
+Otra posibilidad, es hacer que la entrada en la secuencia para el
+dispositivo de disco arranque nuestro |GRUB|. Eso pasa porque se cree
+:file:`/EFI/Boot/bootx64.efi` para lo cual podemos hacer::
+
+   # grub-install --no-nvram --force-extra-removable
+
+Otra posibilidad es crear una entrada que arranque directamente el sistema, lo
+cual dejaremos para epígrafe aparte.
+
+.. _efi-arranque-directo:
+
+Arranque directo
+----------------
+El núcleo de *debian* tiene EFIStub_, esto es, la
+capacidad de ser cargado como un ejecutable directamente por el firmware |UEFI|,
+sin necsidad de usar |GRUB| u otro gestor de arranque. Ello supone copiar el
+núcleo y el sistema de ficheros inicial (*initrd*) en la partición |ESP| y, si
+queremos que tanto lo uno como lo otro se actualicen al actualizar el núcleo, 
+añadir un par de *scripts*.
+
+#. Crear el *script* para automatizar la copia del núcleo en la partición
+   |ESP|::
+
+      # cat > /etc/kernel/postinst.d/zz-update-efistub
+      #!/bin/sh
+
+      cp /vmlinuz /boot/efi/EFI/debian/
+
+#. Crear el *script* para automatizar la copia del *initrd* en la partición
+   |ESP|::
+
+      # mkdir -p /etc/initramfs/post-update.d
+      # cat > /etc/initramfs/post-update.d/zz-update-efistub
+      #!/bin/sh
+
+      cp /initrd.img /boot/efi/EFI/debian/
+
+#. Copiar manualmente el núcleo y la imagen *initrd*::
+
+      # /etc/kernel/postinst.d/zz-update-efistub
+      # /etc/initramfs/post-update.d/zz-update-efistub
+
+#. Añadir una entrada al menú de arranque |UEFI|::
+
+      # efibootmgr -c -g -L "Debian $(/etc/debian_version)" -d /dev/sda -p2 -l /EFI/debian/vmlinuz \
+         -u "root=/dev/VGbuster/raiz ro quiet rootfstype=ext4 add_efi_memmap initrd=/EFI/debian/initrd.img"
+
+   donde se ha supuesto que la partición |ESP| es :file:`/dev/sda2` y la raíz
+   del sistema se encuentra en el volumen :file:`/dev/VGbuster/raiz`.
+
+.. https://askbot.fedoraproject.org/en/question/111637/how-can-i-create-a-efi-boot-menu-entry-using-efibootmgr/
+.. https://wiki.mageia.org/en/About_EFI_UEFI
+
+
+
+.. rubric:: Notas al pie
+
+.. [#] Para crear un fichero de un tamaño determinado hay tres alternativas:
+
+   - :command:`truncate`, que es la más eficiente ya que hace un
+     :ref:`aprovisionamiento fino <lvm-aprovisionamiento>` del espacio.
+   - :manpage:`fallocate(1)`, que reserva efectivamente los bloqies necesarios,
+     pero que no escribe en disco.
+   - :ref:`dd <dd>`, que puede usarse para escribir el tamaño deseado de ceros
+     (tomándolos de :file:`/dev/zero`) y que es el método menos recomendable, ya
+     que, además de ocupar todo el espacio, escribe en el disco los ceros; y es,
+     por tanto, el más lento.
+
+.. [#] Es posible que después de alterar la tabla de particiones con :ref:`fdisk
+   <fdisk>` o :ref:`gdisk <gdisk.i>` el *kernel* no actualice la tabla de
+   particiones porque haya algún proceso que lo impida, por ejemplo, porque hay
+   un sistema de ficheros montado o un |RAID| ensamblado. En esos caso, es
+   preciso primero, parar tal proceso y a continuación intentar releer la tabla
+   de particiones.
+.. [#] Hasta la versión *2.25*, el propio :command:`sfdisk` suministraba una
+   opción :kbd:`-I` para deshacer los cambios.
+.. [#] Utilizaremos el fichero de 20G que propusimos crear anteriormente para
+   estas pruebas.
+.. [#] En realidad, si nuestra intención es arrancar mediante |UEFI| y partimos
+   de un particionado |DOS|, la "Bios Boot Partition" es ya absolutamente
+   irrelevante y podemos prescindir de ella.
+.. [#] Al menos en la máquina virtual en la que se han hecho las pruebas (kvm_
+   cuyo implementación de |UEFI| es la de OVMF_), si el equipo se apaga
+   (:ref:`poweroff <poweroff>`) tras el cambio, no se guarda la nueva entrada.
+
+.. |UEFI| replace:: :abbr:`UEFI (Unified Extensible Firmware Interface)`
+.. |EFI| replace:: :abbr:`EFI (Extensible Firmware Interface)`
+.. |DOS| replace:: :abbr:`DOS (Disk Operating System)`
+.. |GPT| replace:: :abbr:`GPT (GUID Partition Table)`
+.. |GTK| replace:: :abbr:`GTK (Gimp ToolKit)`
+.. |BIOS| replace:: :abbr:`BIOS (Basic I/O System)`
+.. |MBR| replace:: :abbr:`MBR (Master Boot Record)`
+.. |GUID| replace:: :abbr:`GUID (Globally Unique Identifier)`
+.. |ESP| replace:: :abbr:`ESP (EFI System Partition)`
+.. |GRUB| replace:: :abbr:`GRUB (GRand Unified Bootloader)`
+.. |gdisk| replace:: :ref:`gdisk <gdisk.i>`
+
+.. _kvm: https://www.linux-kvm.org/page/Main_Page
+.. _parted: https://www.gnu.org/software/parted/manual/parted.html
+.. _gparted: https://gparted.org/
+.. _gdisk: http://www.rodsbooks.com/gdisk
+.. _OVMF: https://github.com/tianocore/tianocore.github.io/wiki/OVMF
+.. _EFIStub: https://wiki.archlinux.org/index.php/EFISTUB

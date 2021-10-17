@@ -1,0 +1,161 @@
+.. _openvpn+restr:
+
+Redes restringidas
+******************
+En este caso, una :dfn:`red restringida` será toda red que no permita al *road
+warrior* conectar directamente al puerto del servidor en el que escucha Open\
+|VPN|.
+
+Tenemos varias alternativas para evitar las restricciones, cuya efectividad
+dependerá del grado de vigilancia al que esté sometida la red:
+
+#. Si no hay restricciones sobre el puerto *53/UDP* y no hemos levantado un
+   servidor |DNS|, podemos poner a escuchar el servicio en este puerto también
+   (o usar el cortafuegos para redirigir el tráfico a este puerto hacia el
+   puerto de escucha).
+
+#. Escuchar también en el puerto *443/TCP* (se requiere otra instancia
+   distinta), lo cual es probable que implique entrar en conflicto con el
+   servicio *web* y, en consecuencia, tener que usar un multiplexor como
+   :ref:`sslh <sslh>` o :ref:`haproxy <haproxy>`.
+
+#. Tunelizar con :ref:`wstunnel` y :ref:`nginx <n-ginx>` via :ref:`Websockets
+   <nginx-websockets>`, bien por el puerto *80/TCP* bien por el *443/TCP*.
+
+#. Tunelizar con |TLS| y usar el puerto *443/TCP* en donde escucha :ref:`haproxy
+   <haproxy>`.
+
+.. seealso:: Échele un vistazo a la introduciión al :ref:`epígrafe sobre
+   multiplexación con nginx <nginx-multiplexacion>`, donde se discute el
+   rendimiento de estas soluciones.
+
+Servidor
+========
+En el caso particular de |VPN| es bastante más eficiente usar el procolo |UDP|
+que el |TCP|, pero sólo la primera solución (que será inútil en muchos casos)
+y la cuarta (que de todos modos tiene que hacer una conversión a |TCP|),
+funcionan con |UDP|. En el resto de soluciones será necesario crear una segunda
+instancia de Open\ |VPN| que escuche en el puerto *1194/TCP*. Como la
+configuración es exactamente la misma y sólo cambian las directivas que indican
+el puerto y el protocolo de escucha, lo más inteligente es crear un fichero
+:file:`/etc/openvpn/common` con las directivas comunes (la mayoria) y dos
+ficheros, :file:`free.conf`::
+
+   port 1194
+   proto udp
+   dev tun0
+
+   server 10.0.8.0 255.255.255.128
+   ifconfig-pool-persist ipp-free.txt
+
+   config common
+
+y :file:`ies.conf`\ [#]_::
+
+   local 127.1.1.1
+   port 1194
+   proto tcp
+   dev tun1
+
+   server 10.0.8.128 255.255.255.128
+   ifconfig-pool-persist ipp-ies.txt
+
+   config common
+
+En cuanto a la configuración del proxy *multiplexor*, basta con seguir las
+instrucciones para :ref:`sslh <sslh>`, :ref:`haproxy <haproxy>` o :ref:`nginx
+<nginx-multiplexacion>`.
+
+Cliente
+=======
+Proponemos una configuración análaga a :ref:`la ya aconsejada <srw3-client>`,
+aunque ahora podemos incluir varios nodos *connection*. Por ejemplo::
+
+   <connection>
+      remote www.example.net 1194 udp
+   </connection>
+
+   <connection>
+      remote www.example.net 443 tcp
+   </connection>
+
+   <connection>
+      remote www.example.net 12345 tcp
+   </connection>
+
+.. note:: Si conocemos de antemano que alguna conexión no funcionará, podemos
+   eliminarla para que sea más ágil el establecimiento del túnel.
+
+La primera conexión es posible si la red no es restringida, mientras que la
+segunda y la tercera permitirían la conexión desde redes restringidas. La
+segunda es bastante clara: conectamos directamente con el puerto *443/TCP* del
+servidor bien porque usemos :program:`sslh` bien porque usamos
+:program:`haproxy` utlizando la :ref:`segunda variante <haproxy-2v>` con la que
+permitimos conectar sin crear un túnel |TLS|.
+
+La tercera conexión pretende implementar aquellas soluciones en las que tenemos
+que tunelizar la conexión (*Websockets* o túnel |TLS|) para burlar un
+:ref:`proxy DPI <dpi>`. Aparentemente conecta con el servidor remoto
+*www.example.net* pero esto es sólo una argucia para que Open\  |VPN| modifique
+correctamente el encaminamiento. Lo analizaremos después.
+
+Para la tunelización podemos usar:
+
+:ref:`stunnel <stunnel>`
+   si pretendemos encapsular con |TLS|. Esta configuración:
+
+   .. code-block:: ini
+
+      [vpn-ssl]
+      client = yes
+      accept = localhost:12345
+      connect = www.example.net:443
+
+   permite que nuestro cliente |VPN| se conecte al puerto *12345/TCP* para que
+   se encapsulen sus datos y, este tráfico ya encapsulado, se envíe al puerto
+   *443/TCP* del servidor en que debe escuchar :program:`haproxy`.
+
+:ref:`wstunnel <wstunnel>`
+   si pretendemos usar :ref:`Websockets <nginx-websockets>`::
+
+      # wstunnel -u --udpTimeoutSec=-1 -L 12345:127.1.1.1:1194 ws://www.example.net
+
+Por último, debemos resolver el escollo de que en la configuración hemos dejado
+dicho que el cliente |VPN| conecta directamente con el servidor, cuando debe
+hacerlo en realidad con la propia máquina\ [#]_. La solución es usar el
+cortafuegos::
+
+   # iptables -t nat -A OUTPUT -d www.example.net -p tcp --dport 12345 -j REDIRECT
+
+es decir, hacemos que el tráfico que pretendía conectar con el puerto
+*12345/TCP* del servidor |VPN| acabe en el propio cliente en donde escuchan
+:program:`stunnel` o :program:`wstunnel`, que se encargan del resto.
+
+.. note:: Obviamente, si no incluimos la directiva *redirect-gateway*, porque no
+   es nuestra intención hacer que el cliente salga a internet a través del túnel
+   VPN, no es necesaria esta argucia, por lo que podremos ahorranos la
+   redirección con :command:`iptables` y deberemos decir en el nodo ``connection``
+   correspondiente que conectamos a *localhost*.
+
+.. rubric:: Notas al pie
+
+.. [#] Este instancia escucha sólo en la interfaz local, ya que llegaremos a
+   ella o por un :program:`sslh` o por un :program:`haproxy` que se encuentra
+   en la misma máquina. De este modo, el acceso al sercico |VPN| se hace o por
+   el puerto *1194/UDP* desde redes no restringidas o por el puerto *443/TCP*
+   desde redes restringidas.
+
+.. [#] O sea, que la conexión debería haberse escrito::
+
+         <connection>
+            remote localhost 12345 tcp
+         </connection>
+
+      y no *www.example.net*.
+
+.. |TLS| replace:: :abbr:`TLS (Transport Layer Security)`
+.. |VPS| replace:: :abbr:`VPS (Virtual Private Server)`
+.. |TCP| replace:: :abbr:`TCP (Transmission Control Protocol)`
+.. |UDP| replace:: :abbr:`UDP (User Datagram Protocol)`
+
+.. _Websockets: https://v0ctor.me/websocket

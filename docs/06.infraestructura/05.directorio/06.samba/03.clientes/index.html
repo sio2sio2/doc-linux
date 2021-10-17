@@ -1,0 +1,369 @@
+
+
+
+<!DOCTYPE html>
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>6.4.2.3. Clientes &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/classic.css" />
+    <link rel="stylesheet" href="../../../../_static/custom.css" type="text/css" />
+    
+    <script data-url_root="../../../../" id="documentation_options" src="../../../../_static/documentation_options.js"></script>
+    <script src="../../../../_static/jquery.js"></script>
+    <script src="../../../../_static/underscore.js"></script>
+    <script src="../../../../_static/doctools.js"></script>
+    <script src="../../../../_static/translations.js"></script>
+    
+    <link rel="index" title="Índice" href="../../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../../search.html" />
+    <link rel="next" title="6.4.2.4. Directorios compartidos" href="../04.share/index.html" />
+    <link rel="prev" title="6.4.2.2. Controlador de dominio" href="../02.install-addc/index.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="../04.share/index.html" title="6.4.2.4. Directorios compartidos"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="../02.install-addc/index.html" title="6.4.2.2. Controlador de dominio"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" ><span class="section-number">6. </span>Servicios de infraestructura</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../index.html" ><span class="section-number">6.4. </span>Servicio de directorio</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../index.html" accesskey="U"><span class="section-number">6.4.2. </span>Samba</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">6.4.2.3. </span>Clientes</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="clientes">
+<h1><span class="section-number">6.4.2.3. </span>Clientes<a class="headerlink" href="#clientes" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>Configurado el servidor, toca ver cómo añadir clientes al dominio. Dependiendo
+del sistema operativo del cliente, deberemos actuar.</p>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Recuérdese que nuestro servidor lo hemos hecho participar en dos
+redes y que es <em>controlador de dominio</em> en la <code class="docutils literal notranslate"><span class="pre">192.168.255.0/24</span></code>. Por
+tanto, cualquier cliente que queramos añadir deberá pertenecer a esta red.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Es conveniente configurar el servidor como un cliente linux, lo que
+implica configurar para él <em>sssd</em> y <abbr title="Pluggable Authentication Modules">PAM</abbr>, tal como se hace en el cliente.
+Para lo primero siga esta guía justamente a partir de cuando se crea <a class="reference internal" href="#smb-keytab"><span class="std std-ref">el
+keytab de la máquina</span></a> y para lo segundo siga lo indicado para la
+<a class="reference internal" href="../05.usuarios/index.html#smb-perfmov"><span class="std std-ref">configuración de los perfiles móviles en linux</span></a>.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Los clientes deben tener sincronizada su hora con el servidor.</p>
+</div>
+<div class="section" id="linux">
+<h2><span class="section-number">6.4.2.3.1. </span>Linux<a class="headerlink" href="#linux" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Antes de empezar, es <strong>indispensable</strong> hacer varias cosas:</p>
+<ul class="simple">
+<li><p>Configurar el nombre del equipo (<em>hostname</em>) y el dominio tal como ya
+<a class="reference internal" href="../01.prologo/index.html#smb-hostname"><span class="std std-ref">hicimos en el servidor</span></a>. Denominaremos a este cliente
+<em>clienteL</em>.</p></li>
+<li><p>Asegurarnos de que el servidor de nombres del cliente es el controlador del
+dominio, cosa que así será si recibe <em>ip</em> de forma dinámica.</p></li>
+<li><p>Sincronizar su hora con el controlador de dominio. Para ello, o bien,
+instalamos otr servidor de hora en el cliente y lo configuramos para que se
+sincronice con <code class="docutils literal notranslate"><span class="pre">dc</span></code>, o bien, instalamos el cliente de hora <a class="reference external" href="https://packages.debian.org/stable/ntpdate">ntpdate</a> y
+nos aseguramos que usará el controlador de dominio como servidor y que durante
+el arranque del sistema se realiza una sincronización.</p></li>
+</ul>
+<p>Para permitir que el cliente acceda a los usuarios del <em>controlador de dominio</em>
+usaremos <em>sssd</em> con el provisor <em>ad</em> que exige que la máquina sea miembro del
+dominio y se disponga de un fichero <code class="file docutils literal notranslate"><span class="pre">/etc/krb5.keytab</span></code>. Existen otras
+alternativas, que no requieron esto<a class="footnote-reference brackets" href="#id3" id="id1">1</a>.</p>
+<p>Instalemos lo necesario:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt-get install samba krb5-user smbclient sssd
+</pre></div>
+</div>
+<div class="admonition-todo admonition" id="id2">
+<p class="admonition-title">Por hacer</p>
+<p>Asegurarse de que no se necesita winbind en el cliente.</p>
+</div>
+<p>Y paramos los servicios de samba:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> invoke-rc.d smbd stop
+<span class="gp">#</span> invoke-rc.d nmbd stop
+</pre></div>
+</div>
+<p>para configurar como miembro del dominio este equipo creando un
+<code class="file docutils literal notranslate"><span class="pre">/etc/samba/smb.conf</span></code> mínimo así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[global]</span>
+<span class="go">workgroup = IESPJM</span>
+<span class="go">client signing = yes</span>
+<span class="go">client use spnego = yes</span>
+<span class="go">kerberos method = secrets and keytab</span>
+<span class="go">realm = IESPJM.DOMUS</span>
+<span class="go">security = ads</span>
+</pre></div>
+</div>
+<p>Ahora reiniciamos un par de servicios:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> invoke-rc.d smbd start
+<span class="gp">#</span> invoke-rc.d nmbd start
+</pre></div>
+</div>
+<p>Y, pidiendo las credenciales del administrador:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> kinit Administrator@IESPJM.DOMUS
+</pre></div>
+</div>
+<p>Añadimos el equipo al dominio:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> net ads join -k
+<span class="go">Joined &#39;CLIENTEL&#39; to dns domain &#39;iespjm.domus&#39;</span>
+</pre></div>
+</div>
+<p id="smb-keytab">Finalmente creemos un fichero <code class="file docutils literal notranslate"><span class="pre">/etc/krb5.keytab</span></code> que usará el demonio
+<em>sssd</em>, encargado de posibilitar el uso de usuarios y grupos definidos en el
+servidor:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> net ads keytab create -k
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Si se está creando la <em>keytab</em> en el propio <em>controlador</em> debe hacer
+lo siguiente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> samba-tool domain exportkeytab /etc/krb5.keytab --principal<span class="o">=</span>DC$
+</pre></div>
+</div>
+<p>donde <kbd class="kbd docutils literal notranslate">DC</kbd> es el nombre que se le ha dado al <em>controlador de domino</em>.</p>
+</div>
+<p>Por último, es necesario que el cliente reconozca los usuarios definidos en el
+servidor. Para ello hay que influir en <abbr title="Pluggable Authentication Modules">PAM</abbr> (que es el servicio que permite la
+autenticación) y <em>nss</em> que permite reconocer los usuarios y obtener sus
+propiedades (<em>uid</em>, etc.). La instalación de <em>sssd</em> facilita esto y. de hecho,
+si se echa un vistazo a <code class="file docutils literal notranslate"><span class="pre">/etc/nsswitch.conf</span></code> y se ejecuta
+<strong class="command">pam-auth-update</strong>, se comprobará que el instalador de paquetes ya se ha
+encargado de añadir <em>sss</em> a su configuración. Lo único que queda es crear una
+configuración a este demonio a través de <code class="file docutils literal notranslate"><span class="pre">/etc/sssd/sssd.conf</span></code>. Para esta
+configuración tenemos dos alternativas:</p>
+<ol class="arabic">
+<li><p>Que los usuarios tengan definido en el propio directorio de <em>samba</em> su
+<em>UID</em> y el <em>GID</em> de su grupo principal para lo cual podemos hacer esto:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[sssd]</span>
+<span class="go">services = nss, pam</span>
+<span class="go">config_file_version = 2</span>
+<span class="go">domains = IESPJM.DOMUS</span>
+
+<span class="gp">#</span> Sustituye el espacio en los nombres de
+<span class="gp">#</span> usuarios y grupos por lo indicado
+<span class="go">override_space = _</span>
+
+<span class="go">[nss]</span>
+<span class="gp">#</span> Si no hay definida shell en el directorio
+<span class="go">default_shell = /bin/bash</span>
+
+<span class="gp">#</span> Si se quiere fijar un valor para el directorio personal
+<span class="gp">#</span> %H es el valor de homedir_subtring <span class="o">(</span><span class="s2">&quot;/home&quot;</span>, por defecto<span class="o">)</span>
+<span class="gp">#</span> %u es el nombre de usuario.
+<span class="go">fallback_homedir = %H/samba/%u</span>
+
+<span class="go">[domain/IESPJM.DOMUS]</span>
+<span class="go">id_provider = ad</span>
+<span class="go">access_provider = ad</span>
+<span class="go">auth_provider = ad</span>
+<span class="go">chpass_provider = ad</span>
+
+<span class="gp">#</span> El atributo que se usará como información gecos.
+<span class="go">ldap_user_gecos = displayName</span>
+
+<span class="gp">#</span> Se filtrará todo usuario
+<span class="gp">#</span> con UID fuera del rango
+<span class="go">min_id = 1500</span>
+<span class="go">max_id = 10000</span>
+
+<span class="go">ldap_id_mapping = False</span>
+
+<span class="gp">#</span> Permite mostrar todos los usuarios del
+<span class="gp">#</span> directorio activo al hacer un <span class="s2">&quot;getent passwd&quot;</span>
+<span class="gp">#</span> No es recomendable habitarlo, por motivos de rendimiento
+<span class="gp">#</span>enumerate True
+</pre></div>
+</div>
+<p>Hemos fijado que los usuarios que adminitiremos son aquellos que tiene UID
+entre 1500 y 10000. Cualquier usuario de <em>samba</em> cuyo <em>UID</em> exceda estos
+límies, simplemente, no existirá para el cliente.</p>
+</li>
+<li><p>Que no se encuentre ese dato en el directorio y que <em>sssd</em> genere una
+traducción partiendo del <em>SID</em> (el número de identificación que se usa en
+<em>windows</em> para usuarios y grupos). Para ello basta sustituir la línea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ldap_id_mapping = False</span>
+</pre></div>
+</div>
+<p>por estas otras:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> sssd traducirá el SID del usuario o grupo
+<span class="gp">#</span> a un UID o GID de UNIX. Se obliga a que este
+<span class="gp">#</span> número esté entre <span class="m">1500</span> y <span class="m">10000</span>.
+<span class="go">ldap_id_mapping = True</span>
+
+<span class="go">ldap_idmap_range_min = 1500</span>
+<span class="go">ldap_idmap_range_max = 10000</span>
+<span class="go">ldap_idmap_range_size = 8500</span>
+</pre></div>
+</div>
+<p>obsérvese que estos límites coinciden con <em>min_id</em> y <em>max_id</em>.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>En el presente documento usaremos esto segundo.</p>
+</div>
+</li>
+</ol>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Si se arranco el servicio con un método y después se cambia al
+otro, es necesario parar el servicio, cambiar la configuración y, antes de de
+reiniciar, borrar las base de datos que crea <strong class="command">sssd</strong>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> rm -f /var/lib/sss/db/*
+</pre></div>
+</div>
+</div>
+<p>Una vez creada la configuración, puede arrancarse el servidor:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> invoke-rc.d sssd start
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p><em>sssd</em> usa una caché que almacena los usuarios del directorio activo
+que se acreditan, lo que le permite autenticar a un usuario cacheado, aunque el
+controlador esté caído. Sin embargo, esto puede impidir que, si se realiza un
+cambio en el servidor, el cliente lo refleje. Para borrar la caché es
+necesario ejecutar la orden (del paquete <em>sssd-tools</em>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> sss_cache -E
+</pre></div>
+</div>
+</div>
+<p>Tras todo esto, tendremos un cliente <em>linux</em> que es miembro del dominio y que es
+capaz de reconocer los usuarios que se creen en el servidor.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Para completar la configuración del cliente <em>linux</em>, si se desean
+perfiles móviles, aun falta por <a class="reference internal" href="../05.usuarios/index.html#smb-perfmov"><span class="std std-ref">configurar estos</span></a>.</p>
+</div>
+</div>
+<div class="section" id="windows">
+<h2><span class="section-number">6.4.2.3.2. </span>Windows<a class="headerlink" href="#windows" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>La condición fundamental para poder añadir el sistema al dominio es que el
+servidor <abbr title="Domain Name Server">DNS</abbr> de la máquina sea el <em>controlador de dominio</em>. Si la red de
+pruebas es la que se ha sugerido aquí y se recibe <em>ip</em> dinámica, debería ser
+así. No obstante, se puede comprobar abriendo una consola y comprobando la
+configuración:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">C:&gt; ipconfig /all</span>
+</pre></div>
+</div>
+<p>En cualquier caso, no es muy complicado configurar los servidores <abbr title="Domain Name Server">DNS</abbr> y se
+presupondrá que el lector sabe hacerlo.</p>
+<p>La adición al dominio es sumamente sencilla, elegir en el menú contextual de
+<em>Equipo</em> el ítem <em>Propiedades</em>:</p>
+<img alt="Localización de las propiedades de &quot;Equipo&quot; en windows7" src="../../../../_images/equipo_propiedades.jpg" />
+<p>y en la ventana emergente escoger <em>Cambiar configuración</em>, tras lo cual se
+escogerá cambiar el nombre que dará paso a una ventana en la que podemos escoger
+el nombre del equipo (<em>ClienteW</em>) y el dominio en el que queremos ingresar:</p>
+<img alt="Adición del equipo al dominio de windows." src="../../../../_images/adddom.jpg" />
+<p>Se nos pedirá qe nos acreditemos como algún usuario del dominio con tal poder
+(<em>Administrator</em>) y tras poco se nos informará de que se nos ha agregado al
+dominio y deberemos reiniciar el sistema. A partir de este momento podremos
+entrar en el equipo tanto con la cuenta local que se usó en la instalación como
+con cualquier otra cuenta del dominio. Ahora bien, cuando se introduce un nombre
+de usuario a secas, se sobrentiende que es un nombre de usuario del dominio y
+estará definido en el <em>controlador</em> dicho de otro modo <em>Administrador</em> equivale
+a <em>IESPJM\Administrator</em>. En cambio, si se quiere acceder a una cuenta local,
+deberá añadirse antes el nombre de la propia máquina (<em>CLIENTEW7\usuario</em>, por
+ejemplo):</p>
+<img alt="Ingreso en windows7 con un usuario local" src="../../../../_images/ingreso.jpg" />
+<p class="rubric"><strong>Enlaces de interés</strong></p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://help.ubuntu.com/lts/serverguide/sssd-ad.html#sssd-ad-join">SSSD and Active Directory</a></p></li>
+</ul>
+<p class="rubric">Notas al pie</p>
+<dl class="footnote brackets">
+<dt class="label" id="id3"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p>Por ejemplo, <em>sssd</em> con el provisior <abbr title="Lightweight Directory Access Protocol">LDAP</abbr> que aprovecha que el
+directorioa activo es compatible con <abbr title="Lightweight Directory Access Protocol">LDAP</abbr>, o <em>libpam-ldapd</em> y <em>libnss-ldapd</em>
+con <em>nslcd</em>.</p>
+</dd>
+</dl>
+</div>
+</div>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../../../../index.html">Tabla de contenido</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">6.4.2.3. Clientes</a><ul>
+<li><a class="reference internal" href="#linux">6.4.2.3.1. Linux</a></li>
+<li><a class="reference internal" href="#windows">6.4.2.3.2. Windows</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Tema anterior</h4>
+  <p class="topless"><a href="../02.install-addc/index.html"
+                        title="capítulo anterior"><span class="section-number">6.4.2.2. </span>Controlador de dominio</a></p>
+  <h4>Próximo tema</h4>
+  <p class="topless"><a href="../04.share/index.html"
+                        title="próximo capítulo"><span class="section-number">6.4.2.4. </span>Directorios compartidos</a></p>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../../_sources/06.infraestructura/05.directorio/06.samba/03.clientes/index.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="../04.share/index.html" title="6.4.2.4. Directorios compartidos"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="../02.install-addc/index.html" title="6.4.2.2. Controlador de dominio"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" ><span class="section-number">6. </span>Servicios de infraestructura</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../index.html" ><span class="section-number">6.4. </span>Servicio de directorio</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../index.html" ><span class="section-number">6.4.2. </span>Samba</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">6.4.2.3. </span>Clientes</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor CC BY 4.0, 2016-2021, José Miguel Sánchez Alés.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.2.0.
+    </div>
+  </body>
+</html>
