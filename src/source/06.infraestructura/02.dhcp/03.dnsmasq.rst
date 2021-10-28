@@ -421,6 +421,71 @@ red *172.16.0.0/16*:
    debe obviar esta última. Por ello, cuando se desea la opción para añadir una
    ruta adicional siempre es necesarto incluir la ruta predeterminada.
 
+.. _dhcp-helper:
+
+Retransmisión de peticiones
+===========================
+Por como hemos descrito el :ref:`protocolo DHCP <dhcp-proto>` (una petición de
+*broadcast* no es capaz de salir de la red lógica en la que se emite) es obvio
+que cliente y servidor deben encontrarse en la misma red. Observemos el
+siguiente esquema:
+
+.. image:: files/relay_dhcp.png
+
+En él el servidor |DHCP| y el cliente no están en la misma red, así que
+cualquier petición del cliente, moriría al llegar al router; y es obvio que para
+servirle una configuración de red, deberíamos montar un servidor dentro de la
+red *192.168.1.0/24*. Sin embargo, podríamos querer centralizar toda la
+configuración dinámica en un único servidor y, por consiguiente, no estar
+conformes con esta solución. Así, tendríamos dos soluciones alternativas que sí
+nos permitirían mantener un único servidor |DHCP|:
+
+* La evidente de que el servidor |DHCP| tuviera una segunda interfaz en
+  la segunda red y así pudiera repartir configuraciones en ambas redes. Esto
+  podríamos materializarlo convirtiéndolo en el *router* entre ambas redes o
+  conectando directamente una segunda interfaz a la otra red o mediante el uso
+  de :ref:`interfaces VLAN <vlan>`. Pero podría darse el caso de que ninguna de
+  estas tres alternativas pudiera materializarse.
+
+* Colocando en el *router* un retransmisor de peticiones |DHCP| para que
+  recogiera las peticiones de los clientes de la red *192.168.1.0/24* y las
+  hiciera llegar al servidor que se encuentra en la red *192.168.0.0/24*.
+
+Esta es la última solución que se describe bajo este epígrafe.
+:program:`dnsmasq` no es capaz de realizar esta tarea, pero sí un *software*
+adicional creado por el mismo programador: :deb:`dhcp-helper`.
+
+Consideremos el esquema completo como este:
+
+.. image:: files/relay_dhcp_2.png
+
+donde en el servidor |DHCP| se sirven configuraciones para ambas redes y en
+router que se separa ambas, se ha instalado el *software*::
+
+   # apt install dhcp-helper
+
+La configuración es sumamente sencilla. En :file:`/etc/default/dhcp-helper`
+debemos indicar la interfaz que comunica con el servidor |DHCP|:
+
+.. code:: bash
+
+   DHCPHELPER_OPTS="-b eth0"
+
+esto determina que la petición se retransmita por esa interfaz y que por el
+resto se admitan peticiones. Si el servidor |DHCP| se preparó para servir
+también configuraciones en la red *192.168.1.0/24*, entonces un cliente situado
+en esa red recibirá una |IP|.
+
+.. warning:: Tenga presente que en esta comunicación no tiene efecto enmascarar
+   el tráfico que sale por la *eth0* del router que hace *relay* para que el
+   tráfico saliente (la concesión) sea capaz de regresar, Por esta razón el
+   servidor |DHCP| debe saber cómo alcanzar la red *192.168.1.0/24*. Por tanto,
+   o añade una entrada a su tabla de encaminamiento o la añade a su puerta de
+   enlace (en este caso el router de salida a internet)::
+
+      # ip route add 192.168.1.0/24 via 192.168.0.254
+
+
 .. rubric:: Notas al pie
 
 .. [#] E incluso también de servidor :abbr:`TFTP (Trivial FTP)` para integrar
