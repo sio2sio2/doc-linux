@@ -1,7 +1,7 @@
 .. _syslog:
 
-Ficheros *logs*
-===============
+Archivos de registro
+====================
 
 Muchas aplicaciones, en particular aquellas que actúan en segundo plano sin
 intervención del usuario, informan al sistema de distintos aspectos de su

@@ -13,7 +13,15 @@ Como es probable que distintos servicios establezcan distintas políticas de
 acceso, |PAM| permite particularizar la configuración según el servicio.
 
 .. warning:: La configuración de la autenticación es bastante delicada, por
-   cuanto una mala configuración puede dejarnos sin acceso al sistema.
+   cuanto una mala configuración puede dejarnos sin acceso al sistema. Si se
+   piensan hacer modificaciones, quizás convenga instalar :deb:`pamtester`
+   que permite comprobar el funcionamiento de la configuración hecha. Por
+   ejemplo::
+
+      # pamtester -v login usuario authenticate
+
+   comprueba cómo funciona la autenticación del usuario "usuario" en el servicio
+   *login*.
 
 Estructura
 ----------
