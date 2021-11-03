@@ -18,6 +18,7 @@
     <script src="../../_static/underscore.js"></script>
     <script src="../../_static/doctools.js"></script>
     <script src="../../_static/translations.js"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     
     <link rel="index" title="Índice" href="../../genindex.html" />
     <link rel="search" title="Búsqueda" href="../../search.html" />
@@ -205,37 +206,93 @@ cantidad de información muy pequeña.</p>
 </section>
 <section id="cifrado-hibrido">
 <span id="hibrido"></span><h3><span class="section-number">9.1.2.2.3. </span>Cifrado híbrido<a class="headerlink" href="#cifrado-hibrido" title="Enlazar permanentemente con este título">¶</a></h3>
-<p>El <em class="dfn">cifrado híbrido</em> consiste en el uso combinado de cifrado simétrico y
-asimétrico para sortear:</p>
+<p>De lo expuesto para los cífrados simétrico y asimétrico concluimos que:</p>
 <ul class="simple">
-<li><p>La debilidad intrínseca de requerir la clave simétrica en ambos extremos de la
-comunicación.</p></li>
-<li><p>El mayor costo computacional del cifrado asimétrico, que lo hace sólo apto
-para cifrar poca información.</p></li>
+<li><p>El cifrado <em>asimétrico</em> en la práctica habitual es inútil para cifrar
+información, por cuanto sólo es apto para cantidades muy pequeñas de
+información.</p></li>
+<li><p>El cifrado <em>simétrico</em> sí es válido, pero es intrínsecamente inseguro para
+transmitir información por cuanto nos obliga a enviar previamente (y, por
+tanto, en claro) la clave al otro extremo. Si el atacante ya escucha en este
+instante previo y captura la clave, todo el cifrado posterior, por bueno que
+sea el algoritmo con que se realiza, es inútil.</p></li>
 </ul>
-<p>Se fundamenta en cifrar la información con un algoritmo simétrico y
-reservar el costoso cifrado asimétrico exclusivamente para ofuscar la clave
-simétrica utilizada. De este modo, para el grueso (la propia información) se usa
-el cifrado más económico; y el costoso se reserva para una cantidad infima de
-datos (la clave simétrica que muy posiblemente no pase de 512 <em>bytes</em>). Así
-pues:</p>
-<ul class="simple">
-<li><p>Si queremos intercambiar un archivo, generamos primero una clave simétrica con
-la que ciframos el archivo y luego ciframos tal clave con la clave pública de
-aquel al que queremos enviar el archivo. Hecho esto, remitimos el conjunto
-compùesto por archivo cifrado y clave simétrica cifrada.</p>
+<p id="clave-sesion">Estas conclusiones derivan en el <em class="dfn">problema de intercambio de clave</em>, esto
+es, en resolver cómo intercambiar una clave simétrica de forma segura a través
+de un medio inseguro. Logrado esto, se dispondrá de una clave simétrica con la
+que cifrar la comunicación entre ambos extremos el tiempo que dure ésta. A esta
+clave simétrica se la conoce como <em class="dfn">clave de sesión</em>. Pero, en cualquier
+caso, es preciso resolver el problema de su seguridad. Hay dos alternativas
+habituales:</p>
+<ol class="loweralpha">
+<li><p><em>Intercambio de clave basado en clave pública</em></p>
+<p>Consiste en que uno de los extremos genera la clave simétrica, la cifra con
+la clave pública del otro extremo y se la envía cifrada. Al recibirla éste,
+descifra con su clave privada y obtiene la clave simétrica que se usará
+durante la comunicación.</p>
 </li>
-<li id="clave-sesion"><p>En un comunicación, utilizamos en una primera fase cifrado asimétrico oon el
-fin de establecer un canal seguro por el cual transmitir al otro extremo una
-clave simétrica, denominada <em class="dfn">clave de sesión</em>. Una vez que esta clave
-esté en ambos extremos, podemos proseguir la comunicación utilizando cifrado
-simétrico. Esta es la base de todos los <a class="reference internal" href="03.aplicaciones/04.ssl.html#proto-seguro"><span class="std std-ref">protocolos seguros de red</span></a>.</p></li>
+<li><p><em>Intercambio de clave Diffie-Hellman</em></p>
+<p>Consiste en que ambos extremos acuerdan en claro los parámetros que usarán y
+a partir de ellos generan <em>ad hoc</em> sendas claves privadas (<span class="math notranslate nohighlight">\(x\)</span> e
+<span class="math notranslate nohighlight">\(y\)</span>) que se reservan. Con estas claves, generan sendas claves públicas
+<span class="math notranslate nohighlight">\(g^x\)</span> y <span class="math notranslate nohighlight">\(g^y\)</span> que comunican a la otra parte. Las matemáticas
+involucradas propician que, cuando ambos aplican su propia clave privada
+sobre la clave pública recibida desde la otra parte (<span class="math notranslate nohighlight">\((g^x)^y\)</span> y
+<span class="math notranslate nohighlight">\((g^y)^x\)</span>), el resultado en ambas partes coincide y éste es la clave
+simétrica con la que cifrarán la comunicación (<span class="math notranslate nohighlight">\(K = (g^x)^y =
+(g^y)^x\)</span>). Un atacante que esté escuchando es capaz de capturar ambas claves
+públicas, pero no dispone de ninguna de las claves privadas, por lo que no
+podrá calcular la clave de sesión como hacen ambos extremos legítimos.</p>
+<p>Para ilustrar cómo funciona este mecanismo sin necesidad de entender las
+matemáticas subyacentes suele recurrirse a una analogía cromática:</p>
+<img alt="../../_images/colores-dh.png" src="../../_images/colores-dh.png" />
+<p>O sea, Alice y Bob acuerdan un color base verdoso y cada uno de ellos por
+su cuenta escoge un color secreto (naranja y azul respectivamente).
+Componen un nuevo color con el color base y su color secreto y obtienen una
+mezcla (amarillo y azul claro, respectivamente) que
+sí publican comunicándolo al otro. Ambos finalmente mezclan el color
+comunicado con su propio color secreto y obtienen un mismo color resultante:
+una especie de violeta.</p>
+</li>
+</ol>
+<p>Las dos estrategias cumplen con el propósito y combinan una técnica inicial de
+cifrado asimétrico para establecer secretamente la clave de cifrado simétrico
+con la que se asegura finalmente la comunicación. Son, por tanto, técnicas de
+<em class="dfn">cifrado híbrido</em>.  Obsérvese, no obstante, que existe una diferencia
+capital entre ambas: la primera resolución utiliza una pareja de claves
+<strong>preexistente</strong> y <strong>persistente</strong>, mientras que la segunda usa un par de
+parejas de claves <strong>efímeras</strong>, que se crean para la ocasión y se abandonan
+acabada esta:</p>
+<ul class="simple">
+<li><p>La <em>preexistencia</em> determina que no haya que generar las claves asimétricas y,
+por tanto, se agilice el mecanismo para establecer el canal seguro.</p></li>
+<li><p>La <em>persistencia</em> de una pareja de claves permite que la otra parte pueda
+comprobar la identidad de su propietario. Por ejemplo, podemos estar seguros
+de que el otro extremo es quien dice ser, porque en una ocasión anterior nos
+entregó en mano su clave pública<a class="footnote-reference brackets" href="#id20" id="id5">5</a>. Esto con claves efímeras generadas
+<em>ad hoc</em> es imposible; lo que determina que un atacante pueda realizar un
+ataque <abbr title="Man in the Middle">MiTM</abbr>.</p></li>
+<li><p>La <em>efimeridad</em> de las claves privadas mejora la seguridad, porque, si la
+la clave de sesión se cifró con la clave pública persistente de uno de
+los extremos, un atacante que haya guardado la conversación completa será
+incapaz de leerla en el momento; pero, si en el futuro logra hacerse con la
+clave privada, entonces podrá volver a recuperar la conversación y
+descrifrarla. Por contra, si las claves son efímeras, nunca se sufrirá este
+problema.</p></li>
 </ul>
-<div class="admonition-todo admonition" id="id5">
-<p class="admonition-title">Por hacer</p>
-<p>Incluir en la disertación el <a class="reference external" href="https://es.wikipedia.org/wiki/Diffie-Hellman">protocolo criptográfico de
-Diffie-Hellman</a>. Puede
-tomarse como referencia <a class="reference external" href="https://crypto.stackexchange.com/a/6309">esta respuesta en stackexchange.com</a>.</p>
+<p>El cifrado híbrido es la base de todos los <a class="reference internal" href="03.aplicaciones/04.ssl.html#proto-seguro"><span class="std std-ref">protocolos seguros de red</span></a> como <abbr title="Transport Layer Security">TLS</abbr>/<abbr title="Secure Socket Layer">SSL</abbr> o <abbr title="Security SHell">SSH</abbr>. Para resolver el <em>problema del
+intercambio de la clave simétrica</em> estos protocolos pueden optar por una de las
+dos estrategias o dejar libertad para que alguno de los extremos escoja cuál
+prefiere. Sea cual sea la estrategia de intercambio, es indispensable que al
+menos el cliente se asegure de la identidad del servidor, por lo que para la
+identificación siempre se usa una técnica de clave pública.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Hemos centrado la explicación en la comunicación segura, pero el
+cifrado híbrido también sirve para cifrar previamente un archivo que queremos
+transmitir posteriormente mediante una comunicación no segura. En este caso,
+se usa la clave pública del destinatario para cifrar una clave simétrica con
+la que se cifra el archivo.</p>
 </div>
 </section>
 <section id="conclusiones">
@@ -252,9 +309,7 @@ cifrada asimétricamente, lo cual ya hemos definido como <a class="reference int
 <li><p>Cifrado <strong>asimétrico</strong> sobre una muy pequeña cantidad de información:</p>
 <ul class="simple">
 <li><p>Una clave simétrica que se desea transmitir, que es el complemento del
-<a class="reference internal" href="#hibrido"><span class="std std-ref">cifrado híbrido</span></a> que se acaba de citar. Para cifrar la
-clave simétrica se utiliza la clave pública de su destinatario legítimo ,
-puesto que sólo él será capaz de descifrarla.</p></li>
+<a class="reference internal" href="#hibrido"><span class="std std-ref">cifrado híbrido</span></a> que se acaba de citar.</p></li>
 <li><p>Un resumen generado con una función <em>hash</em>. Este acción de cifrado, sin
 embargo, es propia de la <em>firma digital</em>; y la entenderemos a continuación.</p></li>
 </ul>
@@ -293,7 +348,7 @@ metainformación.</p></li>
 firmado), es capaz de certificar que el origen es quien dice ser, ya que
 descifrará el resumen con la clave pública de éste y, por otra parte, podrá
 comprobar si los datos conservan su integridad gracias al propio resumen
-descifrado<a class="footnote-reference brackets" href="#id20" id="id7">5</a>.</p>
+descifrado<a class="footnote-reference brackets" href="#id21" id="id7">6</a>.</p>
 </section>
 <section id="apendice-practico">
 <h2><span class="section-number">9.1.2.4. </span>Apéndice práctico<a class="headerlink" href="#apendice-practico" title="Enlazar permanentemente con este título">¶</a></h2>
@@ -301,12 +356,12 @@ descifrado<a class="footnote-reference brackets" href="#id20" id="id7">5</a>.</p
 Open<abbr title="Secure Socket Layer">SSL</abbr>. También podríamos usar <abbr title="GNU Provacy Guard">GnuPG</abbr>, que implementa el estándar <a class="reference external" href="https://www.openpgp.org/">OpenPGP</a>; pero, dado que este estándar se usa
 fundamentalmente en el correo electrónico, introduciremos la orden en el
 <a class="reference internal" href="03.aplicaciones/03.correo.html#email-seguro"><span class="std std-ref">epígrafe correspondiente</span></a>.</p>
-<div class="admonition note">
+<div class="admonition note" id="entropia">
 <p class="admonition-title">Nota</p>
 <p>En caso de que hagamos pruebas en una máquina virtual puede que sea
 conveniente aumentar la entropía del sistema para mejorar y acelerar la
 creación de claves asimétricas. Para lograrlo puede obrarse del siguiente
-modo<a class="footnote-reference brackets" href="#id21" id="id8">6</a>:</p>
+modo<a class="footnote-reference brackets" href="#id22" id="id8">7</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> cat /proc/sys/kernel/random/entropy_avail  <span class="c1"># Entropía inicial</span>
 <span class="go">234</span>
 <span class="gp">#</span> apt install rng-tools
@@ -347,7 +402,7 @@ más adelante para comprobar la integridad de los ficheros:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> md5sum saludo1.txt saludo2.txt &gt; saludos.md5
 </pre></div>
 </div>
-<p>Con posterioridad, podrá comprobarse la integridad del siguiente modo<a class="footnote-reference brackets" href="#id22" id="id9">7</a>:</p>
+<p>Con posterioridad, podrá comprobarse la integridad del siguiente modo<a class="footnote-reference brackets" href="#id23" id="id9">8</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> <span class="nv">LC_ALL</span><span class="o">=</span>C md5sum -c saludos.md5
 <span class="go">saludo1.txt: OK</span>
 <span class="go">saludo2.txt: OK</span>
@@ -413,7 +468,7 @@ interactiva. Puede proporcionarse en la propia orden incluyendo la opción
 </section>
 <section id="openssl-asi">
 <span id="id11"></span><h4><span class="section-number">9.1.2.4.1.2. </span>Cifrado asimétrico<a class="headerlink" href="#openssl-asi" title="Enlazar permanentemente con este título">¶</a></h4>
-<p>Llevarlo a cabo requiere generar un par de claves (<abbr title="Rivest, Shamir y Adleman">RSA</abbr> en concreto<a class="footnote-reference brackets" href="#id23" id="id12">8</a>):</p>
+<p>Llevarlo a cabo requiere generar un par de claves (<abbr title="Rivest, Shamir y Adleman">RSA</abbr> en concreto<a class="footnote-reference brackets" href="#id24" id="id12">9</a>):</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> openssl genrsa -aes128 -out privkey.pem <span class="m">4096</span>
 <span class="gp">#</span> openssl rsa -in privkey.pem -pubout -out pubkey.pem
 </pre></div>
@@ -460,9 +515,9 @@ información almacenada y para el caso de claves <abbr title="Rivest, Shamir y A
 </div>
 <p>Obsérvese que ambas claves son pareja porque tienen el mismo módulo (que se
 puede consultar independientemente sustituyendo <kbd class="kbd docutils literal notranslate">-text</kbd> pòr
-<kbd class="kbd docutils literal notranslate">-modulus</kbd>)<a class="footnote-reference brackets" href="#id24" id="id13">9</a>.</p>
+<kbd class="kbd docutils literal notranslate">-modulus</kbd>)<a class="footnote-reference brackets" href="#id25" id="id13">10</a>.</p>
 </div>
-<p>Con ellas podemos cifrar y descifrar <strong>pequeños</strong><a class="footnote-reference brackets" href="#id25" id="id14">10</a> ficheros. Usando la
+<p>Con ellas podemos cifrar y descifrar <strong>pequeños</strong><a class="footnote-reference brackets" href="#id26" id="id14">11</a> ficheros. Usando la
 clave pública para cifrar y la privada para descifrar:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> <span class="nb">echo</span> <span class="s2">&quot;Hola&quot;</span> &gt; saludo.txt
 <span class="gp">#</span> openssl rsautl -encrypt -inkey pubkey.pem -pubin -in saludo.txt -out saludo.enc
@@ -551,34 +606,39 @@ inteligible por OpenSSL</span></a></p>
 </dd>
 <dt class="label" id="id19"><span class="brackets"><a class="fn-backref" href="#id4">4</a></span></dt>
 <dd><p>De hecho, <a class="reference external" href="https://www.openssh.com/">OpenSSH</a>, para su versión 7,
-<a class="reference external" href="https://www.gentoo.org/support/news-items/2015-08-13-openssh-weak-keys.html">deshabilitó el uso de DSA</a>.</p>
+<a class="reference external" href="https://www.openssh.com/txt/release-7.0">deshabilitó el uso de DSA</a> (búsquese por <abbr title="Digital Signature Standard">DSS</abbr>).</p>
 </dd>
-<dt class="label" id="id20"><span class="brackets"><a class="fn-backref" href="#id7">5</a></span></dt>
+<dt class="label" id="id20"><span class="brackets"><a class="fn-backref" href="#id5">5</a></span></dt>
+<dd><p>¿Y si no es posible el contacto físico previo? Precisamente para eso
+existen los <a class="reference internal" href="03.aplicaciones/01.certdig.html#cert-digital"><span class="std std-ref">certificados digitales</span></a> que introduciremos
+más adelante.</p>
+</dd>
+<dt class="label" id="id21"><span class="brackets"><a class="fn-backref" href="#id7">6</a></span></dt>
 <dd><p>Pero para que todo esto no haga aguas es necesario confiar en que la clave
 pública es de aquel de quien parece ser. Resolveremos este último escollo al
 introducir el concepto de <a class="reference internal" href="03.aplicaciones/01.certdig.html#cert-digital"><span class="std std-ref">certificado digital</span></a>.</p>
 </dd>
-<dt class="label" id="id21"><span class="brackets"><a class="fn-backref" href="#id8">6</a></span></dt>
+<dt class="label" id="id22"><span class="brackets"><a class="fn-backref" href="#id8">7</a></span></dt>
 <dd><p>Usar, sin embargo, el propio kernel para la generación de la
 entropía no es muy recomendable. Debería usarse el dispositivo
 hardware (/dev/hwrng), pero en la máquina virtual es posible que
 no esté. Para <strong class="program">qemu</strong> véase
 <a class="reference external" href="https://wiki.qemu.org/Features/VirtIORNG">su wiki</a>.</p>
 </dd>
-<dt class="label" id="id22"><span class="brackets"><a class="fn-backref" href="#id9">7</a></span></dt>
+<dt class="label" id="id23"><span class="brackets"><a class="fn-backref" href="#id9">8</a></span></dt>
 <dd><p>Se fuerza a que la orden se ejecute en inglés, para que el resultado se
 exprese como <em>OK</em> o <em>FAILED</em>. En castellano, la leyenda se expresa de forma
 muy farragosa.</p>
 </dd>
-<dt class="label" id="id23"><span class="brackets"><a class="fn-backref" href="#id12">8</a></span></dt>
+<dt class="label" id="id24"><span class="brackets"><a class="fn-backref" href="#id12">9</a></span></dt>
 <dd><p>Podríamos también generar claves de curva elíptica. Hay algún ejemplo
 en el <a class="reference internal" href="../../04.servidor/10.ssh/02.certificados.html#openssh-openssl"><span class="std std-ref">epígrafe en que se comparan las claves SSH con las generadas por
 OpenSSL</span></a>.`</p>
 </dd>
-<dt class="label" id="id24"><span class="brackets"><a class="fn-backref" href="#id13">9</a></span></dt>
+<dt class="label" id="id25"><span class="brackets"><a class="fn-backref" href="#id13">10</a></span></dt>
 <dd><p>La clave pública se compone de un módulo y un exponente</p>
 </dd>
-<dt class="label" id="id25"><span class="brackets"><a class="fn-backref" href="#id14">10</a></span></dt>
+<dt class="label" id="id26"><span class="brackets"><a class="fn-backref" href="#id14">11</a></span></dt>
 <dd><p>Recordemos que el cifrado asimétrico está pensado para aplicarse sobre
 una cantidad muy pequeña de información (un resumen o una clave simétrica).
 La orden, de utilidad únicamente teórica, nos permite usar cifrado

@@ -183,45 +183,104 @@ cantidad de información muy pequeña.
 
 Cifrado híbrido
 ===============
-El :dfn:`cifrado híbrido` consiste en el uso combinado de cifrado simétrico y
-asimétrico para sortear:
+De lo expuesto para los cífrados simétrico y asimétrico concluimos que:
 
-+ La debilidad intrínseca de requerir la clave simétrica en ambos extremos de la
-  comunicación.
-+ El mayor costo computacional del cifrado asimétrico, que lo hace sólo apto
-  para cifrar poca información.
++ El cifrado *asimétrico* en la práctica habitual es inútil para cifrar
+  información, por cuanto sólo es apto para cantidades muy pequeñas de
+  información.
 
-Se fundamenta en cifrar la información con un algoritmo simétrico y
-reservar el costoso cifrado asimétrico exclusivamente para ofuscar la clave
-simétrica utilizada. De este modo, para el grueso (la propia información) se usa
-el cifrado más económico; y el costoso se reserva para una cantidad infima de
-datos (la clave simétrica que muy posiblemente no pase de 512 *bytes*). Así
-pues:
++ El cifrado *simétrico* sí es válido, pero es intrínsecamente inseguro para
+  transmitir información por cuanto nos obliga a enviar previamente (y, por
+  tanto, en claro) la clave al otro extremo. Si el atacante ya escucha en este
+  instante previo y captura la clave, todo el cifrado posterior, por bueno que
+  sea el algoritmo con que se realiza, es inútil.
 
-+ Si queremos intercambiar un archivo, generamos primero una clave simétrica con
-  la que ciframos el archivo y luego ciframos tal clave con la clave pública de
-  aquel al que queremos enviar el archivo. Hecho esto, remitimos el conjunto
-  compùesto por archivo cifrado y clave simétrica cifrada.
+.. _clave-sesion:
 
-  .. _clave-sesion:
+Estas conclusiones derivan en el :dfn:`problema de intercambio de clave`, esto
+es, en resolver cómo intercambiar una clave simétrica de forma segura a través
+de un medio inseguro. Logrado esto, se dispondrá de una clave simétrica con la
+que cifrar la comunicación entre ambos extremos el tiempo que dure ésta. A esta
+clave simétrica se la conoce como :dfn:`clave de sesión`. Pero, en cualquier
+caso, es preciso resolver el problema de su seguridad. Hay dos alternativas
+habituales:
 
-+ En un comunicación, utilizamos en una primera fase cifrado asimétrico oon el
-  fin de establecer un canal seguro por el cual transmitir al otro extremo una
-  clave simétrica, denominada :dfn:`clave de sesión`. Una vez que esta clave
-  esté en ambos extremos, podemos proseguir la comunicación utilizando cifrado
-  simétrico. Esta es la base de todos los :ref:`protocolos seguros de red
-  <proto-seguro>`.
+a. *Intercambio de clave basado en clave pública*
 
-.. todo:: Incluir en la disertación el `protocolo criptográfico de
-   Diffie-Hellman <https://es.wikipedia.org/wiki/Diffie-Hellman>`_. Puede
-   tomarse como referencia `esta respuesta en stackexchange.com
-   <https://crypto.stackexchange.com/a/6309>`_.
+   Consiste en que uno de los extremos genera la clave simétrica, la cifra con
+   la clave pública del otro extremo y se la envía cifrada. Al recibirla éste,
+   descifra con su clave privada y obtiene la clave simétrica que se usará
+   durante la comunicación.
 
-.. Plantearlo como un problema de intercambio de la clave simétrica y dos
-   soluciones: el intercambio RSA (problema de la persistencia de la clave
-   privada) y el intercambio Diffie-Hellman (problema de MITM). Información de:
+b. *Intercambio de clave Diffie-Hellman*
 
-   - https://security.stackexchange.com/a/76907
+   Consiste en que ambos extremos acuerdan en claro los parámetros que usarán y
+   a partir de ellos generan *ad hoc* sendas claves privadas (:math:`x` e
+   :math:`y`) que se reservan. Con estas claves, generan sendas claves públicas
+   :math:`g^x` y :math:`g^y` que comunican a la otra parte. Las matemáticas
+   involucradas propician que, cuando ambos aplican su propia clave privada
+   sobre la clave pública recibida desde la otra parte (:math:`(g^x)^y` y
+   :math:`(g^y)^x`), el resultado en ambas partes coincide y éste es la clave
+   simétrica con la que cifrarán la comunicación (:math:`K = (g^x)^y =
+   (g^y)^x`). Un atacante que esté escuchando es capaz de capturar ambas claves
+   públicas, pero no dispone de ninguna de las claves privadas, por lo que no
+   podrá calcular la clave de sesión como hacen ambos extremos legítimos.
+
+   Para ilustrar cómo funciona este mecanismo sin necesidad de entender las
+   matemáticas subyacentes suele recurrirse a una analogía cromática:
+
+   .. image:: files/colores-dh.png
+
+   O sea, Alice y Bob acuerdan un color base verdoso y cada uno de ellos por
+   su cuenta escoge un color secreto (naranja y azul respectivamente).
+   Componen un nuevo color con el color base y su color secreto y obtienen una
+   mezcla (amarillo y azul claro, respectivamente) que
+   sí publican comunicándolo al otro. Ambos finalmente mezclan el color
+   comunicado con su propio color secreto y obtienen un mismo color resultante:
+   una especie de violeta.
+
+Las dos estrategias cumplen con el propósito y combinan una técnica inicial de
+cifrado asimétrico para establecer secretamente la clave de cifrado simétrico
+con la que se asegura finalmente la comunicación. Son, por tanto, técnicas de
+:dfn:`cifrado híbrido`.  Obsérvese, no obstante, que existe una diferencia
+capital entre ambas: la primera resolución utiliza una pareja de claves
+**preexistente** y **persistente**, mientras que la segunda usa un par de
+parejas de claves **efímeras**, que se crean para la ocasión y se abandonan
+acabada esta:
+
+* La *preexistencia* determina que no haya que generar las claves asimétricas y,
+  por tanto, se agilice el mecanismo para establecer el canal seguro.
+
+* La *persistencia* de una pareja de claves permite que la otra parte pueda
+  comprobar la identidad de su propietario. Por ejemplo, podemos estar seguros
+  de que el otro extremo es quien dice ser, porque en una ocasión anterior nos
+  entregó en mano su clave pública\ [#]_. Esto con claves efímeras generadas
+  *ad hoc* es imposible; lo que determina que un atacante pueda realizar un
+  ataque |MiTM|.
+
+* La *efimeridad* de las claves privadas mejora la seguridad, porque, si la
+  la clave de sesión se cifró con la clave pública persistente de uno de
+  los extremos, un atacante que haya guardado la conversación completa será
+  incapaz de leerla en el momento; pero, si en el futuro logra hacerse con la
+  clave privada, entonces podrá volver a recuperar la conversación y
+  descrifrarla. Por contra, si las claves son efímeras, nunca se sufrirá este
+  problema.
+
+El cifrado híbrido es la base de todos los :ref:`protocolos seguros de red
+<proto-seguro>` como |TLS|/|SSL| o |SSH|. Para resolver el *problema del
+intercambio de la clave simétrica* estos protocolos pueden optar por una de las
+dos estrategias o dejar libertad para que alguno de los extremos escoja cuál
+prefiere. Sea cual sea la estrategia de intercambio, es indispensable que al
+menos el cliente se asegure de la identidad del servidor, por lo que para la
+identificación siempre se usa una técnica de clave pública.
+
+.. note:: Hemos centrado la explicación en la comunicación segura, pero el
+   cifrado híbrido también sirve para cifrar previamente un archivo que queremos
+   transmitir posteriormente mediante una comunicación no segura. En este caso,
+   se usa la clave pública del destinatario para cifrar una clave simétrica con
+   la que se cifra el archivo.
+
+.. - https://security.stackexchange.com/a/76907
    - https://security.stackexchange.com/a/205689
    - https://www.ccn.cni.es/index.php/es/docman/documentos-publicos/boletines-pytec/378-pildorapytec-nov2020-seguridad-tls/file
    - https://security.stackexchange.com/a/41226
@@ -241,9 +300,7 @@ a. Cifrado **simétrico** sobre:
 b. Cifrado **asimétrico** sobre una muy pequeña cantidad de información:
 
    + Una clave simétrica que se desea transmitir, que es el complemento del
-     :ref:`cifrado híbrido <hibrido>` que se acaba de citar. Para cifrar la
-     clave simétrica se utiliza la clave pública de su destinatario legítimo ,
-     puesto que sólo él será capaz de descifrarla.
+     :ref:`cifrado híbrido <hibrido>` que se acaba de citar.
    + Un resumen generado con una función *hash*. Este acción de cifrado, sin
      embargo, es propia de la *firma digital*; y la entenderemos a continuación.
 
@@ -532,7 +589,10 @@ Y para verificar la firma::
    inteligible por OpenSSL <openssh-openssl>` 
 .. [#] De hecho, `OpenSSH <https://www.openssh.com/>`_, para su versión 7,
    `deshabilitó el uso de DSA
-   <https://www.gentoo.org/support/news-items/2015-08-13-openssh-weak-keys.html>`_.
+   <https://www.openssh.com/txt/release-7.0>`_ (búsquese por |DSS|).
+.. [#] ¿Y si no es posible el contacto físico previo? Precisamente para eso
+   existen los :ref:`certificados digitales <cert-digital>` que introduciremos
+   más adelante.
 .. [#] Pero para que todo esto no haga aguas es necesario confiar en que la clave
    pública es de aquel de quien parece ser. Resolveremos este último escollo al
    introducir el concepto de :ref:`certificado digital <cert-digital>`.
@@ -560,17 +620,20 @@ Y para verificar la firma::
 .. |AES| replace:: :abbr:`AES (Advanced Encryption Standard)`
 .. |RSA| replace:: :abbr:`RSA (Rivest, Shamir y Adleman)`
 .. |DSA| replace:: :abbr:`DSA (Digital Signature Algorithm)`
+.. |DSS| replace:: :abbr:`DSS (Digital Signature Standard)`
 .. |ECDSA| replace:: :abbr:`ECDSA (Elliptic Curve Digital Signature Algorithm)`
 .. |EdDSA| replace:: :abbr:`EdDSA (EDwards-curve Curve Digital Signature Algorithm)`
 .. |GnuPG| replace:: :abbr:`GnuPG (GNU Provacy Guard)`
 .. |MD5| replace:: :abbr:`MD5 (Message Digest Algorithm 5)`
 .. |SHA| replace:: :abbr:`SHA (sechure Hash Algorithm)`
 .. |PGP| replace:: :abbr:`PGP (Pretty Good Privacy)`
+.. |TLS| replace:: :abbr:`TLS (Transport Layer Security)`
 .. |SSL| replace:: :abbr:`SSL (Secure Socket Layer)`
 .. |FNMT| replace:: :abbr:`FNMT (Fabrica Nacional de Moneda y Timbre)`
 .. |PKCS| replace:: :abbr:`PKCS (Public-Key Cryptography Standards)`
 .. |DER| replace:: :abbr:`DER (Distinguised Encoding Rules)`
 .. |NIST| replace:: :abbr:`NIST (National Institute of Standards and Technology)`
+.. |MiTM| replace:: :abbr:`MiTM (Man in the Middle)`
 
 .. _GnuPG: https://www.gnupg.org/
 .. _keyservers: http://www.keyserver.net/
