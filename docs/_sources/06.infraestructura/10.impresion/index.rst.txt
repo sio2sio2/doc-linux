@@ -3,14 +3,12 @@
 *********
 Impresión
 *********
-
 La impresión se lleva a cabo en los linux modernos gracias al servidor
-:program:`cups`, y a una serie de drivers para las distintas impresoras en
+|CUPS|, y a una serie de drivers para las distintas impresoras en
 formato ``.ppd``.  De todo ello tratará el presente documento.
 
 Puesta a punto
 ==============
-
 Instalación
 -----------
 
@@ -18,8 +16,8 @@ La instalación básica es sencilla::
 
    # apt-get install cups
 
-ya que basta instalar cups. Podemos también instalar una impresora virtual PDF,
-por si deseamos realizar pruebas y no disponemos de impresora::
+ya que basta instalar :program:cups. Podemos también instalar una impresora
+virtual PDF, por si deseamos realizar pruebas y no disponemos de impresora::
 
    # apt-get install printer-driver-cups-pdf
 
@@ -55,7 +53,6 @@ ello es necesario:
 
 Permisos
 --------
-
 En principio hay dos usuarios relacionados con la impresión:
 
 * **lpadmin**, que tiene permisos para la administración.
@@ -63,7 +60,6 @@ En principio hay dos usuarios relacionados con la impresión:
 
 Manejo
 ------
-
 Hay dos formas de gestionar el servidor:
 
 #. A través de su interfaz web que escucha en el puerto **631**.
@@ -129,8 +125,22 @@ instalar el paquete que driver. De hecho, nuestra acción ha sido totalmente
 inútil, más allá de que sirva para ilustrar cómo agregar. Observemos que
 nuestra impresora está deshabilitada. Para habilitarla es necesario\ [#]_::
 
-   # cupsenable PDFVirtual
-   # cupsaccept PDFVirtual
+   # lpadmin -p PDFVirtual -E
+
+También es útil listar las impresoras para que nos diga no su estado, sino el
+dispositivo al que están asociadas::
+
+   $ lpstat -v
+   dispositivo para PDF: cups-pdf:/
+   dispositivo para PDFVirtual: cups-pdf:/
+
+La opción :kbd:`-s` devuelve la misma salida pero añadiendo cuál es la impresora
+predeterminada::
+
+   $ lpstat -s
+   destino predeterminado del sistema: PDF
+   dispositivo para PDF: cups-pdf:/
+   dispositivo para PDFVirtual: cups-pdf:/
 
 Si :program:`cups` no dispone del driver adecuado, pero podemos obtener el
 fichero ``.ppd``, es posible agregar la impresora con él::
@@ -168,7 +178,6 @@ Para borrar una impresora, basta con usar la opción ``-x``::
 
 Opciones
 """"""""
-
 Las impresoras tienen una serie de opciones predeterminadas que pueden cambiarse
 mediante la orden :command:`lpoptions`::
 
@@ -260,7 +269,7 @@ hacer una conversión previa a uno de estos tres tipos. Por ejemplo::
    $ w3m -dump http://www.google.es | lp
 
 imprime la página principal de `Google <http://www.google.es>`_, puesto la
-opción ``-dump`` hace una transformación a texto plano de la página \[#]_.
+opción ``-dump`` hace una transformación a texto plano de la página\ [#]_.
 
 Si se desea imprimir con otra impresora puede hacerse a través de la opción
 ``-d``::
@@ -324,14 +333,12 @@ administrador. Este, además, puede limpiar por completo la cola de pendientes::
 
 Compartición
 ============
-
 .. todo:: Por escribir
 
 Profundización
 ==============
-
 Los programas (editores y procesadores de texto, visores de pdf, etc.) envían a
-*cups* el contenido del fichero en formato `postscript
+:program:`cups` el contenido del fichero en formato `postscript
 <https://es.wikipedia.org/wiki/PostScript>`_ (``.ps``) junto a las opciones de
 impresión que se hayan seleccionado. Con ambos datos, el servidor se encarga de
 componer el fichero que se manda a la impresora gracias a las reglas que se
@@ -357,8 +364,7 @@ impresora.
 
 tea4cups
 --------
-
-`tea4cups <http://www.pykota.com/software/tea4cups>`_ es un wrapper para
+`tea4cups <http://www.pykota.com/software/tea4cups>`_ es un *wrapper* para
 los drivers de :program:`cups`, que permite interceptar la orden de impresión
 después de que se hayan aplicado los *filtros* y antes de que el fichero sea
 enviado a la impresora.
@@ -368,22 +374,58 @@ El esquema de funcionamiento es el siguiente:
 .. image:: files/tea4cups.png
    :alt: Esquema de funcionamiento de cups
 
-Como puede verse, al actuar :program:`tea4cups`, el driver ya ha actuado sobre
-el fichero *postscript* que originariamente había enviado el servidor\ [#]_.
+Como puede verse, al actuar :program:`tea4cups`, el driver ya ha manipulado
+sobre el fichero *postscript* que originariamente había enviado el servidor\
+[#]_.
 
 :program:`tea4cups` proporciona tres herramientas para manipular la impresión:
 
 * `filter`, que es la primera que actúa y que únicamente permite alterar el
-   flujo de datos. Debe ser un programa que tome por la entrada estándar
-   los datos de impresión y devuelva por la salida estándar los datos
-   modificados de impresión. No hay más acceso que al contenido de los datos.
+  flujo de datos. Debe ser un programa que tome por la entrada estándar
+  los datos de impresión y devuelva por la salida estándar los datos
+  modificados de impresión. No hay más acceso que al contenido de los datos.
 
 * `prehook`, ganchos que actúan a continuación del filtro anterior y antes de
-   que se envíen datos a la impresora. Hay disponibles algunas variables de
-   ambiente y si acaba con un error 255, cancela la impresión.
+  que se envíen datos a la impresora. Hay disponibles algunas variables de
+  ambiente y si acaba con un error 255, cancela la impresión. Es útil para
+  hacer una manipulación de última hora sobre los datos que se mandan a la
+  impresora (el contenido del archivo :var:`$TEADATAFILE`).
 
-* `posthook`, ganchos que actúan después de que se haya dado la orden de
-   impresión.
+* `posthook`, ganchos que actúan después de que se haya dado la orden de impresión.
+
+Para utilizar el programa son necesarias dos acciones:
+
+#. Indicar qué impresora lo usará. Esto puede hacerse consultando cuál es el
+   dispositivo asociado a la impresora::
+
+      $ lpstat -v RICOH
+      dispositivo para RICOH: socket://172.16.1.241
+
+   y modificando su expresión, de modo que se preceda con el prefijo
+   ":kbd:`tea4cups:`:"::
+
+      $ lpadmin -p RICOH -v 'tea4cups:socket://172.16.1.241'
+
+#. Incluir en el archivo de configuración :file:`/etc/cups/tea4cups.conf` qué
+   filtros y ganchos se desea utilizar (consulte el propio archivo para más
+   información). Por ejemplo, añadiendo las líneas::
+
+      [RICOH]
+      prehook_insertcode: /usr/local/bin/insertcode.sh
+
+   donde el gancho es un *script* de la *shell* que hemos creado para manipular
+   los datos que se envían a la impresora :var:`$TEADATAFILE`.
+
+.. seealso:: Para ilustrar su uso se facilita el script
+   :download:`pedir_codigo.sh <files/pedir_codigo.sh>` que:
+
+   * Instala :program:`tea4cups` en caso de no estar instalado en el sistema.
+   * Instala, si es necesario, el gancho :file:`insercode.sh` que permite
+     introducir justo antes de la impresión el código de usuario con que se
+     configuran algunas impresoras para controlar las impresiones de sus
+     usuarios.
+   * Permite seleccionar las impresoras con las que se quiere usar *tea4cups*
+     aplicando este gancho.
 
 .. rubric:: Notas al pie
 
@@ -400,18 +442,25 @@ el fichero *postscript* que originariamente había enviado el servidor\ [#]_.
 
       # lpinfo -l -v
 
-.. [#] :command:`lpadmin` dispone de la opción ``-E`` para habilitar la
-   impresora, pero en mi sistema parece no funcionar.
+.. [#] La :kbd:`-E` debe situarse **después** de la opción :kbd:`-p`, no antes;
+   y podría, además, haberse usado en la orden de instalación anterior.
+   También podríamos hacer::
+
+      # cupsenable PDFVirtual
+      # cupsaccept PDFVirtual
 
 .. [#] ... o no. Véase :ref:`qué pasa con lpoptions <impr-predeterminada>`.
 
-.. [#] De hecho, si probáramos a pasarle el código html::
+.. [#] De hecho, si probáramos a pasarle el código |HTML|::
 
    $ wget -qO - http://www.google.es | lp
 
-   Lo que obtendríamos es la impresión del código fuente.
+   lo que obtendríamos es la impresión del código fuente.
 
 .. [#] El fichero a imprimir se almacena en :file:`/var/spool/cups/` y su nombre
    completo se almacena en la variable *TEADATAFILE*. Hay otra variable
    llamada *TEAINPUTFILE* que contiene el nombre del fichero original, pero
    no en todos los drivers está disponible.
+
+.. |CUPS| replace:: :abbr:`CUPS (Common Unix Printing System)`
+.. |HTML| replace:: :abbr:`HTML (HyperText Markup Language)`
