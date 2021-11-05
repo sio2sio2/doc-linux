@@ -7,6 +7,7 @@ CODECONFFILE="/usr/local/etc/usercode.conf"
 OPTION="UserCode"
 PJLOPTION="USERCODE"
 
+#XDIALOG=yad
 XDIALOG=zenity
 DIALOG='whiptail --title "Gestión de códigos de usuario"'
 
@@ -46,7 +47,7 @@ check_install() {
 
 # Impresoras instaladas con su dispositivo.
 get_printers() {
-   LC_ALL=C lpstat -s | sed -nr 's;^device for \b([^/]+):\s+(tea4cups:)?/?/?(.*);\1 \3 \2;p'
+   LC_ALL=C lpstat -v 2> /dev/null | sed -nr 's;^device for \b([^/]+):\s+(tea4cups:)?/?/?(.*);\1 \3 \2;p'
 }
 
 # Prepara las impresoras como opciones para whiptail
@@ -59,7 +60,7 @@ prepara_opciones() {
 # $1: Lista de impresoras tal como la saca get_printers
 # $2: Impresoras con gestión habilitada. Por ejemplo: "RICOH" "OTRA_RICOH"
 lista_cambios() {
-   HAB="("$(echo "$2" | sed -r 's:"::g; s: :|:g; /^$/s::qwwqwjjq:')")"
+   HAB="^("$(echo "$2" | sed -r 's:"::g; s: :|:g; /^$/s::qwwqwjjq:')")\$"
    # +, si estaba deshabilitada y se habilita la gestión; y
    # -, si estaba habilitada, pero se deshabilita.
    echo "$1" | awk '{
@@ -92,22 +93,22 @@ deshabilita() {
 # $2: Nombre de la impresora
 config() {
    local PRINTER="$2"
-   local LISTA="$(echo "$1" | awk '$3 != "" {print $1, "\ ", "OFF"}')"
-   local NUM=$(echo "$LISTA" | wc -l)
+   local LISTA="$(echo "$1" | awk '$3 != "" {print $1, " OFF"}')"
+   local NUM=$(printf "$LISTA" | wc -l)
    if [ -z "$PRINTER" ]; then
       case $NUM in
-         0) eval $DIALOG --msgbox '"No hay definidas impresoras"' 8 40
+         0) eval $DIALOG --msgbox '"No hay definidas impresoras con tea4cups"' 8 40
             exit 255
             ;;
          1) PRINTER=$(echo "$LISTA" | cut -d\  -f1)
             break
             ;;
-         *) eval $DIALOG --radiolist '"Escoja la impresora a configurar"' $((NUM+7)) 30 $NUM "$LISTA" 2> "$TMPFILE"  "|| return 255"
+         *) eval $DIALOG --noitem --radiolist '"Escoja la impresora a configurar"' $((NUM+7)) 30 $NUM $LISTA 2> "$TMPFILE" "|| return 255"
             PRINTER=$(tr -d '"' < "$TMPFILE")
       esac
-   else 
-      if echo "$LISTA" | grep -vq "^$PRINTER\b"; then
-         eval $DIALOG --msgbox "'"La impresora *$PRINTER* no existe"'" 8 40
+   else
+      if ! echo "$LISTA" | grep -q "^$PRINTER\>"; then
+         eval $DIALOG --msgbox "'"La impresora *$PRINTER* no existe o no usa tea4cups"'" 8 40
          return 3
       fi
    fi
@@ -169,8 +170,6 @@ trap "rm -f $TMPFILE" TERM INT EXIT
 
 LISTA=$(get_printers)
 
-[ -z "$CONFIG" ] || { config "$LISTA" $PRINTER ; exit $?; }
-
 check_install $TEA4CUPS || apt-get install -y $TEA4CUPS
 if [ $? -ne 0 ]; then
    eval $DIALOG --msgbox '"Imposible instalar tea4cups. Lo siento."' 7 40
@@ -184,6 +183,7 @@ if [ $? -ne 0 ]; then
    exit 4
 fi
 
+[ -z "$CONFIG" ] || { config "$LISTA" $PRINTER ; exit $?; }
 
 NUM=$(echo "$LISTA" | wc -l)
 NUM=$((NUM+1))
@@ -192,7 +192,7 @@ if [ $NUM -eq 0 ]; then
    exit 255
 fi
 
-eval $DIALOG --checklist '"Seleccione las impresoras que requiran código"' $((NUM+7)) 55 $NUM '$(prepara_opciones "$LISTA")' 2> "$TMPFILE"
+eval $DIALOG --checklist '"Seleccione las impresoras que requiran código"' $((NUM+7)) 55 $NUM '$(prepara_opciones "$LISTA")' 2> "$TMPFILE" || exit $?
 
 CAMBIOS=`lista_cambios "$LISTA" "$(cat $TMPFILE)"`
 echo "$CAMBIOS" | while read hab nombre; do
@@ -210,7 +210,7 @@ echo "$CAMBIOS" | while read hab nombre; do
 done
 
 if [ ! -f "$SCRIPT" ]; then
-   sed '1,/^exit 0/d; s:^OPTION=$:&'$OPTION':; s:^PJLOPTION=$:&'$PJLOPTION':; s:^CODECONFFILE=$:&'"$CODECONFIGFILE"':' $0 > "$SCRIPT"
+   sed '1,/^exit 0/d; s:^DIALOGPROG=$:&'$XDIALOG':; s:^OPTION=$:&'$OPTION':; s:^PJLOPTION=$:&'$PJLOPTION':; s:^CODECONFFILE=$:&'"$CODECONFFILE"':' $0 > "$SCRIPT"
    chown root:lpadmin "$SCRIPT"
    chmod +x "$SCRIPT"
 fi
@@ -247,10 +247,11 @@ exit 0
 #     # lpstats -s
 
 export DISPLAY=":0.0"
-DIALOG="zenity --title 'Impresora $TEAPRINTERNAME'"
+DIALOGPROG=
 OPTION=
 PJLOPTION=
 CODECONFFILE=
+DIALOG="$DIALOGPROG --title 'Impresora $TEAPRINTERNAME'"
 
 usercode_options() {
    [ -f "$2" ] || return 255
