@@ -15,7 +15,7 @@ La instalación básica es sencilla::
 
    # apt-get install cups
 
-ya que basta instalar :program:cups. Podemos también instalar una impresora
+ya que basta instalar :program:`cups`. Podemos también instalar una impresora
 virtual PDF, por si deseamos realizar pruebas y no disponemos de impresora::
 
    # apt-get install printer-driver-cups-pdf
@@ -332,29 +332,33 @@ Compartición
 
 Profundización
 ==============
-Los programas (editores y procesadores de texto, visores de pdf, etc.) envían a
-:program:`cups` el contenido del fichero en formato `postscript
-<https://es.wikipedia.org/wiki/PostScript>`_ (``.ps``) junto a las opciones de
-impresión que se hayan seleccionado. Con ambos datos, el servidor se encarga de
-componer el archivo que se manda a la impresora gracias a las reglas que se
-establecen en su driver |PPD|. Para ello:
+Las impresoras requieren recibir los datos para su impresión escritos en un
+|PDL|, esto es, un `lenguaje de descripción de páginas
+<https://es.wikipedia.org/wiki/Lenguaje_de_descripci%C3%B3n_de_p%C3%A1ginas>`_,
+como |PCL| (cuya versión 6 suele referirse como *PXL*) o `PostScript
+<https://es.wikipedia.org/wiki/PostScript>`_. Los programas (editores y
+procesadores de texto, visores de |PDF|, etc.), por su parte, generan una salida
+hacia impresión *PostScript* junto a las opciones de impresión seleccionadass, que
+recoge :program:`cups`. Este servidor de impresión, gracias a las reglas
+contenidas en el driver |PPD| se encarga de componer los datos que se envía a la
+impresora oara lo cual:
 
-#. Se añaden al principio del archivo las opciones de impresión mediante
-   instrucciones **PJL**. Por ejemplo::
+#. Añade al comienzo de los datos las opciones de impresión mediante
+   instrucciones |PJL|. Por ejemplo::
 
       @PJL SET COPIES=2
 
    le indica a la impresora que debe sacar dos copias del documento, lo cual es
    una traducción de la opción ``-n`` de :command:`lp`.
 
-#. Tras la cabecera se incluye el contenido del documento en el formato que
-   soporte la impresora. Si este es ``.ps``, no será necesaria hacer ninguna
-   transformación. Si es otro, como **PXL**, entonces el |PPD| indicará a
-   :program:`cups` que haga uso de :command:`gs` (*ghostscript*), para llevar a
-   cabo la transformación.
+#. Tras la cabecera se incluye el documento en el |PDL| que soporte la
+   impresora. Si este es *PostScript*, no será necesaria hacer ninguna
+   transformación. Si en cambio es otro, como |PCL| (*PXL* en particular),
+   entonces el |PPD| indicará a :program:`cups` que haga uso de :command:`gs`
+   (*ghostscript*), para llevar a cabo la transformación.
 
 Estas acciones que determina hacer el driver |PPD| son las que se denominan
-:dfn:`filtros`  y propician la creación del fichero final que se envía a la
+:dfn:`filtros`  y propician la creación del archivo final que se envía a la
 impresora.
 
 .. rubric:: tea4cups
@@ -419,8 +423,8 @@ Para utilizar el programa son necesarias dos acciones:
      introducir justo antes de la impresión el código de usuario con que se
      configuran algunas impresoras para controlar las impresiones de sus
      usuarios.
-   * Permite seleccionar las impresoras con las que se quiere usar *tea4cups*
-     aplicando este gancho.
+   * Permite seleccionar de entre las instaladas las impresoras con las que se
+     quiere usar *tea4cups* aplicando este gancho.
 
 .. rubric:: Notas al pie
 
@@ -461,3 +465,6 @@ Para utilizar el programa son necesarias dos acciones:
 .. |HTML| replace:: :abbr:`HTML (HyperText Markup Language)`
 .. |PDF| replace:: :abbr:`PDF (Portable Document Format)`
 .. |PPD| replace:: :abbr:`PPD (PostScript Printer Description)`
+.. |PCL| replace:: :abbr:`PCL (Printer Command Language)`
+.. |PDL| replace:: :abbr:`PDL (Printer Description Language)`
+.. |PJL| replace:: :abbr:`PJL (Printer Job Language)`
