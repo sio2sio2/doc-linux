@@ -7,11 +7,10 @@ La impresión se lleva a cabo en los linux modernos gracias al servidor
 |CUPS|, y a una serie de drivers para las distintas impresoras en
 formato ``.ppd``.  De todo ello tratará el presente documento.
 
-Puesta a punto
-==============
+Configuración inicial
+=====================
 Instalación
 -----------
-
 La instalación básica es sencilla::
 
    # apt-get install cups
@@ -23,7 +22,6 @@ virtual PDF, por si deseamos realizar pruebas y no disponemos de impresora::
 
 Ficheros
 --------
-
 La configuración del servidor se almacena bajo :file:`/etc/cups`. Tienen
 especial relevancia:
 
@@ -70,10 +68,8 @@ así que trataremos aquí la segunda.
 
 Administración
 ==============
-
 Impresoras
 ----------
-
 Búsqueda
 """"""""
 Lo primero es localizar cuáles son las impresoras disponibles para ser añadidas
@@ -165,7 +161,7 @@ aquella sobre la que se realizará una determinada acción (p.e. imprimir), en
 caso de que no se especifique sobre cuál. Podemos conocer cuál está definida
 como tal::
 
-   $ lpstats -d
+   $ lpstat -d
    destino predeterminado del sistema: PDFVirtual
 
 Para cambiarla basta\ [#]_ con usar :command:`lpadmin`::
@@ -216,9 +212,10 @@ pero entonces nuestro perfiles de dos caras, imprimirá a una y será exactament
 igual que el perfil normal.
 
 Hay un conjunto de opciones que son comunes a todos los drivers y que pueden
-consultarse en la página de manual de :command:`lp`. Otro conjunto, sin embargo,
-ique son *particulares de cada driver*, pero pueden consultarse gracias a
-:command:`lopoptions`::
+consultarse en `la documentación de cups
+<https://www.cups.org/doc/options.html#OPTIONS>`_ o en la página de manual de
+:manpage:`cups-client/lp(1)`. Otro conjunto, sin embargo, son *particulares* de cada
+*driver*, pero pueden consultarse gracias a :command:`lopoptions`::
 
    $ lpoptions -p RICOH -l
    OptionTray/Option Tray: *NotInstalled 1Cassette 2Cassette
@@ -251,24 +248,22 @@ incluso a un perfil particular::
 
 Trabajos
 --------
-
 Impresión
 """""""""
-
-Desde línea de comandos es muy sencillo imprimir ficheros de texto, *postscript*
-o *pdf*::
+Desde línea de comandos es muy sencillo imprimir directamente archivos de texto,
+*postscript* o |PDF|::
 
    $ lp /etc/passwd
    $ ls /usr/bin | lp
    $ lp certificado.pdf
 
-Usado de este modo imprimiremos en la impresora predeterminada con las opciones
+Usado de este modo, imprimiremos en la impresora predeterminada con las opciones
 predeterminadas. Si queremos imprimir algún otro tipo de fichero tendremos que
 hacer una conversión previa a uno de estos tres tipos. Por ejemplo::
 
    $ w3m -dump http://www.google.es | lp
 
-imprime la página principal de `Google <http://www.google.es>`_, puesto la
+imprime la página principal de `Google <http://www.google.es>`_, puesto que la
 opción ``-dump`` hace una transformación a texto plano de la página\ [#]_.
 
 Si se desea imprimir con otra impresora puede hacerse a través de la opción
@@ -280,13 +275,13 @@ Si se desea imprimir con otra impresora puede hacerse a través de la opción
 Para alterar las opciones predeterminadas de impresion, puede incluirse la
 opción ``-o``::
 
-   $ lp -d RICOH -o sides=sides=two-sided-short-edge certificado.pdf
+   $ lp -d RICOH -o sides=two-sided-short-edge certificado.pdf
 
 Si se quiere redefinir varias opciones, se puede repetir la opción ``-o``
 o usar la misma y separar con un espacio::
 
-   $ lp -d RICOH -o sides=sides=two-sided-short-edge -o media=a4 certificado.pdf
-   $ lp -d RICOH -o "sides=sides=two-sided-short-edge media=a4" certificado.pdf
+   $ lp -d RICOH -o sides=two-sided-short-edge -o media=a4 certificado.pdf
+   $ lp -d RICOH -o "sides=two-sided-short-edge media=a4" certificado.pdf
 
 Para mandar varias copias a la impresora existe la opción ``-n``::
 
@@ -341,10 +336,10 @@ Los programas (editores y procesadores de texto, visores de pdf, etc.) envían a
 :program:`cups` el contenido del fichero en formato `postscript
 <https://es.wikipedia.org/wiki/PostScript>`_ (``.ps``) junto a las opciones de
 impresión que se hayan seleccionado. Con ambos datos, el servidor se encarga de
-componer el fichero que se manda a la impresora gracias a las reglas que se
-establecen en su driver ``.ppd``. Para ello:
+componer el archivo que se manda a la impresora gracias a las reglas que se
+establecen en su driver |PPD|. Para ello:
 
-#. Se añaden al principio del fichero las opciones de impresión mediante
+#. Se añaden al principio del archivo las opciones de impresión mediante
    instrucciones **PJL**. Por ejemplo::
 
       @PJL SET COPIES=2
@@ -354,20 +349,20 @@ establecen en su driver ``.ppd``. Para ello:
 
 #. Tras la cabecera se incluye el contenido del documento en el formato que
    soporte la impresora. Si este es ``.ps``, no será necesaria hacer ninguna
-   transformación. Si es otro, como **PXL**, entonces el ``.ppd`` indicará a
+   transformación. Si es otro, como **PXL**, entonces el |PPD| indicará a
    :program:`cups` que haga uso de :command:`gs` (*ghostscript*), para llevar a
    cabo la transformación.
 
-Estas acciones que determina hacer el driver ``.ppd`` son las que se denominan
-:dfn:`filtros`  propician la creación del fichero final que se envía a la
+Estas acciones que determina hacer el driver |PPD| son las que se denominan
+:dfn:`filtros`  y propician la creación del fichero final que se envía a la
 impresora.
 
-tea4cups
---------
-`tea4cups <http://www.pykota.com/software/tea4cups>`_ es un *wrapper* para
-los drivers de :program:`cups`, que permite interceptar la orden de impresión
-después de que se hayan aplicado los *filtros* y antes de que el fichero sea
-enviado a la impresora.
+.. rubric:: tea4cups
+
+`tea4cups <http://www.pykota.com/software/tea4cups>`_ es un *wrapper* para los
+drivers de :program:`cups`, que permite interceptar la orden de impresión
+después de que se hayan aplicado los *filtros* del controlador :kbd:`.ppd` y
+antes de que el fichero sea enviado a la impresora.
 
 El esquema de funcionamiento es el siguiente:
 
@@ -464,3 +459,5 @@ Para utilizar el programa son necesarias dos acciones:
 
 .. |CUPS| replace:: :abbr:`CUPS (Common Unix Printing System)`
 .. |HTML| replace:: :abbr:`HTML (HyperText Markup Language)`
+.. |PDF| replace:: :abbr:`PDF (Portable Document Format)`
+.. |PPD| replace:: :abbr:`PPD (PostScript Printer Description)`
