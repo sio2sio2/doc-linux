@@ -25,7 +25,7 @@ Ejercitación
    :maxdepth: 1
    :glob:
 
-   99-ejercicios/[0-9]*
+   99.ejercicios/[0-9]*
 
 Guías para ciclos formativos 
 ============================
