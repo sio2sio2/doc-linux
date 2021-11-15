@@ -328,7 +328,9 @@ administrador. Este, además, puede limpiar por completo la cola de pendientes::
 
 Compartición
 ============
-.. todo:: Por escribir
+.. todo:: Por escribir sobre compartición de impresoras. Un buen punto de
+   partida puede ser `el artículo de la wiki de Archlinux
+   <https://wiki.archlinux.org/title/CUPS/Printer_sharing>`_.
 
 Profundización
 ==============
