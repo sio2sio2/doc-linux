@@ -310,8 +310,7 @@ que generará en el directorio padre el paquete listo para ser instalado::
 
 Proponemos lo más sencillo\ [#]_ (y que en muchos casos nos será suficiente):
 
-+ Con `Let's Encrypt`_, puesto que no requiere ningún tipo de registro y,
-  además, es la autoridad con la que por defecto genera certificados el *script*. 
++ Con `Let's Encrypt`_, puesto que no requiere ningún tipo de registro.
 + El :ref:`desafío HTTP <desafios-acme>`.
 
   .. warning:: No obstante, si pretende albergar múltiples sitios en el mismo
@@ -336,16 +335,22 @@ Proponemos lo más sencillo\ [#]_ (y que en muchos casos nos será suficiente):
 Si la resolución |DNS| de esos dos nombres conduce a nuestro servidor *web*,
 generar un certificado para esos nombres se lleva a cabo con::
 
-   # acme.sh --issue -d example.net -d www.example.net -w /srv/www/default
+   # acme.sh --issue --server letsencrypt -d example.net -d www.example.net -w /srv/www/default
 
 donde :kbd:`-d` introduce los nombres de máquina y :kbd:`-w` el directorio raíz
-para ese servidor virtual. 
+para ese servidor virtual. La opción :kbd:`--server` indica cuál es la |CA| con
+la que queremos generar certificados (véase `todas las alternativas en la
+documentación oficial
+<https://github.com/acmesh-official/acme.sh/wiki/Server>`_) y es necesario
+incluirla en las operaciones que requieren conexión con la |CA| como
+:kbd:`--issue` o :kbd:`--revoke`.
 
 .. note:: Podemos en un mismo certificado asociar varios nombres a distintos
    directorios raíz, para lo cual debemos expresar cada directorio raíz
    inmediatamente después de cada nombre::
 
-      # acme.sh --issue -d example.net -w /srv/www/default \
+      # acme.sh --issue --server letsencrypt
+                        -d example.net -w /srv/www/default \
                         -d www.example.net -w /srv/www/default \
                         -d moodle.example.net -w /srv/www/moodle
 
@@ -378,15 +383,22 @@ listar todos los certificados gestionados por el *script*::
 
 o la que permite revocar y borrar alguno de los certificados::
 
-   # acme.sh --revoke -d example.net
+   # acme.sh --revoke --server letsencrypt -d example.net
    # acme.sh --remove -d example.net
 
 El certificado, aunque ya no esté activo (no aparecerá al usar :kbd:`--list`),
 no se borrará del directorio :file:`/etc/acme.sh/cert/example.net`. Esta operación deberemos hacerla a mano.
 
+.. note:: A partir de la versión **3.0**, `Let's Encrypt`_ dejó de ser la |CA|
+   predeterminada y pasó a serlo ZeroSSL_. Esa es la razón por la que hemos
+   necesita explicitar el servidor a través de la opción :kbd:`--server`.
+   Podemos cambiar, no obstante, muy fácilmente la |CA| predeterminada::
+
+      # acme.sh -set-default-ca  --server letsencrypt
+
 .. warning:: Si ha configurado el servidor de manera que :ref:`la conexión no segura
    redirige a la segura <nginx-https+http>` (lo cual es muy habitual), la
-   revocación no funcionará, así que, antes de revocar comprueba, asegurese de
+   revocación no funcionará, así que, antes de revocar comprueba, asegúrese de
    inhabilitarlo temporalmente.
 
 .. rubric:: Configuración
@@ -510,28 +522,25 @@ o desde la consola con :command:`openssl` al servidor::
 
 Certificados con ZeroSSL_
 -------------------------
-ZeroSSL_ es una buena alternativa a `Let's Encrypt`_, aunque requiere un
-registro previo que puede hacerse desde la propia línea de órdenes::
+ZeroSSL_ es una buena alternativa a `Let's Encrypt`_ y, además. en las últimas
+versiones del *script* `es la CA predefinida
+<https://github.com/acmesh-official/acme.sh/wiki/ZeroSSL.com-CA>`_ [#]_, aunque
+requiere un registro previo que puede hacerse desde la propia línea de órdenes::
 
    # acme.sh  --server zerossl --register-account -m micorreo@example.net
 
 .. note:: Si ya estábamos registrados, sígase la `documentación oficial de acme.sh sobre
-   `certificados de ZeroSSL
+   certificados de ZeroSSL
    <https://github.com/acmesh-official/acme.sh/wiki/ZeroSSL.com-CA>`_
 
 Hecho el registro, la generación de certificados con :kbd:`--issue` es
-exactamente igual excepto pòr la salvedad de que deberermos añadir
+exactamente igual, excepto pòr la salvedad de que deberermos añadir
 :kbd:`--server zerossl`::
 
    # acme.sh --server zerossl --issue -d zero.iescdl.es -w /srv/www/zero1 \
       -d zero2.iescdl.es -w /srv/www/zero2
 
 Obviamente, además habrá que instalar el certificado.
-
-.. note:: En realidad la operativa es exactamente la misma que con `Let's
-   Encrypt`_ con la salvedad de que requerirá indicar con :kbd:`--server` cual
-   es la |CA| en aquellas operaciones que requieren conexión con el servidor
-   como :kbd:`--issue` o :kbd:`--revoke`.
 
 .. seealso:: Échele un vistazo a la `documentación oficial de acme.sh sobre
    `certificados de ZeroSSL
@@ -713,6 +722,9 @@ cambiar el contenido de :file:`snippets/cert.conf`:
 .. [#] Lo cual no es ningún problema, puesto que un certificado digital se puede
    asociar a varios nombres.
 
+.. [#] Lo cuál significa que, si no se incluye la opción :kbd:`--server`, se
+   supondrá que usamos esta |CA|.
+
 .. [#] Lo habitual es que el agente registrador del dominio nos ofrezca el
    servicio |DNS|, y dependiendo de cuál sea que nos ofrezca o no la
    posibilidad de generar registros dinámicamente. Si la ofrece, es obvio que
@@ -720,7 +732,7 @@ cambiar el contenido de :file:`snippets/cert.conf`:
    probable que requiera un registro previo en ese servicio. Lo mejor es
    consultar la documentación del proyecto acme.sh_
 
-.. [#] También hay una opción ``-pre-hook`` para ejecutar antes.
+.. [#] También hay una opción :kbd:`--pre-hook` para ejecutar antes.
 
 .. |SSL| replace:: :abbr:`SSL (Secure Socket Layer)`
 .. |TLS| replace:: :abbr:`TLS (Transport Layer Security)`
