@@ -2,48 +2,197 @@
 
 Servidor |RADIUS|
 *****************
+|RADIUS| es un protocolo de autenticación y autorización para acceso a la red,
+muy utilizado en redes *wifi*, que utiliza para el establecimiento de las
+conexiones el puerto 1812/\ |UDP|. Permite a cada solicitante de acceso a la red
+utilizar una pareja de credenciales (usuario/contraseña) distintas.
 
-.. Chuleta
+En el caso que queremos resolver, tenemos tres agentes:
 
-   https://wiki.freeradius.org/guide/HOWTO
+#. Una servidor *Debian* que actúa como :dfn:`servidor de autenticación`\ [#]_
+   |RADIUS|, cuya implementación más extendida de código abierto es Freeradius_,
+   La instalación, como es habitual cuando existe paquete, es sumamente
+   sencilla::
 
-   Añadir el punto de acceso en client.conf:
+      # apt install freeradius
 
-   client ap {
-      ipaddr   = IP.DEL.PUNTO.DE.ACCESO
-      secret   = clave_secreta
+   Este servidor contendrá las credenciales usuario/contraseña de todos aquellos
+   a los que se permite el acceso a la red.
+
+#. El :dfn:`solicitante`, que es el dispositivo inalámbrico que pide acceso a
+   la red. Deberá disponer de unas credenciales válidas para poder acceder.
+
+#. Un *punto de acceso* que actía como :dfn:`autenticador` o :dfn:`controlador
+   de acceso`, esto es, intermedia entre el *solicitante* y el *servidor de
+   autenticación*.
+
+.. image:: /guias/02.seg/04.redes/files/radius.png
+
+Para establecer un canal seguro de comunicación sobre el que discurra el
+proceso de autenticación y autorización se utiliza |EAP|, que más que un
+protocolo es un *framework* para crear protocolos concretos. Los más comunes
+son |EAP|/|TLS|, que requiere autenticación con certificados tanto del lado del
+servidor como del cliente, y |PEAP|, que sólo requiere certificado en la parte
+del cliente.
+
+.. seealso:: Para consultar los principales protocolos creados con |EAP| puede
+   consultar `este artículo de Intel
+   <https://www.intel.es/content/www/es/es/support/articles/000006999/wireless/legacy-intel-wireless-products.html>`_.
+
+Configuración básica
+====================
+Toda la configuración se encuentra en el directorio :file:`/etc/freeradius/3.0/`
+y es en él donde tenemos que empezarla. El archivo :file:`client.conf` contiene
+los *controladores de acceso* a los que se permite comunicar con el servidor
+para retransmitir las credenciales. Ya tiene definido uno:
+
+.. code-block:: docker
+
+   client localhost {
+      # [...]
+      ippadr = 127.0.0.1
+      # [...]
+      secret = testing123
    }
 
-   Añadir usuarios en users:
+que nos permitirá para :ref:`hacer comprobaciones más adelante <radius-check>`.
+Lo interesante es que nos sirve de modelo para definir nuevos *autenticadores*:
+basta con indicar qué dirección |IP| tiene y establecer una palabra secreta
+arbitraria que habrá luego que trasladar a la configuración de éste:
 
-   usuario1     Cleartext-Password := "contraseña"
+.. code-block:: docker
 
-   Y ya está. Si se quiere almacenar usuarios en una base de datos sqlite:
+   client linksys {
+      ippadr = 192.168.0.10
+      secret = clavesecreta
+   }
 
-   # cd mod-enabled
+También es posible indicar una red completa:
+
+.. code-block:: docker
+
+   client pas {
+      ippadr = 192.168.0.0/24
+      secret = clavesecreta
+   }
+
+La segunda parte de la configuración consiste en añadir las credenciales que
+permitirán el acceso a los solicitantes. Es posible enumerarlas en el archivo
+:file:`users` simplemente añadiendo una línea por credencial:
+
+.. code-block:: none
+
+   usuario1     Cleartext-Password := "contraseña1"
+   usuario2     Cleartext-Password := "contraseña2"
+
+pero para evitar el engorro de alterar el archivo, recurriremos a utilizar otro
+*backend*. El más sencillo es una base de datos SQLite_, puesto que es probable
+que nuestro servidor mínimo ya tenga soporte para ellas\ [#]_. esta opción
+requiere habilitar el módulo::
+
+   # cd /etc/freeradius/3.0/mod-enabled
    # ln -s ../mod-available/sql
 
-   Editar ese archivo:
+y debe editarse este archivo para hacer algunos cambios:
+
+.. code-block:: docker
+   :emphasize-lines: 4, 5, 8
 
    sql {
-      [...]
       dialect = "sqlite"
-      [...]
+
       #driver = "rlm_sql_null"
       driver = "rlm_sql_${dialect}"
-      [...]
 
       sqlite {
-         filename = "/etc/raddb/sqlite.db"
-         [..]
+         filename = "/etc/freeradius/raddb/users-sqlite.db"
+         # [...]
       }
+
+      # [...]
    }
 
-   Y crear el directorio para que se cree automáticamente la base de datos:
+Editado el archivo, es necesario preparar el directorio que albergará la
+base de datos::
 
-   # mkdir -m700 /etc/raddb
-   # chown freerad:freerad /etc/raddb
+   # mkdir -m750 /etc/freeradius/raddb/
+   # chown freerad:freerad /etc/freeradius/raddb/
+
+pero no necesitamos crearla, porque el servidor lo hará por nosotros cuando lo
+reiniciemos::
+
    # invoke-rc.d freeradius restart
-   # echo "INSERT INTO radcheck VALUES (NULL, 'usuario2', 'Cleartext-Password', ':=', 'nolasabes');" | sqlite /etc/raddb/sqlite.db
+
+aunque, obviamente, no habrá credenciales almacenadas. Para ello debemos
+insertar registros en la tabla *radcheck*. Por ejemplo, esto::
+
+   # echo "INSERT INTO radcheck VALUES (NULL, 'cliente', 'Cleartext-Password', ':=', 'nolasabes');" \
+      | sqlite /etc/freeradius/raddb/users-sqlite.db
+
+crea una credenciales *usuario/nolasabes*. Para comprobar que ha ido bien la
+configuración basta con ejecutar:
+
+.. code-block:: console
+   :emphasize-lines: 2, 9
+
+   # radtest cliente nolasabes localhost 10 testing123
+   Sent Access-Request Id 39 from 0.0.0.0:51538 to 127.0.0.1:1812 length 82
+           User-Name = "cliente"
+           User-Password = "nolasabes"
+           NAS-IP-Address = 127.0.1.1
+           NAS-Port = 0
+           Message-Authenticator = 0x00
+           Cleartext-Password = "nolasabes"
+   Received Access-Accept Id 39 from 127.0.0.1:1812 to 127.0.0.1:51538 length 20
+
+La orden exige pasarle las credenciales (los dos primeros argumentos), el
+servidor (*localhost* porque estamos haciendo una consulta local), un número de
+puerto (que debe ser cualquier número entero positivo incluido el cero) y, por
+último, la palabra secreta para conectar al servidor (y que ya vimos que de
+forma predeterminada es *testing123* para conexión local). Como las credenciales
+son válidas (las acabamos de introducir en la base de datos), el cliente debe
+recibir un :kbd:`Access-Accept`.
+
+.. _radius-check:
+
+Autenticadores
+==============
+Para que el punto de acceso actúe como autenticador de nuestro servidores,
+necesitamos configurar la seguridad de su red *wireless* del siguiente modo:
+
+.. table:: Parámetros de configuración
+   
+   ================= =================
+    Modo             WPA2-Enterprise
+    Servidor radius  192.168.0.1
+    Puerto           1812
+    secreto          clavesecreta
+   ================= =================
+
+donde hemos supuesto que nuestro servidor ocupa la |IP| *192.168.0.1*.
+
+.. todo:: Añadir una captura de la pantalla de configuración de la seguridad de
+   un punto de acceso.
+
+.. rubric:: Notas al pie
+
+.. [#] Recibe también el nombre de |NAS| (*Servicio de autenticación de red*),
+   que no hay confundir con el *almacenamiento conectado a red* que comparte el
+   mismo acrónimo y que se revisa dentro de las :ref:`arquitecturas de
+   almacenamiento <arq-alm>`.
+
+.. [#] Lo más que probable que varias aplicaciones del servidor usen bases de
+   datos de este tipo y, por tanto se tenga instalado el paquete
+   :deb:`libsqlite3-0`. También es probable, no obstante, que no se tenga
+   instalado el cliente :deb:`sqlite3`, pero es pequeño y solo se necesita para
+   registrar los usuarios.
 
 .. |RADIUS| replace:: :abbr:`RADIUS (Remote Authentication Dial In User Service)`
+.. |EAP| replace:: :abbr:`EAP (Extensible Authentication Protocol)`
+.. |PEAP| replace:: :abbr:`EAP (Protected Extensible Authentication Protocol)`
+.. |NAS| replace:: :abbr:`NAS (Network Authentication Server)`
+.. |TLS| replace:: :abbr:`TLS (Transport Layer Security)`
+.. |UDP| replace:: :abbr:`UDP (User Datagram Protocol)`
+
+.. _Freeradius: https://freeradius.org/
+.. _SQLite: https://sqlite.org/
