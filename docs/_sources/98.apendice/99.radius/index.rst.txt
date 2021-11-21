@@ -9,10 +9,9 @@ utilizando una pareja de credenciales (usuario/contraseña) propias.
 
 En el caso que queremos resolver, tenemos tres agentes:
 
-#. Una servidor *Debian* que actúa como :dfn:`servidor de autenticación`\ [#]_
-   |RADIUS|, cuya implementación más extendida de código abierto es Freeradius_,
-   La instalación, como es habitual cuando existe paquete, es sumamente
-   sencilla::
+#. Una servidor *Debian* que actúa como servidor |RADIUS|, cuya implementación
+   más extendida de código abierto es Freeradius_, La instalación, como es
+   habitual cuando existe paquete, es sumamente sencilla::
 
       # apt install freeradius
 
@@ -22,9 +21,11 @@ En el caso que queremos resolver, tenemos tres agentes:
 #. El :dfn:`solicitante`, que es el dispositivo inalámbrico que pide acceso a
    la red. Deberá disponer de unas credenciales válidas para poder acceder.
 
-#. Un *punto de acceso* que actía como :dfn:`autenticador` o :dfn:`controlador
-   de acceso`, esto es, intermedia entre el *solicitante* y el *servidor de
-   autenticación*.
+#. Un *punto de acceso* que actúa como :dfn:`autenticador` o |NAS|\ [#]_
+   (:dfn:`servidor de acceso a la red`) u que es el que permite acceder a
+   *solicitante* consultando con el servidor |RADIUS| sus credenciales. Actúa,
+   pues.  como intermediario entre el *solicitante* y el servidor |RADIUS|.
+   
 
 .. image:: /guias/02.seg/04.redes/files/radius.png
 
@@ -185,15 +186,64 @@ donde hemos supuesto que nuestro servidor ocupa la |IP| *192.168.0.1*.
 .. todo:: Añadir una captura de la pantalla de configuración de la seguridad de
    un punto de acceso.
 
+Otras configuraciones
+=====================
+Aparte de la configuración básica, pueden interesarnos otras funcionalidades.
+
+Conexiones simultáneas
+----------------------
+
+.. http://lists.freeradius.org/pipermail/freeradius-users/2016-April/083292.html
+.. http://lists.freeradius.org/pipermail/freeradius-users/2017-January/086105.html
+.. http://lists.freeradius.org/pipermail/freeradius-users/2016-March/thread.html#82510
+.. https://wiki.freeradius.org/guide/faq#common-problems-and-their-solutions_simultaneous-use-doesn-t-work
+.. https://fossies.org/linux/freeradius-server/doc/configuration/simultaneous_use
+
+
+|LDAP|
+------
+.. todo:: Configurar |LDAP| como *backend* del servidor |RADIUS|.
+
+
+|PAM|
+-----
+.. warning:: La configuración propuesta es incompatible con cualquier otro
+   *backend* para almacenar usuarios, por lo que, si usamos esta autenticación,
+   deberemos renunciar a cualquier otro *backend*.
+
+La autenticación con |PAM|, que no está recomendada por los desarrolladores
+exige:
+
+#. Que el usuario *freeradius* pertenezca al grupo *shadow*, lo cual ya
+   previene la instalación del paquete.
+
+#. Que se incluya en :file:`users` la línea:
+
+   .. code-block:: docker
+
+      DEFAULT Auth-Type: Pam
+
+#. Que habilitemos el módulo de modo semejante a como hicimos con *sql*::
+
+      # cd /etc/freeradius/3.0/mod-enabled
+      # ln -s ../mod-available/pam
+
+#. Que descomentemos en :file:`sites-enabled/default` y
+   :file:`sites-enabled/inner-tunnel` la línea referente a |PAM|.
+
+Para comprobar la autenticación :program:`freeradius` usa el servicio de |PAM|
+*radiusd* que ya viene preparado en el paquete. Para cualquier modificación del
+comportamiento predefinido, deberemos tener conocimientos de :ref:`cómo funciona
+PAM <pam>`.
+
 .. rubric:: Notas al pie
 
-.. [#] Recibe también el nombre de |NAS| (*Servicio de autenticación de red*),
-   que no hay confundir con el *almacenamiento conectado a red* que comparte el
-   mismo acrónimo y que se revisa dentro de las :ref:`arquitecturas de
+.. [#] El acrónimo coincide con el de *almacenamiento conectado a red*, con el
+   que no debe confundirse y que se revisa dentro de las :ref:`arquitecturas de
    almacenamiento <arq-alm>`.
 
 .. [#] Lo más que probable que varias aplicaciones del servidor usen bases de
-   datos de este tipo y, por tanto se tenga instalado el paquete
+   datos de este tipo y, por tanto, se tenga instalado el paquete
    :deb:`libsqlite3-0`. También es probable, no obstante, que no se tenga
    instalado el cliente :deb:`sqlite3`, pero es pequeño y solo se necesita para
    registrar los usuarios.
