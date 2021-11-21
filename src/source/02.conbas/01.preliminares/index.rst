@@ -42,7 +42,6 @@ correspondiente:
 
 La interfaz de texto
 --------------------
-
 Los sistemas *UNIX* (y entre ellos *linux*) son comúnmente administrados a
 través de una interfaz de texto\ [#]_, aunque puedan disponer también de una
 interfaz gráfica. Estas interfaces de texto se caracterizan por ejecutar un
@@ -57,7 +56,7 @@ o sea, una línea que proporciona cierta información y que acaba con el símbol
 del dólar y un espacio. A continuación aparece el cursor en espera de que el
 usuario ordene (de ahí, el término de **línea de órdenes** o **línea de
 comandos**) qué es lo que se debe hacer. Esa información inicial acabada en el
-símbolo del dólar se llama *prompt* y puede tener diverso aspecto, ya que
+símbolo del dólar se llama :dfn:`prompt` y puede tener diverso aspecto, ya que
 es configurable. Por lo general, en la mayoría de los sistemas, muestra nuestro
 nombre de usuario (*usuario* en este caso), el símbolo de la arroba (@), el nombre
 de la máquina (*pc*), dos puntos (:) y el directorio de trabajo (*~*, que ya veremos

@@ -4,8 +4,8 @@ Servidor |RADIUS|
 *****************
 |RADIUS| es un protocolo de autenticación y autorización para acceso a la red,
 muy utilizado en redes *wifi*, que utiliza para el establecimiento de las
-conexiones el puerto 1812/\ |UDP|. Permite a cada solicitante de acceso a la red
-utilizar una pareja de credenciales (usuario/contraseña) distintas.
+conexiones el puerto 1812/\ |UDP|. Permite que cada solicitante acceda a la red
+utilizando una pareja de credenciales (usuario/contraseña) propias.
 
 En el caso que queremos resolver, tenemos tres agentes:
 
@@ -16,8 +16,8 @@ En el caso que queremos resolver, tenemos tres agentes:
 
       # apt install freeradius
 
-   Este servidor contendrá las credenciales usuario/contraseña de todos aquellos
-   a los que se permite el acceso a la red.
+   En este servidor deberán almacenarse las credenciales de todos aquellos a los
+   que se permite el acceso a la red.
 
 #. El :dfn:`solicitante`, que es el dispositivo inalámbrico que pide acceso a
    la red. Deberá disponer de unas credenciales válidas para poder acceder.
@@ -33,7 +33,7 @@ proceso de autenticación y autorización se utiliza |EAP|, que más que un
 protocolo es un *framework* para crear protocolos concretos. Los más comunes
 son |EAP|/|TLS|, que requiere autenticación con certificados tanto del lado del
 servidor como del cliente, y |PEAP|, que sólo requiere certificado en la parte
-del cliente.
+del servidor.
 
 .. seealso:: Para consultar los principales protocolos creados con |EAP| puede
    consultar `este artículo de Intel
@@ -41,6 +41,10 @@ del cliente.
 
 Configuración básica
 ====================
+.. warning:: Antes de empezar la configuración es indispensable cerciorarse de
+   que el nombre de la máquina (el que se obtiene con :ref:`hostname <hostname>`)
+   es resoluble (p.e. porque se ha incluido en :file:`/etc/hosts`).
+
 Toda la configuración se encuentra en el directorio :file:`/etc/freeradius/3.0/`
 y es en él donde tenemos que empezarla. El archivo :file:`client.conf` contiene
 los *controladores de acceso* a los que se permite comunicar con el servidor
@@ -55,7 +59,7 @@ para retransmitir las credenciales. Ya tiene definido uno:
       secret = testing123
    }
 
-que nos permitirá para :ref:`hacer comprobaciones más adelante <radius-check>`.
+que nos permitirá :ref:`hacer comprobaciones más adelante <radius-check>`.
 Lo interesante es que nos sirve de modelo para definir nuevos *autenticadores*:
 basta con indicar qué dirección |IP| tiene y establecer una palabra secreta
 arbitraria que habrá luego que trasladar a la configuración de éste:
@@ -105,7 +109,7 @@ y debe editarse este archivo para hacer algunos cambios:
       driver = "rlm_sql_${dialect}"
 
       sqlite {
-         filename = "/etc/freeradius/raddb/users-sqlite.db"
+         filename = "/var/cache/radius/users-sqlite.db"
          # [...]
       }
 
@@ -115,8 +119,8 @@ y debe editarse este archivo para hacer algunos cambios:
 Editado el archivo, es necesario preparar el directorio que albergará la
 base de datos::
 
-   # mkdir -m750 /etc/freeradius/raddb/
-   # chown freerad:freerad /etc/freeradius/raddb/
+   # mkdir -m750 /var/cache/radius
+   # chown freerad:freerad /var/cache/radius
 
 pero no necesitamos crearla, porque el servidor lo hará por nosotros cuando lo
 reiniciemos::
@@ -127,10 +131,12 @@ aunque, obviamente, no habrá credenciales almacenadas. Para ello debemos
 insertar registros en la tabla *radcheck*. Por ejemplo, esto::
 
    # echo "INSERT INTO radcheck VALUES (NULL, 'cliente', 'Cleartext-Password', ':=', 'nolasabes');" \
-      | sqlite /etc/freeradius/raddb/users-sqlite.db
+      | sqlite3 /var/cache/radius/users-sqlite.db
 
 crea una credenciales *usuario/nolasabes*. Para comprobar que ha ido bien la
 configuración basta con ejecutar:
+
+.. _radius-check:
 
 .. code-block:: console
    :emphasize-lines: 2, 9
@@ -153,7 +159,12 @@ forma predeterminada es *testing123* para conexión local). Como las credenciale
 son válidas (las acabamos de introducir en la base de datos), el cliente debe
 recibir un :kbd:`Access-Accept`.
 
-.. _radius-check:
+.. note:: Para depurar el funcionamiento, puede ejecutarse directamente el
+   servicio con::
+
+      # freeradius -X
+
+.. _radius-pa:
 
 Autenticadores
 ==============
@@ -189,7 +200,7 @@ donde hemos supuesto que nuestro servidor ocupa la |IP| *192.168.0.1*.
 
 .. |RADIUS| replace:: :abbr:`RADIUS (Remote Authentication Dial In User Service)`
 .. |EAP| replace:: :abbr:`EAP (Extensible Authentication Protocol)`
-.. |PEAP| replace:: :abbr:`EAP (Protected Extensible Authentication Protocol)`
+.. |PEAP| replace:: :abbr:`PEAP (Protected Extensible Authentication Protocol)`
 .. |NAS| replace:: :abbr:`NAS (Network Authentication Server)`
 .. |TLS| replace:: :abbr:`TLS (Transport Layer Security)`
 .. |UDP| replace:: :abbr:`UDP (User Datagram Protocol)`
