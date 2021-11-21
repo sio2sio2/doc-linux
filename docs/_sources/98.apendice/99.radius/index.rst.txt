@@ -186,8 +186,8 @@ donde hemos supuesto que nuestro servidor ocupa la |IP| *192.168.0.1*.
 .. todo:: Añadir una captura de la pantalla de configuración de la seguridad de
    un punto de acceso.
 
-Otras configuraciones
-=====================
+Configuración adicional
+=======================
 Aparte de la configuración básica, pueden interesarnos otras funcionalidades.
 
 Conexiones simultáneas
@@ -221,7 +221,7 @@ exige:
 
    .. code-block:: docker
 
-      DEFAULT Auth-Type: Pam
+      DEFAULT     Auth-Type=Pam
 
 #. Que habilitemos el módulo de modo semejante a como hicimos con *sql*::
 
