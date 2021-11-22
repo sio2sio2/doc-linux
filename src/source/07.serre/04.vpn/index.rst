@@ -2,9 +2,9 @@
 
 Redes VPN
 *********
-Una red privada virtual (|VPN|) consiste en la conexión de dos nodos remotos,
-(por lo general separados por la internet pública), de manera que ambos se
-comporten como una única red local. Esto se logra estableciendo una conexión
+Una :dfn:`red privada virtual` (|VPN|) consiste en la conexión de dos nodos
+remotos, (por lo general separados por la internet pública), de manera que ambos
+se comporten como una única red local. Esto se logra estableciendo una conexión
 virtual punto a punto. Dado que la comunicación atraviesa internet la
 comunicación es cifrada y, además, se habilitan mecanismos para poder asegurar
 la identidad del otro lado.
