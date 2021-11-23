@@ -74,7 +74,7 @@ Además, las ediciones pueden presentar variantes sobre su forma original:
   Son, por tanto, el equivalente de las versiones |LTS| de las distribuciones de
   *Linux*.
 
-* **N**: sSon variantes que carecen de reproductor multimedia preinstalado (en
+* **N**: son variantes que carecen de reproductor multimedia preinstalado (en
   concreto, el `Windows Media Player
   <https://es.wikipedia.org/wiki/Reproductor_de_Windows_Media>`_)
 
@@ -96,18 +96,21 @@ darle dos núcleos al procesador en vez de 1.
 
 .. rubric:: Particiones
 
-*Windows* necesita una partición mínima de 32GiB formateada en |NTFS| para
-instalarse. Sin embargo, la instalación puede crear otras particiones:
+*Windows* necesita al menos una partición de tamaño mínimo de 32GiB formateada
+en |NTFS| para instalarse. Sin embargo, la instalación puede crear otras
+particiones:
 
 + En sistemas con arranque |EFI|, se crea una pequeña *partición reservada de
   Microsoft* (|MRP|) de 16MiB.
-+ En sistemas con arranque |BIOS|, si el disco no está previamente particionado,
-  se crea una partición aparte de hasta 500MiB que se usa fundamentalmente para
-  instalar los archivos del gestor de arranque y permitir el arranque de un
-  sistema cifrado con :program:`BitLocker`.
-+ En ambos sistemas, si el disco no está previamente particionado, se crea una
-  partición de recuperación *WinRE*. En caso contrario, los archivos se guardan
-  dentro de la partición del sistema (:file:`%SystemDrive%\Recovery`).
++ Cuanto en el proceso de instalación se da libertad a *Windows* para instalarse
+  en el espacio libre disponible se crean, además:
+
+  * Sólo con arranque |BIOS|, una pequeña partición de 50 ó 100 MiB para
+    almacenar  los archivos del gestor de arranque y los que permiten arrancar
+    si la partición del sistema se cifró con :program:`BitLocker`.
+  * Tanto para arranque |BIOS| como |EFI|, una partición de recuperación
+    *WinRE*. En caso contrario, los archivos se guardan dentro de la partición
+    del sistema (:file:`%SystemDrive%\Recovery`).
 
 .. seealso:: *Microsoft* desarrolla en dos documentos la descripción de las
    particiones `en sistemas BIOS
