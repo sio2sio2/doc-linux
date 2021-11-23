@@ -49,38 +49,34 @@ tienen distintos sabores (:dfn:`ediciones` según la propia terminología de
 Microsoft) en que, en esencia, son el mismo sistema, pero con más o menos
 limitaciones. Las ediciones disposibles son:
 
-**Home**
-   Es la edición, pensada para el usuario doméstico estándar, más barata, pero
-   con menos prestaciones. Si se es un usuario avanzado, puede echarse en falta
-   la ausencia de administración remota (tiene cliente, pero no servidor), de
-   Hyper-V para virtualización, o de *BitLocker* (para cifrar el sistema).
+* **Home**: es la edición, pensada para el usuario doméstico estándar, más
+  barata, pero con menos prestaciones. Si se es un usuario avanzado, puede
+  echarse en falta la ausencia de administración remota (tiene cliente, pero no
+  servidor), de Hyper-V para virtualización, o de *BitLocker* (para cifrar el
+  sistema).
 
-**Professional** (o, simplemente, **Pro**)
-   Es la edición recomendada para usuarios avanzados e incorpora
-   características ausentres en la *Home*.
+* **Professional** (o, simplemente, **Pro**): ess la edición recomendada para
+  usuarios avanzados e incorpora características ausentres en la *Home*.
 
-**Enterprise**
-    Es muy parecida a la *Pro*, pero destinada al uso empresarial, de ahí que
-    *Microsoft* sólo permita su adquisión a través de licencias por volumen.
+* **Enterprise**: es muy parecida a la *Pro*, pero destinada al uso empresarial,
+  de ahí que *Microsoft* sólo permita su adquisión a través de licencias por
+  volumen.
 
-**Education**
-    Es la edición *Enterprise* para instituciones educativas.
+* **Education**: es la edición *Enterprise* para instituciones educativas.
 
 .. seealso:: Para más información, puede consultarse `este artículo de Softzone
    <https://www.softzone.es/windows/como-se-hace/windows-10-home-vs-pro-vs-enterprise-vs-education/>`_.
 
 Además, las ediciones pueden presentar variantes sobre su forma original:
 
-|LTSC|
-    Es una variante de la *Enterprise* con soporte extendido que aseguran el
-    mantenimiento y las actualizaciones de seguridad durante al menos 10 años.
-    Son, por tanto, el equivalente de las versiones |LTS| de las distribuciones
-    de *Linux*.
+* |LTSC|: es una variante de la *Enterprise* con soporte extendido que aseguran
+  el mantenimiento y las actualizaciones de seguridad durante al menos 10 años.
+  Son, por tanto, el equivalente de las versiones |LTS| de las distribuciones de
+  *Linux*.
 
-**N**
-    Son variantes que carecen de reproductor multimedia preinstalado (en
-    concreto, el `Windows Media Player
-    <https://es.wikipedia.org/wiki/Reproductor_de_Windows_Media>`_)
+* **N**: sSon variantes que carecen de reproductor multimedia preinstalado (en
+  concreto, el `Windows Media Player
+  <https://es.wikipedia.org/wiki/Reproductor_de_Windows_Media>`_)
 
 .. note:: Microsoft permite la `evaluación durante 90 días de la edición
    Enterprise
