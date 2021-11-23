@@ -1,5 +1,6 @@
 .. _som-inst:
 
+*********************
 Instalación de |SSOO|
 *********************
 El proceso de instalación de uno o varios sistemas operativos (sobre todo si son
@@ -13,13 +14,13 @@ estos aspectos previos, para en el tercero centrarnos en la instalación de dos
 sistemas operativos: *Windows* y *Linux*.
 
 Particionado
-============
+************
 El contenido de este epígrafe está desarrollado en el :ref:`epígrafe sobre
 particiones de Linuxnomicón <particionado>`. En el se describen los dos sistemas
 de particionado que nos interesa conocer: |GPT| y |DOS|.
 
 Arranque
-========
+********
 Para instalar sistemas operativos y, sobre todo, si quieren instalarse varios en
 el equipo, es indispensable entender cómo arranca éste y qué espera encontrar en
 en los discos. Sobre estos asuntos asuntos versa el :ref:`epígrafe sobre
@@ -30,23 +31,224 @@ arranque del manual de Linux <arranque>`.
    en el enlace facilitado (:ref:`GRUB <grub>`, :ref:`rEFInd <refind>`).
 
 Instalación
-===========
+***********
+Se enumeran algunos aspectos a tener en cuenta en la instalación tanto de
+*Windows* como de *Linux*.
+
+Windows
+=======
+Los sistemas *Windows* para ordenadores tienen dos grandes líneas: la destinada
+a servidores (apellidadas "*Server*"), que no trataremos en este módulo; y la
+destinada a clientes.
+
+.. rubric:: Ediciones y versiones
+
+Dentro de la línea para clientes, *Microsoft* saca cada cierto tiempo nuevas
+versiones numeradas (**7**, **8**, **10** y el reciente **11**) que a su vez
+tienen distintos sabores (:dfn:`ediciones` según la propia terminología de
+Microsoft) en que, en esencia, son el mismo sistema, pero con más o menos
+limitaciones. Las ediciones disposibles son:
+
+**Home**
+   Es la edición, pensada para el usuario doméstico estándar, más barata, pero
+   con menos prestaciones. Si se es un usuario avanzado, puede echarse en falta
+   la ausencia de administración remota (tiene cliente, pero no servidor), de
+   Hyper-V para virtualización, o de *BitLocker* (para cifrar el sistema).
+
+**Professional** (o, simplemente, **Pro**)
+   Es la edición recomendada para usuarios avanzados e incorpora
+   características ausentres en la *Home*.
+
+**Enterprise**
+    Es muy parecida a la *Pro*, pero destinada al uso empresarial, de ahí que
+    *Microsoft* sólo permita su adquisión a través de licencias por volumen.
+
+**Education**
+    Es la edición *Enterprise* para instituciones educativas.
+
+.. seealso:: Para más información, puede consultarse `este artículo de Softzone
+   <https://www.softzone.es/windows/como-se-hace/windows-10-home-vs-pro-vs-enterprise-vs-education/>`_.
+
+Además, las ediciones pueden presentar variantes sobre su forma original:
+
+|LTSC|
+    Es una variante de la *Enterprise* con soporte extendido que aseguran el
+    mantenimiento y las actualizaciones de seguridad durante al menos 10 años.
+    Son, por tanto, el equivalente de las versiones |LTS| de las distribuciones
+    de *Linux*.
+
+**N**
+    Son variantes que carecen de reproductor multimedia preinstalado (en
+    concreto, el `Windows Media Player
+    <https://es.wikipedia.org/wiki/Reproductor_de_Windows_Media>`_)
+
+.. note:: Microsoft permite la `evaluación durante 90 días de la edición
+   Enterprise
+   <https://www.microsoft.com/es-xl/evalcenter/evaluate-windows-10-enterprise>`_.
+
+.. rubric:: Requisitos
+
+Como cualquier otro sistema operativo, *Windows* exige un *hardware* mínimo
+(que puede consultarse `aquí
+<https://www.microsoft.com/es-es/windows/windows-10-specifications#primaryR2>`_),
+aunque estas exigencias mínimas no permiten más que arrancar el sistema y
+utilizar con cierta pesadez la interfaz. Para un uso habitual en el que se usan
+aplicaciones, el *hardware* debe ser mucho mejor. Para virtualizar el sistema y
+realizar las prácticas del curso basta con crear una máquina virtual que cumpla
+los requisitos mínimos (2GiB de memoria RAM), aunque si podemos es preferible
+darle dos núcleos al procesador en vez de 1.
+
+.. rubric:: Particiones
+
+*Windows* necesita una partición mínima de 32GiB formateada en |NTFS| para
+instalarse. Sin embargo, la instalación puede crear otras particiones:
+
++ En sistemas con arranque |EFI|, se crea una pequeña *partición reservada de
+  Microsoft* (|MRP|) de 16MiB.
++ En sistemas con arranque |BIOS|, si el disco no está previamente particionado,
+  se crea una partición aparte de hasta 500MiB que se usa fundamentalmente para
+  instalar los archivos del gestor de arranque y permitir el arranque de un
+  sistema cifrado con :program:`BitLocker`.
++ En ambos sistemas, si el disco no está previamente particionado, se crea una
+  partición de recuperación *WinRE*. En caso contrario, los archivos se guardan
+  dentro de la partición del sistema (:file:`%SystemDrive%\Recovery`).
+
+.. seealso:: *Microsoft* desarrolla en dos documentos la descripción de las
+   particiones `en sistemas BIOS
+   <https://docs.microsoft.com/es-es/windows-hardware/manufacture/desktop/configure-biosmbr-based-hard-drive-partitions>`_
+   y `en sistemas EFI
+   <https://docs.microsoft.com/es-es/windows-hardware/manufacture/desktop/configure-uefigpt-based-hard-drive-partitions>`_.
+
+.. note:: Por supuesto, en un arranque |EFI| es necesaria la partición |ESP|,
+   por exigencia del propio estándar.
+
+Linux
+=====
+Las sistemas *Linux* son muy variopintos y es imposible en muchos casos dar unas
+indicaciones generales.
+
+.. _linux-distribuciones:
+
+.. rubric:: Distribuciones
+
+Los sistemas *Linux* se organizan en :dfn:`distribuciones`, a las que podemos
+definir como una colección organizada de aplicaciones basadas en un núcleo de
+*Linux* a la que se dota un sistema simple de instalación, gestión y
+actualización. Las distribuciones de *Linux* son innumerables (consúltese `esta 
+cronología de distribucines
+<https://github.com/FabioLolix/LinuxTimeline/releases>`_ para más información)
+y, en muchos casos, incomparables entre sí, porque intentan satisfacer demandas
+muy dispares.
+
+Sin ánimo de ser exhaustivos (para ello consulte la cronología ya enlazada)
+algunas distribuciones importantes son:
+
+* *Históricas*, que nacieron en los años 90 *ex novo* o a partir de otras
+  distribuciones que no ha sobrevivido:
+
+  + Debian_, que, además de ser aún una de las usadas, es la que más derivadas
+    ha generado. Es la distribución de referencia que se usa para este
+    manual.
+  + Slackware_, que nació de SLS_.
+  + RedHat_, que es la versión empresarial desarrollada por la empresa del
+    mismo nombre.  Tiene, más que variadas, dos variantes: Fedora_, que es la
+    versión para la comunidad y en la que la empresa prueba las
+    características que incorporará a RedHat_; y CentOS_, que es una
+    distribución comunitaria que pretende proporcionar un equivalente a la
+    solución empresarial de RedHat_.
+  + SuSE_, cuyas primeras versiones se publicaron como versiones alemana de
+    Slackware_, pero que se rehizo basándose en Jurix_ para posteriormente
+    adoptar algunas características de RedHat_ como el sistemas de paquetes o
+    la estructura de archivos. Tiene una versión para la comunidad denominada
+    OpenSUSE_.
+
+* *Recientes*, que surgieron *ex novo* posteriormente:
+
+  + Gentoo_.
+  + ArchLinux_.
+
+* *Derivadas* de distribuciones existentes:
+
+  + Ubuntu_, derivada de Debian_.
+  + `Amazon Linux`_ que usa Amazon_ en algunos de sus servicios en la nube y se
+    basa en RedHat_.
+
+* *Especializadas*, que son distribuciones enfocadas a un uso muy concreto:
+
+  + OpenWrt_, enfocada a la instalación de dispositivos de red como
+    *routers*.
+  + SliTaZ_, una distribución minimalista que intenta mantener un tamaño muy
+    reducido.
+
+.. rubric:: Requisitos
+
+Obviamente, el *hardware* mínimo depende de cuál sea la distribución que
+elijamos y, aun en una misma distribución, de cuál sea en entorno que deseemos
+utilizar: no es lo mismo instalar una distribución sin entorno gráfico que esa
+misma con entorno de escritorio. Incluso, dentro de los entornos gráficos, los
+hay muy ligeros como Fluxbox_ o Openbox_ o escritorios completos bastante
+pesados como KDE_ o Gnome_.
+
+Para un *Linux* generalista con un escritorio pesado es probable que requiramos
+un *hardware* semejante al exigido por *Windows*.
+
+.. rubric:: Particiones
+
+En puridad, *Linux* sólo necesita una partición para el sistema raíz
+(habitualmente formateada en *ext4*, aunque no necesariamente). Ahora, es común
+que se creen otras particiones:
+
+* Partición para la *memoria de intercambio* cuyo tamaño suele ser el doble de la
+  memoria |RAM| hasta un máximo de 2GiB, con la salvedad de que, si se desea
+  hiberbar o suspender la ejecución, el tamaño debe ser al menos el de la
+  memoria |RAM|.
+
+* Partición para datos de usuario montada sobre :file:`/home`.
+
+* Cualquier otra que aconseje el uso para el que vaya destinado el sistema. En
+  el :ref:`epígrafe dedicado a la instalación de un servidor <inst-servidor>` se
+  sugieren algunas más de las aquí expuestas.
+
+Recuperación
+************
 .. todo:: Este epígrafe debe desarrollar:
 
-   + Introducción a ambos sistemas operativos: requisitos y variantes.
-
-   * Principios para la instalación de Windows (cuántas particiones se usan,
-     sistema de archivos).
-
-     Para realizar las pruebas pueden utilizarse una `versión de evaluación
-     <https://www.microsoft.com/es-es/evalcenter/evaluate-windows-10-enterprise>`_
-     para 90 días que proporciona la propia Microsoft.
-
-   * Principios para la instalación de Linux (particiones habituales para
-     sistemas de escritorio).
    * Descripción de *Windows Boot Manager* y cómo se recupera.
    * Descripción de |GRUB| y como se recupera.
+
+.. Partición reservada de Windows: https://adictec.com/particion-reservada-sistema-eliminar/
+   MSR: Partición reservada de Microsoft ¿En GPT?
+   SRP: Partición reservada del sistema ¿En BIOS? 
+
 
 .. include:: /guias/01.som/99.ejercicios/031.part.rst
 
 .. |GPT| replace:: :abbr:`GPT (GUID Partition Table)`
+.. |LTSC| replace:: :abbr:`LTSC (Long Term Servicing Channel)`
+.. |LTS| replace:: :abbr:`LTS (Long Term Support)`
+.. |NTFS| replace:: :abbr:`NTFS (NT File System)`
+.. |EFI| replace:: :abbr:`EFI (Extensible Firmware Interface)`
+.. |ESP| replace:: :abbr:`ESP (EFI System Partition)`
+.. |MRP| replace:: :abbr:`MRP (Microsoft Reserved Partition)`
+.. |RAM| replace:: :abbr:`RAM (Random Access Memory)`
+
+.. _Debian: https://www.debian.org
+.. _Slackware: https://es.wikipedia.org/wiki/Slackware
+.. _SLS: https://es.wikipedia.org/wiki/SLS_Linux_(Softlanding_Linux_System)
+.. _Jurix: https://es.wikipedia.org/wiki/Jurix
+.. _RedHat: https://www.redhat.com
+.. _SuSE: https://www.suse.com/
+.. _Gentoo: https://www.gentoo.org/
+.. _ArchLinux: https://archlinux.org/
+.. _Amazon Linux: https://en.wikipedia.org/wiki/Amazon_Machine_Image#Amazon_Linux_AMI
+.. _Ubuntu: https://ubuntu.com
+.. _Amazon: https://aws.amazon.com
+.. _OpenSUSE: https://www.opensuse.org/
+.. _OpenWrt: https://openwrt.org/
+.. _SliTaZ: https://www.slitaz.org/
+.. _Fedora: https://www.fedora.org
+.. _CentOS: https://www.centos.org
+.. _Fluxbox: http://www.fluxbox.org
+.. _Openbox: http://www.openbox.org
+.. _KDE: https://www.kde.org
+.. _Gnome: https://www.gnome.org
