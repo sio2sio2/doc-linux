@@ -47,7 +47,7 @@ Configuración básica
    es resoluble (p.e. porque se ha incluido en :file:`/etc/hosts`).
 
 Toda la configuración se encuentra en el directorio :file:`/etc/freeradius/3.0/`
-y es en él donde tenemos que empezarla. El archivo :file:`client.conf` contiene
+y es en él donde tenemos que empezarla. El archivo :file:`clients.conf` contiene
 los *controladores de acceso* a los que se permite comunicar con el servidor
 para retransmitir las credenciales. Ya tiene definido uno:
 
@@ -95,8 +95,8 @@ pero para evitar el engorro de alterar el archivo, recurriremos a utilizar otro
 que nuestro servidor mínimo ya tenga soporte para ellas\ [#]_. esta opción
 requiere habilitar el módulo::
 
-   # cd /etc/freeradius/3.0/mod-enabled
-   # ln -s ../mod-available/sql
+   # cd /etc/freeradius/3.0/mods-enabled
+   # ln -s ../mods-available/sql
 
 y debe editarse este archivo para hacer algunos cambios:
 
@@ -225,8 +225,8 @@ exige:
 
 #. Que habilitemos el módulo de modo semejante a como hicimos con *sql*::
 
-      # cd /etc/freeradius/3.0/mod-enabled
-      # ln -s ../mod-available/pam
+      # cd /etc/freeradius/3.0/mods-enabled
+      # ln -s ../mods-available/pam
 
 #. Que descomentemos en :file:`sites-enabled/default` y
    :file:`sites-enabled/inner-tunnel` la línea referente a |PAM|.
