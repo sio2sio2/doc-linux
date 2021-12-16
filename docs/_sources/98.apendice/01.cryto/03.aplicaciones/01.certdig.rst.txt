@@ -232,7 +232,7 @@ sobre nginx <nginx-https>`.
 Para descargar el certificado asociado a un sitio web podemos usar el subcomando
 :program:`s_client` de Open\ |SSL|:
 
-#. Para obtener el certificado sin más::
+#. Para obtener el certificado del servidor::
 
       $ openssl s_client -servername www.iescastillodeluna.es -connect www.iescastillodeluna.es:443 < /dev/null > cert.pem
       depth=2 C = US, O = Internet Security Research Group, CN = ISRG Root X1
@@ -246,8 +246,20 @@ Para descargar el certificado asociado a un sitio web podemos usar el subcomando
    Además, obtendremos la verificación de toda la cadena de confianza. La opción
    :kbd:`-servername` permite pasar :ref:`el valor de la extensión SNI <sni>`.
 
-#. Para obtener la cadena completa de certificados basta con añadir
-   :kbd:`-showcerts`::
+#. Para comprobar la cadena de confianza sin obtener el certificado podemos añadir
+   un par de opciones más::
+
+      $ openssl s_client -quiet -no_ign_eof -servername www.iescastillodeluna.es -connect www.iescastillodeluna.es:443 < /dev/null
+      depth=2 C = US, O = Internet Security Research Group, CN = ISRG Root X1
+      verify return:1
+      depth=1 C = US, O = Let's Encrypt, CN = R3
+      verify return:1
+      depth=0 CN = iescastillodeluna.es
+      verify return:1
+      DONE
+
+#. Para obtener la cadena completa de certificados en cambio basta con añadir
+   la opción :kbd:`-showcerts`::
 
       $ openssl s_client -showcerts -servername www.iescastillodeluna.es -connect www.iescastillodeluna.es:443 < /dev/null > fullchain.pem
       depth=2 C = US, O = Internet Security Research Group, CN = ISRG Root X1
@@ -258,17 +270,15 @@ Para descargar el certificado asociado a un sitio web podemos usar el subcomando
       verify return:1
       DONE
 
-#. Y si, simplemente, queremos es comprobar la cadena de confianza sin obtener
-   ningún certificado::
+   Esto, no obstante, generará un |PEM| con todos los certificados
+   concatenados. Si queremos obtenerlos por separado, podemos pasar
+   la salida por :ref:`csplit <csplit>`::
 
-      $ openssl s_client -quiet -no_ign_eof -servername www.iescastillodeluna.es -connect www.iescastillodeluna.es:443 < /dev/null
-      depth=2 C = US, O = Internet Security Research Group, CN = ISRG Root X1
-      verify return:1
-      depth=1 C = US, O = Let's Encrypt, CN = R3
-      verify return:1
-      depth=0 CN = iescastillodeluna.es
-      verify return:1
-      DONE
+      $ openssl s_client -showcerts -servername www.iescastillodeluna.es -connect www.iescastillodeluna.es:443 < /dev/null | \
+         csplit -fcert -sz - '/^-----B/' '{*}'
+
+   que generará los archivos :file:`cert01`, :file:`cert02`, etc. El archivo :file:`cert00`
+   no contendrá certificado alguno, sino la anterior al primer certificado.
 
 .. _X.509:
 

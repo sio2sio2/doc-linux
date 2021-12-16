@@ -148,7 +148,7 @@ se almacenarán las direcciones en claro::
 
 En cualquier caso, aunque estén ofuscados los nombres, puede buscarse si hay ya alguna entrada para un servidor::
 
-   $ ssh-keygen -F servdior
+   $ ssh-keygen -F servidor
 
 A partir de ahora, cada ve que se conecte a *servidor*, se confirmará que el
 *firgenprint* de la clave proporcionada por este coincide con la almacenada. Si
@@ -357,7 +357,7 @@ certificado)::
 
 y una vez en ella, firmarlas para crear el certificado::
 
-   root@ca:~# ssh-keygen -h -s /etc/ssh/ca_host -I s_hostID -n example.net,www.example.net /tmp/ssh_host_*key.pub
+   root@ca:~# ssh-keygen -h -s /etc/ssh/ca_host -I s_hostID -n example.net,www.example.net -z1 /tmp/ssh_host_*key.pub
    root@ca:~# scp /tmp/ssh_host_*-cert.pub servidor:/etc/ssh
 
 .. warning:: Se ha supuesto que la clave de la |CA| es |ECDSA| como se recomendo
@@ -369,7 +369,7 @@ y una vez en ella, firmarlas para crear el certificado::
    para clientes.
 
 La orden genera certificados de servidor (gracias a :kbd:`-h`), firmados
-(:kbd:`-s`) con :file:`ca_host`, con un determinado identificador (:kbd:`-I`) y
+(:kbd:`-s`) con :file:`ca_host`, con un determinado identificador (:kbd:`-I`), un número de serie (:kbd:`-z`) que debería ser único, y
 que son válidos para una máquina llamada *example.net* o *www.example.net*.
 Podríamos haber definido una validez determinada con :kbd:`-V`, pero por ser
 estos certificados de servidor los haremos eternos.
@@ -410,6 +410,8 @@ Debemos pasar la clave al servidor para que este acepte clientes que tengan su c
    root@servidor:~# echo "TrustedUserCAKeys /etc/ssh/ca_user.pub" >> /etc/ssh/sshd_config
    root@servidor:~# invoke-rc.d ssh reload
 
+.. rubric:: Concesión
+
 Y ahora, un usuario que desee autenticarse en tal servidor, deberá generar un par de claves para sí y pasarla a la |CA| para que se las firme::
 
    pepe@cliente:~$ ssh-keygen -C "Clave de pepe"
@@ -417,7 +419,7 @@ Y ahora, un usuario que desee autenticarse en tal servidor, deberá generar un p
 
 La |CA| firmará esas claves::
 
-   root@ca:~# ssh-keygen -s /etc/ssh/ca_user -I u_pepeID -n pepe,root -V +32w /tmp/id_rsa.pub
+   root@ca:~# ssh-keygen -s /etc/ssh/ca_user -I u_pepeID -n pepe,root -z1 -V +32w /tmp/id_rsa.pub
 
 sin indicar la opción :kbd:`-h`, porque esta es una clave de cliente, indicando con :kbd:`-n` que la clave es válida para el usuario del servidor "pepe"\ [#]_ y el administrador del mismo, y que el certificado tiene una validez de 32 semanas a partir del momento en el que se firma::
 
@@ -427,7 +429,7 @@ sin indicar la opción :kbd:`-h`, porque esta es una clave de cliente, indicando
            Public key: RSA-CERT SHA256:eFEoGIJgDNFgiQycGvKXWc1FbJQOQljc90gjzRgI4uA
            Signing CA: ECDSA SHA256:ibktBc6yzycepNgHWYpWWo4V7l0QmKn+q73nf8/9vXM
            Key ID: "u_pepeID"
-           Serial: 0
+           Serial: 1
            Valid: from 2021-04-08T08:43:00 to 2021-11-18T08:44:34
            Principals:
                    pepe
@@ -452,9 +454,86 @@ Por último, el usuario en el cliente deberá obtener el certificado y guardarlo
 
    pepe@cliente:~# scp ca:/tmp/id_rsa-cert.pub ~/.ssh
 
+.. note:: Obsérvese que con la configuración actual del servidor, un usuario podrá
+   acceder al servidor tanto mediante una clave pública convertida en
+   certificado como por una clave pública que no ha acreditado la |CA|, si la sube
+   con :ref:`ssh-copy-id <ssh-copy-id>`. Esto puede hacer inútil
+   la intención del administrador de añadir ciertas limitaciones al certificado
+   (p.e. temporales) en la medida en que, una vez obtenido el certificado, el
+   usuario puede utilizar :command:`ssh-copy-id` para subir la clave al archivo
+   :file:`authorized_keys` de su perfil remoto. Para evitarlo, podemos
+   deshabilitar la lectura de estos archivos personales añadiendo a
+   :file:`sshd_config`::
+
+    AuthorizedKeysFile      /dev/null
+
 .. warning:: :program:`Putty` carece aún de soporte para certificados |SSH|
    (aunque está registrada una `petición en la lista de deseos
    <https://www.chiark.greenend.org.uk/~sgtatham/putty/wishlist/ssh2-openssh-certkeys.html>`_).
+
+.. rubric:: Revocación
+
+Puede darse el caso de que necesitemos revocar certificados antes
+de que expiren. Open\ |SSH| prevee su revocación a través de
+archivos |KRL| que listan aquellos certificados que se ha
+decidido revocar. Lo primero es indicar en
+:file:`/etc/ssh/sshd_config` qué lista consultará el servidor::
+
+    RevokedKeys     /etc/ssh/revoked_keys
+
+y tras ello, generar el archivo (en principio, vacío) y recargar
+el servidor::
+
+    # ssh-keygen -kf /etc/ssh/revoked_keys
+    # invoke-rc.d ssh reload
+
+A partir de este momento, todo está listo para revocar
+certificados cuando sea preciso. Si el administrador conserva el
+certificado o la clave pública, puede hacerlo del siguiente
+modo::
+
+    # ssh-keygen -kuf /etc/ssh/revoked_keys -z1 /path/id_rsa.pub
+
+donde debe notarse la presencia de la opción :kbd:`-u`, porque
+permite conservar la lista y añadir un nuevo ítem. Si
+prescindimos de ella, el contenido anterior del archivo, se
+perdera. Además, :kbd:`-z` permite definir la versión de la lista
+mediante un entero (**1** en el ejemplo, porque es la primera
+revisión). Hemos hecho la revocación, por otro lado, utilizando
+la clave pública, pero habría sido igual de efectivo utilizar el
+certificado (:file:`id_rsa-cert.pub`).
+
+Ahora bien, la revocación también puede llevarse a cabo usando el
+identificador del certificado (que se introdujo con :kbd:`-I` al
+crearlo) o su número de serie (introducido en su momento con
+:kbd:`-z)`. Para esto, sin embargo, se requiere facilitar la
+clave privada de la |CA|::
+
+    # ssh-keygen -kuf /etc/ssh/revoked_keys -z2 -s /etc/ssh/ca_user <(echo "id: u_pepeID")
+    # ssh-keygen -kuf /etc/ssh/revoked_keys -z3 -s /etc/ssh/ca_user <(echo "serial: 5")
+
+.. note:: :command:`ssh-keygen` sólo admite archivos como
+   argumento, así que, en realidad, ":kbd:`id: u_pepeID`" o
+   ":kbd:`serial: 5`" deberían encontrarse en un archivo. Hemos
+   usado :ref:`process substitution <bash-process-substitution>`
+   para evitarlo.
+
+   Además, para revocar varios certificados a la vez, pueden
+   incluirse varios archivos en la misma línea de órdenes como
+   argumento o, en el caso de que revoquemos con identificador o
+   número de serie, hacer un mismo archivo con varias líneas en
+   cada una de los cuales indiquemos un certificado distinto::
+
+    # cat > /tmp/revocaciones.txt
+    id: u_pepeID
+    serial: 5
+
+    # ssh-keygen -kuf /etc/ssh/revoked_keys -z2 /tmp/revocaciones.txt
+
+Finalmente, podemos consultar cuáles son los certificados
+revocado contenidos en el |KRL| mediante la orden::
+
+    # ssh-keygen -Qlf /etc/ssh/revoked_keys
 
 .. _openssh-openssl:
 
@@ -607,3 +686,4 @@ de Open\ |SSL| :file:`miclave.pem`).
 .. |RSA| replace:: :abbr:`RSA (Rivest, Shamir y Adleman)`
 .. |EdDSA| replace:: :abbr:`EdDSA (EDwards-curve Curve Digital Signature Algorithm)`
 .. |SHA| replace:: :abbr:`SHA (Secure Hash Algorithm)`
+.. |KRL| replace:: :abbr:`KRL (Key Revocation List)`
