@@ -55,7 +55,7 @@ para retransmitir las credenciales. Ya tiene definido uno:
 
    client localhost {
       # [...]
-      ippadr = 127.0.0.1
+      ipaddr = 127.0.0.1
       # [...]
       secret = testing123
    }
@@ -68,7 +68,7 @@ arbitraria que habrá luego que trasladar a la configuración de éste:
 .. code-block:: docker
 
    client linksys {
-      ippadr = 192.168.0.10
+      ipaddr = 192.168.0.10
       secret = clavesecreta
    }
 
@@ -77,7 +77,7 @@ También es posible indicar una red completa:
 .. code-block:: docker
 
    client pas {
-      ippadr = 192.168.0.0/24
+      ipaddr = 192.168.0.0/24
       secret = clavesecreta
    }
 
