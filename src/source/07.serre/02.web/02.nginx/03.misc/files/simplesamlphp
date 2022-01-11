@@ -1,0 +1,31 @@
+server {
+   listen  80;
+   listen 443 ssl;
+
+   server_name auth.example.org;
+
+   try_files $uri $uri/ =404;
+   index index.php;
+
+   include "snippets/snakeoil.conf";
+
+   if ($https != "on") {
+      return 301 https://$host$uri$is_args$args;
+   }
+
+   # Si la ruta no empieza por /saml/, se añade
+   rewrite ^(?!/saml/)(.*)$ /saml/$2;
+
+   location ^~ /saml {
+      alias /srv/www/saml/www;
+
+      location ~ \.php(?<pathinfo>/.*)?$ {
+         fastcgi_pass php;
+         include fastcgi_params;
+         fastcgi_param SCRIPT_FILENAME $request_filename;
+         fastcgi_param HTTPS           $_https if_not_empty;
+         fastcgi_param PATH_INFO       $pathinfo if_not_empty;
+         fastcgi_read_timeout          300s;
+      }
+   }
+}
