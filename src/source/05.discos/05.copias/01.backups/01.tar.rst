@@ -24,8 +24,8 @@ copias de seguridad:
 
 :kbd:`-u`\ [#]_
    La opción permite actualizar (**u**\ *pdate*) el paquete añadiendo al final
-   nuevos ficheros o ficheros modificados. Es importante entender que no se
-   sustituye la versión antigua del fichero, sino que se añade al final. Además,
+   nuevos archivos o archivos modificados. Es importante entender que no se
+   sustituye la versión antigua del archivo, sino que se añade al final. Además,
    sólo pueden actualizarse archivos **no** comprimidos::
 
       $ mkdir /tmp/KK
@@ -67,78 +67,82 @@ copias de seguridad:
       $ cat /tmp/numero
       1
 
-   .. note:: :kbd:`occurrence` requiere que se especifique una lista de ficheros
+   .. note:: :kbd:`occurrence` requiere que se especifique una lista de archivos
       a extraer.
 
 :kbd:`-g <SNAP>`
    Puede servirnos para hacer tanto copias *incrementales* como copias
-   *diferenciales*. La opción introduce el nombre del fichero que almacenará la
-   metainformación necesaria para ello.
+   *diferenciales*. La opción introduce el nombre del archivo :kbd:`snap` que
+   se toma como referencia al hacer una nueva copia de seguridad.
 
    **Copias incrementales**
       Como en las copias incrementales se guardan los cambios respecto a la
-      última copia, el fichero *snap* debe actualizarse con cada copia. Por
+      última copia, el archivo :kbd:`snap` debe actualizarse con cada copia. Por
       ejemplo::
 
          $ mkdir /tmp/KK
-         $ echo 1 > /tmp/KK/numero.txt
+         $ echo 1 > /tmp/KK/version
 
       Hacemos una copia completa de los datos::
 
-         $ tar -C /tmp/KK -acvf cc_$(date -I).tar.xz -g info.snap .
+         $ tar -C /tmp/KK -acvf copia1c.tar.xz -g info.snap .
 
-      Tiempo después podemos hacer añadir un fichero y hacer una copia
-      incremental::
+      Tiempo después podemos hacer añadir un archivo y hacer una copia
+      incremental para lo cual debemos tomar como referencia (con :kbd:`-g`) el
+      :kbd:`snap` de la copia anterior::
 
          $ echo a > /tmp/KK/letra.txt
-         $ tar -C /tmp/KK -acvf ci1_$(date -I).tar.xz -g info.snap .
+         $ echo 2 > /tmp/KK/version
+         $ tar -C /tmp/KK -acvf copia1c1i.tar.xz -g info.snap .
 
-      La copia incremental sólo contendrá :file:`letra.txt`. El fichero *snap*,
-      además, cambiará también. Más adelante podríamos modificar el número y
-      eliminar el fichero :file:`letra.txt`::
+      La copia incremental contendrá :file:`letra.txt`  y :file:`version` ya
+      que ha cambiado de contenido. El archivo :kbd:`snap`, además, cambia
+      también y registra el estado en que quedamos al completar la copia incremental.
+      Más adelante podríamos modificar la versión y eliminar el archivo
+      :file:`letra.txt`::
 
-         $ echo 2 > /tmp/KK/numero.txt
+         $ echo 3 > /tmp/KK/version
          $ rm /tmp/KK/letra.txt
-         $ tar -C /tmp/KK -acvf ci2_$(date -I).tar.xz -g info.snap .
+         $ tar -C /tmp/KK -acvf copia1c2i.tar.xz -g info.snap .
 
       En esta ocasión el efecto de la copia incremental debería ser modificar
-      :file:`numero.txt` y borrar :file:`letra.txt`. Para recuperar las copias
+      :file:`version` y borrar :file:`letra.txt`. Para recuperar las copias
       debemos ir, cronológicamente, recuperando todas las copias, aunque añadiendo
       la opción :kbd:`-G` para se tenga en cuenta que las copias han sido
-      incrementales y, en consecuencia, acabe por desaparecer :file:`letra.txt`::
+      incrementales::
 
          $ mkdir /tmp/KK2
-         $ tar -C /tmp/KK2 -axGvf cc_*.tar.xz
-         $ tar -C /tmp/KK2 -axGvf ci1_*.tar.xz
-         $ tar -C /tmp/KK2 -axGvf ci2_*.tar.xz
+         $ tar -C /tmp/KK2 -axGvf copia1c.tar.xz
+         $ tar -C /tmp/KK2 -axGvf copia1c1i.tar.xz
+         $ tar -C /tmp/KK2 -axGvf copia1c2i.tar.xz
+
+      .. note:: El archivo :kbd:`snap` no se inspección al restaurar, así que
+         es absolutamente irrelevante.
 
    **Copias diferenciales**
       En ellas se almacenan todas las modificaciones desde la última copia
-      completa. En consecuencia, el fichero *snap* generado al hacer la copia
-      completa no debe cambiar al hacerse las copias diferenciales. La solución
-      es hacer una copia antes de usarlo::
+      completa. En consecuencia, la referencia para hacer las copias diferenciales
+      siempre tiene que ser el archivo :kbd:`snapp  generado al hacer la copia
+      completa. Para lograrlo, basta con hacer copiar y usar esta copia como referencia::
 
          $ mkdir /tmp/KK
-         $ echo 1 > /tmp/KK/numero.txt
-         $ tar -C /tmp/KK -acvf cc_$(date -I).tar.xz -g cc.snap .
+         $ echo 1 > /tmp/KK/version
+         $ tar -C /tmp/KK -acvf copia1c.tar.gz -g info.snap .
          $ echo a > /tmp/KK/letra.txt
-         $ cp cc.snap cd1.snap
-         $ tar -C /tmp/KK -acvf cd1_$(date -I).tar.xz -g cd1.snap .
+         $ echo 2 > /tmp/KK/version
+         $ cp info.snap temp.snap
+         $ tar -C /tmp/KK -acvf copia1c1d.tar.xz -g temp.snap .
          $ echo 2 > /tmp/KK/numero.txt
          $ rm /tmp/KK/letra.txt
-         $ cp cc.snap cd2.snap
-         $ tar -C /tmp/KK -acvf cd2_$(date -I).tar.xz -g cd2.snap .
-
-      .. note:: Según lo propuesto, cada copia tiene un :file:`.snap` distinto:
-         la copia completa :file:`cc.snap` y la copia diferencial N-ésima
-         :file:`cdN.snap`.
+         $ cp info.snap temp.snap
+         $ tar -C /tmp/KK -acvf copia1c2d.tar.xz -g temp.snap .
 
       Obviamente, para restaurar sólo hay que usar la copia completa y la última
       copia diferencial::
 
          $ mkdir /tmp/KK2
-         $ tar -C /tmp/KK2 -axGvf cc_*.tar.xz
-         $ tar -C /tmp/KK2 -axGvf cd2_*.tar.xz
+         $ tar -C /tmp/KK2 -axGvf copia1c.tar.xz
+         $ tar -C /tmp/KK2 -axGvf copia1c2d.tar.xz
 
 .. rubric:: Notas al pue
 

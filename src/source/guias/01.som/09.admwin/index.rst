@@ -49,7 +49,7 @@ Gestión de usuarios
   :file:`C:\\Users\\nombre_usuario`, de manera que:
 
   - Cada vez que se crea ese directorio personal se copia el contenido de
-    :file:`C:\\Users\\Default` (oculto), exactamente del mismo modo que en +Linux*
+    :file:`C:\\Users\\Default` (oculto), exactamente del mismo modo que en *Linux*
     se hace con :file:`/etc/skel`.
 
   - Se hace accesible todo el contenido que se encuentra dentro de
@@ -113,7 +113,7 @@ Precedencia
 -----------
 La precedencia de las reglas viene dado por lo siguiente:
 
-#. Tiene precedencia cualquier *regla explícita* sobre cualquuier *regla heredada*.
+#. Tiene precedencia cualquier *regla explícita* sobre cualquier *regla heredada*.
 #. Dentro de cada grupo anterior, las *reglas de denegación* tienen precedencia
    sobre las *reglas de concesión*.
 
@@ -168,7 +168,7 @@ avanzados que permite definir *Windows* sobre |NTFS|:
    #. Leer cuáles son los atributos extendidos de un archivo, que son parejas
       nombre/valor equivalentes a lo que denominamos en *Linux* :ref:`atributos
       extendidos de usuario <xattr>`.
-   #. Leer cuáles los permisos asociados a un archivo.
+   #. Leer cuáles los permisos asociados a un archivo\ [#]_.
 
 **Escritura**
    De nuevo, *Windows* distingue distintas operaciones de escritura:
@@ -184,7 +184,7 @@ avanzados que permite definir *Windows* sobre |NTFS|:
 
 **Otros**
    Hay por último dos permisos que en *UNIX*, simplemente, son privativos del
-   propietario del archivo o el administrador:
+   propietario del archivo o el administrador\ [#]_:
 
    12. Modificar los permisos.
    #.  Cambiar el propietario (en realidad, "Tomar posesión").
@@ -269,9 +269,6 @@ por quien tenga permisos para ello:
     NotContentIndexed 8192      Gráfico         El servicio de indexación no indexa el fichero.
     Encrypted         16384     Gráfico\ [a]_   El fichero está cifrado.
    ================== ========= ============== ================================================
-
-.. [a] En realidad el atributo no es ajustable, pero la interfaz gráfica da la posibilidad de comprimir
-   o cifrar el fichero, por lo que como efecto colateral se aplicará el atributo.
 
 .. seealso:: Para información más extensa sobre cuáles todos los atributos y su
    significado consulte `esta documentación de Microsoft
@@ -365,6 +362,12 @@ Compartición de recursos
 
 .. rubric:: Notas al pie
 
+.. [a] En realidad el atributo no es ajustable, pero la interfaz gráfica da la posibilidad de comprimir
+   o cifrar el fichero, por lo que como efecto colateral se aplicará el atributo.
+.. [#] La traducción al castellano del *Windows 10* refiere este permiso con el
+   inexacto rótulo de "Permisos de lectura".
+.. [#] En realidad, en *Linux* pueden asignarse estos permisos a otros usuarios
+   mediante la manipulación de las :ref:`capacidades <capabilities-prof>`.
 .. [#] Atómicos en el sentido de que no pueden descomponerse en otros más
    simples.
 
