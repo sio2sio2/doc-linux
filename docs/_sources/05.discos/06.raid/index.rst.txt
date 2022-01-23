@@ -241,7 +241,7 @@ niveles de |RAID|. Los más utilizados son:
 
    - Hay tolerancia a fallos, ya que el sistema falla cuando fallan
      todos los discos de una misma división.
-   - La probabilidad de que el sistema falle es de :math:`P^{n,m}_{r10}(p) = P^{n/m}_{0}(P^m_{r1}(p)) = 1-(1-p^m)^\frac{n}{m}`.
+   - La probabilidad de que el sistema falle es de :math:`P^{n,m}_{r10}(p) = P^{n/m}_{r0}(P^m_{r1}(p)) = 1-(1-p^m)^\frac{n}{m}`.
    - Aumenta la capacidad hasta :math:`\frac{n}{m}*s`.
    - Hay mejora en el rendimiento de las lecturas y las escrituras,
 
@@ -254,7 +254,7 @@ niveles de |RAID|. Los más utilizados son:
    - Hay tolerancia a fallos, ya que el sistema falla cuando falla uno
      de los |RAID|\ s 5 que constituye cualquiera de las divisiones, esto es
      que fallen dos discos de una misma división.
-   - La probabilidad de que el sistema falle es de :math:`P^{n.m}_{r50}(p) = P^{n/m}_{0}(P^m_{r5}(p))`.
+   - La probabilidad de que el sistema falle es de :math:`P^{n.m}_{r50}(p) = P^{n/m}_{r0}(P^m_{r5}(p))`.
    - Aumenta la capacidad hasta :math:`(n - \frac{n}{m})*s`.
    - Mejora el rendimiento en lectura y escritura respecto al |RAID| 5.
 
