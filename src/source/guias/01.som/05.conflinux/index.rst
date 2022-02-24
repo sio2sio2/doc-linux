@@ -66,16 +66,17 @@ Terminología
 **Servidor gráfico**
    Es la parte encargada de interactuar con los dispositivos de entrada y salida
    como el ratón o la pantalla. En *Linux* el servidor de ventanas más utilizado
-   es el denominado *Sistema de ventanas X* (*X-Window System*, en inglés), muy
+   es el denominado *Sistema de ventanas X* (`X-Window System
+   <https://es.wikipedia.org/wiki/Sistema_de_ventanas_X>`_, en inglés), muy
    comúmente llamado simplemente "*las X*". Hay diversas implementaciones de
    este servidor, pero el usado en prácticamente todas las distribuciones
    modernas de *Linux* es X.Org_.
 
    Otro servidor gráfico es Wayland_, más moderno y eficiente que el anterior y
    que guarda compatibilidad con las aplicaciones escritas para *X*. Algunas
-   distribuciones como *Red Hat* o *Debian* lo usan ya por defecto. Es
+   distribuciones como *Red Hat* o *Ubuntu* lo usan ya por defecto. Es
    previsible que acabe en un futuro sustituyendo por completo a las *X*, aunque
-   la migración sea lenta.
+   la migración sea lenta\ [#]_.
 
    En cualquier caso, el servidor es una capa que pasa inadvertida para el
    usuario, ya que no interactúa con él.
@@ -348,6 +349,8 @@ relación:
 
 .. rubric:: Notas al pie
 
+.. [#] Uno de los principales inconvenientes es que a fecha de 2021 sólo el
+   escritorio GNOME_ tiene soporte completo para Wayland_.
 .. [#] En el :ref:`epígrafe dedicado a las interfaces GUI <ssoo-gui>` confiesa
    el autor cuál es su entorno gráfico y se basa en esta última solución.
 

@@ -27,14 +27,14 @@ sistemas de paquetes son:
 
 Hay, además, sistemas de paquetes universales con una filosofía diferente y que
 pueden convivir con el sistema de empaquetado de la propia distribuición. Todos
-conceptos se tratan en los :ref:`párrafos instroductorios del epígrafe sobre
+conceptos se tratan en los :ref:`párrafos introductorios del epígrafe sobre
 gestión de software del manual <paqueteria>` y es conveniente tenerlos claros.
 
 Los contenidos apropiados para esta sección, aparte de lo anterior son:
 
 - Las `ramas y secciones de Debian <paquetes-deb>`_, aunque solamente si se usa
   como base la propia *Debian*. Si se usa otra derivada como *Ubuntu*, debería
-  adaptarse el epúgrafe\ [#]_.
+  adaptarse el epígrafe\ [#]_.
 - Los :ref:`repositorios <deb-repo>`.
 - Las :ref:`operaciones básicas <paq-bas>`.
 
