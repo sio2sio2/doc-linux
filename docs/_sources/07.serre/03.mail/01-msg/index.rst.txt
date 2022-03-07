@@ -130,6 +130,22 @@ Entre los campos predefinidos, estos son los más importantes:
    contener caracteres no ingleses. Volveremos a tratar este campo al tratar la
    estructura con adjuntos.
 
+   .. _tipo-MIME:
+
+   .. note:: El modo en que se expresa el tipo se incluye en el ya citado
+      estándar |MIME|, por lo que a esta forma de expresar el tipo se le
+      denomina :dfn:`tipo MIME` del archivo. En este caso :kbd:`text/plain` es
+      el tipo |MIME| para identificar a los archivos planos de texto. Como el uso
+      de tipos |MIME| se ha extendido a otros muchos ámbitos ajenos al servicio
+      de correo electrónico, en los sistemas *Linux*\ [#]_, el archivo
+      :file:`/etc/mime.types` relaciona los tipos |MIME| más conocidos con las
+      extensiones a los que se asocian (p.e.  :kbd:`text/plain` se asocia a la
+      extensión :kbd:`.txt`).
+
+   .. note:: En el valor de este campo puede incluirse, además, un subtipo,
+      como es el caso del ejemplo en que el subtipo :kbd:`charset="utf-8"`
+      expresa que la codificación del texto plano.
+
 **Content-Transfer-Encoding**
    Define cómo se representarán los datos. Consúltese `este documento
    <https://www.w3.org/Protocols/rfc1341/5_Content-Transfer-Encoding.html>`_
@@ -284,5 +300,9 @@ Cuya explicación es la siguiente:
 .. [#] Puede consultar la `entrada de la Wikipedia
    <https://es.wikipedia.org/wiki/Multipurpose_Internet_Mail_Extensions>`_ para
    más información.
+
+.. [#] O al menos en las distribuciones derivadas de *Debian*.
+
+.. https://askubuntu.com/questions/16580/where-are-file-associations-stored
 
 .. |MIME| replace:: :abbr:`MIME (Multipurpose Internet Mail Extensions)`
