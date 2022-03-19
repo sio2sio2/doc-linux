@@ -452,7 +452,7 @@ requiere primero saber cómo transmitir nuestra identidad al servidor\ [#]_:
 .. code-block:: console
    :emphasize-lines: 10, 23, 25
 
-   $ printf 'usuario\0usuario\0password' | base64
+   $ printf 'usuario\x00usuario\x00password' | base64
    dXN1YXJpbwB1c3VhcmlvAHBhc3N3b3Jk
    $ openssl s_client -connect localhost:smtp -starttls smtp -quiet
    depth=0 CN = mail.mail1.org                                
