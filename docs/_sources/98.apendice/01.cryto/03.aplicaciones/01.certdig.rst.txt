@@ -964,10 +964,13 @@ Empecemos por crear un almacén de claves *ex-novo*::
    $ certutil -d sql:/tmp/nssdb -N --empty-password
 
 La opción :kbd:`--empty-password` deja sin cifrar las claves privadas que
-puedan almacenarse. Si el catálogo ya contuviera certificados y claves,
-podríamos listarlos mediante la orden::
+puedan almacenarse. De no usarse, se nos pedirá una clave maestra con que se
+cifrarán las claves privadas de los certificados de usuario.
 
-   $ certutil -d sql:/tmp/nssdb -L
+El catálogo debería encontrarse vacío, pero de uno que contuviera ya
+certificados, podría sacarse un listado mediante la orden::
+
+   $ certutil -d /tmp/nssdb -L
 
    Certificate Nickname                                         Trust Attributes
                                                                 SSL,S/MIME,JAR/XPI
@@ -981,41 +984,46 @@ otro lado, una |CA| raíz debe tener los atributos :kbd:`C,C,C`.
 
 Si queremos ver la información de un certificado en particular::
 
-   $ certutil -d sql:/tmp/nssdb -Ln 'PERICO_DE_LOS_PALOTES'
+   $ certutil -d /tmp/nssdb -Ln 'PERICO_DE_LOS_PALOTES'
+
+y si queremos consultar su cadena de confianza::
+
+   $ certutil -d /tmp/nssdb -On 'PERICO_DE_LOS_PALOTES'
+
+El nombre con que debemos referirnos al certificado ("PERICO_DE_LOS_PALOTES" en
+este caso) nos puede resultar un poco engorroso. Podemos cambiarlo fácilmente::
+
+   $ certutil -d /tmp/nssdb --rename -n 'PERICO_DE_LOS_PALOTES' --new-n 'PERICO'
 
 Para importar en el catálogo un archivo |PKCS| #12, podemos hacer::
 
-   $ pk12util -d sql:/tmp/nssdb -i micert.p12
+   $ pk12util -d /tmp/nssdb -i micert.p12
 
-que importará no sólo el propio certificado, sino también todos los
-certificados que constituyan la cadena de confianza y que se incluyeran en el
-archivo. Eso sí, el certificado raíz no tendrá los atributos pertinentes, así
-que habrá que añadírselos::
+que importará no sólo el propio certificado, sino también todos los certificados
+incluidos en ese archivo |PKCS|\ #12. Eso sí, si está incluido el certificado
+raíz, éste no tendrá los atributos pertinentes, así que habrá que añadírselos::
 
-   $ certutil -d sql:/tmp/nssdb -Mn 'AC RAIZ FNMT-RCM - FNMT-RCM' -t 'C,C,C'
+   $ certutil -d /tmp/nssdb -Mn 'AC RAIZ FNMT-RCM - FNMT-RCM' -t 'C,C,C'
 
 Por último, si se quiere añadir un certificado en particular debe usarse
 :command:`certutil`. Por ejemplo, si el :file:`.p12` no hubiera incluido el
-certificado raíz, podríamos haber añadido este con la orden::
+certificado raíz, podríamos haberlo añadido con la orden::
 
-   $ certutil -d sql:/tmp/nssdb -An 'AC RAIZ FNMT-RCM - FNMT-RCM' -t 'C,C,C' -i raiz.pem
+   $ certutil -d /tmp/nssdb -An 'AC RAIZ FNMT-RCM - FNMT-RCM' -t 'C,C,C' -i raiz.pem
 
 donde :file:`raiz.pem` está en formato |PEM| con codificación Base64_. Es
 también posible eliminar certificados con la opción :kbd:`-D` y el nombre
 del certificado.
 
-.. note:: Si se desea que las aplicaciones que usen este catálogo |NSS|
+.. note:: El catálogo es independiente del :ref:`catálogo del sistema <cert-general>`,
+   por lo que, si se desea que las aplicaciones que usen este catálogo |NSS|
    consulten los certificados del sistema en :file:`/etc/ssl/certs`,
-   será necesario el paquete :deb:`p11-kit-modules` y rescribir el archivo
-   :file:`pkcs11.txt` dentro del directorio de catálogo del siguiente modo::
+   será necesario el paquete :deb:`p11-kit-modules` y añadir el uso del módulo::
 
-      $ cat > /tmp/nssdb/pkcs11.txt
-      library=/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-trust.so
-      name=PKCS#11 Trust Module
-      NSS=trustOrder=100
+      $ modutil -dbdir /tmp/nssdb/ -add 'PKCS#11 Trust Module' -libfile /usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-trust.so
 
    De este modo, en nuestro catálogo de ejemplo será prescindible el certificado
-   "AC RAIZ FNMT-RCM - FNMT-RCM", puesto que este certificado raíz se tomará del
+   "AC RAIZ FNMT-RCM - FNMT-RCM", porque éste debe estar incluido ya en el
    catálogo general.
 
 Tanto Firefox_ como Chromium_\ [#]_ usan catálogos de este este tipo en los que
@@ -1029,7 +1037,7 @@ Presentan, no obstante, algunas diferencias:
   encuentra en el propio directorio del perfil.
 + Chromium_, en cambio, sí carga los certificados del sistema y a éstos añade
   los que se hayan instalado en su catálogo |NSS|. Por otra parte, todos los
-  perfiles creados por un mismo usuario comparten este catálogo cuya ruta es
+  perfiles creados por un mismo usuario comparten el catálogo cuya ruta es
   :file:`~/pki/nssdb`.
 
 .. rubric:: Notas al pie
