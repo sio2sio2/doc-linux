@@ -965,10 +965,21 @@ Empecemos por crear un almacén de claves *ex-novo*::
 
 La opción :kbd:`--empty-password` deja sin cifrar las claves privadas que
 puedan almacenarse. De no usarse, se nos pedirá una clave maestra con que se
-cifrarán las claves privadas de los certificados de usuario.
+cifrarán las claves privadas de los certificados de usuario. El catálogo se
+encontrará, por ahora vacío, pero podemos importar un archivo |PKCS| #12 con::
 
-El catálogo debería encontrarse vacío, pero de uno que contuviera ya
-certificados, podría sacarse un listado mediante la orden::
+   $ pk12util -d /tmp/nssdb -i micert.p12
+
+lo cual importará no sólo el propio certificado, sino también todos los
+certificados incluidos en ese archivo |PKCS|\ #12. Eso sí, si está incluido el
+certificado raíz, éste no tendrá los atributos pertinentes, así que habrá que
+añadírselos::
+
+   $ certutil -d /tmp/nssdb -Mn 'AC RAIZ FNMT-RCM - FNMT-RCM' -t 'C,C,C'
+ 
+Para referirnos a los certificados incluidos en el catálogo, se usa un nombre
+("AC RAIZ FNMT-RCM - FNMT-RCM" en esta orden) que conoceremos si listamos cuáles
+el contenido::
 
    $ certutil -d /tmp/nssdb -L
 
@@ -982,7 +993,15 @@ En este caso, hay un certificado de usuario que se reconoce como tal
 (:kbd:`u,u,u`), porque la clave privada está también en la base de datos. Por
 otro lado, una |CA| raíz debe tener los atributos :kbd:`C,C,C`.
 
-Si queremos ver la información de un certificado en particular::
+Si se quiere añadir un certificado individual debe usarse :command:`certutil`.
+Por ejemplo, si el :file:`.p12` no hubiera incluido el certificado raíz,
+podríamos haberlo añadido con la orden::
+
+   $ certutil -d /tmp/nssdb -An 'AC RAIZ FNMT-RCM - FNMT-RCM' -t 'C,C,C' -i raiz.pem
+
+donde :file:`raiz.pem` está en formato |PEM| con codificación Base64_.
+
+Si queremos ver la información de un certificado individual::
 
    $ certutil -d /tmp/nssdb -Ln 'PERICO_DE_LOS_PALOTES'
 
@@ -995,36 +1014,18 @@ este caso) nos puede resultar un poco engorroso. Podemos cambiarlo fácilmente::
 
    $ certutil -d /tmp/nssdb --rename -n 'PERICO_DE_LOS_PALOTES' --new-n 'PERICO'
 
-Para importar en el catálogo un archivo |PKCS| #12, podemos hacer::
+El catálogo es independiente del :ref:`catálogo del sistema <cert-general>`,
+por lo que, si se desea que las aplicaciones que usen este catálogo |NSS|
+consulten los certificados que están en :file:`/etc/ssl/certs`, será
+necesario el paquete :deb:`p11-kit-modules` y añadir el uso del módulo::
 
-   $ pk12util -d /tmp/nssdb -i micert.p12
+   $ modutil -dbdir /tmp/nssdb/ -add 'PKCS#11 Trust Module' -libfile /usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-trust.so
 
-que importará no sólo el propio certificado, sino también todos los certificados
-incluidos en ese archivo |PKCS|\ #12. Eso sí, si está incluido el certificado
-raíz, éste no tendrá los atributos pertinentes, así que habrá que añadírselos::
+De este modo, en nuestro catálogo de ejemplo será prescindible el certificado
+"AC RAIZ FNMT-RCM - FNMT-RCM", porque éste debe estar incluido ya en el
+catálogo general. Por tanto, podremos borrarlo::
 
-   $ certutil -d /tmp/nssdb -Mn 'AC RAIZ FNMT-RCM - FNMT-RCM' -t 'C,C,C'
-
-Por último, si se quiere añadir un certificado en particular debe usarse
-:command:`certutil`. Por ejemplo, si el :file:`.p12` no hubiera incluido el
-certificado raíz, podríamos haberlo añadido con la orden::
-
-   $ certutil -d /tmp/nssdb -An 'AC RAIZ FNMT-RCM - FNMT-RCM' -t 'C,C,C' -i raiz.pem
-
-donde :file:`raiz.pem` está en formato |PEM| con codificación Base64_. Es
-también posible eliminar certificados con la opción :kbd:`-D` y el nombre
-del certificado.
-
-.. note:: El catálogo es independiente del :ref:`catálogo del sistema <cert-general>`,
-   por lo que, si se desea que las aplicaciones que usen este catálogo |NSS|
-   consulten los certificados del sistema en :file:`/etc/ssl/certs`,
-   será necesario el paquete :deb:`p11-kit-modules` y añadir el uso del módulo::
-
-      $ modutil -dbdir /tmp/nssdb/ -add 'PKCS#11 Trust Module' -libfile /usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-trust.so
-
-   De este modo, en nuestro catálogo de ejemplo será prescindible el certificado
-   "AC RAIZ FNMT-RCM - FNMT-RCM", porque éste debe estar incluido ya en el
-   catálogo general.
+   $ cerutil -d /tmp/nssdb -Dn 'NO-QUIERO-ESTE-CERTIFICADO'
 
 Tanto Firefox_ como Chromium_\ [#]_ usan catálogos de este este tipo en los que
 almacenan los certificados añadidos a través del navegador (p.e. los
