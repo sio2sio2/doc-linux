@@ -88,21 +88,16 @@ sistema como `IBM <https://es.wikipedia.org/wiki/IBM>`_, `Google
 Distribución de referencia
 --------------------------
 La distribución de referencia para la elaboración de los apuntes es la
-`Debian <http://www.debian.org>`_ estable disponible en el momento de la
-redacción, esto es, la versión **9** `Stretch
-<https://www.debian.org/News/2017/20170617>`_, aunque se ha procurado revisar la
-sucesora `Buster <https://www.debian.org/releases/buster/index.html>`_. 
+:ref:`Debian estable <ramas>`. La redacción
+se comenzó en 2016 cuando lo era Jessie_ (la versión **8.0**), aunque por estar
+próxima a concluir su ciclo se procuró adaptar el contenido a la versión **9.0**
+Stretch_. Desde entonces se han publicado nuevas versiones (Buster_, Bullseye_)
+y la redacción de nuevos epígrafes y la revisión de algunos ya escritos se ha
+ido procurando adaptar a ellas, pero pueden existir partes que no hayan recibido
+revisión y, por tanto, tengan alguna explicación que haya dejado de ser válida.
 
-Para el uso de cualquier otra distribución quizás sea necesaria en algunos casos
-la adaptación. En particular, para `Ubuntu <https://www.ubuntu.com>`_ las dos
-principales diferencias son:
-
-#. La ausencia de contraseña para el administrador y el uso predeterminado de
-   :ref:`sudo <sudo>` para escalar privilegios.
-
-#. La configuración de la red que desde la versión 17 se hace con `netplan
-   <https://netplan.io/>`_ en vez de con el paquete :deb:`ifupdown`, que lee la
-   configuración de :file:`/etc/network/interfaces`.
+Fuera de *Debian*, la mayor parte de las explicaciones debería ser válida para
+sus distribuciones derivadas.
 
 .. rubric:: Notas al pie
 
@@ -114,3 +109,8 @@ principales diferencias son:
    <http://softlibre.unizar.es/manuales/softwarelibre/catedralbazar.pdf>`_.
 
 .. |BSD| replace:: :abbr:`BSD (Berkeley Software Distribution)`
+
+.. _Jessie: https://www.debian.org/News/2015/20150426
+.. _Stretch: https://www.debian.org/News/2017/20170617
+.. _Buster: https://www.debian.org/News/2019/20190706
+.. _Bullseye: https://www.debian.org/News/2021/20210814
