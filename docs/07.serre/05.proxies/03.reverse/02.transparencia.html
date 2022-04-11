@@ -184,27 +184,27 @@ estrategia de que éste redirija los paquetes a una dirección local
 particular (p.e. la <em>127.1.1.1</em>, en la que debe escuchar el
 servidor y ningún otro). De esta forma, lograremos marcar sólo los
 paquetes dirigidos al servidor procedentes del <em>proxy</em>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> iptables -t raw -A PREROUTING ! -i lo -d <span class="m">127</span>.0.0.0/8 -j DROP
-<span class="gp">#</span> iptables -t mangle -A POSTROUTING ! -o lo -s <span class="m">127</span>.0.0.0/8 -j DROP
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>iptables -t raw -A PREROUTING ! -i lo -d <span class="m">127</span>.0.0.0/8 -j DROP
+<span class="gp"># </span>iptables -t mangle -A POSTROUTING ! -o lo -s <span class="m">127</span>.0.0.0/8 -j DROP
 
-<span class="gp">#</span> iptables -t nat -A OUTPUT -d <span class="m">127</span>.1.1.1 -j CONNMARK --set-mark 0xff
-<span class="gp">#</span> iptables -t mangle -A OUTPUT -m connmark --mark 0xff -j CONNMARK --restore-mark
+<span class="gp"># </span>iptables -t nat -A OUTPUT -d <span class="m">127</span>.1.1.1 -j CONNMARK --set-mark 0xff
+<span class="gp"># </span>iptables -t mangle -A OUTPUT -m connmark --mark 0xff -j CONNMARK --restore-mark
 </pre></div>
 </div>
 </li>
 <li><p>Cuando está en una máquina distinta, la estrategia es marcar en el <em>proxy</em>
 los paquetes entrantes (que son los de vuelta) cuyo destino es un proxy
 transparente<a class="footnote-reference brackets" href="#id6" id="id2">2</a>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> iptables -t mangle -A PREROUTING -m socket --transparent -j MARK --set-mark 0xff
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>iptables -t mangle -A PREROUTING -m socket --transparent -j MARK --set-mark 0xff
 </pre></div>
 </div>
 <div class="admonition warning">
 <p class="admonition-title">Advertencia</p>
 <p>Por alguna razón en mi sistema, <strong class="program">nftables</strong> es
 incapaz de traducir la sentencia anterior, pero existe equivalente:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> nft add table mangle
-<span class="gp">#</span> nft add chain mangle PREROUTING <span class="s2">&quot;{ type filter hook prerouting priority -150; }&quot;</span>
-<span class="gp">#</span> nft add rule mangle PREROUTING socket transparent <span class="m">1</span> meta mark <span class="nb">set</span> 0xff
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>nft add table mangle
+<span class="gp"># </span>nft add chain mangle PREROUTING <span class="s2">&quot;{ type filter hook prerouting priority -150; }&quot;</span>
+<span class="gp"># </span>nft add rule mangle PREROUTING socket transparent <span class="m">1</span> meta mark <span class="nb">set</span> 0xff
 </pre></div>
 </div>
 </div>
@@ -213,15 +213,15 @@ incapaz de traducir la sentencia anterior, pero existe equivalente:</p>
 </li>
 <li><p>Se indica al núcleo que haga posible el encaminamiento a través de la
 interfaz de <em>loopback</em><a class="footnote-reference brackets" href="#id7" id="id3">3</a>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> sysctl -w net.ipv4.conf.default.route_localnet<span class="o">=</span><span class="m">1</span>
-<span class="gp">#</span> sysctl -w net.ipv4.conf.all.route_localnet<span class="o">=</span><span class="m">1</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>sysctl -w net.ipv4.conf.default.route_localnet<span class="o">=</span><span class="m">1</span>
+<span class="gp"># </span>sysctl -w net.ipv4.conf.all.route_localnet<span class="o">=</span><span class="m">1</span>
 </pre></div>
 </div>
 </li>
 <li><p>Se alteran las reglas de encaminamiento para que el tráfico marcado (con, por
 ejemplo, <em>0xff</em>) vaya a la interfaz de <em>loopback</em>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> ip rule add fwmark 0xff lookup <span class="m">100</span>
-<span class="gp">#</span> ip route add <span class="nb">local</span> <span class="m">0</span>.0.0.0/0 dev lo table <span class="m">100</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>ip rule add fwmark 0xff lookup <span class="m">100</span>
+<span class="gp"># </span>ip route add <span class="nb">local</span> <span class="m">0</span>.0.0.0/0 dev lo table <span class="m">100</span>
 </pre></div>
 </div>
 </li>
@@ -236,17 +236,17 @@ ejemplo, <em>0xff</em>) vaya a la interfaz de <em>loopback</em>:</p>
 modo transparente, es necesario que el servidor final nos muestre cuál es la
 <abbr title="Internet Protocol">IP</abbr> del cliente. Un modo muy sencillo es usar como servidor final
 <strong class="program">nginx</strong> con esta configuración:</p>
-<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">server</span> <span class="p">{</span>
-   <span class="kn">listen</span> <span class="mi">80</span><span class="p">;</span>  <span class="c1"># Puerto y dirección de escucha pueden cambiar según el caso.</span>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">server</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">   </span><span class="kn">listen</span><span class="w"> </span><span class="mi">80</span><span class="p">;</span><span class="w">  </span><span class="c1"># Puerto y dirección de escucha pueden cambiar según el caso.</span>
 
-   <span class="kn">location</span> <span class="s">/</span> <span class="p">{</span>
-      <span class="kn">return</span> <span class="mi">200</span> <span class="s">&quot;Saludos</span> <span class="s">desde</span> <span class="s">&#39;</span><span class="nv">$hostname&#39;.</span> <span class="s">Te</span> <span class="s">conectas</span> <span class="s">desde</span> <span class="nv">$remote_addr:$remote_port.\n&quot;</span><span class="p">;</span>
-   <span class="p">}</span>
-<span class="p">}</span>
+<span class="w">   </span><span class="kn">location</span><span class="w"> </span><span class="s">/</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="kn">return</span><span class="w"> </span><span class="mi">200</span><span class="w"> </span><span class="s">&quot;Saludos</span><span class="w"> </span><span class="s">desde</span><span class="w"> </span><span class="s">&#39;</span><span class="nv">$hostname&#39;.</span><span class="w"> </span><span class="s">Te</span><span class="w"> </span><span class="s">conectas</span><span class="w"> </span><span class="s">desde</span><span class="w"> </span><span class="nv">$remote_addr:$remote_port.\n&quot;</span><span class="p">;</span><span class="w"></span>
+<span class="w">   </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
 </pre></div>
 </div>
 <p>y que desde el cliente se haga la consulta<a class="footnote-reference brackets" href="#id8" id="id4">4</a>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> wget --no-check-certificate -qO- https://destino
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>wget --no-check-certificate -qO- https://destino
 <span class="go">Saludos desde &#39;servidor&#39;. Te conectas desde 192.168.0.20:43123.</span>
 </pre></div>
 </div>
@@ -263,13 +263,13 @@ comporte de forma transparente.</p>
 parte, esto es, la relativa a la propia aplicación <em>proxy</em>. Es configuración
 (partido del <a class="reference internal" href="../../../98.apendice/01.cryto/03.aplicaciones/04.ssl.html#stunnel"><span class="std std-ref">ejemplo ilustrativo en que se expuso qué es stunnel</span></a>),
 puede ser esta, si el servidor final se encuentra en la misma máquina:</p>
-<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="c1">; La IP de la interfaz física del servidor es 192.168.0.14</span>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="c1">; La IP de la interfaz física del servidor es 192.168.0.14</span><span class="w"></span>
 
-<span class="k">[netcat-ssl]</span>
-<span class="hll"><span class="na">transparent</span> <span class="o">=</span> <span class="s">source</span>
-</span><span class="na">cert</span> <span class="o">=</span> <span class="s">/etc/stunnel/stunnel.pem</span>
-<span class="na">accept</span> <span class="o">=</span> <span class="s">192.168.0.14:443</span>
-<span class="hll"><span class="na">connect</span> <span class="o">=</span> <span class="s">127.1.1.1:80</span>
+<span class="k">[netcat-ssl]</span><span class="w"></span>
+<span class="hll"><span class="na">transparent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">source</span><span class="w"></span>
+</span><span class="na">cert</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">/etc/stunnel/stunnel.pem</span><span class="w"></span>
+<span class="na">accept</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">192.168.0.14:443</span><span class="w"></span>
+<span class="hll"><span class="na">connect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">127.1.1.1:80</span><span class="w"></span>
 </span></pre></div>
 </div>
 <p>donde las novedades son la particular dirección local del servidor final
@@ -278,8 +278,8 @@ transparente</span></a>), y la línea en que indicamos a
 <strong class="program">stunnel</strong> que mantenga la <abbr title="Internet Protocol">IP</abbr> original del cliente.</p>
 <p>En caso de que el servidor final estuviera en una máquina distinta, la última
 línea deberíamos cambiarla por algo así:</p>
-<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="c1">; El servicio final se encuentra en otra máquina (192.168.255.10)</span>
-<span class="na">connect</span> <span class="o">=</span> <span class="s">192.168.255.100:80</span>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="c1">; El servicio final se encuentra en otra máquina (192.168.255.10)</span><span class="w"></span>
+<span class="na">connect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">192.168.255.100:80</span><span class="w"></span>
 </pre></div>
 </div>
 <div class="admonition warning">
@@ -318,37 +318,37 @@ tráfico a una interfaz local particular.</p>
 <em>transparente</em> pasa por ejecutarlo como administrador:</p>
 <div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="c1"># Esto es nginx.conf</span>
 
-<span class="k">user</span> <span class="s">root</span>
+<span class="k">user</span><span class="w"> </span><span class="s">root</span><span class="w"></span>
 
-<span class="s">[...]</span>
+<span class="s">[...]</span><span class="w"></span>
 
-<span class="s">stream</span> <span class="p">{</span>
-   <span class="kn">server</span> <span class="p">{</span>
-      <span class="kn">listen</span> <span class="mi">80</span><span class="p">;</span>
+<span class="s">stream</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">   </span><span class="kn">server</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="kn">listen</span><span class="w"> </span><span class="mi">80</span><span class="p">;</span><span class="w"></span>
 
-      <span class="kn">proxy_bind</span> <span class="nv">$remote_addr</span> <span class="s">transparent</span><span class="p">;</span>
-      <span class="kn">proxy_pass</span> <span class="mi">127</span><span class="s">.1.1.1</span><span class="p">;</span>
-   <span class="p">}</span>
-<span class="p">}</span>
+<span class="w">      </span><span class="kn">proxy_bind</span><span class="w"> </span><span class="nv">$remote_addr</span><span class="w"> </span><span class="s">transparent</span><span class="p">;</span><span class="w"></span>
+<span class="w">      </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="mi">127</span><span class="s">.1.1.1</span><span class="p">;</span><span class="w"></span>
+<span class="w">   </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
 </pre></div>
 </div>
 <p>que supone que el servidor final está en la propia máquina. Esta configuración
 de proxy <abbr title="Transmission Control Protocol">TCP</abbr>, a menos que fuera con <abbr title="Secure Socket Layer">SSL</abbr> y se usara <abbr title="Server Name Indication">SNI</abbr> para discriminar
 los tráficos, resulta un poco inútil. La transparencia también puede practicarse
 en un <em>proxy</em> <abbr title="HyperText Transfer Protocol">HTTP</abbr>:</p>
-<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">upstream</span> <span class="s">backend</span> <span class="p">{</span>
-   <span class="kn">server</span> <span class="mi">192</span><span class="s">.168.0.100</span><span class="p">;</span>
-   <span class="kn">server</span> <span class="mi">192</span><span class="s">.168.0.200</span><span class="p">;</span>
-<span class="p">}</span>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">upstream</span><span class="w"> </span><span class="s">backend</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">   </span><span class="kn">server</span><span class="w"> </span><span class="mi">192</span><span class="s">.168.0.100</span><span class="p">;</span><span class="w"></span>
+<span class="w">   </span><span class="kn">server</span><span class="w"> </span><span class="mi">192</span><span class="s">.168.0.200</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
 
-<span class="k">server</span> <span class="p">{</span>
-   <span class="kn">listen</span> <span class="mi">80</span><span class="p">;</span>
+<span class="k">server</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">   </span><span class="kn">listen</span><span class="w"> </span><span class="mi">80</span><span class="p">;</span><span class="w"></span>
 
-   <span class="kn">location</span> <span class="s">/</span> <span class="p">{</span>
-      <span class="kn">proxy_bind</span> <span class="nv">$remote_addr</span> <span class="s">transparent</span><span class="p">;</span>
-      <span class="kn">proxy_pass</span> <span class="s">http://</span><span class="nv">$backend$uri</span><span class="p">;</span>
-   <span class="p">}</span>
-<span class="p">}</span>
+<span class="w">   </span><span class="kn">location</span><span class="w"> </span><span class="s">/</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="kn">proxy_bind</span><span class="w"> </span><span class="nv">$remote_addr</span><span class="w"> </span><span class="s">transparent</span><span class="p">;</span><span class="w"></span>
+<span class="w">      </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="s">http://</span><span class="nv">$backend$uri</span><span class="p">;</span><span class="w"></span>
+<span class="w">   </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
 </pre></div>
 </div>
 <div class="admonition seealso">
@@ -417,11 +417,11 @@ referente a una jaula que ya es imposible e innecesaria:</p>
 <li><p>Como posiblemente hayamos arrancado ya el servicio, limpiar algunos
 archivos que genera la ejecución porque pertenecen a <em>root</em> y el usuario
 sin privilegios no tiene permisos para sobrescribirlos:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> invoke-rc.d haproxy stop
-<span class="gp">#</span> rm -f /run/haproxy.pid /run/haproxy/*
-<span class="gp">#</span> ls -ld /run/haproxy
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>invoke-rc.d haproxy stop
+<span class="gp"># </span>rm -f /run/haproxy.pid /run/haproxy/*
+<span class="gp"># </span>ls -ld /run/haproxy
 <span class="go">drwxrwsr-x 2 haproxy haproxy 80 Jul 17 21:59 /run/haproxy/</span>
-<span class="gp">#</span> <span class="nb">echo</span> <span class="s1">&#39;PIDFILE=&quot;/run/haproxy/haproxy.pid&quot;&#39;</span> &gt;&gt; /etc/default/haproxy
+<span class="gp"># </span><span class="nb">echo</span> <span class="s1">&#39;PIDFILE=&quot;/run/haproxy/haproxy.pid&quot;&#39;</span> &gt;&gt; /etc/default/haproxy
 </pre></div>
 </div>
 <div class="admonition note">
@@ -433,15 +433,15 @@ sin privilegios no tiene permisos para sobrescribirlos:</p>
 <li><p>Forzar a <a class="reference internal" href="../../../04.servidor/03.init/index.html#systemd"><span class="std std-ref">systemd</span></a> para que ejecute el servicio como el
 usuario <em>haproxy</em>, lo cual implica <a class="reference internal" href="../../../04.servidor/03.init/systemd/04.personalizacion.html#systemd-edicion"><span class="std std-ref">manipular su configuración de
 arranque</span></a>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkdir /etc/systemd/system/haproxy.service.d
-<span class="gp">#</span> cat &gt; /etc/systemd/system/haproxy.service.d/10-nonroot.conf
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mkdir /etc/systemd/system/haproxy.service.d
+<span class="gp"># </span>cat &gt; /etc/systemd/system/haproxy.service.d/10-nonroot.conf
 <span class="go">[Service]</span>
 <span class="go">User=haproxy</span>
 <span class="go">Group=haproxy</span>
-<span class="gp">#</span> systemctl daemon-reload
-<span class="gp">#</span> systemctl cat haproxy.service
+<span class="gp"># </span>systemctl daemon-reload
+<span class="gp"># </span>systemctl cat haproxy.service
 <span class="go">[... configuración vigente del arranque de haproxy ...]</span>
-<span class="gp">#</span> invoke.rc-d haproxy start
+<span class="gp"># </span>invoke.rc-d haproxy start
 </pre></div>
 </div>
 </li>
@@ -454,14 +454,14 @@ arranque</span></a>:</p>
 <dd><p>Si el <em>proxy</em> no se ejecuta como administrador, sino con su propio usuario,
 entonces podemos identificar el tráfico, no por el destino, sino por el usuario
 que lo ejecuta:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> iptables -t nat -A OUTPUT -m owner --uid-owner stunnel -j CONNMARK --set-mark 0xff
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>iptables -t nat -A OUTPUT -m owner --uid-owner stunnel -j CONNMARK --set-mark 0xff
 </pre></div>
 </div>
 </dd>
 <dt class="label" id="id6"><span class="brackets"><a class="fn-backref" href="#id2">2</a></span></dt>
 <dd><p>Esta configuración requiere que el núcleo se haya compilado con el módulo
 <code class="docutils literal notranslate"><span class="pre">NETFILTER_XT_MATCH_SOCKET</span></code>, pero esto es así en las <em>debian</em> modernas:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> grep -i match_socket /boot/config-<span class="sb">`</span>uname -r<span class="sb">`</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>grep -i match_socket /boot/config-<span class="sb">`</span>uname -r<span class="sb">`</span>
 <span class="go">CONFIG_NETFILTER_XT_MATCH_SOCKET=m</span>
 </pre></div>
 </div>
@@ -487,8 +487,9 @@ nuestras pruebas usamos certificados autofirmados.</p>
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
-  <h3><a href="../../../index.html">Tabla de contenido</a></h3>
-  <ul>
+  <div>
+    <h3><a href="../../../index.html">Tabla de contenido</a></h3>
+    <ul>
 <li><a class="reference internal" href="#">7.5.2.3.2. Transparencia</a><ul>
 <li><a class="reference internal" href="#requisitos">7.5.2.3.2.1. Requisitos</a></li>
 <li><a class="reference internal" href="#solucion-general">7.5.2.3.2.2. Solución general</a></li>
@@ -503,12 +504,17 @@ nuestras pruebas usamos certificados autofirmados.</p>
 </li>
 </ul>
 
-  <h4>Tema anterior</h4>
-  <p class="topless"><a href="01.multi.html"
-                        title="capítulo anterior"><span class="section-number">7.5.2.3.1. </span>Multiplexores</a></p>
-  <h4>Próximo tema</h4>
-  <p class="topless"><a href="03.web.html"
-                        title="próximo capítulo"><span class="section-number">7.5.2.3.3. </span>Web</a></p>
+  </div>
+  <div>
+    <h4>Tema anterior</h4>
+    <p class="topless"><a href="01.multi.html"
+                          title="capítulo anterior"><span class="section-number">7.5.2.3.1. </span>Multiplexores</a></p>
+  </div>
+  <div>
+    <h4>Próximo tema</h4>
+    <p class="topless"><a href="03.web.html"
+                          title="próximo capítulo"><span class="section-number">7.5.2.3.3. </span>Web</a></p>
+  </div>
   <div role="note" aria-label="source link">
     <h3>Esta página</h3>
     <ul class="this-page-menu">
@@ -551,7 +557,7 @@ nuestras pruebas usamos certificados autofirmados.</p>
     </div>
     <div class="footer" role="contentinfo">
         &#169; Derechos de autor CC BY 4.0, 2016-2022, José Miguel Sánchez Alés.
-      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.3.2.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.5.0.
     </div>
   </body>
 </html>

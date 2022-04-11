@@ -173,32 +173,32 @@ no lo soporta, completaremos su creación durante la postinstalación.</p></li>
 libertad. Podríamos, para ello, crear un disco virtual y arrancar la máquina con
 un sistema <em>Live</em> como <em>Gparted</em>. En vez de eso, haremos las particiones de
 disco desde el sistema anfitrión para lo cual debemos crear el disco:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> qemu-img create -f qcow2 servidor.qcw 3G
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-img create -f qcow2 servidor.qcw 3G
 </pre></div>
 </div>
 <p>y hacerlo disponible en <code class="file docutils literal notranslate"><span class="pre">/dev/nbd0</span></code>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> modprobe nbd <span class="nv">max_part</span><span class="o">=</span><span class="m">7</span>
-<span class="gp">#</span> qemu-nbd -c /dev/nbd0 servidor.qcw
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>modprobe nbd <span class="nv">max_part</span><span class="o">=</span><span class="m">7</span>
+<span class="gp"># </span>qemu-nbd -c /dev/nbd0 servidor.qcw
 </pre></div>
 </div>
 <p>Hecho lo cual, ya podemos particionar:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> sgdisk -a <span class="m">8</span> -n <span class="s2">&quot;0:40:2047&quot;</span> -t <span class="s2">&quot;0:0xef02&quot;</span> -c <span class="s2">&quot;0:BOOTBIOS&quot;</span> <span class="se">\</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>sgdisk -a <span class="m">8</span> -n <span class="s2">&quot;0:40:2047&quot;</span> -t <span class="s2">&quot;0:0xef02&quot;</span> -c <span class="s2">&quot;0:BOOTBIOS&quot;</span> <span class="se">\</span>
       -a <span class="m">2048</span> -n <span class="s2">&quot;0:2048:+100M&quot;</span> -t <span class="s2">&quot;0:0xef00&quot;</span> -c <span class="s2">&quot;0:EFI&quot;</span> <span class="se">\</span>
               -N <span class="m">0</span> -t <span class="s2">&quot;3:0xfd00&quot;</span> -c <span class="s2">&quot;3:RAID&quot;</span> /dev/nbd0
-<span class="gp">#</span> partx -a /dev/nbd0
+<span class="gp"># </span>partx -a /dev/nbd0
 </pre></div>
 </div>
 <p>Ahora debe crearse el <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr> sobre la tercera partición:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mdadm --create /dev/md0 --metadata<span class="o">=</span><span class="m">1</span> --homehost<span class="o">=</span>any --name<span class="o">=</span><span class="m">0</span> <span class="se">\</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mdadm --create /dev/md0 --metadata<span class="o">=</span><span class="m">1</span> --homehost<span class="o">=</span>any --name<span class="o">=</span><span class="m">0</span> <span class="se">\</span>
    --verbose --level<span class="o">=</span><span class="m">1</span> --raid-devices<span class="o">=</span><span class="m">1</span> --force /dev/nbd0p3
 </pre></div>
 </div>
 <p>y sobre él crear un grupo de volúmenes y definir los volúmenes lógicos:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> vgcreate VGraid /dev/md0
-<span class="gp">#</span> lvcreate -n raiz -L 1792M VGraid
-<span class="gp">#</span> lvcreate -n log -L 64M VGraid
-<span class="gp">#</span> lvcreate -n pool -L 768M VGraid
-<span class="gp">#</span> lvcreate -n swap -C y -L 64M VGraid
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>vgcreate VGraid /dev/md0
+<span class="gp"># </span>lvcreate -n raiz -L 1792M VGraid
+<span class="gp"># </span>lvcreate -n log -L 64M VGraid
+<span class="gp"># </span>lvcreate -n pool -L 768M VGraid
+<span class="gp"># </span>lvcreate -n swap -C y -L 64M VGraid
 </pre></div>
 </div>
 <p>De estos volúmenes, el nombrado <em>pool</em> será el volumen que posteriormente
@@ -207,17 +207,17 @@ dedicado a <em>swap</em> para que al situarse éste último al final pueda ampli
 luego su tamaño hasta los 2 GiB manteniendo la contiguidad del espacio. De
 hecho, forzamos la contiguidad a través de la opción <kbd class="kbd docutils literal notranslate">-C</kbd>.</p>
 <p>Además formateamos para asegurarnos de que el tamaño de bloque es de 4KiB:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span>  mkfs.ext4 -L RAIZ -b4k /dev/VGraid/raiz
-<span class="gp">#</span>  mkfs.ext4 -L LOG -b4k /dev/VGraid/log
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#  </span>mkfs.ext4 -L RAIZ -b4k /dev/VGraid/raiz
+<span class="gp">#  </span>mkfs.ext4 -L LOG -b4k /dev/VGraid/log
 </pre></div>
 </div>
 <p>Una vez hecho esto, ya podemos comenzar la instalación en una máquina virtual,
 así que desconectamos:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> vgchange -an VGraid
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>vgchange -an VGraid
 <span class="go">0 logical volume(s) in volume group &quot;VGraid&quot; now activ</span>
-<span class="gp">#</span> mdadm --stop /dev/md0
+<span class="gp"># </span>mdadm --stop /dev/md0
 <span class="go">mdadm: stopped /dev/md0</span>
-<span class="gp">#</span> qemu-nbd -d /dev/nbd0
+<span class="gp"># </span>qemu-nbd -d /dev/nbd0
 <span class="go">/dev/nbd0 disconnected</span>
 </pre></div>
 </div>
@@ -325,41 +325,41 @@ etc.)</p></li>
 <p>Como el instalador no soporta <a class="reference internal" href="../01.division/04.virt.html#lvm-aprovisionamiento"><span class="std std-ref">aprovisionamiento fino</span></a> es ahora cuando debemos llevarlo a cabo. Para ello
 hemos de arrancar el sistema, instalar la herramienta propiada y convertir el
 volumen lógico que reservamos para esta función en un <em>pool</em>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> apt install thin-provisioning-tools
-<span class="gp">#</span> lvconvert --thinpool /dev/VGraid/pool
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>apt install thin-provisioning-tools
+<span class="gp"># </span>lvconvert --thinpool /dev/VGraid/pool
 </pre></div>
 </div>
 <p>Hecho lo cual debemos crear los tres volúmenes faltantes:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvcreate -T -n home -V 768M VGraid/pool
-<span class="gp">#</span> lvcreate -T -n srv -V 768M VGraid/pool
-<span class="gp">#</span> lvcreate -T -n mysql -V 768M VGraid/pool
-<span class="gp">#</span> mkfs.ext4 -L SRV -b4k /dev/VGraid/srv
-<span class="gp">#</span> mkfs.ext4 -L HOME -b4k /dev/VGraid/home
-<span class="gp">#</span> mkfs.ext4 -L MYSQL -b4k /dev/VGraid/mysql
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lvcreate -T -n home -V 768M VGraid/pool
+<span class="gp"># </span>lvcreate -T -n srv -V 768M VGraid/pool
+<span class="gp"># </span>lvcreate -T -n mysql -V 768M VGraid/pool
+<span class="gp"># </span>mkfs.ext4 -L SRV -b4k /dev/VGraid/srv
+<span class="gp"># </span>mkfs.ext4 -L HOME -b4k /dev/VGraid/home
+<span class="gp"># </span>mkfs.ext4 -L MYSQL -b4k /dev/VGraid/mysql
 </pre></div>
 </div>
 <p>copiar los ficheros personal sobre el nuevo volumen:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mount /dev/VGraid/home /mnt
-<span class="gp">#</span> tar -C /home/ -cf - . <span class="p">|</span> tar -C /mnt/ -xvpf -
-<span class="gp">#</span> umount /mnt
-<span class="gp">#</span> rm /home/usuario -rf
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mount /dev/VGraid/home /mnt
+<span class="gp"># </span>tar -C /home/ -cf - . <span class="p">|</span> tar -C /mnt/ -xvpf -
+<span class="gp"># </span>umount /mnt
+<span class="gp"># </span>rm /home/usuario -rf
 </pre></div>
 </div>
 <p>crear el punto de montaje <code class="file docutils literal notranslate"><span class="pre">/var/log/mysql</span></code>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkdir /var/lib/mysql
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mkdir /var/lib/mysql
 </pre></div>
 </div>
 <p>añadir los tres puntos de montaje a <code class="file docutils literal notranslate"><span class="pre">/etc/fstab</span></code>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> cat &gt;&gt; /etc/fstab
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>cat &gt;&gt; /etc/fstab
 <span class="go">/dev/mapper/VGraid-home /home   ext4    defaults        0       2</span>
 <span class="go">/dev/mapper/VGraid-srv  /srv    ext4    defaults        0       2</span>
 <span class="go">/dev/mapper/VGraid-mysql /var/lib/mysql ext4 defaults   0       2</span>
 </pre></div>
 </div>
 <p>y, por esta vez, montarlo a mano:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mount /home
-<span class="gp">#</span> mount /var/lib/mysql
-<span class="gp">#</span> mount /srv
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mount /home
+<span class="gp"># </span>mount /var/lib/mysql
+<span class="gp"># </span>mount /srv
 </pre></div>
 </div>
 </section>
@@ -378,7 +378,7 @@ innecesriamente.</p></li>
 <p>Es posible hacer estas operaciones a mano montando el disco con
 <strong class="command">qemu-nbd</strong>, pero <a class="reference download internal" download="" href="../../_downloads/bae553b8e54e59517ec1c243249da104/mrproper"><code class="xref download docutils literal notranslate"><span class="pre">este</span> <span class="pre">script</span></code></a> creado para
 la ocasión, puede ahorrarnos el trabajo:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mrproper disco.qcw
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mrproper disco.qcw
 </pre></div>
 </div>
 <p>El script generará en el mismo directorio un nuevo disco <code class="file docutils literal notranslate"><span class="pre">disco-light.qcw</span></code>
@@ -408,8 +408,8 @@ Suponemos que en esta máquina real sí dispondremos de dos discos para el
 para volcar la imagen sobre los discos físicos del servidor real, para lo cual
 es mejor que el disco virtual no esté en formato <em>qcow2</em> sino que sea una imagen
 cruda. Por tanto, antes de nada:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> qemu-info convert -cpf qcow2 disco.qcw -O raw disco.raw
-<span class="gp">#</span> xz -v9 disco.raw
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>qemu-info convert -cpf qcow2 disco.qcw -O raw disco.raw
+<span class="gp"># </span>xz -v9 disco.raw
 </pre></div>
 </div>
 <p>De esta forma, tenemos una imagen comprimida <code class="file docutils literal notranslate"><span class="pre">disco.raw.xz</span></code>. Lo más cómodo
@@ -421,13 +421,13 @@ valernos.</p>
 <p>Sea como sea, arrancando con este pincho <abbr title="Universal Serial Bus">USB</abbr>, suponiendo que la partición en
 la que hemos copiado <code class="file docutils literal notranslate"><span class="pre">disco.raw.xz</span></code> se haya montado sobre <code class="file docutils literal notranslate"><span class="pre">/mnt</span></code>, y
 finalmente que los discos del servidor sean <code class="file docutils literal notranslate"><span class="pre">/sda</span></code> y <code class="file docutils literal notranslate"><span class="pre">/sdb</span></code>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> xzcat /mnt/disco.raw.xz &gt; /dev/sda
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>xzcat /mnt/disco.raw.xz &gt; /dev/sda
 </pre></div>
 </div>
 <p>La orden volcará el contenido del disco sobre el primer disco. Esto, sib
 embargo, no es suficiente, ya que al menos debemos corregir que la copia de la
 <abbr title="GUID Partition Table">GPT</abbr> no se encuentre al final del disco:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> sgdisk -e /devsda
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>sgdisk -e /devsda
 </pre></div>
 </div>
 <section id="constitucion-del-raid">
@@ -438,12 +438,12 @@ disco. Antes de nada, debemos agrandar la partición, pero si lo hacemos ahora e
 bastante probable que como consecuencia de la acción de copiar al final de disco
 la <abbr title="GUID Partition Table">GPT</abbr>, el sistema haya detectado el <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr> y el grupo de volúmenes al releer
 la tabla de particiones. Así que primero vamos a paralos:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> vgchange -an VGraid
-<span class="gp">#</span> mdadm --stop /dev/md0
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>vgchange -an VGraid
+<span class="gp"># </span>mdadm --stop /dev/md0
 </pre></div>
 </div>
 <p>Para, después, a las bravas tocar la tabla de particiones:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> sgdisk -d <span class="m">3</span> -N <span class="m">3</span> -t <span class="s2">&quot;3:0xfd00&quot;</span> -c <span class="s2">&quot;3:RAID&quot;</span> -p /dev/sda3
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>sgdisk -d <span class="m">3</span> -N <span class="m">3</span> -t <span class="s2">&quot;3:0xfd00&quot;</span> -c <span class="s2">&quot;3:RAID&quot;</span> -p /dev/sda3
 </pre></div>
 </div>
 <p>esto, es borrarla y redefinir la última partición hasta el final.  Como sólo
@@ -451,47 +451,47 @@ hemos tocado la propia <abbr title="GUID Partition Table">GPT</abbr> y el conten
 intacto. Tocaría ahora agrandar el <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr>, pero sale más a cuenta sincronizar
 con el segundo disco y sólo después llevar a cabo la ampliación efectiva. Para
 ello, empezamos por copiar la tabla de particiones:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> sgdisk -R /dev/sdb /dev/sda
-<span class="gp">#</span> sgdisk -G /dev/sdb
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>sgdisk -R /dev/sdb /dev/sda
+<span class="gp"># </span>sgdisk -G /dev/sdb
 </pre></div>
 </div>
 <p>Y ahora, sí, añadir el segundo disco al <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mdadm --add /dev/md0 /dev/sdb3
-<span class="gp">#</span> mdadm --grow /dev/md0 --raid-device<span class="o">=</span><span class="m">2</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mdadm --add /dev/md0 /dev/sdb3
+<span class="gp"># </span>mdadm --grow /dev/md0 --raid-device<span class="o">=</span><span class="m">2</span>
 </pre></div>
 </div>
 <p>Al hacerlo, comenzará el proceso de sincronización de los 3GiB, cuyo progreso
 podemos observar:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> watch cat /proc/mdstat
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>watch cat /proc/mdstat
 </pre></div>
 </div>
 <p>Completada la sincronización (que no debe durar demasiado), podemos <em>colonizar</em> el
 resto de la partición:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mdadm --grow /dev/md0 --assume-clean -z max
-<span class="gp">#</span> pvresize /dev/md0
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mdadm --grow /dev/md0 --assume-clean -z max
+<span class="gp"># </span>pvresize /dev/md0
 </pre></div>
 </div>
 <p>Y ya el grupo de volumen ocupará todo el disco y, en consecuencia, podremos
 aplicar los volúmenes lógicos al tamaño que deseemos, empezando eso sí, por el
 dedicado a <em>swap</em> cuyo espacio debe ser contiguo:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvextend -L 2G /dev/VGraid/swap
-<span class="gp">#</span> mkswap -L SWAP -U <span class="k">$(</span>blkid -t <span class="nv">LABEL</span><span class="o">=</span>SWAP -o value -s UUID<span class="k">)</span> /dev/VGraid/swap
-<span class="gp">#</span> lvextend -rL 5G /dev/VGraid/raiz
-<span class="gp">#</span> lvextend -rL 1G /dev/VGraid/log
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lvextend -L 2G /dev/VGraid/swap
+<span class="gp"># </span>mkswap -L SWAP -U <span class="k">$(</span>blkid -t <span class="nv">LABEL</span><span class="o">=</span>SWAP -o value -s UUID<span class="k">)</span> /dev/VGraid/swap
+<span class="gp"># </span>lvextend -rL 5G /dev/VGraid/raiz
+<span class="gp"># </span>lvextend -rL 1G /dev/VGraid/log
 </pre></div>
 </div>
 <p>Opcionalmente podemos reservar 5GiB para futuras instantáneas del sistema raíz<a class="footnote-reference brackets" href="#id12" id="id5">5</a>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvcreate -s -n raiz_snap -L 5G /dev/VGraid/raiz
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lvcreate -s -n raiz_snap -L 5G /dev/VGraid/raiz
 </pre></div>
 </div>
 <p>y reservar para el <em>pool</em> el espacio restante. Los volúmnes que cohabitan en él,
 podemos extenderlos hasta el tamaño que estimemos oportuno, sabiendo que
 posteriomente podremos ampliarlos:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> lvextend -l +100%FREE /dev/VGraid/pool
-<span class="gp">#</span> lvextend -rL 50G /dev/VGraid/home
-<span class="gp">#</span> lvextend -rL 100G /dev/VGraid/srv
-<span class="gp">#</span> lvextend -rL 2G /dev/VGraid/mysql
-<span class="gp">#</span> lvremove /dev/VGraid/raiz_snap
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lvextend -l +100%FREE /dev/VGraid/pool
+<span class="gp"># </span>lvextend -rL 50G /dev/VGraid/home
+<span class="gp"># </span>lvextend -rL 100G /dev/VGraid/srv
+<span class="gp"># </span>lvextend -rL 2G /dev/VGraid/mysql
+<span class="gp"># </span>lvremove /dev/VGraid/raiz_snap
 </pre></div>
 </div>
 </section>
@@ -507,7 +507,7 @@ necesario.</p>
 <h4><span class="section-number">5.10.4.2.1. </span><abbr title="Basic I/O System">BIOS</abbr><a class="headerlink" href="#bios" title="Enlazar permanentemente con este título">¶</a></h4>
 <p>Si el firmware es <abbr title="Basic I/O System">BIOS</abbr>, la sincronización es enormemente sencilla. Basta con
 instalar <abbr title="GRand Unified Bootloader">GRUB</abbr> en el disco en el que falte el arranque:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> grub-install /dev/sdb
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>grub-install /dev/sdb
 </pre></div>
 </div>
 <p>Cada vez que haya que sustituir un disco, tras el proceso de sincronización se
@@ -534,16 +534,16 @@ dificultad lo que expongamos.</p></li>
 <p>Partamos de que mantenemos las dos particiones por separado durante el tiempo en
 que el sistema arranca con <abbr title="Basic I/O System">BIOS</abbr> y que, cuando <a class="reference internal" href="../01.division/03.pract.html#bios-uefi"><span class="std std-ref">migramos a UEFI</span></a><a class="footnote-reference brackets" href="#id13" id="id7">6</a>, usamos la <abbr title="EFI System Partition">ESP</abbr> de <code class="file docutils literal notranslate"><span class="pre">/dev/sda</span></code> para almacenar el arranque.</p>
 <p>En esta situación vamos a copiar temporalmente el contenido de la partición:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mkdir /tmp/EFI
-<span class="gp">#</span> tar -C /boot/efi/EFI -cf - . <span class="p">|</span> tar -C /tmp/EFI -xvpf -
-<span class="gp">#</span> umount /boot/efi
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mkdir /tmp/EFI
+<span class="gp"># </span>tar -C /boot/efi/EFI -cf - . <span class="p">|</span> tar -C /tmp/EFI -xvpf -
+<span class="gp"># </span>umount /boot/efi
 </pre></div>
 </div>
 <p>hecho lo cual, definimos un segundo <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr> 1:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mdadm --create /dev/md1 --metadata<span class="o">=</span><span class="m">1</span>.0 --homehost<span class="o">=</span>any --name<span class="o">=</span><span class="m">1</span> <span class="se">\</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mdadm --create /dev/md1 --metadata<span class="o">=</span><span class="m">1</span>.0 --homehost<span class="o">=</span>any --name<span class="o">=</span><span class="m">1</span> <span class="se">\</span>
       --verbose --level<span class="o">=</span><span class="m">1</span> --raid-devices<span class="o">=</span><span class="m">2</span> --force /dev/sda2 /dev/sdb2
 
-<span class="gp">#</span> mkfs.fat -nEFI -F32 /dev/md1
+<span class="gp"># </span>mkfs.fat -nEFI -F32 /dev/md1
 </pre></div>
 </div>
 <p>Obsérvese algo muy importante: se ha usado como versión de los metadatos la
@@ -556,16 +556,16 @@ las particiones y arrancar. Debemos modificar la entrada en <code class="file do
 </pre></div>
 </div>
 <p>añadir el nuevo <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr> a <code class="file docutils literal notranslate"><span class="pre">/etc/mdadm/mdadm.conf</span></code>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mdadm --examine --scan <span class="p">|</span> grep any:1 &gt;&gt; /etc/mdadm/mdadm.conf
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mdadm --examine --scan <span class="p">|</span> grep any:1 &gt;&gt; /etc/mdadm/mdadm.conf
 </pre></div>
 </div>
 <p>y, por último, restituir los datos al <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> mount /boot/efi
-<span class="gp">#</span> mv /tmp/EFI /boot/efi
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mount /boot/efi
+<span class="gp"># </span>mv /tmp/EFI /boot/efi
 </pre></div>
 </div>
 <p>Además, hacemos que funcione la entrada para el dispositivo de disco:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> grub-install --no-nvram --force-extra-removable /dev/sda
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>grub-install --no-nvram --force-extra-removable /dev/sda
 </pre></div>
 </div>
 <p>donde debemos añadir la opción <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">-</kbd>-<kbd class="kbd docutils literal notranslate">no</kbd>-<kbd class="kbd docutils literal notranslate">nvram</kbd></kbd> para que <abbr title="GRand Unified Bootloader">GRUB</abbr> no intente
@@ -597,24 +597,24 @@ la línea adecuada en <code class="file docutils literal notranslate"><span clas
 </li>
 <li><p>Creamos un nuevo servicio que ensamble el <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr> reincronizando los
 miembros y montándo el resultado sobre <code class="file docutils literal notranslate"><span class="pre">/boot/efi</span></code>:</p>
-<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[Unit]</span>
-<span class="na">Description</span><span class="o">=</span><span class="s">Resync /boot/efi RAID</span>
-<span class="na">DefaultDependencies</span><span class="o">=</span><span class="s">no</span>
-<span class="na">After</span><span class="o">=</span><span class="s">local-fs.target</span>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[Unit]</span><span class="w"></span>
+<span class="na">Description</span><span class="o">=</span><span class="s">Resync /boot/efi RAID</span><span class="w"></span>
+<span class="na">DefaultDependencies</span><span class="o">=</span><span class="s">no</span><span class="w"></span>
+<span class="na">After</span><span class="o">=</span><span class="s">local-fs.target</span><span class="w"></span>
 
-<span class="k">[Service]</span>
-<span class="na">Type</span><span class="o">=</span><span class="s">oneshot</span>
-<span class="na">ExecStart</span><span class="o">=</span><span class="s">/sbin/mdadm --assemble /dev/md1 --uuid=123... --update=resync</span>
-<span class="na">ExecStart</span><span class="o">=</span><span class="s">/bin/mount /boot/efi</span>
-<span class="na">RemainAfterExit</span><span class="o">=</span><span class="s">yes</span>
+<span class="k">[Service]</span><span class="w"></span>
+<span class="na">Type</span><span class="o">=</span><span class="s">oneshot</span><span class="w"></span>
+<span class="na">ExecStart</span><span class="o">=</span><span class="s">/sbin/mdadm --assemble /dev/md1 --uuid=123... --update=resync</span><span class="w"></span>
+<span class="na">ExecStart</span><span class="o">=</span><span class="s">/bin/mount /boot/efi</span><span class="w"></span>
+<span class="na">RemainAfterExit</span><span class="o">=</span><span class="s">yes</span><span class="w"></span>
 
-<span class="k">[Install]</span>
-<span class="na">WantedBy</span><span class="o">=</span><span class="s">sysinit.target</span>
+<span class="k">[Install]</span><span class="w"></span>
+<span class="na">WantedBy</span><span class="o">=</span><span class="s">sysinit.target</span><span class="w"></span>
 </pre></div>
 </div>
 </li>
 <li><p>Actualizamos la imagen de disco inicial:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> update-initramfs -u
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>update-initramfs -u
 </pre></div>
 </div>
 </li>
@@ -675,8 +675,9 @@ la versión <abbr title="Extensible Firmware Interface">EFI</abbr> de <abbr titl
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
-  <h3><a href="../../index.html">Tabla de contenido</a></h3>
-  <ul>
+  <div>
+    <h3><a href="../../index.html">Tabla de contenido</a></h3>
+    <ul>
 <li><a class="reference internal" href="#">5.10. Instalación del servidor</a><ul>
 <li><a class="reference internal" href="#preinstalacion">5.10.1. Preinstalación</a><ul>
 <li><a class="reference internal" href="#sistemas-de-ficheros">5.10.1.1. Sistemas de ficheros</a></li>
@@ -704,12 +705,17 @@ la versión <abbr title="Extensible Firmware Interface">EFI</abbr> de <abbr titl
 </li>
 </ul>
 
-  <h4>Tema anterior</h4>
-  <p class="topless"><a href="../09.recup/index.html"
-                        title="capítulo anterior"><span class="section-number">5.9. </span>Recuperación de datos</a></p>
-  <h4>Próximo tema</h4>
-  <p class="topless"><a href="../../06.infraestructura/index.html"
-                        title="próximo capítulo"><span class="section-number">6. </span>Servicios de infraestructura</a></p>
+  </div>
+  <div>
+    <h4>Tema anterior</h4>
+    <p class="topless"><a href="../09.recup/index.html"
+                          title="capítulo anterior"><span class="section-number">5.9. </span>Recuperación de datos</a></p>
+  </div>
+  <div>
+    <h4>Próximo tema</h4>
+    <p class="topless"><a href="../../06.infraestructura/index.html"
+                          title="próximo capítulo"><span class="section-number">6. </span>Servicios de infraestructura</a></p>
+  </div>
   <div role="note" aria-label="source link">
     <h3>Esta página</h3>
     <ul class="this-page-menu">
@@ -750,7 +756,7 @@ la versión <abbr title="Extensible Firmware Interface">EFI</abbr> de <abbr titl
     </div>
     <div class="footer" role="contentinfo">
         &#169; Derechos de autor CC BY 4.0, 2016-2022, José Miguel Sánchez Alés.
-      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.3.2.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.5.0.
     </div>
   </body>
 </html>

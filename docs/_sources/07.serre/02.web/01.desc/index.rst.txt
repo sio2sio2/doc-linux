@@ -1,3 +1,5 @@
+.. _http:
+
 Descripción del protocolo
 *************************
 El protocolo |HTTP| es un protocolo sin estado (esto es, un protocolo
