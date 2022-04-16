@@ -78,7 +78,7 @@ Para acceder al *software*, basta con instalarlo::
 
 .. rubric:: Notas al pie
 
-.. [#] :program:`Wireguard` se implementó como núcleo de *Linux* desde un
+.. [#] :program:`Wireguard` se implementó como módulo del núcleo de *Linux* desde un
    principio, pero sólo `entró como módulo oficial con la versión 5.6 del kernel
    <https://www.genbeta.com/linux/wireguard-vpn-open-source-admirado-linus-torvalds-sera-parte-kernel-linux>`_.
    Por ese motivo, en cualquier distribución de *Linux* con un núcleo anterior
