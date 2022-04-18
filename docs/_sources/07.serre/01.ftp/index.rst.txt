@@ -18,14 +18,22 @@ algunas de las razones para sostener esta afirmación son\ [#]_:
    `rsync <https://es.wikipedia.org/wiki/Rsync>`_) o el control de versiones
    (p.e. `git <https://en.wikipedia.org/wiki/Git>`_).
 #. Pobre soporte de compresión de datos para el ahorro de ancho de banda.
-#. El protocolo es ineficiente y requiere transtear con los cortafuegos para
+#. El protocolo es ineficiente y requiere trastear con los cortafuegos para
    darle soporte.
-#. El servicio no dispone de software de cacheo ni aceleradores,
+#. El servicio no dispone de *software* de cacheo ni aceleradores,
 #. Muchas implementaciones del protocolo reciben ya pocas actualizaciones.
+#. Incluso los navegadores han ido eliminado su soporte para el protocolo (ni
+   lo `da ya Chrome <https://chromestatus.com/feature/6246151319715840>`_ ni lo
+   `da Firefox
+   <https://blog.mozilla.org/security/2021/07/20/stopping-ftp-support-in-firefox-90/>`_).
 
 Por estas razones bajo el epígrafe proponemos la configuración de un servidor
 |SSH| como sustituto, aunque también describiremos cómo configurar un servidor
 |FTP| clásico, :program:`vsftpd`.
+
+.. seealso:: Échele un ojo a `este interesante artículo
+   <https://www.vice.com/en/article/5dzx43/ftp-is-almost-50-years-oldand-its-ready-to-retire>`_
+   sobre la (larga) historia de este protocolo.
 
 El plan de estudio consistirá en lo siguiente:
 
