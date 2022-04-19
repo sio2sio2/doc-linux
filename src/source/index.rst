@@ -36,9 +36,9 @@ práctico, mientras que las guías pretenden enumerar los contenidos mínimos de
 sus respectivos módulos, éstas contendrán:
 
 - Contenidos de caracter teórico.
+- Relación con resultados de aprendizaje y criterios de evaluación
 - Índices para desarrollar las partes prácticas sin aplicación en *Linux* (las
   referentes a *Windows*, p.e.)
-- Enlaces a las partes pertinentes del manual.
 - Ejercicios complementarios.
 
 .. note:: Las guías son todas las que están, pero no están todas las que son;

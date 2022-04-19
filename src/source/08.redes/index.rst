@@ -1,5 +1,7 @@
-Conceptos avanzados de redes
-============================
+.. _redes:
+
+Redes
+=====
 
 .. Tipos de interfaces en linux:
    https://developers.redhat.com/blog/2018/10/22/introduction-to-linux-interfaces-for-virtual-networking/
