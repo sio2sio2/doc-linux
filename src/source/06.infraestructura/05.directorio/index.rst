@@ -1,3 +1,5 @@
+.. _serv-directorio:
+
 Servicio de directorio
 ======================
 

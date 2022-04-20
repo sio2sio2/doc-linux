@@ -3,68 +3,83 @@
 Gestión de usuarios
 ===================
 
-En los sistemas multiusuario suelen existir dos conceptos: el de :dfn:`usuario` relacionado con una *personalidad* que ejecuta algún programa y el de :dfn:`grupo`, que no es más que un conjunto de usuarios a los que se les quiere dotar de una característica común. Obsérvese que se ha hablado de *personalidad* y no de *persona*, porque un usuario no tiene necesaramente que corresponderse con un ser humano interactuando con el sistema. Muchos usuarios (en los sistemas de escritorio, la mayoría) no son usuarios creados para facilitar el acceso y el manejo a un humano, sino *usuarios de sistema*, creados para que un determinado programa actúe bajo su identidad.
+En los sistemas multiusuario suelen existir dos conceptos: el de :dfn:`usuario`
+relacionado con una *personalidad* que ejecuta algún programa y el de
+:dfn:`grupo`, que no es más que un conjunto de usuarios a los que se les quiere
+dotar de una característica común. Obsérvese que se ha hablado de *personalidad*
+y no de *persona*, porque un usuario no tiene necesaramente que corresponderse
+con un ser humano interactuando con el sistema. Muchos usuarios (en los sistemas
+de escritorio, la mayoría) no son usuarios creados para facilitar el acceso y el
+manejo a un humano, sino *usuarios de sistema*, creados para que un determinado
+programa actúe bajo su identidad.
 
-Con independencia de los anterior, puede haber dos tipos de usuarios (o grupos): usuarios *locales*, esto es, definidos en el propio sistema; y usuarios *remotos*, definidos a través de algún servidor de usuarios como **samba**. Bajo este epígrafe se estudiarán los primeros sin profundizar demasiado, ya que una instalación estándar deja preparado el sistema para funcionar con ellos.
+Con independencia de los anterior, puede haber dos tipos de usuarios (o grupos):
+usuarios *locales*, esto es, definidos en el propio sistema; y usuarios
+*remotos*, definidos a través de algún servidor de usuarios como **samba**. Bajo
+este epígrafe se estudiarán los primeros sin profundizar demasiado, ya que una
+instalación estándar deja preparado el sistema para funcionar con ellos.
 
-En los sistemas *unix* los ficheros que constituyen la *base de datos* de los usuarios son cuatro:
+En los sistemas *UNIX*, hay cuatro archivos que constituyen la *base de datos*
+de los usuarios locales\ [#]_. Todos los archivos se caracterizan por un cada
+línea se define una entidad distinta y porque los campos que constituyen cada
+entidad se separan por el caracter dos puntos (":kbd:`:`").
 
-* :file:`/etc/shadow`, que almacena las contraseñas cifradas\ [#]_ de los usuarios.
-* :file:`/etc/gshadow`, que almacena las contraseñas cifradas de los grupos.
-* :file:`/etc/group`, que almacena los grupos y el nombre de usuario de sus integrantes.
-* :file:`/etc/passwd`, que almacena los usuarios y sus datos, excepto la contraseña.
+Antes de pasar a ver con qué ordenes podemos consultar y manipular esta base de
+datos, veamos las particularidad de cada archivo:
 
-Tiene interés conocer el formato de estos dos últimos ficheros.
-:file:`/etc/group` almacena en cada línea la definición de un grupo con este
-formato::
+:file:`/etc/group`
+   Almacena la definición de los grupos locales, uno por línea. Su formato es el
+   siguiente:
 
-   audio:x:29:pepe,manolo
+   .. code-block:: unixconfig
 
-Cuatro campos separados por :kbd:`:` (dos puntos):
+      audio:x:29:pepe,manolo
 
-#. El primer campo es el **nombre** del grupo (*audio* en este caso),
+   O sea, cuatro campos:
 
-#. El segundo, la *contraseña* de grupo. Esta contraseña sirve para dar acceso
-   a un usuario a un grupo al que no pertenezca (para ello puede usarse el
-   comando `newgrp`_). Sin embargo, es raro que tales contraseñas
-   existan, ya que este método para ganar accesos tiene la debilidad de exigir
-   que varios usuarios deban compartir una misma contraseña.
+   #. El **nombre** del grupo (*audio* en este caso),
+   #. La *contraseña* de grupo. Esta contraseña sirve para dar acceso
+      a un usuario a un grupo al que no pertenezca (para ello puede usarse el
+      comando `newgrp`_). Por lo general, en vez de incluirse la contraseña, se
+      incluye la letra ":kbd:`x`", que significa que lea la contraseña en el
+      archivo :file:`/etc/gshadow`.
+   #. El identificador del grupo (llamado **GID**).
+   #. Los **usuarios** que pertenecen al grupo separados por comas. En esta lista
+      no aparecen los usuarios cuyo *grupo principal* sea este mismo grupo, ya
+      que su pertenencia al grupo puede deducirse de su  :ref:`registro en
+      /etc/passwd <grupo_principal>`.
 
-#. El identificador del grupo (llamado **GID**).
+:file:`/etc/passwd`,
+   Almacena los usuarios y sus datos. El formato de cada línea es el siguiente:
 
-#. Los **usuarios** que pertenecen al grupo separados por comas. En esta lista
-   no aparecen los usuarios cuyo *grupo principal* sea este mismo grupo, ya
-   que su pertenencia al grupo puede obtenerse de :ref:`otro modo
-   <grupo_principal>`.
+   .. code-block:: unixconfig
 
-Por su parte, :file:`/etc/passwd` define cada usuario en una línea también que
-presenta el siguiente aspecto::
+      josem:x:1000:1000:Jose Miguel,,,:/home/josem:/bin/bash
 
-   josem:x:1000:1000:Jose Miguel,,,:/home/josem:/bin/bash
+   .. _grupo_principal:
 
-.. _grupo_principal:
+   En este caso, los campos son siete:
 
-En este caso, los campos son siete:
-
-#. El *nombre* de usuario.
-#. La *contraseña* que no suele encontrarse aquí, sino en :file:`/etc/shadow`.
-#. El identificador de usuario (**ID**) que es el código numérico asociado a
-   cada usuario. Este número es realmente el que se usa en el sistema de
-   ficheros para determinar la partenencia de los ficheros a los usuarios,
-   así que en el fondo es el identificador realmente importante y no el nombre
-   de usuario, que puede modificarse en cualquier momento sin provocar ningún
-   efecto traumático. Se discutirá despues. Este mismo comentario es
-   aplicable al nombre de grupo y su *gid* asociado que se encuentran en
-   :file:`/etc/group`.
-#. El **GID** del *grupo principal*
-#. La *información personal* del usuario (nombre real, etc.), que suele
-   denominarse información **gecos**.
-#. El **directorio personal** del usuario.
-#. La *shell* predeterminada del usuario que se ejecutará al hacer ingreso en
-   el sistema. Las cuentas que no representan usuarios normales, sino que son
-   necesarias para el funcionamiento de ciertos programas suelen tener como
-   *shell* el comando :ref:`false <false>` (:command:`/bin/false`), lo que
-   impide que puedan usarse de modo interactivo.
+   #. El **nombre** de usuario.
+   #. La **contraseña** que no suele encontrarse aquí, sino en :file:`/etc/shadow`.
+      En su sustitución se escribe el carácter ":kbd:`x`".
+   #. El identificador de usuario (**UID**) que es el código numérico asociado a
+      cada usuario. Este número es realmente el que se usa en el sistema de
+      archivos para determinar la partenencia de los archivos a los usuarios,
+      así que en el fondo es el identificador realmente importante y no el nombre
+      de usuario, que puede modificarse en cualquier momento sin provocar ningún
+      efecto traumático. Se discutirá despues. Este mismo comentario es
+      aplicable al nombre de grupo y su *gid* asociado que se encuentran en
+      :file:`/etc/group`.
+   #. El **GID** del *grupo principal*
+   #. La **información personal** del usuario (nombre real, etc.), que suele
+      denominarse información |GECOS|.
+   #. El **directorio personal** del usuario.
+   #. La **shell** predeterminada del usuario que se ejecutará al hacer ingreso en
+      el sistema. Las cuentas que no representan usuarios normales, sino que son
+      necesarias para el funcionamiento de ciertos programas suelen tener como
+      *shell* el comando :ref:`false <false>` (:command:`/bin/false`), lo que
+      impide que puedan usarse de modo interactivo.
 
    .. note:: En algunos linux, incluida debian, existe el ejecutable
       :command:`/usr/sbin/nologin` que se comporta como
@@ -75,6 +90,66 @@ En este caso, los campos son siete:
       el sistema considera válidas. Los servicios que usa de modo interactivo
       el usuario (*login*, *ssh*, *ftp*, etc.) suelen comprobar si la *shell*
       se encuentra dentro de este listado y, si no es así, impiden el acceso.
+
+:file:`/etc/shadow`
+   Almacena las contraseñas cifradas de los usuarios y campos adicionales
+   con información sobre ellas (caducidad, etc). En realidad, las contraseñas no
+   están propiamente cifradas, sino que se les aplica una :ref:`función de hash
+   <hash>`. Por ejemplo, la información del usuario "*usuario*" es la
+   siguiente:
+
+   .. code-block:: unixconfig
+
+      # getent shadow usuario
+      usuario:$6$feeCGVjY$m4drjYETO7DNffE/8AwmTvRnTj8qmSMy8AhMq1jaNf3ZonyAFPVc64SsY/iWTR3LxtXKnD2hfavS1FXwelAyq1:17782:0:99999:7:::
+
+   La contraseña es el chorizo inmenso en el que se aprecian tres subcampos
+   separados por dólares:
+
+   ``6``
+      Es el :ref:`algoritmo <hash>` usado, según la siguiente tabla:
+
+      ======== ======================
+       Código   Algoritmo
+      ======== ======================
+         1       MD5 (desaconsejado)
+         2?      Blowfish
+         5       SHA-256
+         6       SHA-512
+      ======== ======================
+
+      Los posibles algoritmos se encuentran referidos en la página de manual de
+      :manpage:`crypt(5)`.
+
+   ``feeCGVjY``
+      Es `la sal <https://es.wikipedia.org/wiki/Sal_(criptograf%C3%ADa)>`_
+      utilizada para la generación del resumen.
+   
+   ``m4drjYETO7DNffE/8AwmTvRnTj8qmSMy8AhMq1jaNf3ZonyAFPVc64SsY/iWTR3LxtXKnD2hfavS1FXwelAyq1``
+      El resumen resultante de aplicar a la contraseña el algoritmo usando la sal.
+
+   .. _mkpasswd:
+   .. index:: mkpasswd
+
+   Como de antemano, sabemos que la contraseña en claro es "*usuario*", podemos
+   generar el resumen que aparece en :file:`/etc/shadow` del siguiente modo::
+
+      $ mkpasswd -m sha512crypt -S feeCGVjY usuario
+      $6$feeCGVjY$m4drjYETO7DNffE/8AwmTvRnTj8qmSMy8AhMq1jaNf3ZonyAFPVc64SsY/iWTR3LxtXKnD2hfavS1FXwelAyq1
+
+   La nombre para expresar el algoritmo puede obtenerse consultando los nombres
+   disponibles::
+
+      $ mkpasswd -m help
+
+:file:`/etc/gshadow`
+   Almacena las contraseñas cifradas de los grupos. Sin embargo, es raro que
+   tales contraseñas existan, ya que este método para ganar accesos tiene la
+   debilidad de exigir que varios usuarios deban compartir una misma contraseña.
+   Por esto, prescindiremos de analizar su formato,
+
+.. warning:: Absténgase de alterar a manos los archivos anteriores. Existen
+   herramientas para hacerlo que trataremos a continuación.
 
 Consulta
 --------
@@ -176,7 +251,7 @@ de usuarios y grupos:
 
 :command:`getent`
    Sirve para obtener la información de usuarios, grupos y contraseñas tal y como
-   se observa en los ficheros :file:`/etc/passwd` y :file:`/etc/group`::
+   se observa en los archivos :file:`/etc/passwd` y :file:`/etc/group`::
 
       getent (passwd|group|shadow) [<nombre>]
 
@@ -191,7 +266,7 @@ de usuarios y grupos:
 
    .. note::
       Podría pensarse que usar :command:`getent` es equivalente a consultar
-      directamente el contenido de los ficheros correspondientes, pero no es
+      directamente el contenido de los archivos correspondientes, pero no es
       así. :command:`getent` devuelve información sobre todos los usuarios y
       grupos reconocidos por el sistema, algunos de los cuales pueden no ser
       locales, sino estar definidos en servidores como *samba* o *openldap*.
@@ -200,7 +275,7 @@ Manipulación
 ------------
 
 La manipulación inplica la creación, eliminación y modificación de usuarios y
-grupos. Obviamente es posible editar\ [#]_ directamente los ficheros ya
+grupos. Obviamente es posible editar\ [#]_ directamente los archivos ya
 mencionados, aunque es infinitamente más recomedable hacer uso de programas
 específicos, que serán los que se traten a continuación.
 
@@ -216,7 +291,7 @@ específicos, que serán los que se traten a continuación.
 
    Y en su uso más básico no exige ninguna opción. Ejecutado de este modo, el
    comando preguntará por la contraseña y la información *gecos*; y hará una
-   serie de presuposiciones algunas de ellas basadas en el contenido del fichero
+   serie de presuposiciones algunas de ellas basadas en el contenido del archivo
    de configuración :file:`/etc/adduser.conf`:
   
    * El *UID* será el siguiente disponible dentro del rango de números
@@ -231,9 +306,9 @@ específicos, que serán los que se traten a continuación.
       $ adduser nuevo
 
    Creará un usuario de nombre *nuevo* bajo estos presupuestos. Conviene leer
-   la página del manual y el fichero :file:`/etc/adduser.conf` para saber cómo
+   la página del manual y el archivo :file:`/etc/adduser.conf` para saber cómo
    alterar este comportamiento. No obstante, es interesante aclarar algo que se
-   llegará a descubrir si se lee el fichero de configuración.
+   llegará a descubrir si se lee el archivo de configuración.
 
    Hay tres rangos de números definidos para los usuarios:
 
@@ -288,12 +363,12 @@ específicos, que serán los que se traten a continuación.
    *Script* que sirve para borrar usuarios locales. En principio, sólo borra el
    usuario (y su grupo principal si a este grupo sólo pertenecía él), pero
    pueden usarse distintas opciones para borrar el directorio personal
-   (``--remove-home``) o todos los ficheros del sistema que le pertenecen
+   (``--remove-home``) o todos los archivos del sistema que le pertenecen
    (``--remove-all-files``)::
 
       $ deluser --remove-home nuevo
    
-   También es posible hacer copia de seguridad de los ficheros antes de proceder
+   También es posible hacer copia de seguridad de los archivos antes de proceder
    al borrado. Consúltese la página del manual.
 
    Del mismo modo que :command:`adduser` permite añadir un usuario a un grupo,
@@ -304,14 +379,14 @@ específicos, que serán los que se traten a continuación.
    Borra el usuario *nuevo* del grupo *audio*.
 
    .. note::
-      Cuando se borra un usuario, si quedan en el sistema ficheros que le
+      Cuando se borra un usuario, si quedan en el sistema archivos que le
       pertenecían estos seguirán teniendo como usuario propietario un usuario
       con el *UID* que tenía el usuario que se borró. Si comprobamos el
       propietario (con :ref:`stat <stat>` o :ref:`ls -l <ls>`) veremos que aparece directamente
       el *UID* y no el nombre de usuario ya que al haberlo borrado el sistema no
       puede obtener ningún usuario con ese *UID*. Por supuesto, si creáramos un
       nuevo usuario forzando que su *UID* fuera el del borrado, todos los
-      ficheros pasarían a ser de su propiedad.
+      archivos pasarían a ser de su propiedad.
 
 .. _passwd:
 
@@ -367,7 +442,7 @@ específicos, que serán los que se traten a continuación.
       $ HISTFILE=/dev/null
 
    Esto basta con hacerlo antes de salir de la sesión que es el momento en que los
-   comandos se almacenan en el fichero del historial (:file:`~/.bash_history`).
+   comandos se almacenan en el archivo del historial (:file:`~/.bash_history`).
 
    La orden permite también la opción :kbd:`-e` que presupone que la contraseña
    que se le pasa ya está cifrada. Esto tiene utilidad en algunos casos\ [#]_:
@@ -426,7 +501,7 @@ específicos, que serán los que se traten a continuación.
    página de manual. Algunos usos interesantes son:
 
    * Cambia el nombre de usuario, pero también el directorio personal
-     moviendo los ficheros que hubiera dentro del antiguo directorio::
+     moviendo los archivos que hubiera dentro del antiguo directorio::
 
       $ usermod -l otro -md /home/otro nuevo
 
@@ -447,7 +522,8 @@ específicos, que serán los que se traten a continuación.
 .. index:: chage
 
 :command:`chage`
-   Ya se ha dejado escrito más arriba que las contraseñas se escriben en un fichero
+   Ya se ha dejado escrito más arriba que las contraseñas se escriben en un
+   archivo
    aparte llamado :file:`/etc/shadow`. Esto permite no sólo impedir el acceso a
    los usuarios, sino añadir campos adicionales que informen sobre la política
    de contraseñas: máximo tiempo de vigencia de la contraseña, obligatoriedad de
@@ -651,58 +727,16 @@ administración.
 
 .. rubric:: Notas al pie
 
-.. [#] En realidad, las contraseñas no están propiamente cifradas, sino que se
-   les aplica una :ref:`función de hash <hash>`. Por ejemplo, la información
-   del usuario "*usuario*" es la siguiente::
+.. [#] Pueden existir también usuarios de red, definidos en algún servidor de
+   usuarios, pero es materia para :ref:`otro epígrafe posterior
+   <serv-directorio>`.
 
-      # getent shadow usuario
-      usuario:$6$feeCGVjY$m4drjYETO7DNffE/8AwmTvRnTj8qmSMy8AhMq1jaNf3ZonyAFPVc64SsY/iWTR3LxtXKnD2hfavS1FXwelAyq1:17782:0:99999:7:::
-
-   La contraseña es el chorizo inmenso en el que se aprecian tres campos
-   separados por dólares:
-
-   ``6``
-      Es el :ref:`algoritmo <hash>` usado, según la siguiente tabla:
-
-      ======== ======================
-       Código   Algoritmo
-      ======== ======================
-         1       MD5 (desaconsejado)
-         2?      Blowfish
-         5       SHA-256
-         6       SHA-512
-      ======== ======================
-
-      Los posibles algoritmos se encuentran referidos en la página de manual de
-      :manpage:`crypt(5)`.
-
-   ``feeCGVjY``
-      Es `la sal <https://es.wikipedia.org/wiki/Sal_(criptograf%C3%ADa)>`_
-      utilizada para la generación del resumen.
-   
-   ``m4drjYETO7DNffE/8AwmTvRnTj8qmSMy8AhMq1jaNf3ZonyAFPVc64SsY/iWTR3LxtXKnD2hfavS1FXwelAyq1``
-      El resumen resultante de aplicar a la contraseña el algoritmo usando la sal.
-
-   Como de antemano, sabemos que la contraseña en claro es "*usuario*", podemos
-   generar el resumen que aparece en :file:`/etc/shadow` del siguiente modo::
-
-      $ mkpasswd -m sha512crypt -S feeCGVjY usuario
-      $6$feeCGVjY$m4drjYETO7DNffE/8AwmTvRnTj8qmSMy8AhMq1jaNf3ZonyAFPVc64SsY/iWTR3LxtXKnD2hfavS1FXwelAyq1
-
-   .. _mkpasswd:
-   .. index:: mkpasswd
-
-   La nombre para expresar el algoritmo puede obtenerse consultando los nombres
-   disponibles::
-
-      $ mkpasswd -m help
-
-.. [#] No deben, de ningún modo, editarse los ficheros a través del editor
+.. [#] No deben, de ningún modo, editarse los archivos a través del editor
    normal, puesto que mientras se realiza la edición, podría darse el caso de
    que otro usuario intentara modificarlo a través de una de las herramientas
    específicas que existen. Si se tiene la mala idea de tocar a mano, debe
    hacerse a través del :index:`commando <vipw>` :command:`vipw`, que bloquea el
-   fichero para que ningún otro programa lo toque en tanto se completa la
+   archivo para que ningún otro programa lo toque en tanto se completa la
    modificación.
 
 .. [#] Aunque en estos casos es mejor usar la opción :ref:`usermod <usermod>`
@@ -712,3 +746,5 @@ administración.
 
 .. [#] Por tanto, podríamos emular su propósito con la opción :kbd:`-c` de
    :ref:`su <su>`.
+
+.. |GECOS| replace:: :abbr:`GECOS (General Comprehensive Operating System)`
