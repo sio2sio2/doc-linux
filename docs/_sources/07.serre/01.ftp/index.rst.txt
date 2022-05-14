@@ -11,7 +11,7 @@ de otras soluciones de transferencia\ [#]_.
 Es, por tanto, un protocolo obsoleto y que es preferible evitar. En particular,
 algunas de las razones para sostener esta afirmación son\ [#]_:
 
-#. La descarga anónimma de ficheros puede llevarse a cabo mediante otros
+#. La descarga anónima de ficheros puede llevarse a cabo mediante otros
    protocolos como |HTTP|.
 #. Han surgido otros protocolos que explotan algunas necesidades particulares
    como la sincronía entre los datos almacenados en cliente y servidor (p.e.
