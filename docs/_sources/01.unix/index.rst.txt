@@ -1,7 +1,7 @@
 .. _qué-es:
 
-¿Qué es linux?
-==============
+¿Qué es *Linux*?
+================
 En puridad, deberíamos empezar por el principio, esto es, por *UNIX*
 
 UNIX
@@ -69,11 +69,13 @@ desarrollado por `Andrew S. Tanenbaum
 <https://es.wikipedia.org/wiki/Andrew_S._Tanenbaum>`_, que sólo permitía su uso
 educativo.
 
+.. rubric:: Concepto
+
 En puridad *Linux* es sólo el núcleo del sistema, mientras que el resto de
-programas (*shell*, compilador, pequeñas aplicaciones) proceden en su mayoría
-del `proyecto GNU <https://es.wikipedia.org/wiki/Proyecto_GNU>`_, que aun
-habiendo desarrollado desde 1983 muchas de las aplicaciones del *UNIX* original
-aún carecía en 1991 de un núcleo operativo.
+programas básicos (*shell*, compilador, pequeñas aplicaciones) proceden en su
+mayoría del `proyecto GNU <https://es.wikipedia.org/wiki/Proyecto_GNU>`_, que
+aun habiendo desarrollado desde 1983 muchas de las aplicaciones del *UNIX*
+original aún carecía en 1991 de un núcleo operativo.
 
 Aunque el creador original de *Linux* fue Torvald, pronto adoptó un desarrollo
 colaborativo a través de internet\ [#]_ y en la actualidad es desarrollado por
@@ -85,16 +87,78 @@ sistema como `IBM <https://es.wikipedia.org/wiki/IBM>`_, `Google
 .. note:: Por lo general, cuando usemos el término *Linux* en este documento nos
    referiremos al sistema completo, no sólo al *kernel*.
 
-Distribución de referencia
---------------------------
-La distribución de referencia para la elaboración de los apuntes es la
-:ref:`Debian estable <ramas>`. La redacción
-se comenzó en 2016 cuando lo era Jessie_ (la versión **8.0**), aunque por estar
-próxima a concluir su ciclo se procuró adaptar el contenido a la versión **9.0**
-Stretch_. Desde entonces se han publicado nuevas versiones (Buster_, Bullseye_)
-y la redacción de nuevos epígrafes y la revisión de algunos ya escritos se ha
-ido procurando adaptar a ellas, pero pueden existir partes que no hayan recibido
-revisión y, por tanto, tengan alguna explicación que haya dejado de ser válida.
+.. rubric:: Distribuciones
+
+Utilizar directamente el *kernel* descargado de *Linux* es poco menos que
+inviable, así que éste se hace accesible a los usuarios a través de lo que se
+conoce como una *distribución* (o, coloquialmente, *distro*). Una
+:dfn:`distribución` es una colección completa de *software* organizada alrededor
+de un núcleo de *Linux* que constituye un sistema operativo funcional y
+proporciona un instalador, un :ref:`sistema de gestión de software
+<paqueteria>`, una organización de archivos y algunos aspectos básicos más.
+
+Por tanto, "instalar *Linux*" implica en realidad escoger e instalar una
+distribución de *Linux*; y "utilizar *Linux*", utilizar una distribución de
+*Linux*. Y, aunque gran cantidad del *software* que instalan todas las
+distribuciones es común (por ejemplo, el programa :ref:`cp <cp>` para copiar
+archivos), hay notables diferencias entre ellas.
+
+Sea como sea, hay centenares de distribuciones, algunas generalistas y otras
+orientadas a ciertos nichos. `Distrowatch <https://www.distrowatch.com>`_ es un
+buen punto para conocer gran parte de ellas. Sin embargo, no todas las
+distribuciones son independientes entre sí: lo habitual es que una distribución
+tome su base de otra y añada o modifique ciertos aspectos.
+
+Sin ser muy exhaustivos, las principales distribuciones son:
+
+* Slackware_.
+* Debian_:
+
+  - Ubuntu_.
+
+    + Mint_.
+
+  - Knoppix_.
+
+* RedHat_:
+
+  - Fedora_.
+  - CentOS_.
+
+* Suse_.
+* Gentoo_.
+* Archlinux_:
+
+  - Manjaro_.
+
+.. _Slackware: https://www.slackware.com
+.. _Debian: https://www.debian.org
+.. _Ubuntu: https://www.ubuntu.com
+.. _Mint: https://www.linuxmint.com
+.. _Knoppix: https://www.knopper.net
+.. _RedHat: https://www.redhat.com
+.. _Fedora: https://getfedora.org
+.. _CentOS: https://www.centos.org
+.. _Suse: https://www.suse.com
+.. _Gentoo: https://www.gentoo.org
+.. _Archlinux: https://www.archlinux.org
+.. _Manjaro: https://manjaro.org
+
+.. seealso:: `LinuxTimeLine <https://github.com/FabioLolix/LinuxTimeline/tags>`_
+   proporciona un gráfico que refleja la aparición de las principales
+   distribiciones de *Linux* y qué parentesco
+
+.. rubric:: Distribución de referencia
+
+La *distribución de referencia* para la elaboración de los apuntes es la
+:ref:`Debian estable <ramas>`. La redacción se comenzó en 2016 cuando lo era
+Jessie_ (la versión **8.0**), aunque por estar próxima a concluir su ciclo se
+procuró adaptar el contenido a la versión **9.0** Stretch_. Desde entonces se
+han publicado nuevas versiones (Buster_, Bullseye_) y la redacción de nuevos
+epígrafes y la revisión de algunos ya escritos se ha ido procurando adaptar a
+ellas, pero pueden existir partes que no hayan recibido revisión y, por tanto,
+tengan alguna explicación que haya perdido validez o requiera alguna pequeña
+adaptación.
 
 Fuera de *Debian*, la mayor parte de las explicaciones debería ser válida para
 sus distribuciones derivadas.
