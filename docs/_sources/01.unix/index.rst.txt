@@ -111,31 +111,50 @@ tome su base de otra y añada o modifique ciertos aspectos.
 
 Sin ser muy exhaustivos, las principales distribuciones son:
 
-* Slackware_.
-* Debian_:
+#. Slackware_, la más veterana superviviente junto a *Debian* y que se
+   caracteriza por intentar mantener simple su diseño (`principio KISS
+   <https://es.wikipedia.org/wiki/Principio_KISS>`_).
+#. Debian_, que es posiblemente la que ha dado lugar a mayor cantidad de
+   derivadas. Es muy apreciada su versión estable para servidores:
 
-  - Ubuntu_.
+   - Ubuntu_, que nació en principio para acercar *Linux* al usuario novel. Con
+     su popularización ha ido diversificándose y ahora proporciona versiones
+     pensadas para servidor.
 
-    + Mint_.
+     + Mint_. que tiene versiones basadas tanto en *Ubuntu* como en *Debian* y se orienta al usuario novel.
 
-  - Knoppix_.
+   - `Kali Linux`_, muy usada en auditoría y seguridad informáticas.
 
-* RedHat_:
+#. RedHat_, que es la distribución desarrollada por la empresa del mismo nombre (y desde 2019 filial de IBM). Formalmente desapareció en 2003, cuando se desdobló en dos: |RHEL| como versión comercial y Fedora como versión comunitaria.
 
-  - Fedora_.
-  - CentOS_.
+   - Fedora_, que es la versión comunitaria de *Red Hat* (más bien, |RHEL|).
+   - CentOS_, que es la versión gratuita de |RHEL|. *Red Hat* sólo distribuye
+     las versiones terminadas de |RHEL| para sus suscriptores de pago, pero
+     publica el código fuente bajo licencia |GPL|. Los voluntarios de *CentOS*
+     toman ese código fuente, eliminan todas las marcas comerciales referentes
+     a *Red Hat* y compilan para crear un producto terminado. El proyecto ha
+     acabado patrocinado por la propia *Red Hat*.
 
-* Suse_.
-* Gentoo_.
-* Archlinux_:
+#. Suse_, distribución comercial de la empresa alemana del mismo nombre, que
+   actualmente es propiedad de Novell. Tiene una versión comunitaria denominada
+   OpenSuse_.
+#. Gentoo_, cuya particularidad fundamental es no distribuir el *software*
+   precompilado, sino su código fuente junto a las reglas necesarias para su
+   compilación.
+#. Archlinux_, orientada a usuarios avanzados y que persigue el principio |KISS|.
 
-  - Manjaro_.
+   - Manjaro_, que es una derivada de *Archlinux* enfocada a proporcionar una
+     instalación sencilla para usuarios menos avanzados.
+
+#. `Linux from Scratch`_ (o |LFS|), que no es propiamente una distribución,
+   sino un conjunto de instrucciones para construir un sistema *Linux* completo
+   desde cero.
 
 .. _Slackware: https://www.slackware.com
 .. _Debian: https://www.debian.org
 .. _Ubuntu: https://www.ubuntu.com
 .. _Mint: https://www.linuxmint.com
-.. _Knoppix: https://www.knopper.net
+.. _Kali Linux: https://www.kali.org
 .. _RedHat: https://www.redhat.com
 .. _Fedora: https://getfedora.org
 .. _CentOS: https://www.centos.org
@@ -143,10 +162,12 @@ Sin ser muy exhaustivos, las principales distribuciones son:
 .. _Gentoo: https://www.gentoo.org
 .. _Archlinux: https://www.archlinux.org
 .. _Manjaro: https://manjaro.org
+.. _OpenSuse: https://www.opensuse.org
+.. _Linux from Scratch: https://www.linuxfromscratch.org
 
 .. seealso:: `LinuxTimeLine <https://github.com/FabioLolix/LinuxTimeline/tags>`_
    proporciona un gráfico que refleja la aparición de las principales
-   distribiciones de *Linux* y qué parentesco
+   distribiciones de *Linux* y cuál es el parentesco entre ellas.
 
 .. rubric:: Distribución de referencia
 
@@ -173,6 +194,10 @@ sus distribuciones derivadas.
    <http://softlibre.unizar.es/manuales/softwarelibre/catedralbazar.pdf>`_.
 
 .. |BSD| replace:: :abbr:`BSD (Berkeley Software Distribution)`
+.. |RHEL| replace:: :abbr:`RHEL (Red Hat Enterprise Linux)`
+.. |KISS| replace:: :abbr:`KISS (Keep It Simple, Stupid!)`
+.. |LFS| replace:: :abbr:`LFS (Linux From Scratch)`
+.. |GPL| replace:: :abbr:`GPL (General Public Licence)`
 
 .. _Jessie: https://www.debian.org/News/2015/20150426
 .. _Stretch: https://www.debian.org/News/2017/20170617
