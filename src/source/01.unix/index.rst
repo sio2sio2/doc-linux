@@ -72,8 +72,8 @@ educativo.
 .. rubric:: Concepto
 
 En puridad *Linux* es sólo el núcleo del sistema, mientras que el resto de
-programas básicos (*shell*, compilador, pequeñas aplicaciones) proceden en su
-mayoría del `proyecto GNU <https://es.wikipedia.org/wiki/Proyecto_GNU>`_, que
+programas básicos (*shell*, compilador, pequeñas aplicaciones) proceden en gran
+parte del `proyecto GNU <https://es.wikipedia.org/wiki/Proyecto_GNU>`_, que
 aun habiendo desarrollado desde 1983 muchas de las aplicaciones del *UNIX*
 original aún carecía en 1991 de un núcleo operativo.
 
@@ -103,6 +103,15 @@ distribución de *Linux*; y "utilizar *Linux*", utilizar una distribución de
 distribuciones es común (por ejemplo, el programa :ref:`cp <cp>` para copiar
 archivos), hay notables diferencias entre ellas.
 
+.. note:: Los sistemas operativos se distribuyen a menudo junto a un conjunto
+   de herramientas que permite instalarlos y utilizarlos cómodamente. Así es,
+   por ejemplo, como *Microsoft* distribuye su *Windows*. La diferencia
+   fundamental entre la forma en que se distribuye *Windows* y una distribución
+   de *Linux* es que estas distribuciones pretenden hacer disponible al usuario
+   todas las aplicaciones que pueda necesitar, mientras que *Windows* sólo
+   facilita un conjunto muy limitado, y es el usuario el encargado de obtener,
+   descargar e instalar el resto de *software*.
+
 Sea como sea, hay centenares de distribuciones, algunas generalistas y otras
 orientadas a ciertos nichos. `Distrowatch <https://www.distrowatch.com>`_ es un
 buen punto para conocer gran parte de ellas. Sin embargo, no todas las
@@ -123,7 +132,9 @@ Sin ser muy exhaustivos, las principales distribuciones son:
 
      + Mint_. que tiene versiones basadas tanto en *Ubuntu* como en *Debian* y se orienta al usuario novel.
 
-   - `Kali Linux`_, muy usada en auditoría y seguridad informáticas.
+   - `Kali Linux`_, muy usada en auditoría y seguridad informáticas. Es
+     básicamente una versión *live*\ [#]_ de *Debian* con *software* adicional
+     de auditoría y ataque.
 
 #. RedHat_, que es la distribución desarrollada por la empresa del mismo nombre (y desde 2019 filial de IBM). Formalmente desapareció en 2003, cuando se desdobló en dos: |RHEL| como versión comercial y Fedora como versión comunitaria.
 
@@ -133,7 +144,13 @@ Sin ser muy exhaustivos, las principales distribuciones son:
      publica el código fuente bajo licencia |GPL|. Los voluntarios de *CentOS*
      toman ese código fuente, eliminan todas las marcas comerciales referentes
      a *Red Hat* y compilan para crear un producto terminado. El proyecto ha
-     acabado patrocinado por la propia *Red Hat*.
+     acabado patrocinado por la propia *Red Hat* y hasta finales de 2020 seguía
+     esta filosofía. Sin embargo, en diciembre de ese año, *Red Hat* decidió
+     convertir *CentOS* en una :ref:`distribución de liberación continua
+     <ciclo-distro>` renombrándola como `CentOS Stream
+     <https://www.centos.org/centos-stream/>`_, por lo que su fundador original
+     creó `Rocky Linux`_ con el fin de continuar la
+     idea original.
 
 #. Suse_, distribución comercial de la empresa alemana del mismo nombre, que
    actualmente es propiedad de Novell. Tiene una versión comunitaria denominada
@@ -150,6 +167,35 @@ Sin ser muy exhaustivos, las principales distribuciones son:
    sino un conjunto de instrucciones para construir un sistema *Linux* completo
    desde cero.
 
+.. seealso:: `LinuxTimeLine <https://github.com/FabioLolix/LinuxTimeline/tags>`_
+   proporciona un gráfico que refleja la aparición de las principales
+   distribiciones de *Linux* y cuál es el parentesco entre ellas.
+
+Una diferencia fundamental entre distribuciones estriba en cuál es su filosofía
+de actualización, esto es, si liberan periódicamente una *versión estable* o si
+por el contrario son de *liberación continua* (ambos términos se tratan :ref:`al
+analizar el ciclo de vida de las distribuciones <ciclo-distro>`). Según esta
+característica las referidas distribuciones se agrupan así:
+
+.. table::
+   :class: ciclo-distros
+
+   ======================== ========================
+   De distribución estable   De liberación continua
+   ======================== ========================
+   Slackware_                Debian_ (testing, sid)
+   Debian_ (estable)         Gentoo_
+   Ubuntu_                   Archlinux_
+   Mint_                     Manjaro_
+   `Kali Linux`_             `CentOS Stream`_
+   |RHEL|
+   Fedora_
+   CentOS_
+   `Rocky Linux`_
+   Suse_/OpenSuse_
+   ======================== ========================
+
+
 .. _Slackware: https://www.slackware.com
 .. _Debian: https://www.debian.org
 .. _Ubuntu: https://www.ubuntu.com
@@ -164,22 +210,19 @@ Sin ser muy exhaustivos, las principales distribuciones son:
 .. _Manjaro: https://manjaro.org
 .. _OpenSuse: https://www.opensuse.org
 .. _Linux from Scratch: https://www.linuxfromscratch.org
-
-.. seealso:: `LinuxTimeLine <https://github.com/FabioLolix/LinuxTimeline/tags>`_
-   proporciona un gráfico que refleja la aparición de las principales
-   distribiciones de *Linux* y cuál es el parentesco entre ellas.
+.. _Rocky Linux: https://rockylinux.org
 
 .. rubric:: Distribución de referencia
 
-La *distribución de referencia* para la elaboración de los apuntes es la
-:ref:`Debian estable <ramas>`. La redacción se comenzó en 2016 cuando lo era
-Jessie_ (la versión **8.0**), aunque por estar próxima a concluir su ciclo se
-procuró adaptar el contenido a la versión **9.0** Stretch_. Desde entonces se
-han publicado nuevas versiones (Buster_, Bullseye_) y la redacción de nuevos
-epígrafes y la revisión de algunos ya escritos se ha ido procurando adaptar a
-ellas, pero pueden existir partes que no hayan recibido revisión y, por tanto,
-tengan alguna explicación que haya perdido validez o requiera alguna pequeña
-adaptación.
+La *distribución de referencia* para la elaboración de los apuntes es la rama
+estable de *Debian* (véasen :ref:`cuáles son sus distintas ramas <ramas>`). La
+redacción se comenzó en 2016 cuando lo era Jessie_ (la versión **8.0**), aunque
+por estar próxima a concluir su ciclo se procuró adaptar el contenido a la
+versión **9.0** Stretch_. Desde entonces se han publicado nuevas versiones
+(Buster_, Bullseye_) y la redacción de nuevos epígrafes y la revisión de algunos
+ya escritos se ha ido procurando adaptar a ellas, pero pueden existir partes que
+no hayan recibido revisión y, por tanto, tengan alguna explicación que haya
+perdido validez o requiera alguna pequeña adaptación.
 
 Fuera de *Debian*, la mayor parte de las explicaciones debería ser válida para
 sus distribuciones derivadas.
@@ -193,11 +236,17 @@ sus distribuciones derivadas.
    llama *modelo de bazar* en su ensayo clásico `La catedral y el bazar
    <http://softlibre.unizar.es/manuales/softwarelibre/catedralbazar.pdf>`_.
 
+.. [#] Una :dfn:`distribución live` es un sistema operativo completo almacenado
+   en un medio extraíble (|CD| o |DVD| tradicionalmente, pero ahora también
+   dispositivos de memorias flash) pensado para ejecutarse sin instalación.
+
 .. |BSD| replace:: :abbr:`BSD (Berkeley Software Distribution)`
 .. |RHEL| replace:: :abbr:`RHEL (Red Hat Enterprise Linux)`
 .. |KISS| replace:: :abbr:`KISS (Keep It Simple, Stupid!)`
 .. |LFS| replace:: :abbr:`LFS (Linux From Scratch)`
 .. |GPL| replace:: :abbr:`GPL (General Public Licence)`
+.. |CD| replace:: :abbr:`CD (Compact Disk)`
+.. |DVD| replace:: :abbr:`DVD (Digital Versatile Disc)`
 
 .. _Jessie: https://www.debian.org/News/2015/20150426
 .. _Stretch: https://www.debian.org/News/2017/20170617
