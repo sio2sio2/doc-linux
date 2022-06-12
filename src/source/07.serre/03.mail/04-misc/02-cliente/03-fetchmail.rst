@@ -1,5 +1,9 @@
 .. _fetchmail:
 
+.. getmail. ¿Por qué utilicé getmail?
+   OAuth2 con getmail para Gmail:
+   https://www3.isi.edu/~johnh/OTHER/LINUX/OAUTH2/index.html
+
 :command:`fetchmail` (|MRA|)
 ============================
 Ya se ha introducido `el programa fetchmail <http://www.fetchmail.info/>`_ como
