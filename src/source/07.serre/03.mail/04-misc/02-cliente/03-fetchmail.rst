@@ -194,18 +194,51 @@ en el que hay tres secciones:
 :kbd:`[destination]`
    que define cómo se entregan los mensajes al usuario destinatario. En el
    ejemplo, se ceden los mensajes a un |MDA| externo (:ref:`procmail <procmail>`),
-   aunque se podrían haber dejado en una archivo (formato *mailbox*), en un
-   directorio (formato *maildir*) o haberse cedido a un |MTA| local (que es como
-   se configuró fetchmail_).
+   aunque se podrían:
 
-   .. todo:: Ilustrar las tres alternativas de entrega que permite getmail.
+   a. haber dejado en una archivo (formato *mailbox*)
+
+      .. code:: ini
+
+         [destination]
+         type = Mboxrd
+         path = ~/inbox
+
+      aunque el archivo :file:`inbox` debe preexistir. Bastará con crear un
+      archivo vacío::
+
+         $ touch ~/inbox
+
+   #. en un directorio (formato *maildir*):
+
+
+      .. code:: ini
+
+         [destination]
+         type = Maildir
+         path = ~/Mail/
+
+      aunque el directorio debe existir previamente::
+
+         $ mkdir -p ~/Mail/{new,cur,tmp}
+
+   #. haberse cedido a un |MTA| local (que es como se configuró fetchmail_):
+
+
+      .. code:: ini
+
+         [destination]
+         type = MDA_qmaillocal
 
 .. note:: Pueden crearse también secciones para filtrado de mensajes utilizando
    etiquetas :kbd:`[filter-loquesea]`, pero no las abordaremos ya que hemos
    optado por usar :program:`procmail` para ese trabajo.
 
 .. seealso:: Para más información, puede consultarse la `página oficial de
-   documentación <https://getmail6.org/configuration.html>`_.
+   la documentación <https://getmail6.org/configuration.html>`_.
+
+.. todo:: Documentar la demonización consultando la `wiki de Archilinux
+   <https://wiki.archlinux.org/title/Getmail#Fetching_mail_automatically_with_systemd>`_.
 
 .. |POP| replace:: :abbr:`POP (Post Office Protocol)`
 .. |MUA| replace:: :abbr:`MUA (Mail User Agent)`
