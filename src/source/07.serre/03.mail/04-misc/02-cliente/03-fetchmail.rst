@@ -1,11 +1,16 @@
+***********************************************
+:program:`fetchmail`/:program:`getmail` (|MRA|)
+***********************************************
+
+Como |MRA| estudiaremos dos de los más usandos en *Linux*:
+
+* El veterano :ref:`fetchmail <fetchmail>`.
+* El más moderno :ref:`getmail <getmail>`, que es quizás más recomendable.
+
 .. _fetchmail:
 
-.. getmail. ¿Por qué utilicé getmail?
-   OAuth2 con getmail para Gmail:
-   https://www3.isi.edu/~johnh/OTHER/LINUX/OAUTH2/index.html
-
-:command:`fetchmail` (|MRA|)
-============================
+:command:`fetchmail`
+====================
 Ya se ha introducido `el programa fetchmail <http://www.fetchmail.info/>`_ como
 un *software* que permite descargar a través de |POP|\ 3 o |IMAP| los mensajes
 almacenados en buzones remotos\ [#]_. La ventaja de usarlo es que puede
@@ -20,13 +25,10 @@ La instalación es sencilla a través del paquete homónimo::
 
 Hay dos modos de arrancar :command:`fetchmail`:
 
-* Como servicio de :program:`systemd` con una configuración centralizada en
-  :file:`/etc/fetchmailrc`.
-* Como programa que ejecuta un usuario interesado según su configuración
-  incluida en :file:`~/.fetchmailrc`. En este caso, si queremos consultar
-  periódicamente el correo, el programa debe acabar demonizado o ejecutado
-  periodícamente con :program:`cron`. Nos centraremos en el primer caso, ya que
-  el segundo no tiene excesivo misterio.
+#. Como servicio de :program:`systemd` con una configuración centralizada en
+   :file:`/etc/fetchmailrc`.
+#. Como programa que ejecuta un usuario interesado según su configuración
+   incluida en :file:`~/.fetchmailrc`.
 
 Comencemos primero por analizar un :download:`fichero de configuración típico
 <files/fetchmailrc>`:
@@ -45,7 +47,7 @@ Comencemos primero por analizar un :download:`fichero de configuración típico
  
 * Una opción muy interesante en ese bloque es ``keep`` que no borrará los
   mensajes del servidor. Con la capacidad que tienen los buzones de los modernos
-  servidores, arriesgarse a perder un mensaje, entra de lleno dentro de la
+  servidores, arriesgarse a perder un mensaje entra de lleno dentro de la
   cicatería más injustificable. Que los mensajes permanezcan en el servidor, no
   implica que la próxima vez, se vuelvan a descargar: sólo se descargarán los
   nuevos\ [#]_.
@@ -115,31 +117,95 @@ Comencemos primero por analizar un :download:`fichero de configuración típico
 
 Así, pues, éste es un fichero de configuración válido tanto para la gestión
 centralizada (en :file:`/etc/fetchmailrc`) como para la gestión distribuida (en
-:file:`~/.fetchmailrc)`.
-
-En el primer caso, en *debian*, se exige además que
+:file:`~/.fetchmailrc)`. Ahora, si se desea centralizadamente demonizar en el
+arranque :program:`fetchmail`, es necesario, además, que
 :file:`/etc/default/fetchmail` contenga la línea::
 
    START_DAEMON=yes
 
-En el segundo caso, en cambio, existe un problema: dado que no tenemos un
-servicio asociado que ejecute :command:`fetchmail` al arrancar el sistema,
-cada usuario deberia arrancarlo explícitamente tras iniciar sesión. Eso... o
-manipular |PAM| para el arranque se haga como parte el proceso de autenticación.
-Y eso haremos, porque :download:`el script <files/pam_fetchmail.sh>` es bastante
-sencillo; basta con comprobar si :file:`~/.fetchmailrc` existe y, si es así,
-lanzar fetchmail que quedará en memoria como demonio si así lo hemos dispuesto:
+En cambio, si nuestra intención es hacer configuraciones particulares de
+usuario, existe un problema: dado que no tenemos un servicio asociado que
+ejecute :command:`fetchmail` al arrancar el sistema, cada usuario deberia
+arrancarlo explícitamente tras iniciar sesión. Eso... o ser un poco más
+inteligente:
 
-.. literalinclude:: files/pam_fetchmail.sh
-   :language: bash
+a. Podemos eliminar la directiva que lo transforma en un demonio (:kbd:`set
+   daemon`) y hacer que se ejecute periódicamente :ref:`editando el contrab del
+   usuario <cron>`. Esta alternativa es trivial si se conoce :program:`cron` y
+   es precisamente la que se utiliza al configurar más adelante getmail_.
 
-Hecho lo cual, deberíamos hacer que |PAM| lo ejecutase. Lo más elegante es crear
-un fichero de configuración en :file:`/user/share/pam-configs` para
-:command:`pam-auth-update` con el :download:`siguiente contenido
-<files/fetchmail>`:
+#. Manipular |PAM| para que el arranque de :program:`fetchmail` se haga como
+   parte el proceso de autenticación.  Y eso haremos, porque :download:`el
+   script <files/pam_fetchmail.sh>` es bastante sencillo: basta con comprobar si
+   :file:`~/.fetchmailrc` existe y, si es así, lanzar fetchmail que quedará en
+   memoria como demonio si así lo hemos dispuesto:
 
-.. literalinclude:: files/fetchmail
-   :language: bash
+   .. literalinclude:: files/pam_fetchmail.sh
+      :language: bash
+
+   Hecho lo cual, deberíamos hacer que |PAM| lo ejecutase. Lo más elegante es crear
+   un fichero de configuración en :file:`/user/share/pam-configs` para
+   :command:`pam-auth-update` con el :download:`siguiente contenido
+   <files/fetchmail>`:
+
+   .. literalinclude:: files/fetchmail
+      :language: bash
+
+.. _getmail:
+
+:program:`getmail`
+==================
+:program:`getmail` y más concretamente `la versión 6 de getmail
+<https://getmail6.org/>`_ es un |MRA| escrito en Python3. Con este *software*
+parece no ser posible centralizar la configuración, sino que cada usuario debe
+hacer la configuración de sus cuentas de correo. Además, no puede demonizarse
+con lo que forzosamente debe echarse mano de :ref:`cron <cron>` para obtener
+regularmente los mensajes del servidor.
+
+Empecemos, no obstante, por explicar dónde colocar los archivos de
+configuración. Hay dos posibles localizaciones:
+
+* :file:`~/.getmail/`.
+* :file:`$XDG_CONFIG_HOME/getmail/`, que habitualmente es
+  :file:`~/.config/getmail/`
+
+Dentro de este directorio se buscará el archivo :file:`getmailrc` o en su
+ausencia cualquier otro que contenga configuración\ [#]_ y a los que es
+convenientemnete poner como nombre la dirección de la cuenta que configuran
+(p.e. :file:`pericodelospalotes@gmail.com`), porque es importante tener
+presente que un archivo sólo puede contener la información sobre un buzón.
+
+Cada archivo de configuración tendrá un aspecto semejante a este:
+
+.. literalinclude:: files/getmailrc
+   :language: ini
+
+en el que hay tres secciones:
+
+:kbd:`[retreiver]`
+   que contiene la información de autenticación. En el ejemplo, se usa el
+   protocolo |POP|\ 3s para obtener los mensajes del buzón.
+
+:kbd:`[options]`
+   que define algunas particularidades de la obtención. En el ejemplo, sólo se
+   descargan mensajes nuevos, no se borran del buzón los mensajes y se define un
+   archivo para almacenar los registros.
+
+:kbd:`[destination]`
+   que define cómo se entregan los mensajes al usuario destinatario. En el
+   ejemplo, se ceden los mensajes a un |MDA| externo (:ref:`procmail <procmail>`),
+   aunque se podrían haber dejado en una archivo (formato *mailbox*), en un
+   directorio (formato *maildir*) o haberse cedido a un |MTA| local (que es como
+   se configuró fetchmail_).
+
+   .. todo:: Ilustrar las tres alternativas de entrega que permite getmail.
+
+.. note:: Pueden crearse también secciones para filtrado de mensajes utilizando
+   etiquetas :kbd:`[filter-loquesea]`, pero no las abordaremos ya que hemos
+   optado por usar :program:`procmail` para ese trabajo.
+
+.. seealso:: Para más información, puede consultarse la `página oficial de
+   documentación <https://getmail6.org/configuration.html>`_.
 
 .. |POP| replace:: :abbr:`POP (Post Office Protocol)`
 .. |MUA| replace:: :abbr:`MUA (Mail User Agent)`
@@ -160,6 +226,9 @@ un fichero de configuración en :file:`/user/share/pam-configs` para
 .. [#] Si se quieren descargar todos los mensajes de un servidor, incluso los
    descargados anteriormente, se puede añadir la opción :kbd:`fetchall`.
 
-.. [#] El ejemplo ilustra dos buzones más llamados file:`INBOX.trabajo` e
+.. [#] El ejemplo ilustra dos buzones más llamados :file:`INBOX.trabajo` e
    :file:`INBOX.cooperativa`. Los nombres son absolutamente arbitrarios y no
    tendrían porquñé haber empezado con *INBOX*.
+
+.. [#] Para otras ubicaciones, aún es posible utilizar la opción :kbd:`-r`
+   (incluso repetidamente) al ejecutar :command:`getmail`.

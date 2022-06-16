@@ -64,8 +64,13 @@ Estudiemos por separado cada uno de los agentes:
 
    [0-9]*
 
-.. note:: Para ilustrar las configuraciones, fingiremos que tenemos abierta una
-   cuenta en *gmail.com*.
+.. warning:: Para ilustrar las configuraciones, hemos usado una cuenta de Gmail_.
+   Sin embargo, desde junio de 2022 Gmail_ impide la autenticación usando la simple
+   contraseña con lo que los ejemplos de configuración que se encuentran en
+   algunos de los epígrafes no funcionarán precisamente si se usan cuentas de
+   este servidor. El :ref:`último apartado <oauth2-gmail>` ilustra cómo
+   autenticar cuentas de Gmail_ en algunas de las aplicaciones usadas en los
+   epígrafes anteriores.
 
 .. |POP3| replace:: :abbr:`POP3 (Post Office Protocol v3)`
 .. |MTA| replace:: :abbr:`MTA (Mail Transport Agent)`
@@ -74,3 +79,6 @@ Estudiemos por separado cada uno de los agentes:
 .. |MAA| replace:: :abbr:`MAA (Mail Access Agent)`
 .. |MSA| replace:: :abbr:`MSA (Mail Submission Agent)`
 .. |MRA| replace:: :abbr:`MRA (Mail Retrieval Agent)`
+
+.. _Gmail: https://gmail.google.com
+
