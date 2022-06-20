@@ -49,12 +49,12 @@ La **recepción** es algo más compleja y puede describirse así:
 
 .. image:: files/cliente-recepción.png
 
-.. note:: Cuando el |MUA|, esto es, :ref:`el cliente de correo es gráfico
-   <mua-grafico>`, lo habitual es que éste incorpore un |MRA| y descargue
-   directamente el correo; permita establecer filtros para repartir el
-   correo en distintos buzones (asumiento también el papel del |MDA|); y
-   disponga de las funciones de |MSA|. Por tanto, todas las labores requeridas
-   en el cliente las puede realizar él y no es necesario otro *software*.
+.. note:: Cuando el |MUA|, esto es, *el cliente de correo es gráfico*, lo
+   habitual es que éste incorpore un |MRA| y descargue directamente el correo;
+   permita establecer filtros para repartir el correo en distintos buzones
+   (asumiento también el papel del |MDA|); y disponga de las funciones de |MSA|.
+   Por tanto, todas las labores requeridas en el cliente las puede realizar él y
+   no es necesario otro *software*.
 
 Estudiemos por separado cada uno de los agentes:
 

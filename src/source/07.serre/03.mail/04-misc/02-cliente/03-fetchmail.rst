@@ -163,17 +163,19 @@ con lo que forzosamente debe echarse mano de :ref:`cron <cron>` para obtener
 regularmente los mensajes del servidor.
 
 Empecemos, no obstante, por explicar dónde colocar los archivos de
-configuración. Hay dos posibles localizaciones:
+configuración. Hay tres posibles localizaciones\ [#]_:
 
-* :file:`~/.getmail/`.
-* :file:`$XDG_CONFIG_HOME/getmail/`, que habitualmente es
-  :file:`~/.config/getmail/`
+* :file:`~/.getmail/getmailrc`.
+* :file:`$XDG_CONFIG_HOME/getmail/getmailrc`\ [#]_.
+* :file:`$XDG_CONFIG_HOME/getmail/*`, donde ":kbd:`*`" es cualquier nombre de
+  archivo que generalmente se hace coincidir con la dirección de la cuenta que
+  se configura (p.e. :file:`pericodelospalotes@gmail.com`), porque es importante
+  tener presente que un archivo sólo puede contener la información sobre un
+  buzón.
 
-Dentro de este directorio se buscará el archivo :file:`getmailrc` o en su
-ausencia cualquier otro que contenga configuración\ [#]_ y a los que es
-convenientemnete poner como nombre la dirección de la cuenta que configuran
-(p.e. :file:`pericodelospalotes@gmail.com`), porque es importante tener
-presente que un archivo sólo puede contener la información sobre un buzón.
+.. warning:: La tercera de las posibles localizaciones originariamente no era
+   predeterminada y en la versión incluida en bullseye no se lee, por lo que
+   habría que recurrir a la opción :kbd:`-r` (véase :manpage:`getmail(1)`).
 
 Cada archivo de configuración tendrá un aspecto semejante a este:
 
@@ -265,3 +267,6 @@ en el que hay tres secciones:
 
 .. [#] Para otras ubicaciones, aún es posible utilizar la opción :kbd:`-r`
    (incluso repetidamente) al ejecutar :command:`getmail`.
+
+.. [#] Ubicación que, si no se define lo contrario, es
+   :file:`~/.config/getmail/getmailrc`.
