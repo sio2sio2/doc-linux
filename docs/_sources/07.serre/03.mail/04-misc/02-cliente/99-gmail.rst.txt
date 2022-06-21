@@ -70,28 +70,28 @@ Configuración de aplicaciones
 =============================
 El método de configuración, obviamente, es particular para cada aplicación.
 
-mutt
-----
+:program:`mutt`
+---------------
+:program:`mutt` requiere la autenticación tanto para el envío de mensajes a
+través del servidor |smtp| como para el acceso |imap| interactivo. para
+llevarlo a cabo, el paquete :deb:`mutt` provee un *script* escrito en
+:program:`python`: :file:`/usr/share/doc/mutt/examples/mutt_oauth2.py`.
+asi que empezaremos por copiar este *script* en un lugar adecuado::
+
+   $ cp /usr/share/doc/mutt/examples/mutt_oauth2.py ~/.mutt/
+
+.. todo:: Por completar cómo configurar mutt con OAuth2.
 
 .. _getmail-oauth2:
 
-getmail
--------
+:program:`getmail`
+------------------
 Debemos crear un archivo :file:`~/.config/provider.json` con este
 contenido:
 
-.. code:: json
-
-   {
-      "scope": "https://mail.google.com/",
-      "user": "xxx-@example.com",
-      "client_id": "xxx.apps.googleusercontent.com",
-      "client_secret": "xxx-yyy",
-      "token_uri": "https://accounts.google.com/o/oauth2/token",
-      "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-      "redirect_uri": "urn:ietf:wg:oauth:2.0:oob",
-      "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs"
-   }
+.. literalinclude:: files/provider.json
+   :language: json
+   :emphasize-lines: 3-5
 
 donde :kbd:`client_id` y :kbd:`client_secret` son las credenciales que hemos
 obtenido en el paso anterior. Creado el archivo, podemos obtener el token
@@ -107,11 +107,16 @@ anteriormente <getmail>`):
 .. literalinclude:: files/getmailrc-oauth2
    :language: ini
 
-El *token* tiene una caducidad por lo que cada 90 días habrá que volver a
-renegerarlos con la orden anterior.
+.. note:: El *token* tiene una caducidad por lo que cada 90 días habrá que
+   volver a renegerarlos con la orden anterior.
 
-.. https://www3.isi.edu/~johnh/OTHER/LINUX/OAUTH2/index.html
-   https://wiki.archlinux.org/title/Getmail
+.. seealso:: `Este artículo
+   <https://www3.isi.edu/~johnh/OTHER/LINUX/OAUTH2/index.html>`_ documenta el
+   soporte de OAuth2 en :program:`getmail`.
+
+.. https://luxing.im/mutt-integration-with-gmail-using-oauth/
+.. https://wiki.archlinux.org/title/Getmail
+
 
 
 .. _Thunderbird: https://thunderbird.net
