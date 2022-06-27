@@ -78,9 +78,68 @@ llevarlo a cabo, el paquete :deb:`mutt` provee un *script* escrito en
 :program:`python`: :file:`/usr/share/doc/mutt/examples/mutt_oauth2.py`.
 asi que empezaremos por copiar este *script* en un lugar adecuado::
 
-   $ cp /usr/share/doc/mutt/examples/mutt_oauth2.py ~/.mutt/
+   $ mkdir -p .config/mutt
+   $ install -m750 /usr/share/doc/mutt/examples/mutt_oauth2.py ~/.config/mutt/
 
-.. todo:: Por completar cómo configurar mutt con OAuth2.
+Este *script* nos permitirá obtener un token de acceso que se almacena en una
+base de datos gestionada por :ref:`GNUpg <gnupg>`, por lo que necesitaremos
+también este *software*. Como en *Debian* es una dependencia del propio
+:program:`mutt` no será necesaria ninguna instalación adicional.
+
+Lo que sí debemos hacer es crearlo::
+
+   $ gpg --gen-key
+
+La orden nos pedirá un nombre (podemos usar "Mutt OAuth2", por ejemplo) y una
+dirección de correo, que puede ser la dirección de correo de la que estamos
+generando la autenticación, a menos que realmente queramos tener claves |GPG|
+asociadas a la dirección. Si este es el caso, entonces podemos usar cualquier
+otra dirección falsa como :kbd:`pericodelospalotes@gmail.com.token`. Finalmente
+deberemos asegurarlo todo con una contraseña, que deberemos recordar, porque
+será la que se nos pregunte cada vez que queramos tener acceso al token.
+
+.. note:: Para que :program:`gpg-agent` sepa por donde pedir la contraseña es
+   probable que se deba definir una variable de ambiente persistente:
+
+   .. code-block:: bash
+
+      export GPG_TTY=$(tty)
+
+Hecho esto, debemos editar :file:`~/.config/mutt/mutt_oauth2.py` para:
+
+- En la definición de :kbd:`ENCRYPTION_PIPE` añadir la dirección de correo a la
+  que asociamos la clave recién creada.
+- Añadir las credenciales :kbd:`client_id` y :kbd:`client_secret` obtenidas
+  bajo el epígrafe anterior.
+
+Una vez hecho, podemos obtener el *token* ejecutando la orden::
+
+   $ ~/.config/mutt/mutt_oauth2.py -va --authflow authcode pericodelospalotes@gmail.com
+
+Esta orden generará una |URL| que habrá que copiar en el navegador y a resultas
+de la cual, se generará un código que debemos facilitar al *script*. Con ello,
+ya se generará y registrará el *token* que buscábamos.
+
+Con esto ya podemos configurar :program:`mutt`, pero antes probemos que el *token* funciona::
+
+   $ ~/.config/mutt/mutt_oauth2.py -vt pericodelospalotes@gmail.com
+   Access token: xxx
+   IMAP authentication succeeded
+   POP authentication succeeded
+   SMTP authentication succeeded
+
+Finalmente, para configurar |SMTP| e |IMAP| la configuración necesaria es la siguiente:
+
+.. code-block:: bash
+
+   set smtp_url = "smtp://pericodelospalotes@gmail.com@smtp.gmail.com:587/"
+   set smtp_authenticators = "oauthbearer:xoauth2"
+   set smtp_oauth_refresh_command = "~/.config/mutt/mutt_oauth2.py pericodelospalotes@gmail.com"
+
+   set imap_user="pericodelospalotes@gmail.com"
+   set folder = "imap://imap.gmail.com"
+   set imap_authenticators=$smtp_authenticators 
+   set imap_oauth_refresh_command=$smtp_oauth_refresh_command
 
 .. _getmail-oauth2:
 
@@ -122,3 +181,5 @@ anteriormente <getmail>`):
 .. _Thunderbird: https://thunderbird.net
 
 .. |API| replace:: :abbr:`API (Application Programming Interface)`
+.. |GPG| replace:: :abbr:`GPG (GNU Privacy Guard)`
+.. |URL| replace:: :abbr:`URL (Uniform Resource Locator)`

@@ -36,9 +36,11 @@ Traeremos aquí (y comentaremos) una configuración que permite:
 Configuración base
 ==================
 Mutt dispone de un fichero de configuración general (:file:`/etc/Muttrc`)\ [#]_
-y un fichero de configuración particular para cada usuario en :file:`~/-muttrc`.
-Si se configura de forma monolítica, este último fichero puede llegar a ser un
-monstruo intratable, por lo que nos reduciremos a incluir en él este contenido::
+y un fichero de configuración particular para cada usuario que se busca en
+:file:`~/.muttrc` o :file:`~/.mutt/muttrc` o
+:file:`$XDG_CONFIG_HOME/mutt/muttrc`.  Si se configura de forma monolítica, este
+último fichero puede llegar a ser un monstruo intratable, por lo que nos
+reduciremos a incluir en él este contenido::
 
    # Por defecto, gestionamos el correo descargado.
    source ~/.mutt/servers/local.rc

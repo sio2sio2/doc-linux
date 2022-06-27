@@ -113,12 +113,65 @@ través del servidor <abbr title="Simple Mail Transfer Protocol">SMTP</abbr> com
 llevarlo a cabo, el paquete <a class="reference external" href="https://packages.debian.org/stable/mutt">mutt</a> provee un <em>script</em> escrito en
 <strong class="program">python</strong>: <code class="file docutils literal notranslate"><span class="pre">/usr/share/doc/mutt/examples/mutt_oauth2.py</span></code>.
 asi que empezaremos por copiar este <em>script</em> en un lugar adecuado:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>cp /usr/share/doc/mutt/examples/mutt_oauth2.py ~/.mutt/
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>mkdir -p .config/mutt
+<span class="gp">$ </span>install -m750 /usr/share/doc/mutt/examples/mutt_oauth2.py ~/.config/mutt/
 </pre></div>
 </div>
-<div class="admonition-todo admonition" id="id1">
-<p class="admonition-title">Por hacer</p>
-<p>Por completar cómo configurar mutt con OAuth2.</p>
+<p>Este <em>script</em> nos permitirá obtener un token de acceso que se almacena en una
+base de datos gestionada por <a class="reference internal" href="../../../../98.apendice/01.cryto/03.aplicaciones/03.correo.html#gnupg"><span class="std std-ref">GNUpg</span></a>, por lo que necesitaremos
+también este <em>software</em>. Como en <em>Debian</em> es una dependencia del propio
+<strong class="program">mutt</strong> no será necesaria ninguna instalación adicional.</p>
+<p>Lo que sí debemos hacer es crearlo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>gpg --gen-key
+</pre></div>
+</div>
+<p>La orden nos pedirá un nombre (podemos usar «Mutt OAuth2», por ejemplo) y una
+dirección de correo, que puede ser la dirección de correo de la que estamos
+generando la autenticación, a menos que realmente queramos tener claves <abbr title="GNU Privacy Guard">GPG</abbr>
+asociadas a la dirección. Si este es el caso, entonces podemos usar cualquier
+otra dirección falsa como <kbd class="kbd docutils literal notranslate">pericodelospalotes&#64;gmail.com.token</kbd>. Finalmente
+deberemos asegurarlo todo con una contraseña, que deberemos recordar, porque
+será la que se nos pregunte cada vez que queramos tener acceso al token.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Para que <strong class="program">gpg-agent</strong> sepa por donde pedir la contraseña es
+probable que se deba definir una variable de ambiente persistente:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span> <span class="nv">GPG_TTY</span><span class="o">=</span><span class="k">$(</span>tty<span class="k">)</span>
+</pre></div>
+</div>
+</div>
+<p>Hecho esto, debemos editar <code class="file docutils literal notranslate"><span class="pre">~/.config/mutt/mutt_oauth2.py</span></code> para:</p>
+<ul class="simple">
+<li><p>En la definición de <kbd class="kbd docutils literal notranslate">ENCRYPTION_PIPE</kbd> añadir la dirección de correo a la
+que asociamos la clave recién creada.</p></li>
+<li><p>Añadir las credenciales <kbd class="kbd docutils literal notranslate">client_id</kbd> y <kbd class="kbd docutils literal notranslate">client_secret</kbd> obtenidas
+bajo el epígrafe anterior.</p></li>
+</ul>
+<p>Una vez hecho, podemos obtener el <em>token</em> ejecutando la orden:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>~/.config/mutt/mutt_oauth2.py -va --authflow authcode pericodelospalotes@gmail.com
+</pre></div>
+</div>
+<p>Esta orden generará una <abbr title="Uniform Resource Locator">URL</abbr> que habrá que copiar en el navegador y a resultas
+de la cual, se generará un código que debemos facilitar al <em>script</em>. Con ello,
+ya se generará y registrará el <em>token</em> que buscábamos.</p>
+<p>Con esto ya podemos configurar <strong class="program">mutt</strong>, pero antes probemos que el <em>token</em> funciona:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>~/.config/mutt/mutt_oauth2.py -vt pericodelospalotes@gmail.com
+<span class="go">Access token: xxx</span>
+<span class="go">IMAP authentication succeeded</span>
+<span class="go">POP authentication succeeded</span>
+<span class="go">SMTP authentication succeeded</span>
+</pre></div>
+</div>
+<p>Finalmente, para configurar <abbr title="Simple Mail Transfer Protocol">SMTP</abbr> e <abbr title="Internet Message Access Protocol">IMAP</abbr> la configuración necesaria es la siguiente:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">set</span> <span class="nv">smtp_url</span> <span class="o">=</span> <span class="s2">&quot;smtp://pericodelospalotes@gmail.com@smtp.gmail.com:587/&quot;</span>
+<span class="nb">set</span> <span class="nv">smtp_authenticators</span> <span class="o">=</span> <span class="s2">&quot;oauthbearer:xoauth2&quot;</span>
+<span class="nb">set</span> <span class="nv">smtp_oauth_refresh_command</span> <span class="o">=</span> <span class="s2">&quot;~/.config/mutt/mutt_oauth2.py pericodelospalotes@gmail.com&quot;</span>
+
+<span class="nb">set</span> <span class="nv">imap_user</span><span class="o">=</span><span class="s2">&quot;pericodelospalotes@gmail.com&quot;</span>
+<span class="nb">set</span> <span class="nv">folder</span> <span class="o">=</span> <span class="s2">&quot;imap://imap.gmail.com&quot;</span>
+<span class="nb">set</span> <span class="nv">imap_authenticators</span><span class="o">=</span><span class="nv">$smtp_authenticators</span>
+<span class="nb">set</span> <span class="nv">imap_oauth_refresh_command</span><span class="o">=</span><span class="nv">$smtp_oauth_refresh_command</span>
+</pre></div>
 </div>
 </section>
 <section id="getmail">
