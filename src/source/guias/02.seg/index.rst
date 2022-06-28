@@ -1,3 +1,5 @@
+.. _seg:
+
 Seguridad Informática
 =====================
 El módulo de **Seguridad Informática**, con código **0226**, pertenece al
