@@ -81,21 +81,25 @@ asi que empezaremos por copiar este *script* en un lugar adecuado::
    $ mkdir -p .config/mutt
    $ install -m750 /usr/share/doc/mutt/examples/mutt_oauth2.py ~/.config/mutt/
 
-Este *script* nos permitirá obtener un token de acceso que se almacena en una
-base de datos gestionada por :ref:`GNUpg <gnupg>`, por lo que necesitaremos
-también este *software*. Como en *Debian* es una dependencia del propio
-:program:`mutt` no será necesaria ninguna instalación adicional.
+La estrategia del *script* es almacenar el *token* de acceso en un archivo
+cifrado para lo cual en principio usa |GPG| (véase ref:`GNUpg <gnupg>` para más
+detalles sobre las órdenes siguientes). Como en *Debian* es una dependencia del
+propio :program:`mutt` no será necesaria ninguna instalación adicional.
 
-Lo que sí debemos hacer es crearlo::
+Ilustremos cómo usar |GPG| para cifrar el archivo. Lo primero es generar una
+clave::
 
    $ gpg --gen-key
+   Nombre y apellidos: Mutt Oauth2
+   Dirección de correo electrónico: pericodelospalotes@token
 
-La orden nos pedirá un nombre (podemos usar "Mutt OAuth2", por ejemplo) y una
-dirección de correo, que puede ser la dirección de correo de la que estamos
-generando la autenticación (p.e. :kbd:`pericodelospalotes@gmail.com`), aunque no
-necesariamente. Finalmente deberemos asegurarlo todo con una contraseña, que
-deberemos recordar, porque será la que se nos pregunte cada vez que queramos
-tener acceso al token.
+La orden nos pedirá un nombre y una dirección de correo, que puede ser
+directamente la dirección de correo de la que estamos generando la
+autenticación, pero no necesariamente\ [#]_. Para demostrar que no tiene por qué ser
+así, aquí utilizaremos la dirección ficticia :kbd:`pericodelospalotes@token`.
+En cualquier caso, la clave privada se cifra con una contraseña que deberemos
+recordar, porque será la que se nos pregunte cuando queramos tener acceso al
+token.
 
 .. note:: Para que :program:`gpg-agent` sepa por donde pedir la contraseña
    podría ser necesario definir una variable de ambiente persistente:
@@ -106,28 +110,27 @@ tener acceso al token.
 
 Generada la clave, debemos editar :file:`~/.config/mutt/mutt_oauth2.py` para:
 
-- En la definición de :kbd:`ENCRYPTION_PIPE` añadir la dirección a la que
-  asociamos la clave recién creada.
+- En la definición de :kbd:`ENCRYPTION_PIPE` debemos la dirección de correo
+  a la que asociamos la clave recién creada (:kbd:`pericodelospalotes@token`)
 - Añadir las credenciales :kbd:`client_id` y :kbd:`client_secret` obtenidas
-  bajo el epígrafe anterior.
+  bajo el epígrafe anterior (que están referidas a la cuenta real
+  :kbd:`pericodelospalotes@gmail.com`).
 
-Una vez hecho, podemos obtener el *token* ejecutando la orden::
+Una vez hecho, podemos obtener el *token* y almacenar en un archivo ejecutando
+la orden::
 
-   $ ~/.config/mutt/mutt_oauth2.py -va --authflow authcode ~/.config/mutt/pericodelospalotes@gmail.com
+   $ ~/.config/mutt/mutt_oauth2.py -va ~/.config/mutt/pericodelospalotes@gmail.com.token
 
-Esta orden generará una |URL| que habrá que copiar en el navegador y a resultas
-de la cual, se generará un código que debemos facilitar al *script* para que
-cree el archivo cifrado.
-
-.. note:: La dirección no debe ser necesariamente la dirección de correo
-   (podríamos haber usando otra falsa como :kbd:`pericodelospalotes@gmail.com.token`).
-   La dirección real debe usarse en la configuración del propio :program:`mutt`
-   (véase a continuación) y en la dirección de correo que interactivamente nos
-   pregunta la ejecución de :command:`mutt_oauth2.py`
+Esta orden generará en primera instancia una |URL| que habrá que copiar en el
+navegador y a resultas de la cual, se generará un código que debemos facilitar
+al *script* para que acabe creando el archivo cifrado. Se nos preguntará por una
+dirección de correo que debe ser la dirección real
+(:kbd:`pericodelospalotes@gmail.com`) ya que se utiliza para definir qué cuenta
+quiere ser autenticada.
 
 Con esto ya podemos configurar :program:`mutt`, pero antes probemos que el *token* funciona::
 
-   $ ~/.config/mutt/mutt_oauth2.py -vt ~/.config/mutt/pericodelospalotes@gmail.com
+   $ ~/.config/mutt/mutt_oauth2.py -vt ~/.config/mutt/pericodelospalotes@gmail.com.token
    Access token: xxx
    IMAP authentication succeeded
    POP authentication succeeded
@@ -139,12 +142,45 @@ Finalmente, para configurar |SMTP| e |IMAP| la configuración necesaria es la si
 
    set smtp_url = "smtp://pericodelospalotes@gmail.com@smtp.gmail.com:587/"
    set smtp_authenticators = "oauthbearer:xoauth2"
-   set smtp_oauth_refresh_command = "~/.config/mutt/mutt_oauth2.py ~/.config/mutt/pericodelospalotes@gmail.com"
+   set smtp_oauth_refresh_command = "~/.config/mutt/mutt_oauth2.py ~/.config/mutt/pericodelospalotes@gmail.com.token"
 
    set imap_user="pericodelospalotes@gmail.com"
    set folder = "imap://imap.gmail.com"
    set imap_authenticators=$smtp_authenticators 
    set imap_oauth_refresh_command=$smtp_oauth_refresh_command
+
+.. note:: :ref:`GNUpg <gnupg>` dispone de un agente que recuerda la
+   contraseña, por lo que si envíamos varios mensajes sólo deberemos
+   introducirla al realizar el primer envío. Por otra parte, :program:`GNUpg`
+   también puede integrarse con :ref:`Gnome Keyring <gnome-keyring-ssh>` con lo
+   que podríamos lograr que el acceso al sistema desbloquease la clave y no
+   hubiera que introducirla más.
+
+.. rubric:: Variantes
+
+Consisten en utilizar métodos alternativos a |GPG| con este mismo *script*:
+
+#. No cifrar el archivo en absoluto. Basta con usar :ref:`cat <cat>` como
+   programa de cifrado para lo cual podemos :program:`mutt_oauth2.py` y dejarlo
+   así:
+
+   .. code-block:: python
+
+      ENCRYPTATION_PIPE = ['cat']
+      DECRYPTATION_PIPE = ['cat']
+
+   Por supuesto, nos ahorramos todo lo relativo a crear la clave |GPG|.
+
+#. Cifrar el archivo con contraseña:
+
+   .. code-block:: python
+
+      ENCRYPTION_PIPE = ['openssl', 'enc', '-aes256', '-pbkdf2', '-a']
+      DECRYPTION_PIPE = ['openssl', 'enc', '-aes256', '-pbkdf2', '-a', '-d']
+
+   .. note:: Esta variante se deja como curiosidad, ya que es enormemente
+      incómoda: como no hay agente que recuerde la contraseña, siempre habrá que
+      introducirla.
 
 .. _getmail-oauth2:
 
@@ -156,6 +192,10 @@ contenido:
 .. literalinclude:: files/provider.json
    :language: json
    :emphasize-lines: 3-5
+
+y permisos restringidos de lectura::
+
+   $ chmod 600 ~/.config/provider.json
 
 donde :kbd:`client_id` y :kbd:`client_secret` son las credenciales que hemos
 obtenido en el paso anterior. Creado el archivo, podemos obtener el token
@@ -181,6 +221,10 @@ anteriormente <getmail>`):
 .. https://luxing.im/mutt-integration-with-gmail-using-oauth/
 .. https://wiki.archlinux.org/title/Getmail
 
+.. rubric:: Notas al pie
+
+.. [#] Su usamos |GPG| para cifrar y firmar correos electrónicos lo más
+   apropiado es utilizar la propia dirección de correo.
 
 
 .. _Thunderbird: https://thunderbird.net
