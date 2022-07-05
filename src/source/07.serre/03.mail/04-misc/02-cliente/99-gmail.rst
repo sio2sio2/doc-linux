@@ -1,7 +1,7 @@
 .. _oauth2-gmail:
 
-Uso de cuentas de Gmail
-***********************
+Autenticación OAuth2 para *Gmail*
+*********************************
 Desde junio de 2022 `Google no permite la autenticación simple con usuario y
 contraseña <https://support.google.com/accounts/answer/6010255?hl=en>`_, lo que
 inutiliza algunas de las configuraciones expuestas si se utiliza *Gmail* como
@@ -70,6 +70,8 @@ Configuración de aplicaciones
 =============================
 El método de configuración, obviamente, es particular para cada aplicación.
 
+.. _mutt-oauth2:
+
 :program:`mutt`
 ---------------
 :program:`mutt` requiere la autenticación tanto para el envío de mensajes a
@@ -82,7 +84,7 @@ asi que empezaremos por copiar este *script* en un lugar adecuado::
    $ install -m750 /usr/share/doc/mutt/examples/mutt_oauth2.py ~/.config/mutt/
 
 La estrategia del *script* es almacenar el *token* de acceso en un archivo
-cifrado para lo cual en principio usa |GPG| (véase ref:`GNUpg <gnupg>` para más
+cifrado para lo cual en principio usa |GPG| (véase :ref:`GNUpg <gnupg>` para más
 detalles sobre las órdenes siguientes). Como en *Debian* es una dependencia del
 propio :program:`mutt` no será necesaria ninguna instalación adicional.
 
@@ -179,8 +181,8 @@ Consisten en utilizar métodos alternativos a |GPG| con este mismo *script*:
       DECRYPTION_PIPE = ['openssl', 'enc', '-aes256', '-pbkdf2', '-a', '-d']
 
    .. note:: Esta variante se deja como curiosidad, ya que es enormemente
-      incómoda: como no hay agente que recuerde la contraseña, siempre habrá que
-      introducirla.
+      incómoda: como no hay agente que recuerde la contraseña, habrá que
+      introducirla cada vez que se envíe un mensaje.
 
 .. _getmail-oauth2:
 
@@ -203,7 +205,7 @@ necesario ejecutando::
 
    $ getmail-gmail-xoauth-tokens -i ~/.config/provider.json
 
-que añadirá al archivo los campos :kbd:`access_token` y :kbd:`refresh_token`.
+que añadirá al archivo los campos :kbd:`access_token` y :kbd:`refresh_token`\ [#]_. 
 Hecho lo cual, podemos autenticarnos creando una sección :kbd:`[retriever]` en
 el archivo de configuración (el resto de puede quedarse tal como :ref:`se expuso
 anteriormente <getmail>`):
@@ -225,6 +227,9 @@ anteriormente <getmail>`):
 
 .. [#] Su usamos |GPG| para cifrar y firmar correos electrónicos lo más
    apropiado es utilizar la propia dirección de correo.
+.. [#] :file:`provider.json` queda sin cifrar y, por tanto, lo que hace
+   :program:`getmail` a efectos de seguridad equivale a la primera variante que
+   :ref:`propusimos para mutt <mutt-oauth2>`.
 
 
 .. _Thunderbird: https://thunderbird.net

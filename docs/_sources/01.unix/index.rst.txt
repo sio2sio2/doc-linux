@@ -180,21 +180,19 @@ característica las referidas distribuciones se agrupan así:
 .. table::
    :class: ciclo-distros
 
-   ======================== ========================
-   De distribución estable   De liberación continua
-   ======================== ========================
-   Slackware_                Debian_ (testing, sid)
-   Debian_ (estable)         Gentoo_
-   Ubuntu_                   Archlinux_
-   Mint_                     Manjaro_
-   `Kali Linux`_             `CentOS Stream`_
+   ============================== ========================
+   Con liberación de versiones     De liberación continua
+   ============================== ========================
+   Slackware_                      Debian_ (testing, sid)
+   Debian_ (estable)               Gentoo_
+   Ubuntu_                         Archlinux_
+   Mint_                           Manjaro_
+   `Kali Linux`_                   `CentOS Stream`_
    |RHEL|
    Fedora_
-   CentOS_
-   `Rocky Linux`_
+   CentOS_ (ahora `Rocky Linux`_)
    Suse_/OpenSuse_
-   ======================== ========================
-
+   ============================== ========================
 
 .. _Slackware: https://www.slackware.com
 .. _Debian: https://www.debian.org
