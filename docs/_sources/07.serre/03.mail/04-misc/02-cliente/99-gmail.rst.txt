@@ -118,6 +118,8 @@ Generada la clave, debemos editar :file:`~/.config/mutt/mutt_oauth2.py` para:
   bajo el epígrafe anterior (que están referidas a la cuenta real
   :kbd:`pericodelospalotes@gmail.com`).
 
+.. _gen_token_oauth2_mutt:
+
 Una vez hecho, podemos obtener el *token* y almacenar en un archivo ejecutando
 la orden::
 
@@ -130,7 +132,7 @@ dirección de correo que debe ser la dirección real
 (:kbd:`pericodelospalotes@gmail.com`) ya que se utiliza para definir qué cuenta
 quiere ser autenticada.
 
-Con esto ya podemos configurar :program:`mutt`, pero antes probemos que el *token* funciona::
+Con esto ya podemos configurar :program:`mutt`, pero antes probemos que el *token* funciona\ [#]_::
 
    $ ~/.config/mutt/mutt_oauth2.py -vt ~/.config/mutt/pericodelospalotes@gmail.com.token
    Access token: xxx
@@ -213,9 +215,6 @@ anteriormente <getmail>`):
 .. literalinclude:: files/getmailrc-oauth2
    :language: ini
 
-.. note:: El *token* tiene una caducidad por lo que cada 90 días habrá que
-   volver a renegerarlos con la orden anterior.
-
 .. seealso:: `Este artículo
    <https://www3.isi.edu/~johnh/OTHER/LINUX/OAUTH2/index.html>`_ documenta el
    soporte de OAuth2 en :program:`getmail`.
@@ -227,6 +226,15 @@ anteriormente <getmail>`):
 
 .. [#] Su usamos |GPG| para cifrar y firmar correos electrónicos lo más
    apropiado es utilizar la propia dirección de correo.
+.. [#] En realidad, se obtienen dos *tokens*: uno de acceso (*access_token*)
+   que tiene una caducidad limitada y uno de refresco (*refresh_token*) sin
+   caducidad y que sirve para actualizar al anterior tras cada uso. En
+   consecuencia, si se usan periódicamente, no habrá que regenerarlos manualmente;
+   pero en caso contrario, habrá que volver a ejecutar la :ref:`orden para
+   obtenerlos manualmente <gen_token_oauth2_mutt>`. Tenga presente que en el
+   caso de un |MRA| lo habitual es revisar el correo a intervalos regulares de
+   tiempo, pero en el de *mutt* puede no darse esta periodicidad (aunque podemos
+   incluir en una tarea de *cron* la orden de testeo para remediarlo).
 .. [#] :file:`provider.json` queda sin cifrar y, por tanto, lo que hace
    :program:`getmail` a efectos de seguridad equivale a la primera variante que
    :ref:`propusimos para mutt <mutt-oauth2>`.

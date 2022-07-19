@@ -82,7 +82,7 @@ colaborativo a través de internet\ [#]_ y en la actualidad es desarrollado por
 voluntarios y empleados de grandes empresas con interés en el desarrollo del
 sistema como `IBM <https://es.wikipedia.org/wiki/IBM>`_, `Google
 <https://es.wikipedia.org/wiki/Google>`_ o `Red Hat
-<https://es.wikipedia.org/wiki/Red_Hat>`_.
+<https://es.wikipedia.org/wiki/Red_Hat>`_\ [#]_.
 
 .. note:: Por lo general, cuando usemos el término *Linux* en este documento nos
    referiremos al sistema completo, no sólo al *kernel*.
@@ -100,8 +100,9 @@ proporciona un instalador, un :ref:`sistema de gestión de software
 Por tanto, "instalar *Linux*" implica en realidad escoger e instalar una
 distribución de *Linux*; y "utilizar *Linux*", utilizar una distribución de
 *Linux*. Y, aunque gran cantidad del *software* que instalan todas las
-distribuciones es común (por ejemplo, el programa :ref:`cp <cp>` para copiar
-archivos), hay notables diferencias entre ellas.
+distribuciones es común (por ejemplo, las `herramientas GNU
+<https://www.gnu.org/software/coreutils/manual/coreutils.html>`_), hay notables
+diferencias entre ellas.
 
 .. note:: Los sistemas operativos se distribuyen a menudo junto a un conjunto
    de herramientas que permite instalarlos y utilizarlos cómodamente. Así es,
@@ -127,8 +128,8 @@ Sin ser muy exhaustivos, las principales distribuciones son:
    derivadas. Es muy apreciada su versión estable para servidores:
 
    - Ubuntu_, que nació en principio para acercar *Linux* al usuario novel. Con
-     su popularización ha ido diversificándose y ahora proporciona versiones
-     pensadas para servidor.
+     su popularización ha ido diversificándose y ahora proporciona también
+     versiones pensadas para servidor.
 
      + Mint_. que tiene versiones basadas tanto en *Ubuntu* como en *Debian* y se orienta al usuario novel.
 
@@ -213,7 +214,7 @@ característica las referidas distribuciones se agrupan así:
 .. rubric:: Distribución de referencia
 
 La *distribución de referencia* para la elaboración de los apuntes es la rama
-estable de *Debian* (véasen :ref:`cuáles son sus distintas ramas <ramas>`). La
+estable de *Debian* (véanse :ref:`cuáles son sus distintas ramas <ramas>`). La
 redacción se comenzó en 2016 cuando lo era Jessie_ (la versión **8.0**), aunque
 por estar próxima a concluir su ciclo se procuró adaptar el contenido a la
 versión **9.0** Stretch_. Desde entonces se han publicado nuevas versiones
@@ -233,6 +234,9 @@ sus distribuciones derivadas.
 .. [#] Lo que `Eric S. Raymond <https://es.wikipedia.org/wiki/Eric_S._Raymond>`_
    llama *modelo de bazar* en su ensayo clásico `La catedral y el bazar
    <http://softlibre.unizar.es/manuales/softwarelibre/catedralbazar.pdf>`_.
+
+.. [#] En realidad, desde 2019 `Red Hat es propiedad de IBM
+   <https://newsroom.ibm.com/2019-07-09-IBM-Closes-Landmark-Acquisition-of-Red-Hat-for-34-Billion-Defines-Open-Hybrid-Cloud-Future>`_.
 
 .. [#] Una :dfn:`distribución live` es un sistema operativo completo almacenado
    en un medio extraíble (|CD| o |DVD| tradicionalmente, pero ahora también
