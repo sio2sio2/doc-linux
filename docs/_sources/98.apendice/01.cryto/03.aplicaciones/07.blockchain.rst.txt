@@ -1,7 +1,7 @@
 .. _blockchain:
 
-Tecnología *Blockchain*
-***********************
+Tecnología de *blockchain*
+**************************
 Una de las aplicaciones de la criptografía que más impulso ha tomado en los
 últimos años es la tecnología de **blockchain** (o de *cadena de bloques*, si
 usamos su traducción literal). Conceptualmente fue desarrollada en los años 80
@@ -17,6 +17,8 @@ entonces, *Bitcoin* y muchas otras criptomonedas nacidas después han
 experimentado un desarrollo espectacular, y ya han excedido el ámbito puramente
 informático. Aunque su efecto económico (y especulativo) es enormemente
 interesante, el epígrafe se centra en los aspectos técnicos de la tecnología.
+
+.. _blockchain-propo:
 
 Propósito
 =========
@@ -59,8 +61,8 @@ El esquema nos ayudará a entender el funcionamiento:
      implicaciones de esto, échele un vistazo al `vídeo sobre hard fork de
      Crypto Español
      <https://www.youtube.com/channel/UC_TmOIPWu-hCVuE2fA3M8Tg>`_. Conviene
-     antes, no obstante, leer el siguiente epígrafe donde se expone formalmente
-     lo que es una *cadena de bloques*.
+     antes, no obstante, leer :ref:`el siguiente epígrafe <blockchain-desc>`
+     donde se expone formalmente lo que es una *cadena de bloques*.
 
 Por tanto, se siguen las reglas definidas en el *software* de gestión y los
 interesados en hacer transacciones acceden a la red de mineros pare que estas se
@@ -69,26 +71,35 @@ por parte de todos conocer todas las transacciones producidas. Este, pues, es el
 esquema de funcionamiento, pero hacer que esta idea general funcione, no es en
 absoluto trivial. Aún debe exponerse cómo lograr que este sistema:
 
+.. _blockchain-prob:
+
 a. Distinga cada cliente de los restantes.
+#. Dado que en un libro de contabilidad los registros tiene un orden secuencial,
+   consiga secuencialidad.
+#. Evite la manipulación posterior de las transacciones.
 #. Evite registros simultáneos que provoquen inconsistencia, o sea, colisiones.
    Por ejemplo, imaginemos que, teniendo el señor **A** 5 *bitcoins*, uno
    de los nodos registra que cede al señor **B** 4 *bitcoins* y otro nodo
    diferente, que aún no está enterado de ello, registra que cede al señor **C**,
    3 *bitcoins*.
-#. Dado que en un libro de contabilidad los registros tiene un orden secuencial,
-   consiga secuencialidad.
-#. Evite la manipulación malintencionada de las transacciones.
 #. Incentive el trabajo de los mineros.
 
 Todo ello se resuelve mediante la **cadena de bloques**, que es lo que
 describiremos a continuación.
 
+.. _blockchain-desc:
+
 Descripción
 ===========
+.. seealso:: Es recomendabilísimo el vídeo `Cómo funciona blockchain
+   <https://www.youtube.com/watch?v=hEoYL5j0wYU>`_ del canal `Crypto Español
+   <https://www.youtube.com/channel/UC_TmOIPWu-hCVuE2fA3M8Tg>`_. Gran parte de
+   las explicaciones contenidas bajo este epígrafe se han tomado de él.
+
 Para implementar esta base de datos distribuida, las transacciones se agrupan en
-bloques y la base de datos distribuida toma la forma de una cadena de bloques, o
-sea, una secuencia ordenada de bloques en el que uno va detrás del anterior. Un
-bloque, de forma muy, muy resumida, tiene el siguiente aspecto:
+bloques y la base de datos distribuida toma la forma de una **cadena de
+bloques**, o sea, una secuencia ordenada de bloques en el que uno va detrás del
+anterior. Un bloque, de forma muy, muy resumida, tiene el siguiente aspecto:
 
 .. image:: files/bloque.png
 
@@ -98,16 +109,175 @@ esto es:
    :ref:`hash <hash>` del bloque que le precede en la cadena, y el |nonce|, que
    definiremos más adelante.
 
-#. La lista de transacciones contenidas en el bloque.
+#. La lista de transacciones contenidas en el bloque. Pero ¿por qué se agrupan
+   múltiples transacciones en un bloque? La razón se halla en el problema de
+   sincronización del tiempo. En un libro de contabilidad, el orden en que se
+   llevan a cabo las transacciones es fundamental. El problema es que al ser un
+   sistema distribuido, necesitaríamos que todos los nodos tuvieran
+   sincronizados sus relojes y esto es un problema. Una solución que evita
+   sincronizar es dividr el tiempo en intervalos (p.e. 10 minutos) y agrupar
+   todas las transacciones que se han producido dentro de ese intervalo. De este
+   modo, ya no es necesario que todos los nodos tengan exactamente la misma
+   hora; y no sabremos en qué orden se hicieron las transacciones incluidas en
+   un mismo bloque, pero sí podremos estar seguros de que se hicieron después de
+   las transacciones del bloque anterior y antes de las del posterior.
 
-Y la cadena de bloques, supuesto que ya tenga cuatro, se verá así:
+   Por supuesto, obrar así implica definir ciertas restricciones sobre las
+   transacciones de un mismo bloque como, por ejemplo, que no se incluyan dos
+   o más transacciones que implican la transferencia de las mismas monedas.
+
+La cadena de bloques, supuesto que ya tenga cuatro, se verá así:
 
 .. image:: files/cadena.png
+
+Por simplicidad, se ha supuesto que cada bloque sólo contiene una transacción y
+que sólo existen los tres clientes (señores **A**, **B** y **C**) que
+introdujimos bajo el epígrafe anterior. Como es necesario que alguno de los tres
+posea algo inicialmente, en el primer bloque cargamos con 5 monedas al señor
+**A**. Obsérvese, además, que la cadena de bloques es un mero libro de
+contabilidad donde se van registrando transacciones y, en consecuencia, cada
+cliente posee las monedas que la lectura de todas las transacciones arroja.
+En el ejemplo, **A** tiene :math:`5-3+1=3` *bitcoins*; **B**, :math:`3-2=1`
+*bitcoins*; y **C**, :math:`2-1=1` *bitcoin*.
+
+Con este punto de partida, analicemos más detalladamente qué ocurre y cómo la
+**cadena de bloques** soluciona los :ref:`problemas expuestos al final del
+apartado anterior <blockchain-prob>`.
+
+**Distinción de clientes**
+   Dado que todo este esquema nos sirve para realizar transacciones entre
+   clientes, es fundamental que cada cliente esté individualizado y que, por
+   ejemplo, el hecho de que la transacción del segundo bloque que transfiere dos
+   monedas del señor **A** al señor **B**, suponga que fue **A** el que
+   la hizo y que sólo **B** sea a partir de ese momento capaz de transferir esas
+   dos unidades.
+
+   Esto se logra generando cada cliente :ref:`un par de claves ECDSA
+   <asimetrico>`\ [#]_, por lo que cada cual tendrá una clave privada y una
+   clave pública. En muchos de estos sistemas no interesa en absoluto saber
+   quién es realmente el cliente (¿quién es en realidad el señor **A**?\ [#]_),
+   muy al contrario, se toma como uno de los objetivos preservar el anonimato.
+   Por ese motivo, no hay certificados, sino simplemente parejas de claves
+   que son suficientes para individualizar a cada uno de los clientes.
+
+   De este modo, las transacciones se caracterizan por incluir un pequeño
+   problema criptográfico que requiere la clave privada del propietario: este es
+   el modo de asegurarse qué solo el propietario de una moneda es capaz de hacer
+   una transacción con ella. Por ello, para la transacción del bloque 2, el
+   señor **A** tuvo que utilizar su clave privada en un pequeño problema
+   propuesto en la transacción del bloque 1; y, además, propuso un pequeño
+   problema que necesitará resolver el señor **B** cuando transfiera (lo que
+   ocurre en el bloque 3).
+
+   Por otro lado, la **clave pública** sirve para identificar al cliente. Y,
+   así, cuando se transfiere criptomoneda al señor **B**, se transfiere a una
+   dirección que coincide con el *hash* de la clave pública de **B**. En
+   consecuencia, los clientes se identifican en la red por el |SHA|\ -256 de su
+   clave pública.
+
+   En realidad, en el mundo de las criptomonedas se maneja el concepto de
+   :dfn:`wallet` (o :dfn:`monedero`). Cada cliente está representado por su
+   *wallet*, de manera que cuando se hacen transacciones se hacen transferencias
+   entre *wallets*. Sin embargo, a diferencia de lo que podría parecer por su
+   nombre y la analogía con el mundo físico, los *wallets* no contienen monedas,
+   sino la clave privada asociada al cliente, la clave pública que se puede
+   obtener a partir de ella y el *hash* de esta última que actúa como dirección
+   del *wallet*. El *wallet* es personal e intransferible y, mientras no nos lo
+   roben, podemos estar seguros de que podemos disponer de las monedas que la
+   cadena de bloques determina que son nuestras.
+
+**Secuencialidad**
+   El orden de los bloques esta definido por el hecho de que cada bloque incluye
+   un *hash* (|SHA|\ -256) del bloque anterior. Nótese, además, que manipular un
+   bloque (pongamos que se intenta alterar a posteriori la transacción incluida
+   en el bloque 2) supone que habrá que cambiar todos los bloques subsiguientes,
+   porque dejarán de ser válidos los *hashes* contenidos en ellos.
+
+**Inalterabilidad**
+   Para que todo este sistema funcione es fundamental que no se pueda alterar la
+   cadena de bloques. Imaginemos, por ejemplo, que alguien malintencionado
+   pretende robar las tres monedas que obtiene el señor **B** gracias a la
+   transacción del bloque **2** rescribiendo esa transacción para que las
+   monedas se destinen al *wallet* de **C**. Tendría que hacer ese cambio y
+   luego, rescribir los bloques siguientes para alterar los *hashes*: si lograra
+   hacer prevalecer esta cadena alternativa en los nodos, se habría consumado el
+   fraude.
+
+   La solución para evitarlo es, ¡cómo no!, criptográfica. En realidad, en estas
+   cadenas de bloques no se admite que el *hash* de cada bloque sea un número
+   cualquiera de 256 *bits* (recordemos que se usa |SHA|\ -256), sino que debe
+   cumplir un requisito (por ejemplo, que las 30 primeras cifras sean 0). Pero
+   un resumen criptográfico está determinado por el contenido que se resume, así
+   que ¿cómo se le pueden poner exigencias al *hash*? Saldrá el que tenga que
+   salir. Aquí es donde entra en juego el |nonce|. El :dfn:`nonce` es un número
+   de 4 *bytes* cuya función es exclusivamente alterar el valor del resumen. En
+   consecuencia, para que un bloque sea válido, un minero tiene que ir alterando
+   el valor del |nonce| hasta dar con uno para el que el *hash* resultante
+   cumpla las condiciones impuestas. No hay formula para obtener un |nonce|
+   apropiado: simplemente hay que ir probando una y otra vez hasta dar con uno.
+   Cuando más estrictas son estas condiciones, mayor :dfn:`dificultad` para
+   obtenerlo. Este proceso de obtención del bloque (del |nonce|, en realidad) es
+   lo que se conoce como :dfn:`prueba de trabajo` y es la razón por la que a los
+   nodos de esta red se les conoce como "mineros": deben encontrar por trabajo
+   bruto un bloque adecuado antes de poder añadirlo a la cadena, del mismo modo
+   que un minero tiene que cabar en una mina para obtener el mineral.
+
+   Si algún nodo quisiera manipular la transacción contenida en un bloque,
+   entonces no solamente tendría que calcular el |nonce| de ese bloque (pongamos
+   que el bloque **2**), sino el |nonce| de todos los posteriores (**3** y
+   **4**) hasta llegar al final de la cadena, puesto que cada bloque contiene el
+   *hash* del anterior. Por mucha capacidad de cálculo que tenga, es imposible
+   que sea capaz de minar más rápido que el resto de nodos, que siguen a su vez
+   entre todos minando la cadena legítima.
+
+   En el caso particular del *bitcoin*, la dificultad es dinámica y se adapta
+   para que aproximadamente se mine un bloque cada 10 minutos.
+
+**Colisiones**
+   Por colisión entendemos que dos o más nodos quieran de manera más o menos
+   simultánea introducir el siguiente bloque en la cadena. En nuestro ejemplo,
+   añadir el bloque **5**. Gracias a la *prueba de trabajo*, esta coincidencia se
+   producirá solamente si dos nodos han logrado minar simultáneamenta el bloque,
+   lo cual reduce mucho la competencia. Si se produce esta última circunstancia,
+   entonces ambos nodos difundirán su bloque en la red y nos encontraremos con
+   nodos que tienen como bloque **5** el de uno y bloques que tienen como bloque
+   **5** el otro. Como esto es inaceptable, ya que la cadena debe ser única, el
+   sistema se esperará para tomar una decisión a la generación del siguiente
+   bloque (el **6**): la variante que prevalecerá será aquella que logre generar
+   antes el bloque **6**; y al producirse este hecho, todos los nodos adoptarán
+   esta variante y desecharán la otra. Si se hubiera vuelto a producir la
+   simultaneidad, se resolverá cuál es la cadena prevalente en el bloque **7** y
+   así sucesivamente, porque, en general, se considera como cadena prevalente la
+   cadena más larga.
+
+   .. note:: Retómese la lectura del punto referente a la **inalterablidad**:
+      para que un minero manipulara el bloque **2**, debería minar el bloque
+      **2**, el **3**, el **4** y el **5** antes de que el resto de mineros
+      minarán únicamente el bloque **5**.
+
+**Incentivos**
+   La labor de los mineros implica grandes costes en equipos y electricidad, por
+   lo que sin la existencia de incentivos, nadie minaría. Para asegurar su
+   existencia, pueden obtener como compensación criptomoneda por dos conceptos:
+
+   + Comisión a las transacciones.
+   + Por bloque minado. Las nuevas monedas se crean al minar bloques y dar esa
+     recompensa al minero que ha logrado añadirlo. En el caso del
+     *bitcoin* como su creador decidió que su cantidad total estuviera limitada
+     a 21 millones, la recompensa decrece con el tiempo. Empezó siendo de 50 BTC
+     y cada 4 años aproximadamente se divide a la mitad.
 
 .. _crypto-tipos:
 
 Tipos de criptomonedas
 ======================
+
+
+.. _crypto-exchanges:
+
+Exchanges
+=========
+
 
 .. https://www.linuxparty.es/recursos/publicidad/18-encriptacion/10714-parte-1-blockchain-en-linux-introduccion-y-criptomoneda.html
    https://www.linuxjournal.com/content/blockchain-part-i-introduction-and-cryptocurrency
@@ -116,10 +286,20 @@ Tipos de criptomonedas
 
    https://www.usvotefoundation.org/blockchain-voting-is-not-a-security-strategy
 
+.. rubric:: Notas al pie
+
+.. [#] Las claves son |ECDSA| y no |RSA|, porque son más eficientes. En teoría,
+   las claves |RSA| también servirían para este propósito.
+.. [#] La primera trasacción de bitcoins se hizo el 12 de enero de 2009 entre
+   `Hal Finney <https://academy.bit2me.com/quien-es-hal-finney/>`_ y Satoshi
+   Nakamoto. Conocemos quién es (fue) Hal, pero aún sigue siendo un misterio
+   quién es en realidad Satoshi. Ni siquiera está claro que sea una persona.
+
 .. _Bitcoin: https://es.wikipedia.org/wiki/Bitcoin
 .. _Natoshi Nakamoto: https://es.wikipedia.org/wiki/Satoshi_Nakamoto
 .. _bitcoin.org: https://bitcoin.org
 
-
 .. |nonce| replace:: :abbr:`nonce (Number Only Used Once)`
-
+.. |RSA| replace:: :abbr:`RSA (Rivest, Shamir y Adleman)`
+.. |ECDSA| replace:: :abbr:`ECDSA (Elliptic Curve Digital Signature Algorithm)`
+.. |SHA| replace:: :abbr:`SHA (Sechure Hash Algorithm)`
