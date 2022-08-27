@@ -385,5 +385,6 @@ lexers['php'] = PhpLexer(startinline=True)
 lexers['php-annotations'] = PhpLexer(startinline=True)
 
 extlinks = {
-    'deb': ('https://packages.debian.org/stable/%s','')
+    'deb': ('https://packages.debian.org/stable/%s',''),
+    'crypto': ('https://coinmarketcap.com/es/currencies/%s', '%s')
 }

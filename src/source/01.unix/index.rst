@@ -151,7 +151,8 @@ Sin ser muy exhaustivos, las principales distribuciones son:
      <ciclo-distro>` renombrándola como `CentOS Stream
      <https://www.centos.org/centos-stream/>`_, por lo que su fundador original
      creó `Rocky Linux`_ con el fin de continuar la
-     idea original.
+     idea original. Otra distribución creada para mantener la filosofía original
+     es `Alma Linux`_.
 
 #. Suse_, distribución comercial de la empresa alemana del mismo nombre, que
    actualmente es propiedad de Novell. Tiene una versión comunitaria denominada
@@ -181,19 +182,19 @@ característica las referidas distribuciones se agrupan así:
 .. table::
    :class: ciclo-distros
 
-   ============================== ========================
-   Con liberación de versiones     De liberación continua
-   ============================== ========================
-   Slackware_                      Debian_ (testing, sid)
-   Debian_ (estable)               Gentoo_
-   Ubuntu_                         Archlinux_
-   Mint_                           Manjaro_
-   `Kali Linux`_                   `CentOS Stream`_
+   =============================================== ========================
+   Con liberación de versiones                      De liberación continua
+   =============================================== ========================
+   Slackware_                                       Debian_ (testing, sid)
+   Debian_ (estable)                                Gentoo_
+   Ubuntu_                                          Archlinux_
+   Mint_                                            Manjaro_
+   `Kali Linux`_                                    `CentOS Stream`_
    |RHEL|
    Fedora_
-   CentOS_ (ahora `Rocky Linux`_)
+   CentOS_ (ahora `Rocky Linux`_, `Alma Linux`_)
    Suse_/OpenSuse_
-   ============================== ========================
+   =============================================== ========================
 
 .. _Slackware: https://www.slackware.com
 .. _Debian: https://www.debian.org
@@ -210,6 +211,7 @@ característica las referidas distribuciones se agrupan así:
 .. _OpenSuse: https://www.opensuse.org
 .. _Linux from Scratch: https://www.linuxfromscratch.org
 .. _Rocky Linux: https://rockylinux.org
+.. _Alma Linux: https://almalinux.org
 
 .. rubric:: Distribución de referencia
 

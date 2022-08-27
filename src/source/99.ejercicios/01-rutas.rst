@@ -1,3 +1,5 @@
+.. _ej-rutas:
+
 Ejercicios sobre rutas
 ----------------------
 
