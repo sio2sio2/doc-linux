@@ -67,7 +67,9 @@ del todo satisfecho con la licencia de `MINIX
 <https://es.wikipedia.org/wiki/MINIX>`_, otro clon de sistemas *UNIX*
 desarrollado por `Andrew S. Tanenbaum
 <https://es.wikipedia.org/wiki/Andrew_S._Tanenbaum>`_, que sólo permitía su uso
-educativo.
+educativo. En realidad, para entonces ya existía un *UNIX* gratuito para la
+arquitectura |PC|, el citado |BSD|, pero se hallaba enfracado en una disputa
+legal con AT&T.
 
 .. rubric:: Concepto
 
@@ -251,6 +253,7 @@ sus distribuciones derivadas.
 .. |GPL| replace:: :abbr:`GPL (General Public Licence)`
 .. |CD| replace:: :abbr:`CD (Compact Disk)`
 .. |DVD| replace:: :abbr:`DVD (Digital Versatile Disc)`
+.. |PC| replace:: :abbr:`PC (Personal Computer)`
 
 .. _Jessie: https://www.debian.org/News/2015/20150426
 .. _Stretch: https://www.debian.org/News/2017/20170617
