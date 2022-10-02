@@ -40,50 +40,50 @@ correspondiente al dominio de la dirección del *remitente del sobre*.
 Trasladando esta explicación a un ejemplo, podríamos ilustrarlo del siguiente
 modo:
 
-   El dueño de la cuenta *pepe@gmail.com* usará los mecanismos que le
-   proporciona su proveedor de correo (|SMTP| o el *webmail* `gmail.google.com
-   <http://gmail.google.com>`_) para enviar un mensaje a *paco@example.com*.
-   Esto implica que sea una máquina de *Gmail* la que se encargue de entregar el
-   mensaje al servidor *smtp.example.com*. Éste, al recibir el mensaje,
-   registrará la |IP| de la máquina remitente y, como la dirección del sobre
-   es *pepe@gmail.com*, para certificar que realmente
-   tal |IP| es de una máquina de *Gmail*, realizará las siguientes consultas
-   |DNS|:
+El dueño de la cuenta *pepe@gmail.com* usará los mecanismos que le
+proporciona su proveedor de correo (|SMTP| o el *webmail* `gmail.google.com
+<http://gmail.google.com>`_) para enviar un mensaje a *paco@example.com*.
+Esto implica que sea una máquina de *Gmail* la que se encargue de entregar el
+mensaje al servidor *smtp.example.com*. Éste, al recibir el mensaje,
+registrará la |IP| de la máquina remitente y, como la dirección del sobre
+es *pepe@gmail.com*, para certificar que realmente
+tal |IP| es de una máquina de *Gmail*, realizará las siguientes consultas
+|DNS|:
 
-   * ¿Quiénes son las máquinas que se encargan de enviar mensajes del dominio
-     *gmail.com*?
+* ¿Quiénes son las máquinas que se encargan de enviar mensajes del dominio
+  *gmail.com*?
 
-     ::
+  ::
 
-      # dig +nocmd +noall +answer gmail.com TXT
-      gmail.com.              176     IN      TXT     "v=spf1 redirect=_spf.google.com"
+   # dig +nocmd +noall +answer gmail.com TXT
+   gmail.com.              176     IN      TXT     "v=spf1 redirect=_spf.google.com"
 
-     Bien, la respuesta no es concluyente. El registro nos dice, simplemente,
-     que lo que diga otro registro.
+  Bien, la respuesta no es concluyente. El registro nos dice, simplemente,
+  que lo que diga otro registro.
 
-   * Vale. Pues, ¿qué es lo que dice este registro?
+* Vale. Pues, ¿qué es lo que dice este registro?
 
-     ::
+  ::
 
-      # dig +nocmd +noall +answer _spf.google.com TXT
-      _spf.google.com.        299     IN      TXT     "v=spf1 include:_netblocks.google.com include:_netblocks2.google.com include:_netblocks3.google.com ~all"
-      
-     La respuesta sigue sin ser del todo concluyente. Nos informa de que las
-     máquinas seran las incluidas en alguno de esos tres registros.
+   # dig +nocmd +noall +answer _spf.google.com TXT
+   _spf.google.com.        299     IN      TXT     "v=spf1 include:_netblocks.google.com include:_netblocks2.google.com include:_netblocks3.google.com ~all"
+   
+  La respuesta sigue sin ser del todo concluyente. Nos informa de que las
+  máquinas seran las incluidas en alguno de esos tres registros.
 
-   * Vale. Pues, ¿qué dicen esos registros?
+* Vale. Pues, ¿qué dicen esos registros?
 
-     ::
+  ::
 
-      # dig +nocmd +noall +answer _netblocks.google.com TXT
-      _netblocks.google.com.  2480    IN      TXT     "v=spf1 ip4:35.190.247.0/24 ip4:64.233.160.0/19 ...mas_ips... ~all"
+   # dig +nocmd +noall +answer _netblocks.google.com TXT
+   _netblocks.google.com.  2480    IN      TXT     "v=spf1 ip4:35.190.247.0/24 ip4:64.233.160.0/19 ...mas_ips... ~all"
 
-   Ahí sí están referidos todos los rangos de |IP| de máquinas autorizadas para
-   enviar mensajes del dominio *gmail.com*. La |IP| de la máquina que contactó
-   al servidor *smtp.example.net* debería estar incluida en uno de esos rangos.
+Ahí sí están referidos todos los rangos de |IP| de máquinas autorizadas para
+enviar mensajes del dominio *gmail.com*. La |IP| de la máquina que contactó
+al servidor *smtp.example.net* debería estar incluida en uno de esos rangos.
 
-   .. seealso:: Esta misma averiguación podríamos haberla hecho más visualmente
-      desde `este enlace <https://stopemailfraud.proofpoint.com/spf/>`_.
+.. seealso:: Esta misma averiguación podríamos haberla hecho más visualmente
+   desde `este enlace <https://stopemailfraud.proofpoint.com/spf/>`_.
 
 Hay, no obstante, que hacer dos puntualizaciones respecto a las consultas que
 permiten acreditar el remitente. Por un lado, no pueden requerirse más de 10
