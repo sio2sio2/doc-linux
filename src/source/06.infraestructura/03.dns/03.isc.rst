@@ -1,9 +1,219 @@
 .. _bind:
 
+***************
 :program:`bind`
 ***************
-.. Va ya por su versión **9**, pero posiblemente sea la última, ya que el |ISC|
-   `abandonó el desarrollo de la versión 10 en favor de KEA
-   <https://www.isc.org/downloads/platform/>`_.
+El servidor :program:`bind` es el estándar de facto para el servicio |DNS|. Está patrocinado por el |ISC| y permite hacer configuraciones complejas
+
+Preliminares
+************
+Antes de meternos de lleno en la configuración de zonas, es preciso instalar y preparar el servidor.
+
+Instalación
+===========
+*Debian* trae su propio paquete para instalar el servidor::
+
+   # apt install bind9
+
+La instalación es plenamente funcional:
+
++ No hay definida ninguna zona propia (no es servidor *autoritario*), pero
+  funciona perfectamente como servidor recursivo.
++ Utiliza para sus consultas recursivas los servidores raíz.
+
+Podemos probar el servidor con :ref:`host <host>`::
+
+   $ host www.iescastillodeluna.es localhost
+
+.. warning:: En este caso, tenemos que especificar que queremos usar nuestro
+   propio servidor, porque no hemos tocado el archivo :file:`/etc/resolv.conf`.
+   Recuerde que :ref:`hay que editar este archivo para indicar qué servidor DNS
+   desea usarse <bas-resolv.conf>`
+
+   A partir de ahora supondremos que se ha editado este archivo para evitar el
+   tedio de indicar explícitamente que se está usando nuestor propio
+   :program:`bind`.
+
+Archivos de configuración
+=========================
+Toda la configuración se encuentra dentro del directorio :file:`/etc/bind`. El
+archivo básico de configuración es :file:`named.conf`, pero mediante sentencias
+``include`` *Debian* ha dividido sus contenidos en otros dos\ [#]_. Nos
+centraremos en los siguientes archivos:
+
+:file:`named.conf.options`
+   Define algunos parámetros de configuración. Nos interesa fundamentalmente el
+   bloque ``forwarders`` que define los servidores que usará nuestro servidor
+   para realizar búsquedas recursivas. Al encontrarse deshabilitado, recurre
+   directamente a los servidores raíz.
+
+:file:`named.conf.local`
+   Está destinado a la declaración de las zonas que se definirán en nuestro
+   servidor. Siempre que definamos una zona, deberemos incluir aquí una
+   referencia.
+
+:file:`db.empty`
+   Es un archivo que nos sirve como plantilla para la creación de archivos de
+   zona.
+
+Enjaulamiento
+=============
+El servicio |DNS| es tristemente célebre por sus repetidos problemas de
+seguridad. Por ello, es muy recomendable enjaular el servidor dentro de un
+directorio que llamaremos :file:`/var/lib/chroot-dns`. Comenzemos por parar el
+servicio::
+
+   # invoke-rc.d bind9 stop
+
+y preparar los directorios necesarios::
+
+   # mkdir -p /var/lib/chroot-dns/{etc,dev,var/{cache,run}}
+
+Poblemos ahora :file:`dev/` con los archivos especiales que necesita el
+servidor::
+
+   # mknod -m666 /var/lib/chroot-dns/dev/null c 1 3
+   # mknod -m666 /var/lib/chroot-dns/dev/random c 1 8
+
+Movemos los directorios necesarios dentro de la jaula::
+
+   # mv /etc/bind /var/lib/chroot-dns/etc
+   # ln -s /var/lib/chroot-dns/etc/bind /etc
+   # mv /var/cache/bind /var/lib/chroot-dns/var/cache
+   # ln -s /var/lib/chroot-dns/var/cache/bind /var/cache
+   # mv /var/run/named /var/lib/chroot-dns/var/run
+   # ln -s /var/lib/chroot-dns/var/run/named /var/run
+
+Y hacemos propietario al usuario *bind* de todo el contenido::
+
+   # chown -R bind:bind /var/lib/chroot-dns/*
+
+Metemos dentro de la jaula también el registro::
+
+   # echo '$AddUnixListenSocket /var/lib/chroot-dns/dev/log' > /etc/rsyslog.d/dns-chroot.conf
+   # invoke-rc.d rsyslog restart
+
+Por último, para rematar podemos modificar la versión que comunica nuestro
+servidor para que un posible atacante no la conozca de antemano. Esto se hace
+editando :file:`/etc/bind/named.conf.options`:
+
+.. code-block:: bash
+
+   version "3.1416"
+
+Con esto ya podemos indicar al demonio que arranque enjaulado, para lo cual
+editamos :file:`/etc/default/bind` y dejamos las opciones del siguiente modo:
+
+.. code-block:: bash
+
+   OPTIONS="-u bind -t /var/lib/chroot-dns"
+
+E iniciamos de nuevo el servidor::
+
+   # invoke-rc.d bind9 start
+
+Configuración inicial
+=====================
+Básicamente consiste en editar :file:`named.conf.options` y ajustarlo a nuestro
+gusto. Nos centramos, por ahora, en el comportamiento del servidor ante
+resoluciones recursivas. La configuración predefinida permite resoluciones
+recursivas, pero éstas se harán recurriendo a los servidores raíz, lo cual no es
+la solución más ágil. Por ello, es conveniente descomentar el bloque
+:kbd:`forwarders` y añadir servidores recursivos más eficientes. Por ejemplo\ [#]_:
+
+.. code-block:: 
+
+   forwarders {  // Servidores de Cloudflare
+      1.1.1.1;
+      1.0.0.1;
+      //194.179.1.100;
+   };
+
+Su nuestra intención fuera crear un servidor autoritario que no atendiera
+consultas recursivas y, en consecuencia, que se limitara a resolver consultas de
+sus propias zonas podríamos utilizar:
+
+* :kbd:`allow-recursion`, que permite indicar la lista de clientes a los que
+  se les permite hacer consultas recursivas.
+
+* :kbd:`allow-recursion-on`, que permite indicar la lista de direcciones |IP|
+  locales a través de las cuales se permite hacer consultas recursivas.
+  Entiéndase esto: si por ejemplo, tuviéramos un servidor con una interfaz
+  interna y otra externa, podríamos permitir consultas recursivas a las
+  peticiones que llegan a la interfaz interna, pero no a las que llegan a la
+  externa.
+
+Por ejemplo:
+
+.. code-block::
+
+   allow-recursion {};
+
+**impediría** a todos realizar consultas recursivas.
+
+Además, el archivo contiene una línea:
+
+.. code-block::
+
+   directory "/var/cache/bind";
+
+que identifica el directorio donde tendremos que almacenar los archivos de
+definición de las zona que gestionemos.
+
+Comprobación
+============
+Una vez que hayamos hecho una configuración, tenemos distintas herramientas para
+validarla::
+
+   # named-checkconf archivo_configuracion
+
+que comprueba errores en los archivos de configuración como
+:file:`named.conf.options` o :file:`named.conf.local`. Por otra parte::
+
+   # named-checkzone archivo_de_zona
+
+comprueba errores en la definición de la zona incluida en el archivo que se
+proporciona (nosotros los almacenaremos en :file:`/var/cache/bind`). Estos
+archivos no los hemos visto aún, pero los escribiremos a partir del próximo
+epígrafe.
+
+Por supuesto, también podemos iniciar el servidor y consultar los registros
+en búsqueda de errores, haciendo uso de :ref:`journalctl <journalctl>`. Por
+ejemplo::
+
+   # journalctl -u named -n30
+
+que nos muestra las últimas treinta líneas del registro.
+
+.. warning:: Iniciar (o reiniciar) este servidor no muestra ningún error,
+   aunque lo haya habido y el servidor ni siquiera haya podido arrancar.
+
+DNS directo
+***********
+
+Definición de zona
+==================
+
+Delegación
+==========
+
+Servidor esclavo
+================
+
+DNS inverso
+***********
+
+DNS dinámico
+************
+
+.. rubric:: Notas al pie
+
+.. [#] Tres en realidad, pero el tercero no lo tocaremos.
+.. [#] ``194.179.1.100`` era un arcaico servidor |DNS| de `Telefónica`_ de los tiempos de
+   `Infovía`_. Su inclusión en la lista es meramente sentimental. De hecho, está
+   comentado, porque ni siquiera funciona.
 
 .. |ISC| replace:: :abbr:`ISC (Internet Systems Consortium)`
+
+.. _Telefónica: https://www.telefonica.com
+.. _Infovía: https://es.wikipedia.org/wiki/InfoV%C3%ADa

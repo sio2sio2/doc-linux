@@ -50,6 +50,210 @@
             
   <section id="bind">
 <span id="id1"></span><h1><span class="section-number">6.2.3. </span><strong class="program">bind</strong><a class="headerlink" href="#bind" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>El servidor <strong class="program">bind</strong> es el estándar de facto para el servicio <abbr title="Domain Name Server">DNS</abbr>. Está patrocinado por el <abbr title="Internet Systems Consortium">ISC</abbr> y permite hacer configuraciones complejas</p>
+<section id="preliminares">
+<h2><span class="section-number">6.2.3.1. </span>Preliminares<a class="headerlink" href="#preliminares" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Antes de meternos de lleno en la configuración de zonas, es preciso instalar y preparar el servidor.</p>
+<section id="instalacion">
+<h3><span class="section-number">6.2.3.1.1. </span>Instalación<a class="headerlink" href="#instalacion" title="Enlazar permanentemente con este título">¶</a></h3>
+<p><em>Debian</em> trae su propio paquete para instalar el servidor:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>apt install bind9
+</pre></div>
+</div>
+<p>La instalación es plenamente funcional:</p>
+<ul class="simple">
+<li><p>No hay definida ninguna zona propia (no es servidor <em>autoritario</em>), pero
+funciona perfectamente como servidor recursivo.</p></li>
+<li><p>Utiliza para sus consultas recursivas los servidores raíz.</p></li>
+</ul>
+<p>Podemos probar el servidor con <a class="reference internal" href="02.clientes.html#host"><span class="std std-ref">host</span></a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>host www.iescastillodeluna.es localhost
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>En este caso, tenemos que especificar que queremos usar nuestro
+propio servidor, porque no hemos tocado el archivo <code class="file docutils literal notranslate"><span class="pre">/etc/resolv.conf</span></code>.
+Recuerde que <a class="reference internal" href="../../02.conbas/09.admbasica/11.red.html#bas-resolv-conf"><span class="std std-ref">hay que editar este archivo para indicar qué servidor DNS
+desea usarse</span></a></p>
+<p>A partir de ahora supondremos que se ha editado este archivo para evitar el
+tedio de indicar explícitamente que se está usando nuestor propio
+<strong class="program">bind</strong>.</p>
+</div>
+</section>
+<section id="archivos-de-configuracion">
+<h3><span class="section-number">6.2.3.1.2. </span>Archivos de configuración<a class="headerlink" href="#archivos-de-configuracion" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Toda la configuración se encuentra dentro del directorio <code class="file docutils literal notranslate"><span class="pre">/etc/bind</span></code>. El
+archivo básico de configuración es <code class="file docutils literal notranslate"><span class="pre">named.conf</span></code>, pero mediante sentencias
+<code class="docutils literal notranslate"><span class="pre">include</span></code> <em>Debian</em> ha dividido sus contenidos en otros dos<a class="footnote-reference brackets" href="#id4" id="id2">1</a>. Nos
+centraremos en los siguientes archivos:</p>
+<dl class="simple">
+<dt><code class="file docutils literal notranslate"><span class="pre">named.conf.options</span></code></dt><dd><p>Define algunos parámetros de configuración. Nos interesa fundamentalmente el
+bloque <code class="docutils literal notranslate"><span class="pre">forwarders</span></code> que define los servidores que usará nuestro servidor
+para realizar búsquedas recursivas. Al encontrarse deshabilitado, recurre
+directamente a los servidores raíz.</p>
+</dd>
+<dt><code class="file docutils literal notranslate"><span class="pre">named.conf.local</span></code></dt><dd><p>Está destinado a la declaración de las zonas que se definirán en nuestro
+servidor. Siempre que definamos una zona, deberemos incluir aquí una
+referencia.</p>
+</dd>
+<dt><code class="file docutils literal notranslate"><span class="pre">db.empty</span></code></dt><dd><p>Es un archivo que nos sirve como plantilla para la creación de archivos de
+zona.</p>
+</dd>
+</dl>
+</section>
+<section id="enjaulamiento">
+<h3><span class="section-number">6.2.3.1.3. </span>Enjaulamiento<a class="headerlink" href="#enjaulamiento" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>El servicio <abbr title="Domain Name Server">DNS</abbr> es tristemente célebre por sus repetidos problemas de
+seguridad. Por ello, es muy recomendable enjaular el servidor dentro de un
+directorio que llamaremos <code class="file docutils literal notranslate"><span class="pre">/var/lib/chroot-dns</span></code>. Comenzemos por parar el
+servicio:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>invoke-rc.d bind9 stop
+</pre></div>
+</div>
+<p>y preparar los directorios necesarios:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mkdir -p /var/lib/chroot-dns/<span class="o">{</span>etc,dev,var/<span class="o">{</span>cache,run<span class="o">}}</span>
+</pre></div>
+</div>
+<p>Poblemos ahora <code class="file docutils literal notranslate"><span class="pre">dev/</span></code> con los archivos especiales que necesita el
+servidor:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mknod -m666 /var/lib/chroot-dns/dev/null c <span class="m">1</span> <span class="m">3</span>
+<span class="gp"># </span>mknod -m666 /var/lib/chroot-dns/dev/random c <span class="m">1</span> <span class="m">8</span>
+</pre></div>
+</div>
+<p>Movemos los directorios necesarios dentro de la jaula:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mv /etc/bind /var/lib/chroot-dns/etc
+<span class="gp"># </span>ln -s /var/lib/chroot-dns/etc/bind /etc
+<span class="gp"># </span>mv /var/cache/bind /var/lib/chroot-dns/var/cache
+<span class="gp"># </span>ln -s /var/lib/chroot-dns/var/cache/bind /var/cache
+<span class="gp"># </span>mv /var/run/named /var/lib/chroot-dns/var/run
+<span class="gp"># </span>ln -s /var/lib/chroot-dns/var/run/named /var/run
+</pre></div>
+</div>
+<p>Y hacemos propietario al usuario <em>bind</em> de todo el contenido:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>chown -R bind:bind /var/lib/chroot-dns/*
+</pre></div>
+</div>
+<p>Metemos dentro de la jaula también el registro:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span><span class="nb">echo</span> <span class="s1">&#39;$AddUnixListenSocket /var/lib/chroot-dns/dev/log&#39;</span> &gt; /etc/rsyslog.d/dns-chroot.conf
+<span class="gp"># </span>invoke-rc.d rsyslog restart
+</pre></div>
+</div>
+<p>Por último, para rematar podemos modificar la versión que comunica nuestro
+servidor para que un posible atacante no la conozca de antemano. Esto se hace
+editando <code class="file docutils literal notranslate"><span class="pre">/etc/bind/named.conf.options</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>version <span class="s2">&quot;3.1416&quot;</span>
+</pre></div>
+</div>
+<p>Con esto ya podemos indicar al demonio que arranque enjaulado, para lo cual
+editamos <code class="file docutils literal notranslate"><span class="pre">/etc/default/bind</span></code> y dejamos las opciones del siguiente modo:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">OPTIONS</span><span class="o">=</span><span class="s2">&quot;-u bind -t /var/lib/chroot-dns&quot;</span>
+</pre></div>
+</div>
+<p>E iniciamos de nuevo el servidor:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>invoke-rc.d bind9 start
+</pre></div>
+</div>
+</section>
+<section id="configuracion-inicial">
+<h3><span class="section-number">6.2.3.1.4. </span>Configuración inicial<a class="headerlink" href="#configuracion-inicial" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Básicamente consiste en editar <code class="file docutils literal notranslate"><span class="pre">named.conf.options</span></code> y ajustarlo a nuestro
+gusto. Nos centramos, por ahora, en el comportamiento del servidor ante
+resoluciones recursivas. La configuración predefinida permite resoluciones
+recursivas, pero éstas se harán recurriendo a los servidores raíz, lo cual no es
+la solución más ágil. Por ello, es conveniente descomentar el bloque
+<kbd class="kbd docutils literal notranslate">forwarders</kbd> y añadir servidores recursivos más eficientes. Por ejemplo<a class="footnote-reference brackets" href="#id5" id="id3">2</a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">forwarders {  // Servidores de Cloudflare</span>
+<span class="go">   1.1.1.1;</span>
+<span class="go">   1.0.0.1;</span>
+<span class="go">   //194.179.1.100;</span>
+<span class="go">};</span>
+</pre></div>
+</div>
+<p>Su nuestra intención fuera crear un servidor autoritario que no atendiera
+consultas recursivas y, en consecuencia, que se limitara a resolver consultas de
+sus propias zonas podríamos utilizar:</p>
+<ul class="simple">
+<li><p><kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">allow</kbd>-<kbd class="kbd docutils literal notranslate">recursion</kbd></kbd>, que permite indicar la lista de clientes a los que
+se les permite hacer consultas recursivas.</p></li>
+<li><p><kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">allow</kbd>-<kbd class="kbd docutils literal notranslate">recursion</kbd>-<kbd class="kbd docutils literal notranslate">on</kbd></kbd>, que permite indicar la lista de direcciones <abbr title="Internet Protocol">IP</abbr>
+locales a través de las cuales se permite hacer consultas recursivas.
+Entiéndase esto: si por ejemplo, tuviéramos un servidor con una interfaz
+interna y otra externa, podríamos permitir consultas recursivas a las
+peticiones que llegan a la interfaz interna, pero no a las que llegan a la
+externa.</p></li>
+</ul>
+<p>Por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">allow-recursion {};</span>
+</pre></div>
+</div>
+<p><strong>impediría</strong> a todos realizar consultas recursivas.</p>
+<p>Además, el archivo contiene una línea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">directory &quot;/var/cache/bind&quot;;</span>
+</pre></div>
+</div>
+<p>que identifica el directorio donde tendremos que almacenar los archivos de
+definición de las zona que gestionemos.</p>
+</section>
+<section id="comprobacion">
+<h3><span class="section-number">6.2.3.1.5. </span>Comprobación<a class="headerlink" href="#comprobacion" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Una vez que hayamos hecho una configuración, tenemos distintas herramientas para
+validarla:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>named-checkconf archivo_configuracion
+</pre></div>
+</div>
+<p>que comprueba errores en los archivos de configuración como
+<code class="file docutils literal notranslate"><span class="pre">named.conf.options</span></code> o <code class="file docutils literal notranslate"><span class="pre">named.conf.local</span></code>. Por otra parte:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>named-checkzone archivo_de_zona
+</pre></div>
+</div>
+<p>comprueba errores en la definición de la zona incluida en el archivo que se
+proporciona (nosotros los almacenaremos en <code class="file docutils literal notranslate"><span class="pre">/var/cache/bind</span></code>). Estos
+archivos no los hemos visto aún, pero los escribiremos a partir del próximo
+epígrafe.</p>
+<p>Por supuesto, también podemos iniciar el servidor y consultar los registros
+en búsqueda de errores, haciendo uso de <a class="reference internal" href="../../04.servidor/08.monitorizacion/01.logs/02.journalctl.html#journalctl"><span class="std std-ref">journalctl</span></a>. Por
+ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>journalctl -u named -n30
+</pre></div>
+</div>
+<p>que nos muestra las últimas treinta líneas del registro.</p>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Iniciar (o reiniciar) este servidor no muestra ningún error,
+aunque lo haya habido y el servidor ni siquiera haya podido arrancar.</p>
+</div>
+</section>
+</section>
+<section id="dns-directo">
+<h2><span class="section-number">6.2.3.2. </span>DNS directo<a class="headerlink" href="#dns-directo" title="Enlazar permanentemente con este título">¶</a></h2>
+<section id="definicion-de-zona">
+<h3><span class="section-number">6.2.3.2.1. </span>Definición de zona<a class="headerlink" href="#definicion-de-zona" title="Enlazar permanentemente con este título">¶</a></h3>
+</section>
+<section id="delegacion">
+<h3><span class="section-number">6.2.3.2.2. </span>Delegación<a class="headerlink" href="#delegacion" title="Enlazar permanentemente con este título">¶</a></h3>
+</section>
+<section id="servidor-esclavo">
+<h3><span class="section-number">6.2.3.2.3. </span>Servidor esclavo<a class="headerlink" href="#servidor-esclavo" title="Enlazar permanentemente con este título">¶</a></h3>
+</section>
+</section>
+<section id="dns-inverso">
+<h2><span class="section-number">6.2.3.3. </span>DNS inverso<a class="headerlink" href="#dns-inverso" title="Enlazar permanentemente con este título">¶</a></h2>
+</section>
+<section id="dns-dinamico">
+<h2><span class="section-number">6.2.3.4. </span>DNS dinámico<a class="headerlink" href="#dns-dinamico" title="Enlazar permanentemente con este título">¶</a></h2>
+<p class="rubric">Notas al pie</p>
+<dl class="footnote brackets">
+<dt class="label" id="id4"><span class="brackets"><a class="fn-backref" href="#id2">1</a></span></dt>
+<dd><p>Tres en realidad, pero el tercero no lo tocaremos.</p>
+</dd>
+<dt class="label" id="id5"><span class="brackets"><a class="fn-backref" href="#id3">2</a></span></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">194.179.1.100</span></code> era un arcaico servidor <abbr title="Domain Name Server">DNS</abbr> de <a class="reference external" href="https://www.telefonica.com">Telefónica</a> de los tiempos de
+<a class="reference external" href="https://es.wikipedia.org/wiki/InfoV%C3%ADa">Infovía</a>. Su inclusión en la lista es meramente sentimental. De hecho, está
+comentado, porque ni siquiera funciona.</p>
+</dd>
+</dl>
+</section>
 </section>
 
 
@@ -59,6 +263,31 @@
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="../../index.html">Tabla de contenido</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">6.2.3. <strong class="program">bind</strong></a><ul>
+<li><a class="reference internal" href="#preliminares">6.2.3.1. Preliminares</a><ul>
+<li><a class="reference internal" href="#instalacion">6.2.3.1.1. Instalación</a></li>
+<li><a class="reference internal" href="#archivos-de-configuracion">6.2.3.1.2. Archivos de configuración</a></li>
+<li><a class="reference internal" href="#enjaulamiento">6.2.3.1.3. Enjaulamiento</a></li>
+<li><a class="reference internal" href="#configuracion-inicial">6.2.3.1.4. Configuración inicial</a></li>
+<li><a class="reference internal" href="#comprobacion">6.2.3.1.5. Comprobación</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#dns-directo">6.2.3.2. DNS directo</a><ul>
+<li><a class="reference internal" href="#definicion-de-zona">6.2.3.2.1. Definición de zona</a></li>
+<li><a class="reference internal" href="#delegacion">6.2.3.2.2. Delegación</a></li>
+<li><a class="reference internal" href="#servidor-esclavo">6.2.3.2.3. Servidor esclavo</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#dns-inverso">6.2.3.3. DNS inverso</a></li>
+<li><a class="reference internal" href="#dns-dinamico">6.2.3.4. DNS dinámico</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
   <div>
     <h4>Tema anterior</h4>
     <p class="topless"><a href="02.clientes.html"
