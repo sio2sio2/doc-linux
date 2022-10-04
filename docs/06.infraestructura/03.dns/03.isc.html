@@ -85,7 +85,7 @@ tedio de indicar explícitamente que se está usando nuestor propio
 <h3><span class="section-number">6.2.3.1.2. </span>Archivos de configuración<a class="headerlink" href="#archivos-de-configuracion" title="Enlazar permanentemente con este título">¶</a></h3>
 <p>Toda la configuración se encuentra dentro del directorio <code class="file docutils literal notranslate"><span class="pre">/etc/bind</span></code>. El
 archivo básico de configuración es <code class="file docutils literal notranslate"><span class="pre">named.conf</span></code>, pero mediante sentencias
-<code class="docutils literal notranslate"><span class="pre">include</span></code> <em>Debian</em> ha dividido sus contenidos en otros dos<a class="footnote-reference brackets" href="#id4" id="id2">1</a>. Nos
+<code class="docutils literal notranslate"><span class="pre">include</span></code> <em>Debian</em> ha dividido sus contenidos en otros dos<a class="footnote-reference brackets" href="#id5" id="id2">1</a>. Nos
 centraremos en los siguientes archivos:</p>
 <dl class="simple">
 <dt><code class="file docutils literal notranslate"><span class="pre">named.conf.options</span></code></dt><dd><p>Define algunos parámetros de configuración. Nos interesa fundamentalmente el
@@ -162,7 +162,7 @@ gusto. Nos centramos, por ahora, en el comportamiento del servidor ante
 resoluciones recursivas. La configuración predefinida permite resoluciones
 recursivas, pero éstas se harán recurriendo a los servidores raíz, lo cual no es
 la solución más ágil. Por ello, es conveniente descomentar el bloque
-<kbd class="kbd docutils literal notranslate">forwarders</kbd> y añadir servidores recursivos más eficientes. Por ejemplo<a class="footnote-reference brackets" href="#id5" id="id3">2</a>:</p>
+<kbd class="kbd docutils literal notranslate">forwarders</kbd> y añadir servidores recursivos más eficientes. Por ejemplo<a class="footnote-reference brackets" href="#id6" id="id3">2</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">forwarders {  // Servidores de Cloudflare</span>
 <span class="go">   1.1.1.1;</span>
 <span class="go">   1.0.0.1;</span>
@@ -173,7 +173,7 @@ la solución más ágil. Por ello, es conveniente descomentar el bloque
 <p>Su nuestra intención fuera crear un servidor autoritario que no atendiera
 consultas recursivas y, en consecuencia, que se limitara a resolver consultas de
 sus propias zonas podríamos utilizar:</p>
-<ul class="simple">
+<ul class="simple" id="bind-allow-recursion">
 <li><p><kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">allow</kbd>-<kbd class="kbd docutils literal notranslate">recursion</kbd></kbd>, que permite indicar la lista de clientes a los que
 se les permite hacer consultas recursivas.</p></li>
 <li><p><kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">allow</kbd>-<kbd class="kbd docutils literal notranslate">recursion</kbd>-<kbd class="kbd docutils literal notranslate">on</kbd></kbd>, que permite indicar la lista de direcciones <abbr title="Internet Protocol">IP</abbr>
@@ -224,33 +224,221 @@ ejemplo:</p>
 aunque lo haya habido y el servidor ni siquiera haya podido arrancar.</p>
 </div>
 </section>
+<section id="cacheo">
+<span id="bind-cacheo"></span><h3><span class="section-number">6.2.3.1.6. </span>Cacheo<a class="headerlink" href="#cacheo" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Nuestro servidor cachea las resoluciones que realiza, por lo que también es
+interesante saber cómo manejarlas. Para ello podemos echar mano de la orden
+<strong class="command">rndc</strong>. Un primer uso, nos permite eliminar toda la caché:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>rndc flush
+</pre></div>
+</div>
+<p>aunque podemos restringir la eliminación a un nombre particular:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>rndc flushname www.google.com
+</pre></div>
+</div>
+<p>o a un dominio y todo su contenido:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>rndc flushtree google.com
+</pre></div>
+</div>
+<p>También podemos volcar los registros que se encuentran en la caché al archivo
+<code class="file docutils literal notranslate"><span class="pre">/var/cache/bind/named_dump.db</span></code> para consultarlos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>rndc dumpdb -cache
+</pre></div>
+</div>
+<p>La orden tiene otros muchos más usos. Más adelante indicaremos algunos
+referentes a las zonas.</p>
+</section>
 </section>
 <section id="dns-directo">
-<h2><span class="section-number">6.2.3.2. </span>DNS directo<a class="headerlink" href="#dns-directo" title="Enlazar permanentemente con este título">¶</a></h2>
+<span id="bind-resolucion-directa"></span><h2><span class="section-number">6.2.3.2. </span>DNS directo<a class="headerlink" href="#dns-directo" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Ya sabemos cómo hacer la configuración inicial de <strong class="program">bind</strong> y cómo
+convertirlo en un servidor para consultas recursivas. Nuestra intención a partir
+de ahora es exponer cómo hacerlo un servidor autoritario para las zonas que
+decidamos y cómo crear los registros dentro de tales zonas. Para la exposición
+pongamos que la zona que queremos definir es «iescastillodeluna.es» como venimos
+haciendo hasta ahora.</p>
+<p>En principio, hay dos posibilidades:</p>
+<ol class="arabic simple">
+<li><p><strong>Servidor de internet</strong>: nuestro servidor <abbr title="Domain Name Server">DNS</abbr> resuelve una zona pública,
+esto es, una zona con máquinas expuestas a internet, por lo que las
+resoluciones de nombres dirigen a <abbr title="Internet Protocol">IP</abbr> públicas. En este caso:</p>
+<ul class="simple">
+<li><p>Habremos pagado a un agente registrador para que incluya el registro
+<kbd class="kbd docutils literal notranslate">NS</kbd> correspondiente en el <abbr title="Top-Level Domain">TLD</abbr> «es».</p></li>
+<li><p>El agente registrador es muy probable que nos ofrezca la posibilidad de
+usar un servidor <abbr title="Domain Name Server">DNS</abbr> suyo para gestionar el dominio con lo que nos
+proporcionará una interfaz web sencilla para añadir, modificar y eliminar
+registros. En este caso, no tenemos que aprender más: con saber
+<a class="reference internal" href="01.desc.html#dns-registros"><span class="std std-ref">cuáles son y para qué sirven los distintos tipos de registros</span></a> nos basta. Pero a nosotros no nos interesa este caso,
+porque buscamos aprender a configurar el servidor <abbr title="Domain Name Server">DNS</abbr>, sino aquel otro en
+que nosotros mismos lo montamos.</p></li>
+<li><p>Necesitamos indicarle al agente registrador que refiera un servidor de
+nuestra propiedad que disponga de <abbr title="Internet Protocol">IP</abbr> pública como servidor <abbr title="Domain Name Server">DNS</abbr> en el
+<abbr title="Top-Level Domain">TLD</abbr>. Este será el servidor <abbr title="Domain Name Server">DNS</abbr> que configuremos. A menos que este
+servidor <abbr title="Domain Name Server">DNS</abbr> disponga de un nombre de máquina resoluble, además deberá
+incluirse un <a class="reference internal" href="01.desc.html#glue-record"><span class="std std-ref">glue record</span></a>, ya que el servidor tendrá un
+nombre del propio dominio «iescastillodeluna.es».</p></li>
+<li><p>Habitualmente, no se nos obligará a que haya redundancia de servidores,
+así que necesitaremos al menos otro servidor con <abbr title="Internet Protocol">IP</abbr> pública que, como en
+el punto anterior, deberemos facilitar al agente registrador para que pida
+su adición al <abbr title="Top-Level Domain">TLD</abbr> «es». Este servidor a diferencia del primero, será un
+<em>servidor esclavo</em>, así que <a class="reference internal" href="#bind-esclavo"><span class="std std-ref">tendremos que definirlo de distinta forma</span></a>.</p></li>
+<li><p>Lo más lógico es que el servidor no se dedique a hacer resoluciones
+recursivas para terceras máquinas (véase <a class="reference internal" href="#bind-allow-recursion"><span class="std std-ref">cómo limitar la recursión</span></a>).</p></li>
+<li><p>No podemos definir <a class="reference internal" href="#bind-resolucion-inversa"><span class="std std-ref">resolución inversa</span></a>, ya que las
+redes públicas pertenecen a <abbr title="Internet Service Provider">ISP</abbr> o grandes empresas de servicios en la
+nube. Si necesitamos que alguna de nuestras <abbr title="Internet Protocol">IP</abbr>s públicas resuelva a un
+nombre determinado necesitaremos contactar con el <abbr title="Internet Service Provider">ISP</abbr> o la empresa para
+que haga tal cambio en sus servidores <abbr title="Domain Name Server">DNS</abbr>.</p></li>
+</ul>
+</li>
+<li><p><strong>Servidor interno</strong>: en este caso montamos el servidor para dotar de nombres
+a las máquinas de una red privada:</p>
+<ul class="simple">
+<li><p>No necesitamos que el dominio exista fuera de nuestra propia red, por lo
+que no nos es necesario registrarlo.</p></li>
+<li><p>No necesitamos redundancia de servidores con lo que podríamos no tener que
+configurar ningún servidor esclavo.</p></li>
+<li><p>El servidor sí realizará resoluciones recursivas, ya que las máquinas de la
+red lo usarán también para resolver nombres de servidores externos.</p></li>
+<li><p>La red privada sí será nuestra, por lo que haremos <a class="reference internal" href="#bind-resolucion-inversa"><span class="std std-ref">resolución inversa</span></a>.</p></li>
+<li><p>Como existirá un servicio <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr>, es probable que nos interese un <a class="reference internal" href="#bind-ddns"><span class="std std-ref">DNS
+dinámico</span></a>, esto es, que las máquinas que reciben una configuración
+<abbr title="Internet Protocol">IP</abbr> también reciban un nombre automático.</p></li>
+</ul>
+</li>
+</ol>
+<p>Por supuesto, también cabe la posibilidad de que tengamos que hacer ambas cosas:
+un servidor que dispone de una interfaz pública con la cual implementamos el
+primer caso; y una interfaz interna con la cual implementamos la segunda
+posibilidad.</p>
 <section id="definicion-de-zona">
-<h3><span class="section-number">6.2.3.2.1. </span>Definición de zona<a class="headerlink" href="#definicion-de-zona" title="Enlazar permanentemente con este título">¶</a></h3>
+<span id="bind-definicion-zona"></span><h3><span class="section-number">6.2.3.2.1. </span>Definición de zona<a class="headerlink" href="#definicion-de-zona" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Para definir una zona debemos hacer dos cosas:</p>
+<ul class="simple">
+<li><p>Declararla en <code class="file docutils literal notranslate"><span class="pre">named.conf.local</span></code>.</p></li>
+<li><p>Definirla propiamente en su archivo correspondiente.</p></li>
+</ul>
+<p>Para lo primero debemos añadir un bloque a <code class="file docutils literal notranslate"><span class="pre">named.conf.local</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">zone &quot;iescastillodeluna.es&quot; {</span>
+<span class="go">   type master;</span>
+<span class="go">   file &quot;db.iescastillodeluna.es&quot;;</span>
+<span class="go">};</span>
+</pre></div>
+</div>
+<p>En él definimos el servidor como maestro para la zona e indicamos cuál es el
+archivo en el que declararemos los registros  que la componen. Como no indicamos
+ruta, el archivo debe ubicarse en <code class="file docutils literal notranslate"><span class="pre">/var/cache/bind</span></code>.</p>
+<p>Ahora entramos de lleno en la configuración propiamente de la zona. Para ello,
+lo mejor es copiar la plantilla <code class="file docutils literal notranslate"><span class="pre">db.empty</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>cp /etc/bind/db.empty /var/cache/bin/db.iescastillodeluna.es
+</pre></div>
+</div>
+<p>y editarla para dejarla más o menos así:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>;
+; Zona IESCASTILLODELUNA.ES
+;
+@  IN SOA   ns1 hostmaster (
+               1     ; Serial
+          604800     ; Refresh
+           86400     ; Retry
+         2419200     ; Expire
+           86400 )   ; Negative Cache TTL
+;
+@        IN    TXT   &quot;Ejemplo de definición de la zona IESCASTILLODELUNA.ES&quot;
+               NS    ns1
+               NS    ns2
+               MX    10 mail
+ns1      IN    A     80.80.80.81
+ns2      IN    A     80.80.80.91
+mail     IN    A     194.179.100.201
+;
+$TTL  300
+;
+smtp     IN    CNAME mail
+pop3     IN    CNAME mail
+imap     IN    CNAME mail
+www      IN    A     80.80.80.80
+ftp      IN    CNAME www
+*        IN    CNAME www
+</pre></div>
+</div>
+<p>Sin entrar en el detalle de cada  registro (porque esto se hizo <a class="reference internal" href="01.desc.html#dns-registros"><span class="std std-ref">al
+explicarlos</span></a>):</p>
+<ul>
+<li><p>Como se está definiendo la zona «iescastillodeluna.es», los nombres que no
+acaban en punto añaden este dominio automáticamente.</p></li>
+<li><p>No hay ningún registro con un <abbr title="Time To Live">TTL</abbr> específico, de modo que el <abbr title="Time To Live">TTL</abbr>  viene
+dado por el especificado en el registro <abbr title="Start Of Authority">SOA</abbr>. Sin embargo, hacia la mitad del
+archivo existe la directiva:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span>TTL <span class="m">300</span>
+</pre></div>
+</div>
+<p>que afecta a todos los registros definidos a continuación<a class="footnote-reference brackets" href="#id7" id="id4">3</a>.</p>
+</li>
+<li><p>El ejemplo define una zona de máquinas públicas, no un dominio privado, y eso
+está en consonancia con que se definan dos servidores de dominio para la zona:
+«ns1» y «ns2». El primero debe de ser el servidor primario, puesto que así se
+deduce del registro <abbr title="Start Of Authority">SOA</abbr> y el segundo un servidor esclavo.</p></li>
+<li><p>Los nombres de los servidores <abbr title="Domain Name Server">DNS</abbr> pertenecen al propio dominio, lo que
+provoca que existan dos registros <kbd class="kbd docutils literal notranslate">A</kbd> que  indiquen cuál es su dirección
+<abbr title="Internet Protocol">IP</abbr> y que deduzcamos que en el <abbr title="Top-Level Domain">TLD</abbr> superior existan, además de los dos
+registros <kbd class="kbd docutils literal notranslate">NS</kbd> que provocan la delegación, dos <em>glue records</em> con sus
+direcciones <abbr title="Internet Protocol">IP</abbr>. Por consiguiente, en el <abbr title="Top-Level Domain">TLD</abbr> «es», que no controlamos, pero
+a cuyo <abbr title="Network Information Center">TTL</abbr> hemos pagado a través de un agente para que lo haga, habrá estos
+registros:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">iescastillodeluna.es.       IN       NS       ns1.iescastillodeluna.es.</span>
+<span class="go">iescastillodeluna.es.       IN       NS       ns2.iescastillodeluna.es.</span>
+<span class="go">; Estos son los glue records</span>
+<span class="go">ns1.iescastillodeluna.es.   IN        A       80.80.80.81</span>
+<span class="go">ns2.iescastillodeluna.es.   IN        A       80.80.80.91</span>
+</pre></div>
+</div>
+</li>
+<li><p>Hay definido un servidor para gestionar el correo del dominio («mail»).</p></li>
+<li><p>Hay un registro <kbd class="kbd docutils literal notranslate">TXT</kbd> bastante inútil que únicamente ilustra su
+uso: los registros <kbd class="kbd docutils literal notranslate">TXT</kbd> suelen incluirse con algún fin
+específico  para que algún programa los consulte y haga uso de información.</p></li>
+<li><p>Hay un <em class="dfn">registro comodín</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">*      IN       CNAME    www</span>
+</pre></div>
+</div>
+<p>que implica que cualquier nombre (excepto los definidos implícitamente) sean
+alias de «www». Por eso «smtp», por ejemplo, es alias de «mail».
+Estos comodines no se limitan a este tipo de registros: también pueden
+definirse con <kbd class="kbd docutils literal notranslate">MX</kbd>, <kbd class="kbd docutils literal notranslate">A</kbd>, <kbd class="kbd docutils literal notranslate">SRV</kbd>, etc.</p>
+</li>
+</ul>
 </section>
 <section id="delegacion">
-<h3><span class="section-number">6.2.3.2.2. </span>Delegación<a class="headerlink" href="#delegacion" title="Enlazar permanentemente con este título">¶</a></h3>
+<span id="bind-delegacion"></span><h3><span class="section-number">6.2.3.2.2. </span>Delegación<a class="headerlink" href="#delegacion" title="Enlazar permanentemente con este título">¶</a></h3>
 </section>
 <section id="servidor-esclavo">
-<h3><span class="section-number">6.2.3.2.3. </span>Servidor esclavo<a class="headerlink" href="#servidor-esclavo" title="Enlazar permanentemente con este título">¶</a></h3>
+<span id="bind-esclavo"></span><h3><span class="section-number">6.2.3.2.3. </span>Servidor esclavo<a class="headerlink" href="#servidor-esclavo" title="Enlazar permanentemente con este título">¶</a></h3>
+</section>
+<section id="vistas">
+<span id="bind-view"></span><h3><span class="section-number">6.2.3.2.4. </span>Vistas<a class="headerlink" href="#vistas" title="Enlazar permanentemente con este título">¶</a></h3>
 </section>
 </section>
 <section id="dns-inverso">
-<h2><span class="section-number">6.2.3.3. </span>DNS inverso<a class="headerlink" href="#dns-inverso" title="Enlazar permanentemente con este título">¶</a></h2>
+<span id="bind-resolucion-inversa"></span><h2><span class="section-number">6.2.3.3. </span>DNS inverso<a class="headerlink" href="#dns-inverso" title="Enlazar permanentemente con este título">¶</a></h2>
 </section>
 <section id="dns-dinamico">
-<h2><span class="section-number">6.2.3.4. </span>DNS dinámico<a class="headerlink" href="#dns-dinamico" title="Enlazar permanentemente con este título">¶</a></h2>
+<span id="bind-ddns"></span><h2><span class="section-number">6.2.3.4. </span>DNS dinámico<a class="headerlink" href="#dns-dinamico" title="Enlazar permanentemente con este título">¶</a></h2>
 <p class="rubric">Notas al pie</p>
 <dl class="footnote brackets">
-<dt class="label" id="id4"><span class="brackets"><a class="fn-backref" href="#id2">1</a></span></dt>
+<dt class="label" id="id5"><span class="brackets"><a class="fn-backref" href="#id2">1</a></span></dt>
 <dd><p>Tres en realidad, pero el tercero no lo tocaremos.</p>
 </dd>
-<dt class="label" id="id5"><span class="brackets"><a class="fn-backref" href="#id3">2</a></span></dt>
+<dt class="label" id="id6"><span class="brackets"><a class="fn-backref" href="#id3">2</a></span></dt>
 <dd><p><code class="docutils literal notranslate"><span class="pre">194.179.1.100</span></code> era un arcaico servidor <abbr title="Domain Name Server">DNS</abbr> de <a class="reference external" href="https://www.telefonica.com">Telefónica</a> de los tiempos de
 <a class="reference external" href="https://es.wikipedia.org/wiki/InfoV%C3%ADa">Infovía</a>. Su inclusión en la lista es meramente sentimental. De hecho, está
 comentado, porque ni siquiera funciona.</p>
+</dd>
+<dt class="label" id="id7"><span class="brackets"><a class="fn-backref" href="#id4">3</a></span></dt>
+<dd><p>No hay ninguna razón técnica para cambiar el <abbr title="Time To Live">TTL</abbr> de los registros
+siguientes. Se ha hecho, simplemente, para ilustrar la existencia de esta
+directiva.</p>
 </dd>
 </dl>
 </section>
@@ -273,12 +461,14 @@ comentado, porque ni siquiera funciona.</p>
 <li><a class="reference internal" href="#enjaulamiento">6.2.3.1.3. Enjaulamiento</a></li>
 <li><a class="reference internal" href="#configuracion-inicial">6.2.3.1.4. Configuración inicial</a></li>
 <li><a class="reference internal" href="#comprobacion">6.2.3.1.5. Comprobación</a></li>
+<li><a class="reference internal" href="#cacheo">6.2.3.1.6. Cacheo</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#dns-directo">6.2.3.2. DNS directo</a><ul>
 <li><a class="reference internal" href="#definicion-de-zona">6.2.3.2.1. Definición de zona</a></li>
 <li><a class="reference internal" href="#delegacion">6.2.3.2.2. Delegación</a></li>
 <li><a class="reference internal" href="#servidor-esclavo">6.2.3.2.3. Servidor esclavo</a></li>
+<li><a class="reference internal" href="#vistas">6.2.3.2.4. Vistas</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#dns-inverso">6.2.3.3. DNS inverso</a></li>

@@ -133,6 +133,8 @@ Su nuestra intención fuera crear un servidor autoritario que no atendiera
 consultas recursivas y, en consecuencia, que se limitara a resolver consultas de
 sus propias zonas podríamos utilizar:
 
+.. _bind-allow-recursion:
+
 * :kbd:`allow-recursion`, que permite indicar la lista de clientes a los que
   se les permite hacer consultas recursivas.
 
@@ -188,20 +190,207 @@ que nos muestra las últimas treinta líneas del registro.
 .. warning:: Iniciar (o reiniciar) este servidor no muestra ningún error,
    aunque lo haya habido y el servidor ni siquiera haya podido arrancar.
 
+.. _bind-cacheo:
+
+Cacheo
+======
+Nuestro servidor cachea las resoluciones que realiza, por lo que también es
+interesante saber cómo manejarlas. Para ello podemos echar mano de la orden
+:command:`rndc`. Un primer uso, nos permite eliminar toda la caché::
+
+   # rndc flush
+
+aunque podemos restringir la eliminación a un nombre particular::
+
+   # rndc flushname www.google.com
+
+o a un dominio y todo su contenido::
+
+   # rndc flushtree google.com
+
+También podemos volcar los registros que se encuentran en la caché al archivo
+:file:`/var/cache/bind/named_dump.db` para consultarlos::
+
+   # rndc dumpdb -cache
+
+La orden tiene otros muchos más usos. Más adelante indicaremos algunos
+referentes a las zonas.
+
+.. _bind-resolucion-directa:
+
 DNS directo
 ***********
+Ya sabemos cómo hacer la configuración inicial de :program:`bind` y cómo
+convertirlo en un servidor para consultas recursivas. Nuestra intención a partir
+de ahora es exponer cómo hacerlo un servidor autoritario para las zonas que
+decidamos y cómo crear los registros dentro de tales zonas. Para la exposición
+pongamos que la zona que queremos definir es "iescastillodeluna.es" como venimos
+haciendo hasta ahora.
+
+En principio, hay dos posibilidades:
+
+#. **Servidor de internet**: nuestro servidor |DNS| resuelve una zona pública,
+   esto es, una zona con máquinas expuestas a internet, por lo que las
+   resoluciones de nombres dirigen a |IP| públicas. En este caso:
+
+   + Habremos pagado a un agente registrador para que incluya el registro
+     :kbd:`NS` correspondiente en el |TLD| "es".
+   + El agente registrador es muy probable que nos ofrezca la posibilidad de
+     usar un servidor |DNS| suyo para gestionar el dominio con lo que nos
+     proporcionará una interfaz web sencilla para añadir, modificar y eliminar
+     registros. En este caso, no tenemos que aprender más: con saber
+     :ref:`cuáles son y para qué sirven los distintos tipos de registros
+     <dns-registros>` nos basta. Pero a nosotros no nos interesa este caso,
+     porque buscamos aprender a configurar el servidor |DNS|, sino aquel otro en
+     que nosotros mismos lo montamos.
+   + Necesitamos indicarle al agente registrador que refiera un servidor de
+     nuestra propiedad que disponga de |IP| pública como servidor |DNS| en el
+     |TLD|. Este será el servidor |DNS| que configuremos. A menos que este
+     servidor |DNS| disponga de un nombre de máquina resoluble, además deberá
+     incluirse un :ref:`glue record <glue-record>`, ya que el servidor tendrá un
+     nombre del propio dominio "iescastillodeluna.es".
+   + Habitualmente, no se nos obligará a que haya redundancia de servidores,
+     así que necesitaremos al menos otro servidor con |IP| pública que, como en
+     el punto anterior, deberemos facilitar al agente registrador para que pida
+     su adición al |TLD| "es". Este servidor a diferencia del primero, será un
+     *servidor esclavo*, así que :ref:`tendremos que definirlo de distinta forma
+     <bind-esclavo>`.
+   + Lo más lógico es que el servidor no se dedique a hacer resoluciones
+     recursivas para terceras máquinas (véase :ref:`cómo limitar la recursión
+     <bind-allow-recursion>`).
+   + No podemos definir :ref:`resolución inversa <bind-resolucion-inversa>`, ya que las
+     redes públicas pertenecen a |ISP| o grandes empresas de servicios en la
+     nube. Si necesitamos que alguna de nuestras |IP|\ s públicas resuelva a un
+     nombre determinado necesitaremos contactar con el |ISP| o la empresa para
+     que haga tal cambio en sus servidores |DNS|.
+
+#. **Servidor interno**: en este caso montamos el servidor para dotar de nombres
+   a las máquinas de una red privada:
+
+   + No necesitamos que el dominio exista fuera de nuestra propia red, por lo
+     que no nos es necesario registrarlo.
+   + No necesitamos redundancia de servidores con lo que podríamos no tener que
+     configurar ningún servidor esclavo.
+   + El servidor sí realizará resoluciones recursivas, ya que las máquinas de la
+     red lo usarán también para resolver nombres de servidores externos.
+   + La red privada sí será nuestra, por lo que haremos :ref:`resolución inversa
+     <bind-resolucion-inversa>`.
+   + Como existirá un servicio |DHCP|, es probable que nos interese un :ref:`DNS
+     dinámico <bind-ddns>`, esto es, que las máquinas que reciben una configuración
+     |IP| también reciban un nombre automático.
+
+Por supuesto, también cabe la posibilidad de que tengamos que hacer ambas cosas:
+un servidor que dispone de una interfaz pública con la cual implementamos el
+primer caso; y una interfaz interna con la cual implementamos la segunda
+posibilidad.
+
+.. _bind-definicion-zona:
 
 Definición de zona
 ==================
+Para definir una zona debemos hacer dos cosas:
+
++ Declararla en :file:`named.conf.local`.
++ Definirla propiamente en su archivo correspondiente.
+
+Para lo primero debemos añadir un bloque a :file:`named.conf.local`:
+
+.. code-block::
+
+   zone "iescastillodeluna.es" {
+      type master;
+      file "db.iescastillodeluna.es";
+   };
+
+En él definimos el servidor como maestro para la zona e indicamos cuál es el
+archivo en el que declararemos los registros  que la componen. Como no indicamos
+ruta, el archivo debe ubicarse en :file:`/var/cache/bind`.
+
+Ahora entramos de lleno en la configuración propiamente de la zona. Para ello,
+lo mejor es copiar la plantilla :file:`db.empty`::
+
+   # cp /etc/bind/db.empty /var/cache/bin/db.iescastillodeluna.es
+
+y editarla para dejarla más o menos así:
+
+.. literalinclude:: files/db.iescastillodeluna.es
+   :language: none
+
+Sin entrar en el detalle de cada  registro (porque esto se hizo :ref:`al
+explicarlos <dns-registros>`):
+
+* Como se está definiendo la zona "iescastillodeluna.es", los nombres que no
+  acaban en punto añaden este dominio automáticamente.
+
+* No hay ningún registro con un |TTL| específico, de modo que el |TTL|  viene
+  dado por el especificado en el registro |SOA|. Sin embargo, hacia la mitad del
+  archivo existe la directiva:
+
+  .. code-block::
+
+     $TTL 300
+
+  que afecta a todos los registros definidos a continuación\ [#]_.
+
+* El ejemplo define una zona de máquinas públicas, no un dominio privado, y eso
+  está en consonancia con que se definan dos servidores de dominio para la zona:
+  "ns1" y "ns2". El primero debe de ser el servidor primario, puesto que así se
+  deduce del registro |SOA| y el segundo un servidor esclavo.
+
+* Los nombres de los servidores |DNS| pertenecen al propio dominio, lo que
+  provoca que existan dos registros :kbd:`A` que  indiquen cuál es su dirección
+  |IP| y que deduzcamos que en el |TLD| superior existan, además de los dos
+  registros :kbd:`NS` que provocan la delegación, dos *glue records* con sus
+  direcciones |IP|. Por consiguiente, en el |TLD| "es", que no controlamos, pero
+  a cuyo |NIC| hemos pagado a través de un agente para que lo haga, habrá estos
+  registros:
+
+  .. code-block::
+
+     iescastillodeluna.es.       IN       NS       ns1.iescastillodeluna.es.
+     iescastillodeluna.es.       IN       NS       ns2.iescastillodeluna.es.
+     ; Estos son los glue records
+     ns1.iescastillodeluna.es.   IN        A       80.80.80.81
+     ns2.iescastillodeluna.es.   IN        A       80.80.80.91
+
+* Hay definido un servidor para gestionar el correo del dominio ("mail").
+
+* Hay un registro :kbd:`TXT` bastante inútil que únicamente ilustra su
+  uso: los registros :kbd:`TXT` suelen incluirse con algún fin
+  específico  para que algún programa los consulte y haga uso de información.
+
+* Hay un :dfn:`registro comodín`:
+
+  .. code-block::
+
+     *      IN       CNAME    www
+
+  que implica que cualquier nombre (excepto los definidos implícitamente) sean
+  alias de "www". Por eso "smtp", por ejemplo, es alias de "mail".
+  Estos comodines no se limitan a este tipo de registros: también pueden
+  definirse con :kbd:`MX`, :kbd:`A`, :kbd:`SRV`, etc.
+
+.. _bind-delegacion:
 
 Delegación
 ==========
 
+.. _bind-esclavo:
+
 Servidor esclavo
 ================
 
+.. _bind-view:
+
+Vistas
+======
+
+.. _bind-resolucion-inversa:
+
 DNS inverso
 ***********
+
+.. _bind-ddns:
 
 DNS dinámico
 ************
@@ -212,8 +401,16 @@ DNS dinámico
 .. [#] ``194.179.1.100`` era un arcaico servidor |DNS| de `Telefónica`_ de los tiempos de
    `Infovía`_. Su inclusión en la lista es meramente sentimental. De hecho, está
    comentado, porque ni siquiera funciona.
+.. [#] No hay ninguna razón técnica para cambiar el |TTL| de los registros
+   siguientes. Se ha hecho, simplemente, para ilustrar la existencia de esta
+   directiva.
 
 .. |ISC| replace:: :abbr:`ISC (Internet Systems Consortium)`
+.. |ISP| replace:: :abbr:`ISP (Internet Service Provider)`
+.. |TLD| replace:: :abbr:`TLD (Top-Level Domain)`
+.. |SOA| replace:: :abbr:`SOA (Start Of Authority)`
+.. |TTL| replace:: :abbr:`TTL (Time To Live)`
+.. |NIC| replace:: :abbr:`TTL (Network Information Center)`
 
 .. _Telefónica: https://www.telefonica.com
 .. _Infovía: https://es.wikipedia.org/wiki/InfoV%C3%ADa
