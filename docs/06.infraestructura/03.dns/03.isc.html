@@ -75,10 +75,9 @@ funciona perfectamente como servidor recursivo.</p></li>
 <p>En este caso, tenemos que especificar que queremos usar nuestro
 propio servidor, porque no hemos tocado el archivo <code class="file docutils literal notranslate"><span class="pre">/etc/resolv.conf</span></code>.
 Recuerde que <a class="reference internal" href="../../02.conbas/09.admbasica/11.red.html#bas-resolv-conf"><span class="std std-ref">hay que editar este archivo para indicar qué servidor DNS
-desea usarse</span></a></p>
-<p>A partir de ahora supondremos que se ha editado este archivo para evitar el
-tedio de indicar explícitamente que se está usando nuestor propio
-<strong class="program">bind</strong>.</p>
+desea usarse</span></a>. A partir de ahora supondremos que se ha
+editado este archivo para evitar el tedio de indicar explícitamente que se
+está usando nuestor propio <strong class="program">bind</strong>.</p>
 </div>
 </section>
 <section id="archivos-de-configuracion">
@@ -225,7 +224,7 @@ aunque lo haya habido y el servidor ni siquiera haya podido arrancar.</p>
 </div>
 </section>
 <section id="cacheo">
-<span id="bind-cacheo"></span><h3><span class="section-number">6.2.3.1.6. </span>Cacheo<a class="headerlink" href="#cacheo" title="Enlazar permanentemente con este título">¶</a></h3>
+<span id="rndc"></span><h3><span class="section-number">6.2.3.1.6. </span>Cacheo<a class="headerlink" href="#cacheo" title="Enlazar permanentemente con este título">¶</a></h3>
 <p>Nuestro servidor cachea las resoluciones que realiza, por lo que también es
 interesante saber cómo manejarlas. Para ello podemos echar mano de la orden
 <strong class="command">rndc</strong>. Un primer uso, nos permite eliminar toda la caché:</p>
@@ -394,6 +393,16 @@ registros:</p>
 <span class="go">ns2.iescastillodeluna.es.   IN        A       80.80.80.91</span>
 </pre></div>
 </div>
+<p>Recuerdese, no obstante, que esto no es obligatorio. El servidor <abbr title="Domain Name Server">DNS</abbr> puede
+tener un nombre en un dominio distinto. Por ejemplo, en nuestro servidor la
+definición dentro de <code class="file docutils literal notranslate"><span class="pre">db.iescastillodeluna.es</span></code> podría haber sido ésta:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">@                           IN       NS       dns1.example.org.</span>
+<span class="go">                                     NS       dns2.example.org.</span>
+</pre></div>
+</div>
+<p>En este caso, el <abbr title="Top-Level Domain">TLD</abbr> superior, obviamente, no tendría <em>glue records</em>, ya
+que las direcciones <abbr title="Internet Protocol">IP</abbr> de esos dos servidores estarían recogidas en la
+definición de la zona «example.org».</p>
 </li>
 <li><p>Hay definido un servidor para gestionar el correo del dominio («mail»).</p></li>
 <li><p>Hay un registro <kbd class="kbd docutils literal notranslate">TXT</kbd> bastante inútil que únicamente ilustra su
@@ -409,9 +418,88 @@ Estos comodines no se limitan a este tipo de registros: también pueden
 definirse con <kbd class="kbd docutils literal notranslate">MX</kbd>, <kbd class="kbd docutils literal notranslate">A</kbd>, <kbd class="kbd docutils literal notranslate">SRV</kbd>, etc.</p>
 </li>
 </ul>
+<p>¿Qué ocurriría si la zona se definiera para una red privada? En realidad, no habría muchos cambios:</p>
+<ul class="simple">
+<li><p>No se habría necesitado registrar el dominio en el <abbr title="Top-Level Domain">TLD</abbr> «es».</p></li>
+<li><p>Las <abbr title="Internet Protocol">IP</abbr> que aparecen en el archivo deberían ser privadas.</p></li>
+<li><p>Probablemente nos sobraría el servidor esclavo.</p></li>
+<li><p>También probablemente nos gustaría implementar <a class="reference internal" href="#bind-resolucion-inversa"><span class="std std-ref">la resolución inversa</span></a>.</p></li>
+</ul>
+<p>Antes de acabar, podemos retomar la orden <a class="reference internal" href="#rndc"><span class="std std-ref">rndc</span></a>, porque tambien nos
+sirve para que <strong class="program">bind</strong> actualice la zona después de haber hecho un
+cambio en  el archivo sin necesidad de reiniciar el servidor:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>rndc reload iescastillodeluna.es
+<span class="gp"># </span>rndc reload
+</pre></div>
+</div>
+<p>La primera orden nos permite recargar exclusivamente la zona
+«iescastillodeluna.es», mientras que la segunda recarga todas las zonas que
+gestione el servidor.</p>
 </section>
 <section id="delegacion">
 <span id="bind-delegacion"></span><h3><span class="section-number">6.2.3.2.2. </span>Delegación<a class="headerlink" href="#delegacion" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>La <em class="dfn">delegación</em> se produce cuando un servidor <abbr title="Domain Name Server">DNS</abbr> delega en otro (u
+otros) una porción de su espacio de nombres. Por ejemplo, la zona
+«sede1.iescastillodeluna.es» la desgajamos de «iescastillodeluna.es» para
+gestionar mediante un servidor distinto. La delegación es, de hecho, la base de
+la <a class="reference internal" href="01.desc.html#dns-jerarquia"><span class="std std-ref">organización jerárquica</span></a> del servicio.</p>
+<p>Para delegar tenemos que tocar tanto la configuración del propio servidor como
+la definición del archivo de zona.</p>
+<dl>
+<dt><strong>Servidor delegante</strong></dt><dd><p>Necesitamos hacer dos cosas:</p>
+<ul>
+<li><p>Modificar ligeramente el bloque de la zona en archivo <code class="file docutils literal notranslate"><span class="pre">named.conf.local</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">zone &quot;iescastillodeluna.es&quot; {</span>
+<span class="go">   type master;</span>
+<span class="go">   file &quot;db.iescastillodeluna.es&quot;;</span>
+<span class="hll"><span class="go">   followers {};</span>
+</span><span class="go">};</span>
+</pre></div>
+</div>
+<p>La línea debe añadirse, porque la zona «sede1.iescastillodeluna.es» no está
+definida en este servidor, y, consecuentemente, si se pregunta a este
+servidor alguna resolución del subdominio recurrirá a los servidores
+definidos en el bloque <code class="docutils literal notranslate"><span class="pre">forwarders</span></code>. Con esta línea, lo evitamos.</p>
+</li>
+<li><p>Incluir en el archivo de zona «iescastillodeluna.es» la delegación de la
+subzona añadiendo estas líneas:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">;</span>
+<span class="go">; Delegación de la zona sede1.iescastillodeluna.es</span>
+<span class="go">;</span>
+<span class="gp">$</span>ORIGIN sede1.iescastillodeluna.es.
+<span class="go">@               IN       NS    ns1</span>
+<span class="go">                         NS    ns2</span>
+<span class="go">; Esto son glue records</span>
+<span class="go">ns1             IN        A    110.111.112.113</span>
+<span class="go">ns2             IN        A    110.111.112.114</span>
+</pre></div>
+</div>
+<p>En el código hemos usado otra directiva <kbd class="kbd docutils literal notranslate">$ORIGIN</kbd> que nos permite
+cambiar el dominio de referencia que usan los nombres: así nos hemos
+ahorrado incluir la palabra «sede1» en todos ellos.</p>
+<p>Nótese que seguimos utilizando como nombres del servidor, nombres del
+propio dominio que gestionan por lo que debemos incluir los <em>glue
+records</em>.</p>
+</li>
+</ul>
+</dd>
+<dt><strong>Servidor delegado</strong></dt><dd><p>En principio no hay que hacer nada especial que no sea definir la zona
+«sede1.iescastillodeluna.es» tal como <a class="reference internal" href="#bind-definicion-zona"><span class="std std-ref">ya explicamos para
+«iescastillodeluna.es»</span></a>.</p>
+<p>Ahora bien, si este servidor lo pretendemos usar también para realizar
+búsquedas recursivas y el dominio superior («iescastillodeluna.es» en este
+caso) es un dominio privado que no está registrado en el <abbr title="Top-Level Domain">TLD</abbr> «es», entonces
+debemos buscar la forma de forzar que consulte al servidor delegante el
+dominio «iescastillodeluna.es». La forma más sencilla es usar a dicho
+servidor como <em>forwarder</em>. Por tanto, bastará con modificar el bloque en
+<code class="file docutils literal notranslate"><span class="pre">named.conf.options</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">forwarders {</span>
+<span class="go">   ip.del.dns.superior;</span>
+<span class="go">}</span>
+</pre></div>
+</div>
+</dd>
+</dl>
 </section>
 <section id="servidor-esclavo">
 <span id="bind-esclavo"></span><h3><span class="section-number">6.2.3.2.3. </span>Servidor esclavo<a class="headerlink" href="#servidor-esclavo" title="Enlazar permanentemente con este título">¶</a></h3>

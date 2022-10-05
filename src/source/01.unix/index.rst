@@ -54,6 +54,8 @@ Actualmente hay tres grandes familias de sistemas *UNIX*:
 
 * Linux.
 
+.. _linux:
+
 Linux
 -----
 *Linux* es un sistema operativo libre que emula el `comportamiento de UNIX

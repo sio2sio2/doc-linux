@@ -28,11 +28,9 @@ Podemos probar el servidor con :ref:`host <host>`::
 .. warning:: En este caso, tenemos que especificar que queremos usar nuestro
    propio servidor, porque no hemos tocado el archivo :file:`/etc/resolv.conf`.
    Recuerde que :ref:`hay que editar este archivo para indicar qué servidor DNS
-   desea usarse <bas-resolv.conf>`
-
-   A partir de ahora supondremos que se ha editado este archivo para evitar el
-   tedio de indicar explícitamente que se está usando nuestor propio
-   :program:`bind`.
+   desea usarse <bas-resolv.conf>`. A partir de ahora supondremos que se ha
+   editado este archivo para evitar el tedio de indicar explícitamente que se
+   está usando nuestor propio :program:`bind`.
 
 Archivos de configuración
 =========================
@@ -190,7 +188,7 @@ que nos muestra las últimas treinta líneas del registro.
 .. warning:: Iniciar (o reiniciar) este servidor no muestra ningún error,
    aunque lo haya habido y el servidor ni siquiera haya podido arrancar.
 
-.. _bind-cacheo:
+.. _rndc:
 
 Cacheo
 ======
@@ -353,6 +351,19 @@ explicarlos <dns-registros>`):
      ns1.iescastillodeluna.es.   IN        A       80.80.80.81
      ns2.iescastillodeluna.es.   IN        A       80.80.80.91
 
+  Recuerdese, no obstante, que esto no es obligatorio. El servidor |DNS| puede
+  tener un nombre en un dominio distinto. Por ejemplo, en nuestro servidor la
+  definición dentro de :file:`db.iescastillodeluna.es` podría haber sido ésta:
+
+  .. code-block::
+
+     @                           IN       NS       dns1.example.org.
+                                          NS       dns2.example.org.
+
+  En este caso, el |TLD| superior, obviamente, no tendría *glue records*, ya
+  que las direcciones |IP| de esos dos servidores estarían recogidas en la
+  definición de la zona "example.org".
+
 * Hay definido un servidor para gestionar el correo del dominio ("mail").
 
 * Hay un registro :kbd:`TXT` bastante inútil que únicamente ilustra su
@@ -370,10 +381,99 @@ explicarlos <dns-registros>`):
   Estos comodines no se limitan a este tipo de registros: también pueden
   definirse con :kbd:`MX`, :kbd:`A`, :kbd:`SRV`, etc.
 
+¿Qué ocurriría si la zona se definiera para una red privada? En realidad, no habría muchos cambios:
+
+* No se habría necesitado registrar el dominio en el |TLD| "es".
+* Las |IP| que aparecen en el archivo deberían ser privadas.
+* Probablemente nos sobraría el servidor esclavo.
+* También probablemente nos gustaría implementar :ref:`la resolución inversa
+  <bind-resolucion-inversa>`.
+
+Antes de acabar, podemos retomar la orden :ref:`rndc <rndc>`, porque tambien nos
+sirve para que :program:`bind` actualice la zona después de haber hecho un
+cambio en  el archivo sin necesidad de reiniciar el servidor::
+
+   # rndc reload iescastillodeluna.es
+   # rndc reload
+
+La primera orden nos permite recargar exclusivamente la zona
+"iescastillodeluna.es", mientras que la segunda recarga todas las zonas que
+gestione el servidor.
+
+
 .. _bind-delegacion:
 
 Delegación
 ==========
+La :dfn:`delegación` se produce cuando un servidor |DNS| delega en otro (u
+otros) una porción de su espacio de nombres. Por ejemplo, la zona
+"sede1.iescastillodeluna.es" la desgajamos de "iescastillodeluna.es" para
+gestionar mediante un servidor distinto. La delegación es, de hecho, la base de
+la :ref:`organización jerárquica <dns-jerarquia>` del servicio.
+
+Para delegar tenemos que tocar tanto la configuración del propio servidor como
+la definición del archivo de zona.
+
+**Servidor delegante**
+   Necesitamos hacer dos cosas:
+
+   * Modificar ligeramente el bloque de la zona en archivo :file:`named.conf.local`:
+
+     .. code-block::
+        :emphasize-lines: 4
+
+        zone "iescastillodeluna.es" {
+           type master;
+           file "db.iescastillodeluna.es";
+           followers {};
+        };
+
+     La línea debe añadirse, porque la zona "sede1.iescastillodeluna.es" no está
+     definida en este servidor, y, consecuentemente, si se pregunta a este
+     servidor alguna resolución del subdominio recurrirá a los servidores
+     definidos en el bloque ``forwarders``. Con esta línea, lo evitamos.
+
+   * Incluir en el archivo de zona "iescastillodeluna.es" la delegación de la
+     subzona añadiendo estas líneas:
+
+     .. code-block:: 
+
+        ;
+        ; Delegación de la zona sede1.iescastillodeluna.es
+        ;
+        $ORIGIN sede1.iescastillodeluna.es.
+        @               IN       NS    ns1
+                                 NS    ns2
+        ; Esto son glue records
+        ns1             IN        A    110.111.112.113
+        ns2             IN        A    110.111.112.114
+
+     En el código hemos usado otra directiva :kbd:`$ORIGIN` que nos permite
+     cambiar el dominio de referencia que usan los nombres: así nos hemos
+     ahorrado incluir la palabra "sede1" en todos ellos.
+
+     Nótese que seguimos utilizando como nombres del servidor, nombres del
+     propio dominio que gestionan por lo que debemos incluir los *glue
+     records*.
+
+**Servidor delegado**
+   En principio no hay que hacer nada especial que no sea definir la zona
+   "sede1.iescastillodeluna.es" tal como :ref:`ya explicamos para
+   "iescastillodeluna.es" <bind-definicion-zona>`.
+
+   Ahora bien, si este servidor lo pretendemos usar también para realizar
+   búsquedas recursivas y el dominio superior ("iescastillodeluna.es" en este
+   caso) es un dominio privado que no está registrado en el |TLD| "es", entonces
+   debemos buscar la forma de forzar que consulte al servidor delegante el
+   dominio "iescastillodeluna.es". La forma más sencilla es usar a dicho
+   servidor como *forwarder*. Por tanto, bastará con modificar el bloque en
+   :file:`named.conf.options`:
+
+   .. code-block::
+
+      forwarders {
+         ip.del.dns.superior;
+      }
 
 .. _bind-esclavo:
 

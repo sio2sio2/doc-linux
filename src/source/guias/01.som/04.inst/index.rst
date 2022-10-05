@@ -55,8 +55,8 @@ limitaciones. Las ediciones disposibles son:
   servidor), de Hyper-V para virtualización, o de *BitLocker* (para cifrar el
   sistema).
 
-* **Professional** (o, simplemente, **Pro**): ess la edición recomendada para
-  usuarios avanzados e incorpora características ausentres en la *Home*.
+* **Professional** (o, simplemente, **Pro**): es la edición recomendada para
+  usuarios avanzados e incorpora características ausentes en la *Home*.
 
 * **Enterprise**: es muy parecida a la *Pro*, pero destinada al uso empresarial,
   de ahí que *Microsoft* sólo permita su adquisión a través de licencias por
@@ -143,19 +143,17 @@ Sin ánimo de ser exhaustivos (para ello consulte la cronología ya enlazada)
 algunas distribuciones importantes son:
 
 * *Históricas*, que nacieron en los años 90 *ex novo* o a partir de otras
-  distribuciones que no ha sobrevivido:
+  distribuciones que no han sobrevivido:
 
   + Debian_, que, además de ser aún una de las usadas, es la que más derivadas
     ha generado. Es la distribución de referencia que se usa para este
     manual.
   + Slackware_, que nació de SLS_.
   + RedHat_, que es la versión empresarial desarrollada por la empresa del
-    mismo nombre.  Tiene, más que variadas, dos variantes: Fedora_, que es la
-    versión para la comunidad y en la que la empresa prueba las
-    características que incorporará a RedHat_; y CentOS_, que es una
-    distribución comunitaria que pretende proporcionar un equivalente a la
-    solución empresarial de RedHat_.
-  + SuSE_, cuyas primeras versiones se publicaron como versiones alemana de
+    mismo nombre.  Tiene, más que derivadas, algunas variantes: Fedora_,
+    CentOS_, etc. En el :ref:`epígrafe introductorio sobre Linux del
+    manual <linux>` hay información al respecto.
+  + SuSE_, cuyas primeras versiones se publicaron como versión alemana de
     Slackware_, pero que se rehizo basándose en Jurix_ para posteriormente
     adoptar algunas características de RedHat_ como el sistemas de paquetes o
     la estructura de archivos. Tiene una versión para la comunidad denominada
@@ -174,7 +172,7 @@ algunas distribuciones importantes son:
 
 * *Especializadas*, que son distribuciones enfocadas a un uso muy concreto:
 
-  + OpenWrt_, enfocada a la instalación de dispositivos de red como
+  + OpenWrt_, enfocada a la instalación en dispositivos de red como
     *routers*.
   + SliTaZ_, una distribución minimalista que intenta mantener un tamaño muy
     reducido.
