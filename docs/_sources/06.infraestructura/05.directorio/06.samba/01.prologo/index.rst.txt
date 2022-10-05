@@ -13,6 +13,8 @@ Dado que queremos montar el servidor en la red interna, dejaremos in fichero
 .. include:: files/interfaces
    :literal:
 
+.. _disable-dhclient-resolv:
+
 Obsérvese que se ha dejado que la interfaz externa reciba su configuración de un
 servidor *DHCP*. Puede también configurarse de modo estático (que además sería
 lo más normal), pero si se hace como se propone aquí nos encontraremos con el

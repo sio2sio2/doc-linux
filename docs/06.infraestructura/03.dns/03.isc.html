@@ -78,6 +78,10 @@ Recuerde que <a class="reference internal" href="../../02.conbas/09.admbasica/11
 desea usarse</span></a>. A partir de ahora supondremos que se ha
 editado este archivo para evitar el tedio de indicar explícitamente que se
 está usando nuestor propio <strong class="program">bind</strong>.</p>
+<p>Tenga, además, presente que, si durante sus pruebas alguna de las interfaces
+de su servidor tiene configuración dinámica, el cliente <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> alterará el
+contenido de <code class="file docutils literal notranslate"><span class="pre">/etc/resolv.conf</span></code> cada vez que reciba una configuración
+de red. Para evitarlo, puede utilizar <a class="reference internal" href="../05.directorio/06.samba/01.prologo/index.html#disable-dhclient-resolv"><span class="std std-ref">este truco</span></a>.</p>
 </div>
 </section>
 <section id="archivos-de-configuracion">
@@ -193,6 +197,25 @@ externa.</p></li>
 </div>
 <p>que identifica el directorio donde tendremos que almacenar los archivos de
 definición de las zona que gestionemos.</p>
+<p>Por último, como no usaremos <abbr title="Domain Name Server SECurity extensions">DNSSEC</abbr> debemos dejar la línea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dnssec-validation no;</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Por defecto, <strong class="program">bind</strong> permite a cualquier máquina la
+transferencia completa de la zona. Puede hacer la prueba con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>dig iescastillodeluna.es AXFR
+</pre></div>
+</div>
+<p>Esto puede no parecernos buena idea, sobre todo si nuestro servidor está
+expuesto a internet. Para evitarlo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">allow-transfer { none; };</span>
+</pre></div>
+</div>
+<p>Pero téngase presente que los servidores esclavos deben poder recibir la
+transferencia de zona. La sentencia anterior lo impide.</p>
+</div>
 </section>
 <section id="comprobacion">
 <h3><span class="section-number">6.2.3.1.5. </span>Comprobación<a class="headerlink" href="#comprobacion" title="Enlazar permanentemente con este título">¶</a></h3>
@@ -378,7 +401,8 @@ archivo existe la directiva:</p>
 <li><p>El ejemplo define una zona de máquinas públicas, no un dominio privado, y eso
 está en consonancia con que se definan dos servidores de dominio para la zona:
 «ns1» y «ns2». El primero debe de ser el servidor primario, puesto que así se
-deduce del registro <abbr title="Start Of Authority">SOA</abbr> y el segundo un servidor esclavo.</p></li>
+deduce del registro <abbr title="Start Of Authority">SOA</abbr> y el segundo un servidor esclavo. De lo que se deduce
+que estamos escribiendo este archivo en la máquina «ns1».</p></li>
 <li><p>Los nombres de los servidores <abbr title="Domain Name Server">DNS</abbr> pertenecen al propio dominio, lo que
 provoca que existan dos registros <kbd class="kbd docutils literal notranslate">A</kbd> que  indiquen cuál es su dirección
 <abbr title="Internet Protocol">IP</abbr> y que deduzcamos que en el <abbr title="Top-Level Domain">TLD</abbr> superior existan, además de los dos
@@ -503,6 +527,69 @@ servidor como <em>forwarder</em>. Por tanto, bastará con modificar el bloque en
 </section>
 <section id="servidor-esclavo">
 <span id="bind-esclavo"></span><h3><span class="section-number">6.2.3.2.3. </span>Servidor esclavo<a class="headerlink" href="#servidor-esclavo" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>La configuración de un esclavo tiene dos partes diferenciadas:</p>
+<ol class="arabic simple">
+<li><p>Declararlo como tal en el servidor <em>maestro</em>.</p></li>
+<li><p>Configurarlo en sí el servidor <em>esclavo</em>.</p></li>
+</ol>
+<dl>
+<dt><strong>Servidor maestro</strong></dt><dd><p>Para que un servidor maestro notifique cambios en la zona a un servidor
+esclavo, basta con que éste este referido en un registro <kbd class="kbd docutils literal notranslate">NS</kbd> en el archivo de zona.
+En nuestro ejemplo, referimos una máquina «ns2»:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">@           IN          NS    ns1</span>
+<span class="go">                        NS    ns2</span>
+</pre></div>
+</div>
+<p>así que hemos complido con ello.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Existe una directiva <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">also</kbd>-<kbd class="kbd docutils literal notranslate">notify</kbd></kbd> que podemos incluir en el bloque <kbd class="kbd docutils literal notranslate">zone</kbd>
+del archivo <code class="file docutils literal notranslate"><span class="pre">named.conf.local</span></code>, que nos permite referir una lista
+de máquinas a las que notificar los cambios:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">zone &quot;iescastillodeluna.es&quot; {</span>
+<span class="go">   type master;</span>
+<span class="go">   file &quot;db.iescastillodeluna.es&quot;;</span>
+<span class="go">   also-notify { 10.10.10.10; 10.10.10.11; };</span>
+<span class="go">};</span>
+</pre></div>
+</div>
+<p>Sin embargo, si se encuentra la máquina referida a través del registro
+<kbd class="kbd docutils literal notranslate">NS</kbd> es redundante; y, si no lo está, tal servidor sería un servidor esclavo fantasma,
+que no aparecería como servidor autoritario cuando un cliente hiciera la consulta:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>host -tns iescastillodeluna.es
+</pre></div>
+</div>
+<p>lo cual no parece muy recomendable.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Al servidor esclavo le debe estar permitida la transferencia
+completa de la zona. Si la hemos prohibido de modo universal con
+<code class="code docutils literal notranslate"><span class="pre">allow-transfer</span> <span class="pre">{</span> <span class="pre">none;</span> <span class="pre">};</span></code>, entonces tendremos que habilitarla expresamente para la zona:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">zone &quot;iescastillodeluna.es&quot; {</span>
+<span class="go">   type master;</span>
+<span class="go">   file &quot;db.iescastillodeluna.es&quot;;</span>
+<span class="go">   allow-transfer { 80.80.80.91; };  // Esta es la IP de ns2, el</span>
+<span class="go">   esclavo.</span>
+<span class="go">};</span>
+</pre></div>
+</div>
+</div>
+</dd>
+<dt><strong>Servidor esclavo</strong></dt><dd><p>La configuración del servidor esclavo («ns2» en nuestro caso) es muy
+sencilla, ya que no hay que crearle ningún archivo de definición de zona.
+Basta con declarar en él que «iescastillodeluna.es» es una zona que él
+gestionará como esclavo e indicarle cuál es el servidor maestro.
+Consecuentemente, basta con añadir a <code class="file docutils literal notranslate"><span class="pre">named.conf.options</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">zone &quot;iescastillodeluna.es&quot; {</span>
+<span class="go">   type master;</span>
+<span class="go">   file &quot;db.iescastillodeluna.es&quot;;</span>
+<span class="go">   masters { 80.80.80.80; };  // Esta es la IP de ns1, el maestro.</span>
+<span class="go">};</span>
+</pre></div>
+</div>
+</dd>
+</dl>
 </section>
 <section id="vistas">
 <span id="bind-view"></span><h3><span class="section-number">6.2.3.2.4. </span>Vistas<a class="headerlink" href="#vistas" title="Enlazar permanentemente con este título">¶</a></h3>
@@ -510,6 +597,103 @@ servidor como <em>forwarder</em>. Por tanto, bastará con modificar el bloque en
 </section>
 <section id="dns-inverso">
 <span id="bind-resolucion-inversa"></span><h2><span class="section-number">6.2.3.3. </span>DNS inverso<a class="headerlink" href="#dns-inverso" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>La <em class="dfn">resolución inversa</em> de direcciones consiste en devolver el nombre en
+la red que tiene una determinada dirección <abbr title="Internet Protocol">IP</abbr>. Se realiza mediante la
+inclusión de registros <kbd class="kbd docutils literal notranslate">PTR</kbd>. Ahora bien, del mismo modo que para incluir
+registros para la <em>resolución directa</em> necesitamos poder gestionar el dominio,
+para incluir registros <kbd class="kbd docutils literal notranslate">PTR</kbd>, necesitamos poder gestionar redes total o
+parcialmente (subredes). Esto sólo es posible en el caso de una red privada, ya
+que las públicas las gestionan <abbr title="Internet Service Provider">ISP</abbr>s o empresas de servicios en la nube.</p>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>En consecuencia, sólo será posible la configuración de la
+resolución inversa, si nuestro servicio <abbr title="Domain Name Server">DNS</abbr> se configura para la gestión de
+una red local. Si tenemos algún servidor con <abbr title="Internet Protocol">IP</abbr> pública y nos es imperativo
+que la resolución inversa de su <abbr title="Internet Protocol">IP</abbr> devuelva su nombre, tendremos que
+ponernos en contacto con el gestor de esa <abbr title="Internet Protocol">IP</abbr> (el <abbr title="Internet Service Provider">ISP</abbr>, por ejemplo) para
+que él lleve el cambio a efecto.</p>
+</div>
+<p>Antes de meternos en harina es necesario precisar que a efectos de <abbr title="Domain Name Server">DNS</abbr> una
+dirección <abbr title="Internet Protocol">IP</abbr> <code class="docutils literal notranslate"><span class="pre">192.168.3.25</span></code> se nota con el nombre
+«25.3.168.192.in-addr.arpa» esto es con un nombre en que la dirección se escribe
+puesta del revés y dentro del subdominio «in-addr.arpa». En consecuencia un
+registro <kbd class="kbd docutils literal notranslate">PTR</kbd> tendrá este aspecto:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">30.255.168.192.in-addr.arpa.       IN       PTR      sobremesa.red.local.</span>
+</pre></div>
+</div>
+<p>Además, tomemos como referencia este archivo de resolución directa:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>;
+; Zona IESCASTILLODELUNA.ES
+;
+@  IN SOA   ns1 hostmaster (
+               1     ; Serial
+          604800     ; Refresh
+           86400     ; Retry
+         2419200     ; Expire
+           86400 )   ; Negative Cache TTL
+;
+@        IN    TXT   &quot;Ejemplo de definición de la zona IESCASTILLODELUNA.ES&quot;
+               NS    ns1
+               NS    ns2
+               MX    10 mail
+ns1      IN    A     192.168.255.1
+mail     IN    A     192.168.255.10
+smtp     IN    CNAME mail
+pop3     IN    CNAME mail
+imap     IN    CNAME mail
+www      IN    A     192.168.255.20
+ftp      IN    CNAME www
+*        IN    CNAME www
+</pre></div>
+</div>
+<section id="redes-con-clase">
+<h3><span class="section-number">6.2.3.3.1. </span>Redes con clase<a class="headerlink" href="#redes-con-clase" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Son las redes completas de clase <strong>A</strong>, <strong>B</strong> o <strong>C</strong>. Por ejemplo, la <code class="docutils literal notranslate"><span class="pre">10.0.0.0</span></code>
+(se sobrentiende que <code class="docutils literal notranslate"><span class="pre">/8</span></code>), <code class="docutils literal notranslate"><span class="pre">172.22.16.0</span></code> (se sobrentiende que <code class="docutils literal notranslate"><span class="pre">/16</span></code>) o
+<code class="docutils literal notranslate"><span class="pre">192.168.255.0</span></code> (se sobrentiende que <code class="docutils literal notranslate"><span class="pre">/24</span></code>). Para estas redes, el nombre de
+la zona sigue el patrón indicado anteriormente para una <abbr title="Internet Protocol">IP</abbr>, aunque se incluye
+sólo la parte de red. Por tanto, en nuestro ejemplo, la zona es
+«255.168.192.in-addr.arpa».</p>
+<p>Sabido esto ya podemos configurar la resolución inversa de manera análoga a como
+hacemos la directa:</p>
+<ul>
+<li><p>Añadimos la declaración de la zona en <code class="file docutils literal notranslate"><span class="pre">named.conf.local</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">zone &quot;255.168.192.in-addr.arpa&quot; {</span>
+<span class="go">   type master;</span>
+<span class="go">   file &quot;db.192.168.255&quot;;</span>
+<span class="go">};</span>
+</pre></div>
+</div>
+</li>
+<li><p>Creamos el archivo <code class="file docutils literal notranslate"><span class="pre">/var/cache/bind/db.192.168.255</span></code> con los registros:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>;
+; Zona IESCASTILLODELUNA.ES
+;
+@  IN SOA   ns1.iescastillodeluna.es hostmaster.iescastillodeluna.es (
+               1     ; Serial
+          604800     ; Refresh
+           86400     ; Retry
+         2419200     ; Expire
+           86400 )   ; Negative Cache TTL
+;
+@        IN    NS    ns1.iescastillodeluna.es.
+1        IN   PTR    ns1.iescastillodeluna.es.
+10       IN   PTR    mail.iescastillodeluna.es.
+20       IN   PTR    www.iescastillodeluna.es.
+</pre></div>
+</div>
+<p>Hagamos algunas precisiones:</p>
+<ul class="simple">
+<li><p>El dominio de referencia para los nombres incluidos en los registros es
+«255.168.192.in-addr.arpa».</p></li>
+<li><p>Cada <abbr title="Internet Protocol">IP</abbr> sólo puede tener un nombre.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="redes-sin-clase">
+<h3><span class="section-number">6.2.3.3.2. </span>Redes sin clase<a class="headerlink" href="#redes-sin-clase" title="Enlazar permanentemente con este título">¶</a></h3>
+</section>
 </section>
 <section id="dns-dinamico">
 <span id="bind-ddns"></span><h2><span class="section-number">6.2.3.4. </span>DNS dinámico<a class="headerlink" href="#dns-dinamico" title="Enlazar permanentemente con este título">¶</a></h2>
@@ -559,7 +743,11 @@ directiva.</p>
 <li><a class="reference internal" href="#vistas">6.2.3.2.4. Vistas</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#dns-inverso">6.2.3.3. DNS inverso</a></li>
+<li><a class="reference internal" href="#dns-inverso">6.2.3.3. DNS inverso</a><ul>
+<li><a class="reference internal" href="#redes-con-clase">6.2.3.3.1. Redes con clase</a></li>
+<li><a class="reference internal" href="#redes-sin-clase">6.2.3.3.2. Redes sin clase</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#dns-dinamico">6.2.3.4. DNS dinámico</a></li>
 </ul>
 </li>

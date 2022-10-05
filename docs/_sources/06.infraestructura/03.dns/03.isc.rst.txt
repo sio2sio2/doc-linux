@@ -32,6 +32,12 @@ Podemos probar el servidor con :ref:`host <host>`::
    editado este archivo para evitar el tedio de indicar explícitamente que se
    está usando nuestor propio :program:`bind`.
 
+   Tenga, además, presente que, si durante sus pruebas alguna de las interfaces
+   de su servidor tiene configuración dinámica, el cliente |DHCP| alterará el
+   contenido de :file:`/etc/resolv.conf` cada vez que reciba una configuración
+   de red. Para evitarlo, puede utilizar :ref:`este truco
+   <disable-dhclient-resolv>`.
+
 Archivos de configuración
 =========================
 Toda la configuración se encuentra dentro del directorio :file:`/etc/bind`. El
@@ -159,6 +165,27 @@ Además, el archivo contiene una línea:
 
 que identifica el directorio donde tendremos que almacenar los archivos de
 definición de las zona que gestionemos.
+
+Por último, como no usaremos |DNSSEC| debemos dejar la línea:
+
+.. code-block::
+
+   dnssec-validation no;
+
+.. warning:: Por defecto, :program:`bind` permite a cualquier máquina la
+   transferencia completa de la zona. Puede hacer la prueba con::
+
+      $ dig iescastillodeluna.es AXFR
+
+   Esto puede no parecernos buena idea, sobre todo si nuestro servidor está
+   expuesto a internet. Para evitarlo:
+
+   .. code-block::
+
+      allow-transfer { none; };
+
+   Pero téngase presente que los servidores esclavos deben poder recibir la
+   transferencia de zona. La sentencia anterior lo impide. 
 
 Comprobación
 ============
@@ -333,7 +360,8 @@ explicarlos <dns-registros>`):
 * El ejemplo define una zona de máquinas públicas, no un dominio privado, y eso
   está en consonancia con que se definan dos servidores de dominio para la zona:
   "ns1" y "ns2". El primero debe de ser el servidor primario, puesto que así se
-  deduce del registro |SOA| y el segundo un servidor esclavo.
+  deduce del registro |SOA| y el segundo un servidor esclavo. De lo que se deduce
+  que estamos escribiendo este archivo en la máquina "ns1".
 
 * Los nombres de los servidores |DNS| pertenecen al propio dominio, lo que
   provoca que existan dos registros :kbd:`A` que  indiquen cuál es su dirección
@@ -479,6 +507,71 @@ la definición del archivo de zona.
 
 Servidor esclavo
 ================
+La configuración de un esclavo tiene dos partes diferenciadas:
+
+#. Declararlo como tal en el servidor *maestro*.
+#. Configurarlo en sí el servidor *esclavo*.
+
+**Servidor maestro**
+   Para que un servidor maestro notifique cambios en la zona a un servidor
+   esclavo, basta con que éste este referido en un registro :kbd:`NS` en el archivo de zona.
+   En nuestro ejemplo, referimos una máquina "ns2":
+
+   .. code-block::
+
+      @           IN          NS    ns1
+                              NS    ns2
+
+   así que hemos complido con ello.
+
+   .. note:: Existe una directiva :kbd:`also-notify` que podemos incluir en el bloque :kbd:`zone`
+      del archivo :file:`named.conf.local`, que nos permite referir una lista
+      de máquinas a las que notificar los cambios:
+
+      .. code-block::
+
+         zone "iescastillodeluna.es" {
+            type master;
+            file "db.iescastillodeluna.es";
+            also-notify { 10.10.10.10; 10.10.10.11; };
+         };
+
+      Sin embargo, si se encuentra la máquina referida a través del registro
+      :kbd:`NS` es redundante; y, si no lo está, tal servidor sería un servidor esclavo fantasma,
+      que no aparecería como servidor autoritario cuando un cliente hiciera la consulta::
+
+         $ host -tns iescastillodeluna.es
+
+      lo cual no parece muy recomendable.
+
+   .. warning:: Al servidor esclavo le debe estar permitida la transferencia
+      completa de la zona. Si la hemos prohibido de modo universal con
+      :code:`allow-transfer { none; };`, entonces tendremos que habilitarla expresamente para la zona:
+
+      .. code-block::
+
+         zone "iescastillodeluna.es" {
+            type master;
+            file "db.iescastillodeluna.es";
+            allow-transfer { 80.80.80.91; };  // Esta es la IP de ns2, el
+            esclavo.
+         };
+
+
+**Servidor esclavo**
+   La configuración del servidor esclavo ("ns2" en nuestro caso) es muy
+   sencilla, ya que no hay que crearle ningún archivo de definición de zona.
+   Basta con declarar en él que "iescastillodeluna.es" es una zona que él
+   gestionará como esclavo e indicarle cuál es el servidor maestro.
+   Consecuentemente, basta con añadir a :file:`named.conf.options`:
+
+   .. code-block::
+
+         zone "iescastillodeluna.es" {
+            type master;
+            file "db.iescastillodeluna.es";
+            masters { 80.80.80.80; };  // Esta es la IP de ns1, el maestro.
+         };
 
 .. _bind-view:
 
@@ -489,6 +582,70 @@ Vistas
 
 DNS inverso
 ***********
+La :dfn:`resolución inversa` de direcciones consiste en devolver el nombre en
+la red que tiene una determinada dirección |IP|. Se realiza mediante la
+inclusión de registros :kbd:`PTR`. Ahora bien, del mismo modo que para incluir
+registros para la *resolución directa* necesitamos poder gestionar el dominio,
+para incluir registros :kbd:`PTR`, necesitamos poder gestionar redes total o
+parcialmente (subredes). Esto sólo es posible en el caso de una red privada, ya
+que las públicas las gestionan |ISP|\ s o empresas de servicios en la nube.
+
+.. warning:: En consecuencia, sólo será posible la configuración de la
+   resolución inversa, si nuestro servicio |DNS| se configura para la gestión de
+   una red local. Si tenemos algún servidor con |IP| pública y nos es imperativo
+   que la resolución inversa de su |IP| devuelva su nombre, tendremos que
+   ponernos en contacto con el gestor de esa |IP| (el |ISP|, por ejemplo) para
+   que él lleve el cambio a efecto.
+
+Antes de meternos en harina es necesario precisar que a efectos de |DNS| una
+dirección |IP| ``192.168.3.25`` se nota con el nombre
+"25.3.168.192.in-addr.arpa" esto es con un nombre en que la dirección se escribe
+puesta del revés y dentro del subdominio "in-addr.arpa". En consecuencia un
+registro :kbd:`PTR` tendrá este aspecto:
+
+.. code-block::
+
+   30.255.168.192.in-addr.arpa.       IN       PTR      sobremesa.red.local.
+
+Además, tomemos como referencia este archivo de resolución directa:
+
+.. literalinclude:: files/db-local.iescastillodeluna.es
+   :language: none
+
+Redes con clase
+===============
+Son las redes completas de clase **A**, **B** o **C**. Por ejemplo, la ``10.0.0.0``
+(se sobrentiende que ``/8``), ``172.22.16.0`` (se sobrentiende que ``/16``) o
+``192.168.255.0`` (se sobrentiende que ``/24``). Para estas redes, el nombre de
+la zona sigue el patrón indicado anteriormente para una |IP|, aunque se incluye
+sólo la parte de red. Por tanto, en nuestro ejemplo, la zona es
+"255.168.192.in-addr.arpa".
+
+Sabido esto ya podemos configurar la resolución inversa de manera análoga a como
+hacemos la directa:
+
+* Añadimos la declaración de la zona en :file:`named.conf.local`:
+
+  .. code-block::
+
+     zone "255.168.192.in-addr.arpa" {
+        type master;
+        file "db.192.168.255";
+     };
+
+* Creamos el archivo :file:`/var/cache/bind/db.192.168.255` con los registros:
+
+  .. literalinclude:: files/db.192.168.255
+     :language: none
+
+  Hagamos algunas precisiones:
+
+  * El dominio de referencia para los nombres incluidos en los registros es
+    "255.168.192.in-addr.arpa".
+  * Cada |IP| sólo puede tener un nombre.
+
+Redes sin clase
+===============
 
 .. _bind-ddns:
 
@@ -511,6 +668,7 @@ DNS dinámico
 .. |SOA| replace:: :abbr:`SOA (Start Of Authority)`
 .. |TTL| replace:: :abbr:`TTL (Time To Live)`
 .. |NIC| replace:: :abbr:`TTL (Network Information Center)`
+.. |DNSSEC| replace:: :abbr:`DNSSEC (Domain Name Server SECurity extensions)`
 
 .. _Telefónica: https://www.telefonica.com
 .. _Infovía: https://es.wikipedia.org/wiki/InfoV%C3%ADa
