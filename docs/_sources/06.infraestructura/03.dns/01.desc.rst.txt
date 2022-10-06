@@ -128,52 +128,87 @@ servicios *adicionales*:
    particulares estén gestionados por el servidor |DNS|\ [#]_ del *agente
    registrado* que haya usado como intermediario para la contratación.
 
+.. _dns-resolucion:
+
 Resolución
 ----------
-En principio, partiendo de la jerarquía anterior, para resolver el nombre
-"www.iescastillodeluna.es", el cliente:
+Los servidores |DNS| son capaces de soportar dos tipos de consultas:
 
-#. Consulta a alguno de los servidores raíz, cuáles son los |TLD| del dominio
-   "es", a lo cual responderá uno de los raíz con la lista de todos ellos.
-#. Volverá a realizar otra consulta, esta vez a alguno de los |TLD| facilitados
-   para que le facilite las direcciones |IP| de los servidores que gestionan el
-   dominio "iescastillodeluna.es".
-#. De la respuesta, escogerá uno de ellos para consultar cuál es la |IP| de
-   la máquina "www.iescastillodeluna.es".
+* :dfn:`Consulta iterativa` que es aquella que devuelve únicamente una resolución
+  que el servidor puede encontrar en su propia base de datos. Así, ante la pregunta
+  "www.iescastillodeluna.es" el servidor responderá:
 
-Para ilustrar esto, podemos hacer la siguiente consulta\ [#]_::
+  + Si es el servidor que gestiona el dominio "iescastillodeluna.es", con la |IP|
+    de la máquina.
+  + Si es el servidor |TLD| que gestiona "es" con la lista de servidores |DNS|
+    que gestionan "iescastillodeluna.es".
+  + Si es alguno de los servidores raíz, con la lista de servidores |DNS| que
+    gestionan "es".
+  + Si es cualquier otro, devolverá un error por no encontrar un registro adecuado.
 
-   $ dig +trace www.iescastillodeluna.es
+  Todos los servidores |DNS| soportan este tipo de consulta.
 
-Esto, no obstante, es poco eficiente: el cliente tiene que hacer varias
-peticiones para obtener la resolución que desea y, además, todos los clientes
-tendrían que hacer consultas a los servidores raíz lo que podría sobrecargarlos
-de tráfico. En la práctica existen repartidos por internet muchos :dfn:`servidores
-DNS recursivos` cuya misión es aceptar las peticiones de los clientes que a
-ellos se dirijan, averiguar la dirección |IP| del nombre requerido haciendo
-consultas a los servidores autoritarios correspondientes siguiendo la
-descripción expuesta arriba, y cachear el resultado el tiempo que el propietario
-del nombre haya establecido. De este modo, si otro cliente (o el mismo cliente)
-repiten la consulta dentro del tiempo de vigencia del registro, devolverán
-directamente el resultado, sin volver a preguntar a los servidores autoritarios:
+* :dfn:`Consulta recursiva` que es aquella que pretende encontrar la resolución
+  exacta solicitada. Por tanto, ante la consulta "www.iescastillodeluna.es" el
+  cliente espera obtener la |IP| de esa máquina y no ninguna resolución parcial
+  que le permita seguir indagando.
+
+  No todos los servidores |DNS| soportan este tipo y, de hecho, los habitual es
+  que los servidores autoritarios las rechacen y se limiten a aceptar consultas
+  iterativas.
+
+Los clientes, por lo general, realizan consultas recursivas, por lo que en
+Internet hay disponibles dos tipos de servidores:
+
+* Los **servidores autoritarios**, que constituyen la :ref:`jerarquía antes descrita
+  <dns-jerarquia>`.
+* Los :dfn:`servidores DNS recursivos`, que son aquellos que aceptan consultas
+  recursivas de los clientes y, por tanto, son capaces de devolverle la
+  respuesta exacta que esperan. Son éste tipo de servidores los que definen como
+  servidores |DNS| en los sistemas operativos clientes. Los más habituales son:
+
+  + Cualquier servidor |DNS| local que se haya podido configurar. Es muy común, por ejemplo,
+    que los router de conexión a internet traigan uno.
+  + Los del propio |ISP|.
+  + Los de `Google <https://developers.google.com/speed/public-dns>`_: 8.8.8.8 y 8.8.4.4.
+  + Los de `Quad9 <quad9.net/>`_: 9.9.9.9 y 149.112.112.112.
+  + Los de `OpenDNS <https://www.opendns.com/>`_: 208.67.222.222 y 208.67.220.220.
+  + Los de `Cloudflare <https://www.cloudflare.com/es-es/dns/>`_: 1.1.1.1 y 1.0.0.1.
+
+  Por supuesto, un servidor recursivo puede hacer consultas a otro servidor recursivo.
+
+Para lograr responder a una consulta *recursiva*, los servidores recursivos
+realizan sucesivas consultas *iterativas* a los servidores autoritarios de la
+jeraquía, empezando por los servidores raíz, cuyas direcciones |IP| debe conocer previamente\ [#]_:
 
 .. _consulta-recursiva:
 
 .. image:: files/dnscache.png
 
-.. warning:: En un cliente debe usarse como servidor |DNS| un servidor recursivo, no
-   un servidor autoritario. De hecho, éste último servidor normalmente tiene
-   deshabilitadas las consultas recursivas, pro lo que sólo sirve para hacerle
-   consultas sobre nombres de su propio dominio..
+Es decir:
 
-Hay muchos servidores recursivos:
+#. El cliente consulta recursivamente (1) cuál es la |IP| de la máquina
+   "www.iescastillodeluna.es" al servidor recursivo.
+#. El servidor |DNS| hace esa misma consulta pero iterativa (2) a alguno de los
+   servidores raíz. Éste responde (3) con la lista de servidores que gestionan "es".
+#. El servidor |DNS| toma uno de los servidores de la lista y vuelve a repetir
+   la consulta iterativa (4). La respuesta (5) es una lista con los servidores
+   que gestionan el dominio "iescastillodeluna.es".
+#. El servidor |DNS| toma uno de los servidores de esta última lista y vuelve a
+   repetir la consulta iterativa (5). Ahora sí recibirá la respuesta exacta a
+   su consulta (7).
+#. El servidor |DNS| remite la respuesta (8) al cliente.
 
-+ Los del propio |ISP|.
-+ Los de `Google <https://developers.google.com/speed/public-dns>`_: 8.8.8.8 y 8.8.4.4.
-+ Los de `Quad9 <quad9.net/>`_: 9.9.9.9 y 149.112.112.112.
-+ Los de `OpenDNS <https://www.opendns.com/>`_: 208.67.222.222 y 208.67.220.220.
-+ Los de `Cloudflare <https://www.cloudflare.com/es-es/dns/>`_: 1.1.1.1 y 1.0.0.1.
-+ etc.
+Como esta resolución es poco eficiente y sobrecargaría los servidores
+autoritarios, todas las respuestas incluyen un tiempo de vigencia (un |TTL|
+sobre el que profundizaremos después), lo que posibilita que los servidores
+recursivos puedan cachearlas y responder inmediatamente a un cliente posterior
+que repita la consulta.
+
+Para ilustrar cómo funcionan las consultas iterativas, podemos hacer la
+siguiente consulta con el cliente :command:`dig`\ [#]_::
+
+   $ dig www.iescastillodeluna.es +trace +question +nodnsssec
 
 Puertos
 -------
@@ -516,6 +551,8 @@ Para terminar referiremos algunas definiciones, gran parte de las cuáles ya est
 .. [#] En realidad, el agente registrados dispondrá varios servidor |DNS|, pero
    no porque tenga que gestionar muchos dominios, sino porque se necesita, como
    ya explicamos, redundancia.
+.. [#] En el servidor :ref:`bind <bind>` que estudiaremos posteriormente, la resolución
+   de los servidores raíz se encuentra en el archivo :file:`/usr/share/dns/root.hints`.
 .. [#] No parece funcionar correctamente en la versión *9.18*.
 .. [#] No es que seamos muy listos, es que hemos hecho previamente la consulta::
 

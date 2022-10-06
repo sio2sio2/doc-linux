@@ -88,7 +88,7 @@ de red. Para evitarlo, puede utilizar <a class="reference internal" href="../05.
 <h3><span class="section-number">6.2.3.1.2. </span>Archivos de configuración<a class="headerlink" href="#archivos-de-configuracion" title="Enlazar permanentemente con este título">¶</a></h3>
 <p>Toda la configuración se encuentra dentro del directorio <code class="file docutils literal notranslate"><span class="pre">/etc/bind</span></code>. El
 archivo básico de configuración es <code class="file docutils literal notranslate"><span class="pre">named.conf</span></code>, pero mediante sentencias
-<code class="docutils literal notranslate"><span class="pre">include</span></code> <em>Debian</em> ha dividido sus contenidos en otros dos<a class="footnote-reference brackets" href="#id5" id="id2">1</a>. Nos
+<code class="docutils literal notranslate"><span class="pre">include</span></code> <em>Debian</em> ha dividido sus contenidos en otros dos<a class="footnote-reference brackets" href="#id8" id="id2">1</a>. Nos
 centraremos en los siguientes archivos:</p>
 <dl class="simple">
 <dt><code class="file docutils literal notranslate"><span class="pre">named.conf.options</span></code></dt><dd><p>Define algunos parámetros de configuración. Nos interesa fundamentalmente el
@@ -161,11 +161,19 @@ editamos <code class="file docutils literal notranslate"><span class="pre">/etc/
 <section id="configuracion-inicial">
 <h3><span class="section-number">6.2.3.1.4. </span>Configuración inicial<a class="headerlink" href="#configuracion-inicial" title="Enlazar permanentemente con este título">¶</a></h3>
 <p>Básicamente consiste en editar <code class="file docutils literal notranslate"><span class="pre">named.conf.options</span></code> y ajustarlo a nuestro
-gusto. Nos centramos, por ahora, en el comportamiento del servidor ante
-resoluciones recursivas. La configuración predefinida permite resoluciones
-recursivas, pero éstas se harán recurriendo a los servidores raíz, lo cual no es
-la solución más ágil. Por ello, es conveniente descomentar el bloque
-<kbd class="kbd docutils literal notranslate">forwarders</kbd> y añadir servidores recursivos más eficientes. Por ejemplo<a class="footnote-reference brackets" href="#id6" id="id3">2</a>:</p>
+gusto. No introduciremos demasiadas opciones.</p>
+<p>Al comienzo, el archivo contiene una línea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">directory &quot;/var/cache/bind&quot;;</span>
+</pre></div>
+</div>
+<p>que identifica el directorio donde tendremos que almacenar los archivos de
+definición de las zona que gestionemos. Conviene que lo recordemos.</p>
+<p>Más adelante, mediante el bloque <kbd class="kbd docutils literal notranslate">forwarders</kbd>, se puede configurar cómo el
+servidor hará sus propias consultas recursivas para resolver dominios ajenos. De
+forma predeterminada, el servidor no hace consultas recursivas (el bloque está
+comentado), sino que los resuelve utilizando <a class="reference internal" href="01.desc.html#dns-resolucion"><span class="std std-ref">consultas iterativas</span></a> a partir de los servidores raíz. Para agilizar estas  consultas
+es mejor recurrir a consultas recursivas a otros servidores <abbr title="Domain Name Server">DNS</abbr> de internet
+que las permitan. Por ejemplo<a class="footnote-reference brackets" href="#id9" id="id3">2</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">forwarders {  // Servidores de Cloudflare</span>
 <span class="go">   1.1.1.1;</span>
 <span class="go">   1.0.0.1;</span>
@@ -173,36 +181,22 @@ la solución más ágil. Por ello, es conveniente descomentar el bloque
 <span class="go">};</span>
 </pre></div>
 </div>
-<p>Su nuestra intención fuera crear un servidor autoritario que no atendiera
-consultas recursivas y, en consecuencia, que se limitara a resolver consultas de
-sus propias zonas podríamos utilizar:</p>
-<ul class="simple" id="bind-allow-recursion">
-<li><p><kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">allow</kbd>-<kbd class="kbd docutils literal notranslate">recursion</kbd></kbd>, que permite indicar la lista de clientes a los que
-se les permite hacer consultas recursivas.</p></li>
-<li><p><kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">allow</kbd>-<kbd class="kbd docutils literal notranslate">recursion</kbd>-<kbd class="kbd docutils literal notranslate">on</kbd></kbd>, que permite indicar la lista de direcciones <abbr title="Internet Protocol">IP</abbr>
-locales a través de las cuales se permite hacer consultas recursivas.
-Entiéndase esto: si por ejemplo, tuviéramos un servidor con una interfaz
-interna y otra externa, podríamos permitir consultas recursivas a las
-peticiones que llegan a la interfaz interna, pero no a las que llegan a la
-externa.</p></li>
-</ul>
-<p>En principio, el valor de <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">allow</kbd>-<kbd class="kbd docutils literal notranslate">recursion</kbd></kbd> predeterminado es:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">allow-recursion { localnets; localhost; };</span>
-</pre></div>
-</div>
-<p>lo que significa que <strong class="program">bind</strong> solo permite hacer consultas recursivas
-usando la interfaz de <em>loopback</em> y desde máquinas en la misma red que nuestro
-servidor.</p>
-<p>Además, el archivo contiene una línea:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">directory &quot;/var/cache/bind&quot;;</span>
-</pre></div>
-</div>
-<p>que identifica el directorio donde tendremos que almacenar los archivos de
-definición de las zona que gestionemos.</p>
 <p>Por último, como no usaremos <abbr title="Domain Name Server SECurity extensions">DNSSEC</abbr> debemos dejar la línea:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dnssec-validation no;</span>
 </pre></div>
 </div>
+<p id="bind-recursion">Un aspecto muy importante de nuestro servidor y al que tenemos que atender, es
+si pensamos permitir las consultas recursivas o no. En un servidor local que
+ofrecerá servicio a las máquinas de la red es obvio que sí. En cambio, si
+montamos un servidor autoritario público, lo mejor es impedirlas. En el archivo
+no hay configuración al respecto, así que se usa la predeterminada que es:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">recursion yes;</span>
+<span class="go">allow-recursion { localnets; localhost; };</span>
+</pre></div>
+</div>
+<p>que significa que sí se permite, pero sólo a la lista de clientes proporcionada
+por <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">allow</kbd>-<kbd class="kbd docutils literal notranslate">recursion</kbd></kbd> que es la propia máquina local y las máquinas que
+pertenecen a las redes a las que directamente esté conectada el servidor.</p>
 <div class="admonition warning">
 <p class="admonition-title">Advertencia</p>
 <p>Por defecto, <strong class="program">bind</strong> permite a cualquier máquina la
@@ -308,7 +302,7 @@ el punto anterior, deberemos facilitar al agente registrador para que pida
 su adición al <abbr title="Top-Level Domain">TLD</abbr> «es». Este servidor a diferencia del primero, será un
 <em>servidor esclavo</em>, así que <a class="reference internal" href="#bind-esclavo"><span class="std std-ref">tendremos que definirlo de distinta forma</span></a>.</p></li>
 <li><p>Lo más lógico es que el servidor no se dedique a hacer resoluciones
-recursivas para terceras máquinas (véase <a class="reference internal" href="#bind-allow-recursion"><span class="std std-ref">cómo limitar la recursión</span></a>).</p></li>
+recursivas para terceras máquinas (véase <a class="reference internal" href="#bind-recursion"><span class="std std-ref">cómo limitar la recursión</span></a>).</p></li>
 <li><p>No podemos definir <a class="reference internal" href="#bind-resolucion-inversa"><span class="std std-ref">resolución inversa</span></a>, ya que las
 redes públicas pertenecen a <abbr title="Internet Service Provider">ISP</abbr> o grandes empresas de servicios en la
 nube. Si necesitamos que alguna de nuestras <abbr title="Internet Protocol">IP</abbr>s públicas resuelva a un
@@ -398,7 +392,7 @@ archivo existe la directiva:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span>TTL <span class="m">300</span>
 </pre></div>
 </div>
-<p>que afecta a todos los registros definidos a continuación<a class="footnote-reference brackets" href="#id7" id="id4">3</a>.</p>
+<p>que afecta a todos los registros definidos a continuación<a class="footnote-reference brackets" href="#id10" id="id4">3</a>.</p>
 </li>
 <li><p>El ejemplo define una zona de máquinas públicas, no un dominio privado, y eso
 está en consonancia con que se definan dos servidores de dominio para la zona:
@@ -592,6 +586,11 @@ Consecuentemente, basta con añadir a <code class="file docutils literal notrans
 </div>
 </dd>
 </dl>
+<div class="admonition-todo admonition" id="id5">
+<p class="admonition-title">Por hacer</p>
+<p>Habría que discutir sobre <abbr title="Transaction Signature">TSIG</abbr> para que se reconozcan maestro y
+esclavo.</p>
+</div>
 </section>
 <section id="vistas">
 <span id="bind-view"></span><h3><span class="section-number">6.2.3.2.4. </span>Vistas<a class="headerlink" href="#vistas" title="Enlazar permanentemente con este título">¶</a></h3>
@@ -630,6 +629,116 @@ clientes de la red interna cada servidor tiene una <abbr title="Internet Protoco
 </tr>
 </tbody>
 </table>
+<p><strong class="program">bind</strong> permite definir múltiples vistas para las cuales no sólo se
+pueden cambiar las definiciones de los registros, sino también la
+configuración. Por ejemplo, en una vista se pueden admitir las consultas
+recursivas, pero en otra no.</p>
+<p>Una <em>vista</em> se define con la siguiente estructura:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>view &quot;nombre_de_la_vista&quot; {
+
+      // directivas que definan quién ve esta vista.
+      // opciones particulares de la vista.
+
+      // bloques &quot;zone&quot; pertinentes...
+
+}
+</pre></div>
+</div>
+<p>Hay que tener en cuenta, además, que cuando se definen vistas, no pueden haber
+bloques <kbd class="kbd docutils literal notranslate">zone</kbd> definidos fuera de ella.</p>
+<p>Para ilustrarlo, definamos en nuestra configuración las dos vistas anteriores,
+Para ello debemos hacer primero unos cambios en <code class="file docutils literal notranslate"><span class="pre">named.conf</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">include &quot;/etc/bind/named.conf.options&quot;;</span>
+<span class="go">//include &quot;/etc/bind/named.conf.local&quot;;</span>
+<span class="go">//include &quot;/etc/bind/named.conf.default-zones&quot;;</span>
+
+<span class="go">include &quot;/etc/bind/named.conf.view.interna&quot;;</span>
+<span class="go">include &quot;/etc/bind/named.conf.view.externa&quot;;</span>
+</pre></div>
+</div>
+<p>Con ello cargamos dos archivos: uno nos servirá para definir la vista interna y
+otro la externa. Es importante, además, tener presente que <strong class="program">bind</strong> lee
+en orden los bloques y aplica el primero con el que la solicitud concuerde,
+desechando los que se encuentran a continuación.</p>
+<p>El primer archivo es éste:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>view {
+   match-clients { localnets; localhost; };
+   recursion yes;
+
+   zone &quot;iescastillodeluna.es&quot; {
+      type master;
+      file &quot;interna/db.iescastillodeluna.es&quot;;
+   }
+
+   include &quot;/etc/bind/named.conf.default-zones&quot;;
+}
+</pre></div>
+</div>
+<p>Y éste el segundo:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>view {
+   match-clients { any; };
+   recursion no;
+
+   zone &quot;iescastillodeluna.es&quot; {
+      type master;
+      file &quot;externa/db.iescastillodeluna.es&quot;;
+   }
+
+   //include &quot;/etc/bind/named.conf.default-zones&quot;;
+}
+</pre></div>
+</div>
+<p>Esta configuración implica lo siguiente:</p>
+<ul>
+<li><p>Quiénes ven cada vista se logra a través de la cláusula <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">match</kbd>-<kbd class="kbd docutils literal notranslate">clients</kbd></kbd>,
+que comprueba cuál es la dirección <abbr title="Internet Protocol">IP</abbr> de origen de las consultas.</p></li>
+<li><p>Las máquinas de redes directamente conectadas verán la vista <em>interna</em>,
+mientras que el resto la <em>externa</em>. Nótese que si la red local fuera más
+compleja y existieran otras redes no directamente conectadas al servidor,
+entonces no bastaría <kbd class="kbd docutils literal notranslate">localnets</kbd> y habría que enumerarlas explícitamente.
+Lo más limpio sería utilizar un bloque <kbd class="kbd docutils literal notranslate">acl</kbd> en <code class="file docutils literal notranslate"><span class="pre">named.conf</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">include &quot;/etc/bind/named.conf.options&quot;;</span>
+
+<span class="hll"><span class="go">acl &quot;privadas&quot; {</span>
+</span><span class="hll"><span class="go">    10.0.0.0/8;</span>
+</span><span class="hll"><span class="go">    172.16.0.0/12;</span>
+</span><span class="hll"><span class="go">    192.168.0.0/16;</span>
+</span><span class="hll"><span class="go">};</span>
+</span>
+<span class="go">include &quot;/etc/bind/named.conf.view.interna&quot;;</span>
+<span class="go">include &quot;/etc/bind/named.conf.view.externa&quot;;</span>
+</pre></div>
+</div>
+<p>y usar esta definición en las cláusulas <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">match</kbd>-<kbd class="kbd docutils literal notranslate">clients</kbd></kbd>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">match-clients { privadas; localhost; };</span>
+</pre></div>
+</div>
+</li>
+<li><p>En la vista interna están permitidas las consultas recursivas y en la externa,
+no.</p></li>
+<li><p>El archivo <code class="file docutils literal notranslate"><span class="pre">named.conf.default-zones</span></code> contiene algunas definiciones
+relativas a la resolución de la dirección «localhost» (que de todos modos ya
+debería estar resuelta en <code class="file docutils literal notranslate"><span class="pre">/etc/hosts</span></code>), pero también es la que permite
+la realización de consultas iterativas sin usar los <em>forwarders</em>. No puede
+dejarse en el archivo named.conf (o sea, fuera de los bloques <kbd class="kbd docutils literal notranslate">view</kbd>),
+porque contiene declaración de zonas, así que es necesario meter  el
+<kbd class="kbd docutils literal notranslate">include</kbd> en todas las vistas. En nuestro ejemplo, en la vista externa lo
+hemos dejado comentado porque en realidad es algo que nunca se usaría, ya que
+desde fuera no permitimos a los clientes consultas recursivas.</p></li>
+</ul>
+<p>Antes de acabar, añadamos dos puntualizaciones:</p>
+<ul class="simple">
+<li><p><kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">match</kbd>-<kbd class="kbd docutils literal notranslate">clients</kbd></kbd> no es la única cláusula para filtrar clientes. También
+puede usarse sola o en conjunción con ella <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">match</kbd>-<kbd class="kbd docutils literal notranslate">destinations</kbd></kbd> que
+comprueba la direcció <abbr title="Internet Protocol">IP</abbr> de destino de la consulta, en vez de la de origen.</p></li>
+<li><p>Si tenemos un servidor maestro con varias vistas y un servidor esclavo que
+debe sincronizarse con éste. ¿Cómo hacemos para que sea capaz de sincronizar
+todas las vistas? En principio, dependiendo de su <abbr title="Internet Protocol">IP</abbr> sólo será capaz de ver
+una. Esto se resuelve con <abbr title="Transaction Signature">TSIG</abbr> e incluyendo en <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">match</kbd>-<kbd class="kbd docutils literal notranslate">clients</kbd></kbd> la
+referencia a la clave. En <a class="reference external" href="https://www.cyberciti.biz/faq/unix-linux-bind-named-configuring-tsig/">este artículo</a> se
+explica cómo crear una clave, aunque se usa para permitir transferencias de
+zona y no en vistas, pero el concepto es el mismo.</p></li>
+</ul>
 </section>
 </section>
 <section id="dns-inverso">
@@ -730,21 +839,29 @@ hacemos la directa:</p>
 </section>
 <section id="redes-sin-clase">
 <h3><span class="section-number">6.2.3.3.2. </span>Redes sin clase<a class="headerlink" href="#redes-sin-clase" title="Enlazar permanentemente con este título">¶</a></h3>
+<div class="admonition-todo admonition" id="id6">
+<p class="admonition-title">Por hacer</p>
+<p>Redactar la resolución inversa de redes sin clase.</p>
+</div>
 </section>
 </section>
 <section id="dns-dinamico">
 <span id="bind-ddns"></span><h2><span class="section-number">6.2.3.4. </span>DNS dinámico<a class="headerlink" href="#dns-dinamico" title="Enlazar permanentemente con este título">¶</a></h2>
+<div class="admonition-todo admonition" id="id7">
+<p class="admonition-title">Por hacer</p>
+<p>Redactar la  actualización automática de zonas.</p>
+</div>
 <p class="rubric">Notas al pie</p>
 <dl class="footnote brackets">
-<dt class="label" id="id5"><span class="brackets"><a class="fn-backref" href="#id2">1</a></span></dt>
+<dt class="label" id="id8"><span class="brackets"><a class="fn-backref" href="#id2">1</a></span></dt>
 <dd><p>Tres en realidad, pero el tercero no lo tocaremos.</p>
 </dd>
-<dt class="label" id="id6"><span class="brackets"><a class="fn-backref" href="#id3">2</a></span></dt>
+<dt class="label" id="id9"><span class="brackets"><a class="fn-backref" href="#id3">2</a></span></dt>
 <dd><p><code class="docutils literal notranslate"><span class="pre">194.179.1.100</span></code> era un arcaico servidor <abbr title="Domain Name Server">DNS</abbr> de <a class="reference external" href="https://www.telefonica.com">Telefónica</a> de los tiempos de
 <a class="reference external" href="https://es.wikipedia.org/wiki/InfoV%C3%ADa">Infovía</a>. Su inclusión en la lista es meramente sentimental. De hecho, está
 comentado, porque ni siquiera funciona.</p>
 </dd>
-<dt class="label" id="id7"><span class="brackets"><a class="fn-backref" href="#id4">3</a></span></dt>
+<dt class="label" id="id10"><span class="brackets"><a class="fn-backref" href="#id4">3</a></span></dt>
 <dd><p>No hay ninguna razón técnica para cambiar el <abbr title="Time To Live">TTL</abbr> de los registros
 siguientes. Se ha hecho, simplemente, para ilustrar la existencia de esta
 directiva.</p>
