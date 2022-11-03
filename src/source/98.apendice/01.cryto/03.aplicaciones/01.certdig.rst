@@ -8,13 +8,14 @@ Certificado digital
 Antes de pasar a las aplicaciones prácticas propiamente dichas, nos detendremos
 en un concepto que usarán comúnmente tales aplicaciones. Téngase presente que a
 pesar de que la suplantación de identidad parece resuelta gracias al cifrado
-asimétrico, puesto que poder descifrar una firma  supone que el firmante sea el
-propietario de tal clave pública, hay aún una debilidad: ¿cómo puede el
-verificador estar seguro de que tal clave pública pertenece a quien parece
-pertenecer? A fin de cuentas, la suplantación ha podido producirse en el momento
-de la entrega de la clave pública y, si ha sido así, todo el proceso de
-verificación de la identidad estará viciado. Para subsanar este último escollo
-existen los *certificados digitales*.
+asimétrico, puesto que poder descifrar una firma supone que el firmante sea el
+propietario de tal clave pública, hay aún una debilidad: en muchos casos, no
+basta con saber que es el propietario de la clave, sino que además se necesita
+asociarlo a una identidad real (p.e. una persona con nombre y apellidos). La
+información de quién es nos la puede proporcionar el firmante directamente, pero
+¿cómo podemos estar seguros de que no nos miente? ¿Qué garantías tenemos de que
+ese propietario es quien dice ser?  Para subsanar este último escollo existen
+los *certificados digitales*.
 
 Concepto
 ========
@@ -56,7 +57,7 @@ Hay dos estrategias para conferir confianza a un tercero:
 
 .. _web-trust-strat:
 
-#. Una **red de confianza** totalmente descentralizada en que las relacionaes de
+#. Una **red de confianza** totalmente descentralizada en que las relaciones de
    confianza entre los propietarios de las claves se establecen de igual a igual.
    Así, si dos propietarios --"Pepe" y "Paco"-- están seguros de la veracidad del
    certificado del otro (por ejemplo, por un encuentro físico), podrán firmarse
@@ -131,7 +132,7 @@ de *software* habrán efectuado la verificación. Así, *Debian* incluye el paqu
 Un ejemplo de esta jerarquía es el :ref:`certificado gratuito para servidores
 web <nginx-https>` emitido por `Let's Encrypt`_ (descargable en `esta dirección
 <http://r3.i.lencr.org/>`_), cuyo certificado a su vez está firmado por `Digital
-Signature Trust`_ (la cual sí es una |CA| raíz)::
+Signature Trust`_ (la cual sí es una |CA| raíz)\ [#]_::
 
    $ wget -qO letsencrypt.cer "http://r3.i.lencr.org/"
    $ openssl x509 -inform der -in letsencrypt.cer -subject -issuer -noout
@@ -189,20 +190,31 @@ Certificados personales
 -----------------------
 El proceso típico de emisión de un certificado personal es el siguiente:
 
-#. El interesado realiza una solicitud a la |CA|, por lo general a través de
-   un servicio web, en que se recogen los datos identificativos y se genera una
-   pareja de claves. Ahora bien, como la identidad del interesado no ha podido
-   verificarse, la |CA| genera una petición |CSR|.
+#. El interesado genera localmente un par de claves y hace ante la |CA| una
+   solicitud de certificado (llamada |CSR|), por lo general a través de un
+   servicio web. La solicitud incluye la clave pública y los datos
+   identificativos del solicitante (pero, obviamente, no la clave privada, porque
+   esa nunca debe quedar en posesión de nadie más que del propietario). La |CA|,
+   no obstante, no puede atender inmediatamente la petición, ya que debe
+   corroborar antes la identidad del solicitante.
 
 #. El interesado se acerca físicamente a la oficina de una |RA| (autoridad de
-   registro) a fin de confirmar ante ésta que es quien dice ser.
+   registro) a fin de confirmar que es quien indicó en su solicitud. Una
+   :dfn:`autoridad de registro` no es más que una entidad en la que delega la
+   |CA| la verificación de la identidad de los solicitantes.
 
-#. La |RA| notifica a la |CA| tal verificación, con lo que esta pone a
-   disposición del interesado (p.e. a través del servicio web que utilizó
-   primeramente) el certificado solicitado.
+#. Completada la verificación, la |RA| confirma a la |CA| la identidad del
+   solicitante, momento a partir del cual ésta puede ya crear el certificado
+   a partir de la |CSR| y algunos datos adicionales que añada (p.e. la fecha de
+   caducidad)
 
-#. El interesado obtiene el certificado y lo instala en su sistema (navegador,
-   cliente de correo, etc).
+#. El interesado vuelve al dispositivo en el que hizo la solicitud y completa
+   el proceso descargando el certificado desde el servicio de la |CA| y
+   añadiendo a éste la clave privada almacenada localmente. El resultado es un
+   :ref:`archivo p12 <cert-p12>` o su instalación directa en el navegador o el
+   sistema operativo que estuviera usándose. Obsérvese que es necesario volver
+   al dispositivo inicial, porque es en él donde se encuentra almacenada la
+   clave privada.
 
 .. image:: files/certificados.png
 
@@ -452,6 +464,8 @@ común en el *software* libre) al resto de formatos y viceversa\ [#]_:
 
       .. note:: Consulte :manpage:`openssl-rsa(1)` para ver qué otros parámetros
          cifran la clave con algoritmos distintos.
+
+.. _cert-p12:
 
 |PKCS| #12 (``.p12`` o, frecuentemente en *Windows*, ``.pfx``)
    Formato originario de Microsoft_ que se acabó estandarizando mediante el
@@ -1114,6 +1128,15 @@ bastante sencilla, con lo que se hace innecesario el uso de
 
 .. rubric:: Notas al pie
 
+.. [#] En realidad, esta conclusión está obsoleta. Las entidades detrás de
+   `Let's Encrypt`_ acabaron por constituir una |CA| raíz (`Internet Security
+   Research Group`_) que es la que ahora firma el certificado de |CA|
+   intermedia::
+
+      $ openssl x509 -inform der -in letsencrypt.cer -subject -issuer -noout
+      subject=C = US, O = Let's Encrypt, CN = R3
+      issuer=C = US, O = Internet Security Research Group, CN = ISRG Root X1
+
 .. [#] Las órdenes sólo exponen cómo hacer conversiones entre formatos y ver los
        datos del certificado. Por supuesto, se hay otras operaciones interesantes
        como crear certificados o verificar su validez.
@@ -1204,3 +1227,4 @@ bastante sencilla, con lo que se hace innecesario el uso de
 .. _OpenSSL: https://www.openssl.org
 .. _Netscape: https://es.wikipedia.org/wiki/Netscape_Navigator
 .. _SQLite: https://www.sqlite.org
+.. _Internet Security Research Group: https://www.abetterinternet.org
