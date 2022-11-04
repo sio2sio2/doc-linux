@@ -160,10 +160,13 @@ de la entrada "Dispositivos" del menú superior de la aplicación.
 
 .. warning:: Para que en un huésped *Linux* pueda llevarse a cabo la instalación
    correctamente es necesario que el sistema tenga instaladas previamente las
-   cabeceras del núcleo y también las órdenes :command:`make` y :command:`gcc`,
-   por lo que antes de llevar la instalación quizás necesite hacer::
+   cabeceras del núcleo y el paquete :deb:`make`::
 
-      # apt install linux-headers-`uname -r` make gcc
+      # apt install linux-headers-`uname -r` make
+
+   También es necesario el compilador :deb:`gcc`. Dependiendo de la distribución
+   que tengamos puede ser necesario añadirlo de forma explícita a la orden
+   anterior.
 
    En cualquier caso, si una vez instaladas, las adiciones parecen no funcionar,
    pruebe a intentar arrancar::
@@ -181,32 +184,50 @@ La instalación de estos añadidos tiene algunas ventajas:
    ajustes de la máquina particular (``General>Advanced``), se fija
    el portapapeles compartido como bidireccional.
 
-  .. image:: files/portapapeles.png
+   .. image:: files/portapapeles.png
 
 #. Se podrá compartir archivos fácilmente entre anfitrión y huésped con
    sólo definir carpetas compartidas.
 
    .. image:: files/compartida.png
 
-   .. note:: Si en un huésped con sistema *Linux* desea poder leer y escribir en
-      la carpeta compartida con un usuario distinto a *root*, tal usuario deberá
-      pertenecer al grupo *vboxfs*.
+   aunque, dependiendo de su sistema operativo, tendremos que hacer alguna
+   configuración más en el huésped:
 
-   .. note:: En un huésped con un sistema *Linux* muy básico en el que no se
-      monten automáticamente sistemas de archivos, deberá hacer montar el recurso
-      compartido a mano::
+   * Si es *Windows*, la carpeta aparecerá como una carpeta de red y basta con
+     que esté habilitado el descubrimiento de estas carpetas para que la veamos
+     sin más dificultades.
 
-         # mkdir /media/anfitrion
-         # mount.vboxsf NombreCompartido /media/anfitrion
+   * Si es *Linux*, la casuística es mayor:
 
-      donde "NombreCompartido" será el nombre de carpeta que haya especificado
-      en :program:`Virtualbox` (en la captura :kbd:`Anfitrión`).
+     - En uno de escritorio con entorno gráfico, la carpeta se montará directamente,
+       pero de modo que sólo los miembros del grupo *vboxsf* (que se crea al
+       instalar estas adiciones) tendrás permisos de lectura y escritura en él.
+       Por tanto, deberemos añadir al usuario sin privilegios a este grupo.
+
+     - En un sistema más básico en el que no se monten automáticamente sistemas
+       de archivos, deberá montarse el recurso compartido a mano::
+
+         # mkdir -p /media/anfitrion
+         # mount.vboxsf -o gid=vboxsf,dmode=770,fmode=660 NombreCompartido /media/anfitrion
+
+       donde "NombreCompartido" será el nombre de carpeta que haya especificado
+       en :program:`Virtualbox` (en la captura :kbd:`Anfitrión`) y las opciones
+       proporcionadas emulan el comportamiento descrito para los sistemas en que
+       se monta automáticamente la carpeta: sólo los usuarios del grupo *vboxsf*
+       tienen acceso al recurso. Una alternativa al montaje manual es añadir una
+       entrada en :ref:`/etc/fstab <fstab>` para que se monte la carpeta al
+       arrancar el sistema:
+
+      .. code-block:: none
+
+         NombreCompartido  /media/anfitrion  vboxsf gid=vboxsf,dmode=770,fmode=660  0 2
 
 Exportación de máquinas
 =======================
 Para facilitar entre sistemas anfitriones la definición de máquinas virtuales
 completas (y no sólo de sus discos virtuales), existe el formato |OVA|. Lo forma
-más sencillas de copiar una máquina para trasladarla a otro ordenador y volver a
+más sencilla de copiar una máquina para trasladarla a otro ordenador y volver a
 seguir trabajando con ella es exportarla a un fichero |OVA| en el ordenador de
 origen e importarla en el destino desde el fichero.
 
