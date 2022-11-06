@@ -351,16 +351,29 @@ la opción <kbd class="kbd docutils literal notranslate">-showcerts</kbd> a la p
 <span class="go">DONE</span>
 </pre></div>
 </div>
-<p>Esto, no obstante, generará un <abbr title="Private Enhanced Mail">PEM</abbr> con todos los certificados
+<p id="csplit-pem">Esto, no obstante, generará un <abbr title="Private Enhanced Mail">PEM</abbr> con todos los certificados
 concatenados. Si queremos obtenerlos por separado, podemos pasar
 la salida por <a class="reference internal" href="../../../02.conbas/10.texto/03.manipulacion.html#csplit"><span class="std std-ref">csplit</span></a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openssl s_client -showcerts -servername www.iescastillodeluna.es -connect www.iescastillodeluna.es:443 &lt; /dev/null <span class="p">|</span> <span class="se">\</span>
-   csplit -fcert -b%02d.pem -sz - <span class="s1">&#39;/^-----B/&#39;</span> <span class="s1">&#39;{*}&#39;</span>
+   csplit -fcert -b%02d.pem -sz - <span class="s1">&#39;%^-----B%&#39;</span> <span class="s1">&#39;/^-----B/&#39;</span> <span class="s1">&#39;{*}&#39;</span>
 </pre></div>
 </div>
-<p>que generará los archivos <code class="file docutils literal notranslate"><span class="pre">cert01.pem</span></code>, <code class="file docutils literal notranslate"><span class="pre">cert02.pem</span></code>, etc. El
-archivo <code class="file docutils literal notranslate"><span class="pre">cert00.pem</span></code> no contendrá certificado alguno, sino las líneas
-anteriores al comienzo del primer certificado.</p>
+<p>que generará los archivos <code class="file docutils literal notranslate"><span class="pre">cert00.pem</span></code>, <code class="file docutils literal notranslate"><span class="pre">cert01.pem</span></code>, etc, cada
+uno de los cuales contiene un certificado público. Como <a class="reference internal" href="../02.algo.html#openssl"><span class="std std-ref">openssl</span></a> obtiene los certificados de abajo arriba, el primer archivo
+contendrá el certificado de servidor, el segundo el certificado de la <abbr title="Certification Authority">CA</abbr>
+que firmo éste último y así sucesivamente.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p><a class="reference internal" href="../../../02.conbas/10.texto/03.manipulacion.html#csplit"><span class="std std-ref">csplit</span></a> es una orden que permite dividir un archivo en
+varios utilizando un patrón. En nuestro caso usamos <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">/</kbd>^<kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">B/</kbd></kbd>,
+porque todos los certificados y claves privadas concatenados en un
+archivo <abbr title="Private Enhanced Mail">PEM</abbr> (que veremos a continuación) empiezan por una línea de la
+forma «<kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">-</kbd>-<kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate"></kbd>-<kbd class="kbd docutils literal notranslate">BEGIN</kbd></kbd>». Es importante tenerlo presente, porque esta
+misma orden podemos usarla directamente sobre un archivo <abbr title="Private Enhanced Mail">PEM</abbr>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>csplit -fcert -b%02d.pem -sz varioscertificados.pem <span class="s1">&#39;%^-----B%&#39;</span> <span class="s1">&#39;/^-----B/&#39;</span> <span class="s1">&#39;{*}&#39;</span>
+</pre></div>
+</div>
+</div>
 </li>
 </ol>
 </section>
@@ -521,7 +534,7 @@ cifran la clave con algoritmos distintos.</p>
 </dd>
 </dl>
 <dl id="cert-p12">
-<dt><abbr title="Public-Key Cryptography Standards">PKCS</abbr> #12 (<code class="docutils literal notranslate"><span class="pre">.p12</span></code> o, frecuentemente en <em>Windows</em>, <code class="docutils literal notranslate"><span class="pre">.pfx</span></code>)</dt><dd><p>Formato originario de <a class="reference external" href="https://www.microsoft.com">Microsoft</a> que se acabó estandarizando mediante el
+<dt><abbr title="Public-Key Cryptography Standards">PKCS</abbr> #12 (<kbd class="kbd docutils literal notranslate">.p12</kbd> o, frecuentemente en <em>Windows</em>, <kbd class="kbd docutils literal notranslate">.pfx</kbd>)</dt><dd><p>Formato originario de <a class="reference external" href="https://www.microsoft.com">Microsoft</a> que se acabó estandarizando mediante el
 <span class="target" id="index-6"></span><a class="rfc reference external" href="https://datatracker.ietf.org/doc/html/rfc7292.html"><strong>RFC 7292</strong></a> y contiene tanto el certificado como la clave privada asociada.
 También puede contener certificados de <abbr title="Certification Authority">CA</abbr> intermedias. En este formato toda
 la información contenida esta cifrada con una clave simétrica (a diferencia
@@ -530,9 +543,15 @@ navegadores para exportar e importar los certificados personales de los
 usuarios.</p>
 <p>Operaciones habituales:</p>
 <ol class="arabic">
-<li><p>Convertir el archivo <code class="docutils literal notranslate"><span class="pre">.p12</span></code> al formato <abbr title="Private Enhanced Mail">PEM</abbr><a class="footnote-reference brackets" href="#id22" id="id6">5</a> en un sólo archivo:</p>
+<li><p>Convertir el archivo <kbd class="kbd docutils literal notranslate">.p12</kbd> al formato <abbr title="Private Enhanced Mail">PEM</abbr><a class="footnote-reference brackets" href="#id22" id="id6">5</a> en un sólo archivo:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openssl pkcs12 -in CERTIFICADO.p12 -out CERTIFICADO.pem
 </pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Si se quiere generar un archivo <abbr title="Private Enhanced Mail">PEM</abbr> por cada certificado (o
+clave privada) contenida en el <kbd class="kbd docutils literal notranslate">.p12</kbd>, <a class="reference internal" href="#csplit-pem"><span class="std std-ref">podemos valernos de
+csplit como ya ilustramos antes</span></a>.</p>
 </div>
 </li>
 <li><p>Ídem, pero separando en dos archivos la clave pública y la privada:</p>
@@ -580,12 +599,11 @@ opción <kbd class="kbd docutils literal notranslate">-print_certs</kbd> para es
 información de todos los certificados incluidos en el archivo.</p>
 </div>
 </li>
-</ol>
-<p># Consultar el dato del certificado codificado en <abbr title="Distinguished Encoding Rules">DER</abbr>:</p>
+<li><p>Consultar el dato del certificado codificado en <abbr title="Distinguished Encoding Rules">DER</abbr>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$  </span>openssl pkcs7 -inform der -in CERTIFICADO.p7c -print_certs -text -noout
 </pre></div>
 </div>
-<ol class="arabic">
+</li>
 <li><p>Transformar el certificado <abbr title="Public-Key Cryptography Standards">PKCS</abbr> #7 al formato <abbr title="Private Enhanced Mail">PEM</abbr>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>openssl pkcs7 -in certificate.p7b -print_certs -out certificate.pem
 </pre></div>

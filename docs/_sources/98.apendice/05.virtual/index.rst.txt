@@ -15,12 +15,11 @@ entre:
    denomina :dfn:`máquina virtual`, constituido por un sistema operativo que
    corre sobre un *hardware* virtual y sobre el que se ejecutan aplicaciones.
 
-   La introducción a este tipo de virtualización es el objetivo de la primera
-   parte de esta unidad.
+   Este tipo de virtualización es a la que dedicaremos el epígrafe.
 
 **Virtualización de aplicaciones**
    Tiene por propósito crear un entorno virtual para las aplicaciones
-   independiente de la plataforma real (*hardware*\  + sistema operativo) sobre
+   independiente de la plataforma real (*hardware* + sistema operativo) sobre
    la que se pretenden ejecutar. Con ello se logra que una misma aplicación sin
    cambios pueda ejecutarse en todas aquellas plataformas para la que se haga
    esta virtualización. Ejemplos de este tipo de virtualización son la |JVM| o

@@ -314,16 +314,29 @@ Para descargar el certificado asociado a un sitio web podemos usar el subcomando
       verify return:1
       DONE
 
+   .. _csplit-pem:
+
    Esto, no obstante, generará un |PEM| con todos los certificados
    concatenados. Si queremos obtenerlos por separado, podemos pasar
    la salida por :ref:`csplit <csplit>`::
 
       $ openssl s_client -showcerts -servername www.iescastillodeluna.es -connect www.iescastillodeluna.es:443 < /dev/null | \
-         csplit -fcert -b%02d.pem -sz - '/^-----B/' '{*}'
+         csplit -fcert -b%02d.pem -sz - '%^-----B%' '/^-----B/' '{*}'
 
-   que generará los archivos :file:`cert01.pem`, :file:`cert02.pem`, etc. El
-   archivo :file:`cert00.pem` no contendrá certificado alguno, sino las líneas
-   anteriores al comienzo del primer certificado.
+   que generará los archivos :file:`cert00.pem`, :file:`cert01.pem`, etc, cada
+   uno de los cuales contiene un certificado público. Como :ref:`openssl
+   <openssl>` obtiene los certificados de abajo arriba, el primer archivo
+   contendrá el certificado de servidor, el segundo el certificado de la |CA|
+   que firmo éste último y así sucesivamente.
+
+   .. note:: :ref:`csplit <csplit>` es una orden que permite dividir un archivo en
+      varios utilizando un patrón. En nuestro caso usamos :kbd:`/^-----B/`,
+      porque todos los certificados y claves privadas concatenados en un
+      archivo |PEM| (que veremos a continuación) empiezan por una línea de la
+      forma ":kbd:`-----BEGIN`". Es importante tenerlo presente, porque esta
+      misma orden podemos usarla directamente sobre un archivo |PEM|::
+
+         $ csplit -fcert -b%02d.pem -sz varioscertificados.pem '%^-----B%' '/^-----B/' '{*}'
 
 .. _X.509:
 
@@ -469,7 +482,7 @@ común en el *software* libre) al resto de formatos y viceversa\ [#]_:
 
 .. _cert-p12:
 
-|PKCS| #12 (``.p12`` o, frecuentemente en *Windows*, ``.pfx``)
+|PKCS| #12 (:kbd:`.p12` o, frecuentemente en *Windows*, :kbd:`.pfx`)
    Formato originario de Microsoft_ que se acabó estandarizando mediante el
    :rfc:`7292` y contiene tanto el certificado como la clave privada asociada.
    También puede contener certificados de |CA| intermedias. En este formato toda
@@ -480,9 +493,13 @@ común en el *software* libre) al resto de formatos y viceversa\ [#]_:
 
    Operaciones habituales:
 
-   #. Convertir el archivo ``.p12`` al formato |PEM|\ [5]_ en un sólo archivo::
+   #. Convertir el archivo :kbd:`.p12` al formato |PEM|\ [5]_ en un sólo archivo::
 
          $ openssl pkcs12 -in CERTIFICADO.p12 -out CERTIFICADO.pem
+
+      .. note:: Si se quiere generar un archivo |PEM| por cada certificado (o
+         clave privada) contenida en el :kbd:`.p12`, :ref:`podemos valernos de
+         csplit como ya ilustramos antes <csplit-pem>`.
 
    #. Ídem, pero separando en dos archivos la clave pública y la privada::
 
@@ -522,7 +539,7 @@ común en el *software* libre) al resto de formatos y viceversa\ [#]_:
          opción :kbd:`-print_certs` para este tipo de formato muestra la
          información de todos los certificados incluidos en el archivo.
 
-   # Consultar el dato del certificado codificado en |DER|::
+   #. Consultar el dato del certificado codificado en |DER|::
 
          $  openssl pkcs7 -inform der -in CERTIFICADO.p7c -print_certs -text -noout
 
