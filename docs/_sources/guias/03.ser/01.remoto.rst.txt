@@ -28,13 +28,92 @@ Nos centraremos en tres:
    técnico: facilita que un técnico pueda acceder al ordenador de un cliente a
    fin de resolverle algún problema.
 
-Remote Desktop Protocol
------------------------
+Remote Desktop Protocol (|RDP|)
+-------------------------------
+Permite gestionar de manera remota un sistema *Windows* desde cualquier sistema (gracias a que existe FreeRDP_, aunque existen otras implementaciones libres). Las claves para su uso son las siguientes:
 
-.. remmina como cliente (también soporta VNC).
+.. rubric:: Servidor
+
+Se puede acceder a su configuración a través de :kbd:`Configuración>Sistema>Escritorio remoto`, aunque en la búsqueda basta con escribir ":kbd:`remoto`" para que una de las opciones sea "Configuración del escritorio remoto". Por defecto, está deshabilitado, de modo que habrá que habilitarlo:
+
+.. image:: files/conf-rdp.png
+
+Si nuestra intención es conectarnos desde un cliente distinto al de *Windows*
+(p.e. desde *Linux*), necesitamos deshabilitar en la configuración avanzada la
+autenticación a nivel de red:
+
+.. image:: files/conf-rdp-avanzada.png
+
+.. rubric:: Cliente
+
+En *Windows* el cliente es muy fácil de usar. Basta con ejecutar :program:`mstsc.exe` al que se puede acceder sin recordar el nombre simplemente con escribir en la búsqueda ":kbd:`remoto`" y escoger la opción de "Conexión a Escritorio remoto":
+
+.. image:: files/conex-rdp.png
+
+*Linux* tiene varios clientes competentes: :deb:`rdesktop` o :deb:`remmina`
+(este último también sirve como cliente VNC).
 
 |VNC|
 -----
+Permite la gestión remota de múltiples sistemas desde un cliente que puede correr también en múltiples sistemas. Como para la gestión de un *Windows* es mejor utilizar su solución nativa (|RDP|), reservaremos esta posibilidad para la gestión remota de un *Linux*.
+
+.. rubric:: Servidor
+
+Podemos usar TigerVNC_. Si lo usamos, la mejor alternativa es utilizarlo como un módulo de :program:`Xorg`, para lo cual:
+
+1. Instalamos::
+
+      # apt install tigervnc-xorg-extension
+
+2. Se crea el archivo de configuración que cargue el módulo::
+
+      # cat > /etc/X11/xorg.conf.d/10-tigervnc.conf
+      Section "Module"
+         Load "vnc"
+      EndSection
+
+      Section "Screen"
+         Identifier "Screen0"
+
+         # Autenticación mediante contraseña
+         Option "SecurityTypes" "TLSVnc"
+         Option "PasswordFile" "/etc/tigervnc/vncpasswd"
+
+         # Autenticación mediante usuario/contraseña local (alternativa)
+         #Option "SecurityTypes" "VeNCrypt,TLSPlain"
+         #Option "PAMService" "tigervnc"
+         #Option "PlainUsers" "usuario,otrousuario"
+      EndSection
+
+
+3. El archivo anterior presenta dos alternativas:
+
+   + La primera (que es la que no está comentada) exige la autenticación
+     mediante una contraseña almacenada en un archivo. Si preferimos esta opción,
+     necesitaremos crear la contraseña dentro de tal archivo con la orden::
+
+      # vncpasswd /etc/tigervnc/vncpasswd
+
+   + La segunda (comentada y, por tanto, sin efecto) permite la autenticación usando
+     las credenciales de un usuario del sistema. Mediante la opción
+     :kbd:`PlainUsers` definimos la lista de usuarios válidos.
+
+4. Reiniciamos el servidor gráfico para que se haga efectiva la carga del módulo::
+
+      # pkill -1 X 
+
+5. Comprobamos que el servidor escucha en el puerto *5900*::
+
+      $ ss -4ltn
+
+.. rubric:: Cliente
+
+Existen muchas alternativas:
+
+* En *Linux* Vinagre_, Remmina_ (válida también para |VNC|)o el cliente de
+  TigerVNC_ (disponible a través del paquete y que instala el ejecutable
+  :program:`vncviewer`). 
+* En *Windows*, el mismo cliente de TigerVNC_ (utilice :program:`vncviewer64`).
 
 
 TemaViewer
@@ -45,3 +124,9 @@ Servicios de terminal de texto
 ==============================
 
 .. |VNC| replace:: :abbr:`VNC (Virtual Network Computing)`
+.. |RDP| replace:: :abbr:`RDP (Remote Desktop Protocol)`
+
+.. _FreeRDP: https://www.freerdp.com
+.. _TigerVNC: //https://tigervnc.org
+.. _Vinagre: https://wiki.gnome.org/Apps/Vinagre
+.. _Remmina: https://remmina.org
