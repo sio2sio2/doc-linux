@@ -1,5 +1,11 @@
 .. _remove-data:
 
+.. https://grok.lsu.edu/article.aspx?articleid=16716
+   https://linuxhint.com/securely-delete-files-from-my-ssd/
+
+   Explica cómo usar hdparm para borrar discos PATA/SATA (sean HDD o SSD).
+   Investigar también nwipe (que usa dban y sirve para discos magnéticos).
+
 Eliminación de datos
 ====================
 La eliminación de datos es fundamental si es nuestra intención deshacernos del
@@ -21,7 +27,7 @@ dispositivo físico sobre el que los escribíamos. Hay tres opciones:
 
 Antes de empezar es preciso distinguir entre el borrado de discos |SSD| y el
 borrado de discos magnéticos. Dado que las técnicas se basan en hacer muchas
-sobrescrituras para asegurarse de que el dato original haya desaparecido...
+sobrescrituras para asegurarse de que el dato original haya desaparecido.
 
 .. warning:: ... no utilice estas herramientas en discos |SSD|. Para ellos
    cada fabricante debería facilitar herramientas específicas.
