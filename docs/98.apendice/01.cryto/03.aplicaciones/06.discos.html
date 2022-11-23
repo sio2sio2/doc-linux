@@ -56,12 +56,16 @@
 se pretende es almacenar archivos en disco, ya que exige cada vez que se quiera
 realizar la modificación del contenido, un descifrado y un cifrado manual. En la
 práctica, lo que se hace es cifrar la totalidad o parte de un sistema de
-archivos a fin de que todo lo incluido en esa zona este cifrado y no ser leído
-(o escrito) a menos que se conozca la contraseña. Para ponerlo en práctica hay
-tres estrategias.</p>
+archivos a fin de que todo lo incluido en esa zona esté cifrado y no pueda ser
+leído (o escrito) a menos que se conozca la contraseña. Para ponerlo en práctica
+hay cuatro estrategias.</p>
 <ol class="arabic simple">
+<li><p>El cifrado implementado en el propio dispositivo, que se llama <abbr title="Self-Encrypting Drive">SED</abbr>.</p></li>
 <li><p>El cifrado de dispositivos de bloques completos (p.e. una partición), que usa
 <abbr title="Linux Unified Key Setup">LUKS</abbr>.</p></li>
+<li><p>Usar las capacidades de cifrado del propio sistema de archivos, si el que
+usamos las tiene. En el caso de <em>ext4</em>, éste soporta cifrado desde la versión
+4.1 del kernel de <em>Linux</em>.</p></li>
 <li><p>El cifrado del contenido de un directorio arbitrario, que, junto a <a class="reference external" href="https://es.wikipedia.org/wiki/Sistema_de_archivos_en_el_espacio_de_usuario">FUSE</a>, es
 la aproximación que usa software como:</p>
 <ul class="simple">
@@ -73,12 +77,64 @@ contraseña de cifrado</a>.</p></li>
 anterior.</p></li>
 </ul>
 </li>
-<li><p>Usar las capacidades de cifrado del propio sistema de archivos, si el que
-usamos las tiene. En el caso de <em>ext4</em>, éste soporta cifrado desde la versión
-4.1 del kernel de <em>Linux</em>.</p></li>
 </ol>
+<section id="autocifrado">
+<h2><span class="section-number">9.1.3.6.1. </span>Autocifrado<a class="headerlink" href="#autocifrado" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>La primera estrategia consiste en que el propio <em>hardware</em> del disco se encargue
+del cifrado del contenido. Esta estrategia es totalmente transparente para el
+sistema operativo y es la más eficiente, puesto que no consume <abbr title="Central Processing Unit">CPU</abbr> ni memoria
+<abbr title="Random Access Memory">RAM</abbr>. Ahora bien, requiere que el disco implemente esta funcionalidad y no
+todos lo hacen.</p>
+<div class="admonition seealso">
+<p class="admonition-title">Ver también</p>
+<p>El artículo <a class="reference external" href="https://www.fmad.io/blog/what-is-a-self-encrypting-disk-sed">¿Qué es SED? (en inglés)</a> explica
+cuáles son las tres posibilidades respecto al cifrado que podemos encontrar
+en los dispositivos de almacenamiento. Este apartado refiere la última
+(cifrado con bloqueo), mientras que la segunda (cifrado sin bloqueo) refiere
+la que se trata en el <a class="reference internal" href="../../../05.discos/07.delete/index.html#hdparm"><span class="std std-ref">epígrafe sobre borrado seguro</span></a>.</p>
+</div>
+<p>Esta capacidad del disco para cifrar sus propios datos y bloquear así el acceso
+no autorizado se la denomina <abbr title="Self-Encrypting Drive">SED</abbr> y se desarrolla en la especificación
+<abbr title="Trusted Computing Group">TGC</abbr>/Opal. Los principios de este cifrado son los siguientes:</p>
+<ol class="arabic simple">
+<li><p>Todos los datos se guardan cifrados mediante una clave simétrica llamada
+<abbr title="Media Encryption Key">MEK</abbr> (clave de cifrado del medio).</p></li>
+<li><p>La clave anterior se guarda en el dispositivo, pero cifrada mediante otra
+clave denominada <abbr title="Key Encryption Key">KEK</abbr> (clave de cifrado de la clave) que se obtiene a partir
+de una contraseña proporcionada por el usuario.</p></li>
+<li><p>Al perder su alimentación el disco, se pierde el descifrado de la <abbr title="Media Encryption Key">MEK</abbr> y los
+datos quedan otra vez ilegibles.</p></li>
+<li><p>Si el disco cifrado es disco de arranque, es preciso que se nos pida tras el
+encendido la contraseña para poder descifrar el disco e iniciar el arranque.
+Hay dos alternativas para ello:</p>
+<ul class="simple">
+<li><p>Que la propia <abbr title="Basic I/O System">BIOS</abbr> dé soporte y con él sea capaz de detectar la
+circunstancia del disco y hacer la pregunta.</p></li>
+<li><p>Que se arranque a través de un <abbr title="Universal Serial Bus">USB</abbr> externo que contenga el <em>software</em>
+apropiado.</p></li>
+</ul>
+</li>
+</ol>
+<p>Para ponerlo en práctica necesitaremos:</p>
+<ul class="simple">
+<li><p>Un disco con soporte. Para ello deberemos leer con detenimiento las
+características y comprobar si soporta <abbr title="Trusted Computing Group">TGC</abbr>/Opal. En las características
+resumidas que nos proporcione una tienda online es probable que sólo lo
+refiera como «<em>Algoritmo de seguridad soportado AES-256</em>» o una redacción
+similar.</p></li>
+<li><p>La herramientas para habilitar y manipular la seguridad: <a class="reference external" href="https://github.com/Drive-Trust-Alliance/sedutil">sedutil</a> proporcionada por la
+<cite>Drive Trust Alliancep &lt;https://drivertrust.com&gt;</cite>.</p></li>
+<li><p>Un modo para introducir la contraseña  en el momento del arranque. Si no
+disponemos de una placa base que de soporte a <abbr title="Self-Encrypting Drive">SED</abbr>, entonces podremos crear
+un pincho auxiliar con el <em>software</em> que se acaba de referir.</p></li>
+</ul>
+<div class="admonition-todo admonition" id="id1">
+<p class="admonition-title">Por hacer</p>
+<p>Explicar <strong class="program">sedutil</strong>.</p>
+</div>
+</section>
 <section id="cifrado-de-bloques-luks">
-<h2><span class="section-number">9.1.3.6.1. </span>Cifrado de bloques (<abbr title="Linux Unified Key Setup">LUKS</abbr>)<a class="headerlink" href="#cifrado-de-bloques-luks" title="Enlazar permanentemente con este título">¶</a></h2>
+<h2><span class="section-number">9.1.3.6.2. </span>Cifrado de bloques (<abbr title="Linux Unified Key Setup">LUKS</abbr>)<a class="headerlink" href="#cifrado-de-bloques-luks" title="Enlazar permanentemente con este título">¶</a></h2>
 <p>Mediante esta técnica el software hace de intermediario entre los bloques
 físicos y los bloques de un dispositivo virtual cifrando en las escrituras y
 descifrando en las lecturas.</p>
@@ -98,7 +154,7 @@ cual debemos primero instalar el <em>software</em> de cifrado:</p>
 </pre></div>
 </div>
 <p class="rubric">Operativa manual</p>
-<p>Lo primero es mapear una partición física<a class="footnote-reference brackets" href="#id4" id="id1">1</a> (p.e. <code class="file docutils literal notranslate"><span class="pre">/dev/sda6</span></code>) sobre
+<p>Lo primero es mapear una partición física<a class="footnote-reference brackets" href="#id5" id="id2">1</a> (p.e. <code class="file docutils literal notranslate"><span class="pre">/dev/sda6</span></code>) sobre
 un dispositivo virtual:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>cryptsetup -y -v luksFormat /dev/sda6  <span class="c1"># Requerirá una contraseña</span>
 <span class="gp"># </span>cryptsetup open /dev/sda6 cifrado      <span class="c1"># Debemos proporcionar la contraseña</span>
@@ -272,7 +328,7 @@ de las cuales ocupa 128 bytes (16KiB).</p></li>
 sectores, así que podemos ocupar el sector <strong>34</strong> para almacenar nuestra clave,
 con el único costo de que &quot;sólo&quot; podremos definir 124 particiones, lo cual,
 ciertamente, no parece ningún problema.</p>
-<p>Supongamos que el pincho se encuentra en <code class="file docutils literal notranslate"><span class="pre">/dev/sdb</span></code><a class="footnote-reference brackets" href="#id5" id="id2">2</a>:</p>
+<p>Supongamos que el pincho se encuentra en <code class="file docutils literal notranslate"><span class="pre">/dev/sdb</span></code><a class="footnote-reference brackets" href="#id6" id="id3">2</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>gdisk -l /dev/sdb
 <span class="go">[...]</span>
 <span class="go">Number  Start (sector)    End (sector)  Size       Code  Name</span>
@@ -345,102 +401,6 @@ cifrado del sistema, es necesario recurrir a otra estrategia totalmente
 distinta basada en manipular la imagen <a class="reference external" href="https://wiki.gentoo.org/wiki/Initramfs/Guide/es">initramfs</a>.</p>
 </div>
 </section>
-<section id="cifrado-de-directorio-gocrypts">
-<h2><span class="section-number">9.1.3.6.2. </span>Cifrado de directorio (<strong class="command">gocrypts</strong>)<a class="headerlink" href="#cifrado-de-directorio-gocrypts" title="Enlazar permanentemente con este título">¶</a></h2>
-<p>Esta estrategia permite cifrar un directorio entero, de modo que todo sobre lo
-que trabajemos dentro de él se almacenará cifrado de forma transparente. Se basa
-en el uso de un <em>software</em> intermedio que, antes de almacenar datos en el
-sistema de archivos o tras leerlos de él, cifra o descifra la información.</p>
-<img alt="../../../_images/gocryptfs.png" src="../../../_images/gocryptfs.png" />
-<p>En consecuencia:</p>
-<ul class="simple">
-<li><p>Cifrado sobre el sistema de archivos definido para un directorio.</p></li>
-<li><p>El cifrado es también independiente del sistema de archivos.</p></li>
-<li><p>Sólo nos permite cifrar datos, no el sistema operativo completo.</p></li>
-</ul>
-<p>Todo el <em>software</em> con este segundo enfoque se utiliza básicamente del mismo
-modo, de modo que pueden identificarse las siguientes operaciones básicas:</p>
-<ul class="simple">
-<li><p>La creación del directorio cifrado, que exigirá el establecimiento de la clave
-simétrica de cifrado.</p></li>
-<li><p>El montaje de dicho directorio introduciendo la clave; y el desmontaje.</p></li>
-<li><p>El cambio de la clave.</p></li>
-</ul>
-<p>Lo ilustraremos mediante <strong class="program">gocryptfs</strong>, para cuya instalación debemos
-hacer:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>apt install gocryptfs fuse
-</pre></div>
-</div>
-<p class="rubric">Operativa manual</p>
-<p>Es sumamente sencilla. Suponiendo que el directorio cifrado sea
-<code class="file docutils literal notranslate"><span class="pre">~/cipher</span></code>, podemos crearlo con:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>gocryptfs -init ~/cipher
-</pre></div>
-</div>
-<p>que nos pedirá interactivamente la contraseña (la clave simétrica) con que se
-cifrarán los datos. Con ella podremos realizar el montaje del siguiente modo:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>gocryptfs ~/cipher ~/plain
-</pre></div>
-</div>
-<p>lo cual mostrará dentro de <code class="file docutils literal notranslate"><span class="pre">~/plain</span></code> los contenidos descifrados, después de
-que facilitemos la clave. De esta forma, el usuario podrá trabajar de forma
-transparente sobre <code class="file docutils literal notranslate"><span class="pre">~/plain</span></code>, mientras el <em>software</em> se encarga de almacenar
-los datos cifrados dentro de <code class="file docutils literal notranslate"><span class="pre">~/cipher</span></code>. Al acabarse el trabajo, puede
-desmontarse el directorio:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>fusermount -u ~/plain
-</pre></div>
-</div>
-<p>Puede, además, modificarse la clave simétrica de cifrado (incluso cuando el
-directorio está montado):</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>gocryptfs -passwd ~/cipher
-</pre></div>
-</div>
-<p class="rubric">Operativa automatizada</p>
-<p>Lo óptimo y cómodo, cuando se desea que los usuarios tengan la posibilidad de
-tener un directorio cifrado, es que las operaciones se hagan de modo
-automático, de manera que al acceder al sistema el usuario tenga montado el
-directorio que da acceso a los datos sin cifrar y que al dejarlo, se produzca
-el desmontaje. Para lograrlo puede plantearse la siguiente estrategia:</p>
-<ol class="arabic simple">
-<li><p>En la medida en que el usuario no opera sobre el directorio cifrado, se lo
-ocultaremos anteponiendo a su nombre un punto. Por tanto, en vez de llamarlo
-<code class="file docutils literal notranslate"><span class="pre">~/cipher</span></code> lo llamaremos, por ejemplo, <code class="file docutils literal notranslate"><span class="pre">~/.Cifrado</span></code>. Al
-directorio que muestra los datos en claro, le daremos el mismo nombre pero
-sin anteponer el punto (<code class="file docutils literal notranslate"><span class="pre">~/Cifrado</span></code>).</p></li>
-<li><p>Haremos que la clave de cifrado coincida con la contraseña de usuario, lo
-cual propicia que durante el proceso de autenticación con <a class="reference internal" href="../../../04.servidor/09.autenticacion/index.html#pam"><span class="std std-ref">PAM</span></a>
-podamos usar la contraseña introducida para montar automáticamente el
-directorio.</p></li>
-</ol>
-<p>Establecido esto, basta con escribir un <em>script</em> que se encargue de hacer estas
-operaciones, cuyo <a class="reference download internal" download="" href="../../../_downloads/b94154dafc4bae208b297a6e66060879/mgocryptfs"><code class="xref download docutils literal notranslate"><span class="pre">código</span> <span class="pre">se</span> <span class="pre">enlaza</span></code></a> y dejarlo en
-<code class="file docutils literal notranslate"><span class="pre">/usr/local/bin/mgocryptfs</span></code>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mv /patH/donde/este/mgocryptfs /usr/local/bin
-<span class="gp"># </span>chmod +x /usr/local/bin/mgocryptfs
-</pre></div>
-</div>
-<p>y preparar <abbr title="Pluggable Authentication Modules">PAM</abbr> para que se ejecute al abrir y cerrar sesión en el sistema. La
-forma más limpia de hacerlo es creando un <a class="reference download internal" download="" href="../../../_downloads/521b27a79fdbdb4531f29ea999219d58/pam-gocryptfs"><code class="xref download docutils literal notranslate"><span class="pre">plugin</span> <span class="pre">de</span> <span class="pre">configuración</span>
-<span class="pre">como</span> <span class="pre">éste</span></code></a> que puede habilitarse del siguiente modo:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mv /path/donde/este/pam-gocryptfs /usr/share/pam-configs
-<span class="gp"># </span>pam-auth-update
-</pre></div>
-</div>
-<p>El <em>script</em>, además, incluye un aspecto accesorio más: sólo afecta a los
-usuarios que pertenezcan al grupo <em>crypto</em>, de modo que si queremos que un
-usuario monte automáticamente un directorio para guardar cifrados los datos,
-necesitaremos antes haberlo incluido en este directorio.</p>
-<p>Por último, está el problema del cambio de contraseña. Tal y como está
-configurado por defecto, cuando un usuario del grupo <em>crypto</em> accede al sistema
-y no tiene directorio de cifrado, éste se crea utilizando la contraseña de
-acceso. En consecuencia, contraseña y clave de cifrado coinciden y todo
-funciona correctamente. Ahora bien, si se nos antoja cambiar nuestra
-contraseña, la clave de cifrado seguirá siendo la antigua, por lo que para que
-el montaje automático continúe funcionado, también deberemos cambiar la clave
-de forma separada. Para ello podemos crear un <em>script</em> que haga de envoltorio a
-la orden que usemos para cambiar la contraseña. Por ejemplo, si es <a class="reference internal" href="../../../02.conbas/05.seguridad/05a.usuarios.html#passwd"><span class="std std-ref">passwd</span></a>, una posible solución (no demasiado elegante, todo sea dicho) es
-<a class="reference download internal" download="" href="../../../_downloads/8c5eac579e93a057e313b2d2552f3794/passwd"><code class="xref download docutils literal notranslate"><span class="pre">ésta</span></code></a>.</p>
-</section>
 <section id="cifrado-de-directorio-con-ext4">
 <span id="crypto-ext4"></span><h2><span class="section-number">9.1.3.6.3. </span>Cifrado de directorio (con <em>ext4</em>)<a class="headerlink" href="#cifrado-de-directorio-con-ext4" title="Enlazar permanentemente con este título">¶</a></h2>
 <p>Desde la versión <em>4.1</em> del <em>kernel</em> de Linux, <em>ext4</em> soporta el cifrado
@@ -458,7 +418,7 @@ estudiar cómo se cifra con ellos.</p></li>
 <p>Antes de empezar es necesario:</p>
 <ol class="arabic">
 <li><p>Comprobar que el tamaño de página que usa el sistema y el tamaño de bloque
-del sistema de archivos son iguales<a class="footnote-reference brackets" href="#id6" id="id3">3</a>:</p>
+del sistema de archivos son iguales<a class="footnote-reference brackets" href="#id7" id="id4">3</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>getconf PAGE_SIZE
 <span class="go">4096</span>
 <span class="gp"># </span>tune2fs -l /dev/sda5 <span class="p">|</span> awk <span class="s1">&#39;$0 ~ /^Block size:/ {print $NF}&#39;</span>
@@ -577,12 +537,108 @@ rastro de los archivos sin cifrar.</p>
 <p>Lo lógico si se desea que los usuarios tengan cifrado su directorio
 es crear un <em>script</em> para que el alta incluya el cifrado de tal directorio.</p>
 </div>
+</section>
+<section id="cifrado-de-directorio-gocrypts">
+<h2><span class="section-number">9.1.3.6.4. </span>Cifrado de directorio (<strong class="command">gocrypts</strong>)<a class="headerlink" href="#cifrado-de-directorio-gocrypts" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Esta estrategia permite cifrar un directorio entero, de modo que todo sobre lo
+que trabajemos dentro de él se almacenará cifrado de forma transparente. Se basa
+en el uso de un <em>software</em> intermedio que, antes de almacenar datos en el
+sistema de archivos o tras leerlos de él, cifra o descifra la información.</p>
+<img alt="../../../_images/gocryptfs.png" src="../../../_images/gocryptfs.png" />
+<p>En consecuencia:</p>
+<ul class="simple">
+<li><p>Cifrado sobre el sistema de archivos definido para un directorio.</p></li>
+<li><p>El cifrado es también independiente del sistema de archivos.</p></li>
+<li><p>Sólo nos permite cifrar datos, no el sistema operativo completo.</p></li>
+</ul>
+<p>Todo el <em>software</em> con este segundo enfoque se utiliza básicamente del mismo
+modo, de modo que pueden identificarse las siguientes operaciones básicas:</p>
+<ul class="simple">
+<li><p>La creación del directorio cifrado, que exigirá el establecimiento de la clave
+simétrica de cifrado.</p></li>
+<li><p>El montaje de dicho directorio introduciendo la clave; y el desmontaje.</p></li>
+<li><p>El cambio de la clave.</p></li>
+</ul>
+<p>Lo ilustraremos mediante <strong class="program">gocryptfs</strong>, para cuya instalación debemos
+hacer:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>apt install gocryptfs fuse
+</pre></div>
+</div>
+<p class="rubric">Operativa manual</p>
+<p>Es sumamente sencilla. Suponiendo que el directorio cifrado sea
+<code class="file docutils literal notranslate"><span class="pre">~/cipher</span></code>, podemos crearlo con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>gocryptfs -init ~/cipher
+</pre></div>
+</div>
+<p>que nos pedirá interactivamente la contraseña (la clave simétrica) con que se
+cifrarán los datos. Con ella podremos realizar el montaje del siguiente modo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>gocryptfs ~/cipher ~/plain
+</pre></div>
+</div>
+<p>lo cual mostrará dentro de <code class="file docutils literal notranslate"><span class="pre">~/plain</span></code> los contenidos descifrados, después de
+que facilitemos la clave. De esta forma, el usuario podrá trabajar de forma
+transparente sobre <code class="file docutils literal notranslate"><span class="pre">~/plain</span></code>, mientras el <em>software</em> se encarga de almacenar
+los datos cifrados dentro de <code class="file docutils literal notranslate"><span class="pre">~/cipher</span></code>. Al acabarse el trabajo, puede
+desmontarse el directorio:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>fusermount -u ~/plain
+</pre></div>
+</div>
+<p>Puede, además, modificarse la clave simétrica de cifrado (incluso cuando el
+directorio está montado):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>gocryptfs -passwd ~/cipher
+</pre></div>
+</div>
+<p class="rubric">Operativa automatizada</p>
+<p>Lo óptimo y cómodo, cuando se desea que los usuarios tengan la posibilidad de
+tener un directorio cifrado, es que las operaciones se hagan de modo
+automático, de manera que al acceder al sistema el usuario tenga montado el
+directorio que da acceso a los datos sin cifrar y que al dejarlo, se produzca
+el desmontaje. Para lograrlo puede plantearse la siguiente estrategia:</p>
+<ol class="arabic simple">
+<li><p>En la medida en que el usuario no opera sobre el directorio cifrado, se lo
+ocultaremos anteponiendo a su nombre un punto. Por tanto, en vez de llamarlo
+<code class="file docutils literal notranslate"><span class="pre">~/cipher</span></code> lo llamaremos, por ejemplo, <code class="file docutils literal notranslate"><span class="pre">~/.Cifrado</span></code>. Al
+directorio que muestra los datos en claro, le daremos el mismo nombre pero
+sin anteponer el punto (<code class="file docutils literal notranslate"><span class="pre">~/Cifrado</span></code>).</p></li>
+<li><p>Haremos que la clave de cifrado coincida con la contraseña de usuario, lo
+cual propicia que durante el proceso de autenticación con <a class="reference internal" href="../../../04.servidor/09.autenticacion/index.html#pam"><span class="std std-ref">PAM</span></a>
+podamos usar la contraseña introducida para montar automáticamente el
+directorio.</p></li>
+</ol>
+<p>Establecido esto, basta con escribir un <em>script</em> que se encargue de hacer estas
+operaciones, cuyo <a class="reference download internal" download="" href="../../../_downloads/b94154dafc4bae208b297a6e66060879/mgocryptfs"><code class="xref download docutils literal notranslate"><span class="pre">código</span> <span class="pre">se</span> <span class="pre">enlaza</span></code></a> y dejarlo en
+<code class="file docutils literal notranslate"><span class="pre">/usr/local/bin/mgocryptfs</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mv /patH/donde/este/mgocryptfs /usr/local/bin
+<span class="gp"># </span>chmod +x /usr/local/bin/mgocryptfs
+</pre></div>
+</div>
+<p>y preparar <abbr title="Pluggable Authentication Modules">PAM</abbr> para que se ejecute al abrir y cerrar sesión en el sistema. La
+forma más limpia de hacerlo es creando un <a class="reference download internal" download="" href="../../../_downloads/521b27a79fdbdb4531f29ea999219d58/pam-gocryptfs"><code class="xref download docutils literal notranslate"><span class="pre">plugin</span> <span class="pre">de</span> <span class="pre">configuración</span>
+<span class="pre">como</span> <span class="pre">éste</span></code></a> que puede habilitarse del siguiente modo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mv /path/donde/este/pam-gocryptfs /usr/share/pam-configs
+<span class="gp"># </span>pam-auth-update
+</pre></div>
+</div>
+<p>El <em>script</em>, además, incluye un aspecto accesorio más: sólo afecta a los
+usuarios que pertenezcan al grupo <em>crypto</em>, de modo que si queremos que un
+usuario monte automáticamente un directorio para guardar cifrados los datos,
+necesitaremos antes haberlo incluido en este directorio.</p>
+<p>Por último, está el problema del cambio de contraseña. Tal y como está
+configurado por defecto, cuando un usuario del grupo <em>crypto</em> accede al sistema
+y no tiene directorio de cifrado, éste se crea utilizando la contraseña de
+acceso. En consecuencia, contraseña y clave de cifrado coinciden y todo
+funciona correctamente. Ahora bien, si se nos antoja cambiar nuestra
+contraseña, la clave de cifrado seguirá siendo la antigua, por lo que para que
+el montaje automático continúe funcionado, también deberemos cambiar la clave
+de forma separada. Para ello podemos crear un <em>script</em> que haga de envoltorio a
+la orden que usemos para cambiar la contraseña. Por ejemplo, si es <a class="reference internal" href="../../../02.conbas/05.seguridad/05a.usuarios.html#passwd"><span class="std std-ref">passwd</span></a>, una posible solución (no demasiado elegante, todo sea dicho) es
+<a class="reference download internal" download="" href="../../../_downloads/8c5eac579e93a057e313b2d2552f3794/passwd"><code class="xref download docutils literal notranslate"><span class="pre">ésta</span></code></a>.</p>
 <p class="rubric">Notas al pie</p>
 <dl class="footnote brackets">
-<dt class="label" id="id4"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dt class="label" id="id5"><span class="brackets"><a class="fn-backref" href="#id2">1</a></span></dt>
 <dd><p>También puede ser un volumen lógico de <abbr title="Logical Volume Management">LVM</abbr>.</p>
 </dd>
-<dt class="label" id="id5"><span class="brackets"><a class="fn-backref" href="#id2">2</a></span></dt>
+<dt class="label" id="id6"><span class="brackets"><a class="fn-backref" href="#id3">2</a></span></dt>
 <dd><p>Si se observa con atención, la primera partición no empieza en 34.
 Sino más adelante. Es posible, puesto que la parte destinada a la definición
 de particiones puede ser mayor. Sin embargo, ese <abbr title="Universal Serial Bus">USB</abbr> procede de una imagen
@@ -591,7 +647,7 @@ código de un gestor de arranque. En cualquier, como <abbr title="GUID Partition
 mínimo se puedan definir 128 particiones, si escribimos en el sector 34,
 no nos cargaremos nada.</p>
 </dd>
-<dt class="label" id="id6"><span class="brackets"><a class="fn-backref" href="#id3">3</a></span></dt>
+<dt class="label" id="id7"><span class="brackets"><a class="fn-backref" href="#id4">3</a></span></dt>
 <dd><p>Al crear el sistema de archivos, <span class="xref std std-ref">mkfs.ext4</span> escoge un
 tamaño de bloque. Normalmente el tamaño es <strong>4096</strong>, pero puede ser menor, si
 la partición es muy pequeña. En cualquier caso, puede forzarse el tamaño con
@@ -612,9 +668,10 @@ la opción <kbd class="kbd docutils literal notranslate">-b</kbd>.</p>
     <h3><a href="../../../index.html">Tabla de contenido</a></h3>
     <ul>
 <li><a class="reference internal" href="#">9.1.3.6. Cifrado de discos</a><ul>
-<li><a class="reference internal" href="#cifrado-de-bloques-luks">9.1.3.6.1. Cifrado de bloques (<abbr title="Linux Unified Key Setup">LUKS</abbr>)</a></li>
-<li><a class="reference internal" href="#cifrado-de-directorio-gocrypts">9.1.3.6.2. Cifrado de directorio (<strong class="command">gocrypts</strong>)</a></li>
+<li><a class="reference internal" href="#autocifrado">9.1.3.6.1. Autocifrado</a></li>
+<li><a class="reference internal" href="#cifrado-de-bloques-luks">9.1.3.6.2. Cifrado de bloques (<abbr title="Linux Unified Key Setup">LUKS</abbr>)</a></li>
 <li><a class="reference internal" href="#cifrado-de-directorio-con-ext4">9.1.3.6.3. Cifrado de directorio (con <em>ext4</em>)</a></li>
+<li><a class="reference internal" href="#cifrado-de-directorio-gocrypts">9.1.3.6.4. Cifrado de directorio (<strong class="command">gocrypts</strong>)</a></li>
 </ul>
 </li>
 </ul>

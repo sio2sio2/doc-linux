@@ -8,14 +8,18 @@ Aunque ya hemos ilustrado cómo cifrar un archivo puntual tanto :ref:`con openss
 se pretende es almacenar archivos en disco, ya que exige cada vez que se quiera
 realizar la modificación del contenido, un descifrado y un cifrado manual. En la
 práctica, lo que se hace es cifrar la totalidad o parte de un sistema de
-archivos a fin de que todo lo incluido en esa zona este cifrado y no ser leído
-(o escrito) a menos que se conozca la contraseña. Para ponerlo en práctica hay
-cuatro estrategias.
+archivos a fin de que todo lo incluido en esa zona esté cifrado y no pueda ser
+leído (o escrito) a menos que se conozca la contraseña. Para ponerlo en práctica
+hay cuatro estrategias.
 
 #. El cifrado implementado en el propio dispositivo, que se llama |SED|.
 
 #. El cifrado de dispositivos de bloques completos (p.e. una partición), que usa
    :abbr:`LUKS (Linux Unified Key Setup)`.
+
+#. Usar las capacidades de cifrado del propio sistema de archivos, si el que
+   usamos las tiene. En el caso de *ext4*, éste soporta cifrado desde la versión
+   4.1 del kernel de *Linux*.
 
 #. El cifrado del contenido de un directorio arbitrario, que, junto a FUSE_, es
    la aproximación que usa software como:
@@ -27,16 +31,56 @@ cuatro estrategias.
    * gocryptfs_, que será el que utilicemos por no tener la limitación
      anterior.
 
-#. Usar las capacidades de cifrado del propio sistema de archivos, si el que
-   usamos las tiene. En el caso de *ext4*, éste soporta cifrado desde la versión
-   4.1 del kernel de *Linux*.
-
 Autocifrado
 ===========
-.. todo:: Explicar |SED|.
+La primera estrategia consiste en que el propio *hardware* del disco se encargue
+del cifrado del contenido. Esta estrategia es totalmente transparente para el
+sistema operativo y es la más eficiente, puesto que no consume |CPU| ni memoria
+|RAM|. Ahora bien, requiere que el disco implemente esta funcionalidad y no
+todos lo hacen.
 
-.. https://www.fmad.io/blog/what-is-a-self-encrypting-disk-sed
-.. https://www.trentonsystems.com/blog/self-encrypting-drives
+.. seealso:: El artículo `¿Qué es SED? (en inglés)
+   <https://www.fmad.io/blog/what-is-a-self-encrypting-disk-sed>`_ explica
+   cuáles son las tres posibilidades respecto al cifrado que podemos encontrar
+   en los dispositivos de almacenamiento. Este apartado refiere la última
+   (cifrado con bloqueo), mientras que la segunda (cifrado sin bloqueo) refiere
+   la que se trata en el :ref:`epígrafe sobre borrado seguro <hdparm>`.
+
+Esta capacidad del disco para cifrar sus propios datos y bloquear así el acceso
+no autorizado se la denomina |SED| y se desarrolla en la especificación
+|TGC|/Opal. Los principios de este cifrado son los siguientes:
+
+#. Todos los datos se guardan cifrados mediante una clave simétrica llamada
+   |MEK| (clave de cifrado del medio).
+#. La clave anterior se guarda en el dispositivo, pero cifrada mediante otra
+   clave denominada |KEK| (clave de cifrado de la clave) que se obtiene a partir
+   de una contraseña proporcionada por el usuario.
+#. Al perder su alimentación el disco, se pierde el descifrado de la |MEK| y los
+   datos quedan otra vez ilegibles.
+#. Si el disco cifrado es disco de arranque, es preciso que se nos pida tras el
+   encendido la contraseña para poder descifrar el disco e iniciar el arranque.
+   Hay dos alternativas para ello:
+
+   + Que la propia |BIOS| dé soporte y con él sea capaz de detectar la
+     circunstancia del disco y hacer la pregunta.
+   + Que se arranque a través de un |USB| externo que contenga el *software*
+     apropiado.
+
+Para ponerlo en práctica necesitaremos:
+
+* Un disco con soporte. Para ello deberemos leer con detenimiento las
+  características y comprobar si soporta |TGC|/Opal. En las características
+  resumidas que nos proporcione una tienda online es probable que sólo lo
+  refiera como "*Algoritmo de seguridad soportado AES-256*" o una redacción
+  similar.
+* La herramientas para habilitar y manipular la seguridad: `sedutil
+  <https://github.com/Drive-Trust-Alliance/sedutil>`_ proporcionada por la
+  `Drive Trust Alliancep <https://drivertrust.com>`.
+* Un modo para introducir la contraseña  en el momento del arranque. Si no
+  disponemos de una placa base que de soporte a |SED|, entonces podremos crear
+  un pincho auxiliar con el *software* que se acaba de referir.
+
+.. todo:: Explicar :program:`sedutil`.
 
 Cifrado de bloques (|LUKS|)
 ===========================
@@ -315,111 +359,6 @@ encuentre el pincho::
    distinta basada en manipular la imagen `initramfs
    <https://wiki.gentoo.org/wiki/Initramfs/Guide/es>`_.
 
-Cifrado de directorio (:command:`gocrypts`)
-===========================================
-Esta estrategia permite cifrar un directorio entero, de modo que todo sobre lo
-que trabajemos dentro de él se almacenará cifrado de forma transparente. Se basa
-en el uso de un *software* intermedio que, antes de almacenar datos en el
-sistema de archivos o tras leerlos de él, cifra o descifra la información.
-
-.. image:: files/gocryptfs.png
-
-En consecuencia:
-
-- Cifrado sobre el sistema de archivos definido para un directorio.
-- El cifrado es también independiente del sistema de archivos.
-- Sólo nos permite cifrar datos, no el sistema operativo completo.
-
-Todo el *software* con este segundo enfoque se utiliza básicamente del mismo
-modo, de modo que pueden identificarse las siguientes operaciones básicas:
-
-* La creación del directorio cifrado, que exigirá el establecimiento de la clave
-  simétrica de cifrado.
-
-* El montaje de dicho directorio introduciendo la clave; y el desmontaje.
-
-* El cambio de la clave.
-
-Lo ilustraremos mediante :program:`gocryptfs`, para cuya instalación debemos
-hacer::
-
-   # apt install gocryptfs fuse
-
-.. rubric:: Operativa manual
-
-Es sumamente sencilla. Suponiendo que el directorio cifrado sea
-:file:`~/cipher`, podemos crearlo con::
-
-   $ gocryptfs -init ~/cipher
-
-que nos pedirá interactivamente la contraseña (la clave simétrica) con que se
-cifrarán los datos. Con ella podremos realizar el montaje del siguiente modo::
-
-   $ gocryptfs ~/cipher ~/plain
-
-lo cual mostrará dentro de :file:`~/plain` los contenidos descifrados, después de
-que facilitemos la clave. De esta forma, el usuario podrá trabajar de forma
-transparente sobre :file:`~/plain`, mientras el *software* se encarga de almacenar
-los datos cifrados dentro de :file:`~/cipher`. Al acabarse el trabajo, puede
-desmontarse el directorio::
-
-   $ fusermount -u ~/plain
-
-Puede, además, modificarse la clave simétrica de cifrado (incluso cuando el
-directorio está montado)::
-
-   $ gocryptfs -passwd ~/cipher
-
-.. rubric:: Operativa automatizada
-
-Lo óptimo y cómodo, cuando se desea que los usuarios tengan la posibilidad de
-tener un directorio cifrado, es que las operaciones se hagan de modo
-automático, de manera que al acceder al sistema el usuario tenga montado el
-directorio que da acceso a los datos sin cifrar y que al dejarlo, se produzca
-el desmontaje. Para lograrlo puede plantearse la siguiente estrategia:
-
-#. En la medida en que el usuario no opera sobre el directorio cifrado, se lo
-   ocultaremos anteponiendo a su nombre un punto. Por tanto, en vez de llamarlo
-   :file:`~/cipher` lo llamaremos, por ejemplo, :file:`~/.Cifrado`. Al
-   directorio que muestra los datos en claro, le daremos el mismo nombre pero
-   sin anteponer el punto (:file:`~/Cifrado`).
-
-#. Haremos que la clave de cifrado coincida con la contraseña de usuario, lo
-   cual propicia que durante el proceso de autenticación con :ref:`PAM <pam>`
-   podamos usar la contraseña introducida para montar automáticamente el
-   directorio.
-
-Establecido esto, basta con escribir un *script* que se encargue de hacer estas
-operaciones, cuyo :download:`código se enlaza <files/mgocryptfs>` y dejarlo en
-:file:`/usr/local/bin/mgocryptfs`::
-
-   # mv /patH/donde/este/mgocryptfs /usr/local/bin
-   # chmod +x /usr/local/bin/mgocryptfs
-
-y preparar |PAM| para que se ejecute al abrir y cerrar sesión en el sistema. La
-forma más limpia de hacerlo es creando un :download:`plugin de configuración
-como éste <files/pam-gocryptfs>` que puede habilitarse del siguiente modo::
-
-   # mv /path/donde/este/pam-gocryptfs /usr/share/pam-configs
-   # pam-auth-update
-
-El *script*, además, incluye un aspecto accesorio más: sólo afecta a los
-usuarios que pertenezcan al grupo *crypto*, de modo que si queremos que un
-usuario monte automáticamente un directorio para guardar cifrados los datos,
-necesitaremos antes haberlo incluido en este directorio.
-
-Por último, está el problema del cambio de contraseña. Tal y como está
-configurado por defecto, cuando un usuario del grupo *crypto* accede al sistema
-y no tiene directorio de cifrado, éste se crea utilizando la contraseña de
-acceso. En consecuencia, contraseña y clave de cifrado coinciden y todo
-funciona correctamente. Ahora bien, si se nos antoja cambiar nuestra
-contraseña, la clave de cifrado seguirá siendo la antigua, por lo que para que
-el montaje automático continúe funcionado, también deberemos cambiar la clave
-de forma separada. Para ello podemos crear un *script* que haga de envoltorio a
-la orden que usemos para cambiar la contraseña. Por ejemplo, si es :ref:`passwd
-<passwd>`, una posible solución (no demasiado elegante, todo sea dicho) es
-:download:`ésta <files/passwd>`.
-
 .. _crypto-ext4:
 
 Cifrado de directorio (con *ext4*)
@@ -557,6 +496,111 @@ rastro de los archivos sin cifrar.
 .. note:: Lo lógico si se desea que los usuarios tengan cifrado su directorio
    es crear un *script* para que el alta incluya el cifrado de tal directorio.
 
+Cifrado de directorio (:command:`gocrypts`)
+===========================================
+Esta estrategia permite cifrar un directorio entero, de modo que todo sobre lo
+que trabajemos dentro de él se almacenará cifrado de forma transparente. Se basa
+en el uso de un *software* intermedio que, antes de almacenar datos en el
+sistema de archivos o tras leerlos de él, cifra o descifra la información.
+
+.. image:: files/gocryptfs.png
+
+En consecuencia:
+
+- Cifrado sobre el sistema de archivos definido para un directorio.
+- El cifrado es también independiente del sistema de archivos.
+- Sólo nos permite cifrar datos, no el sistema operativo completo.
+
+Todo el *software* con este segundo enfoque se utiliza básicamente del mismo
+modo, de modo que pueden identificarse las siguientes operaciones básicas:
+
+* La creación del directorio cifrado, que exigirá el establecimiento de la clave
+  simétrica de cifrado.
+
+* El montaje de dicho directorio introduciendo la clave; y el desmontaje.
+
+* El cambio de la clave.
+
+Lo ilustraremos mediante :program:`gocryptfs`, para cuya instalación debemos
+hacer::
+
+   # apt install gocryptfs fuse
+
+.. rubric:: Operativa manual
+
+Es sumamente sencilla. Suponiendo que el directorio cifrado sea
+:file:`~/cipher`, podemos crearlo con::
+
+   $ gocryptfs -init ~/cipher
+
+que nos pedirá interactivamente la contraseña (la clave simétrica) con que se
+cifrarán los datos. Con ella podremos realizar el montaje del siguiente modo::
+
+   $ gocryptfs ~/cipher ~/plain
+
+lo cual mostrará dentro de :file:`~/plain` los contenidos descifrados, después de
+que facilitemos la clave. De esta forma, el usuario podrá trabajar de forma
+transparente sobre :file:`~/plain`, mientras el *software* se encarga de almacenar
+los datos cifrados dentro de :file:`~/cipher`. Al acabarse el trabajo, puede
+desmontarse el directorio::
+
+   $ fusermount -u ~/plain
+
+Puede, además, modificarse la clave simétrica de cifrado (incluso cuando el
+directorio está montado)::
+
+   $ gocryptfs -passwd ~/cipher
+
+.. rubric:: Operativa automatizada
+
+Lo óptimo y cómodo, cuando se desea que los usuarios tengan la posibilidad de
+tener un directorio cifrado, es que las operaciones se hagan de modo
+automático, de manera que al acceder al sistema el usuario tenga montado el
+directorio que da acceso a los datos sin cifrar y que al dejarlo, se produzca
+el desmontaje. Para lograrlo puede plantearse la siguiente estrategia:
+
+#. En la medida en que el usuario no opera sobre el directorio cifrado, se lo
+   ocultaremos anteponiendo a su nombre un punto. Por tanto, en vez de llamarlo
+   :file:`~/cipher` lo llamaremos, por ejemplo, :file:`~/.Cifrado`. Al
+   directorio que muestra los datos en claro, le daremos el mismo nombre pero
+   sin anteponer el punto (:file:`~/Cifrado`).
+
+#. Haremos que la clave de cifrado coincida con la contraseña de usuario, lo
+   cual propicia que durante el proceso de autenticación con :ref:`PAM <pam>`
+   podamos usar la contraseña introducida para montar automáticamente el
+   directorio.
+
+Establecido esto, basta con escribir un *script* que se encargue de hacer estas
+operaciones, cuyo :download:`código se enlaza <files/mgocryptfs>` y dejarlo en
+:file:`/usr/local/bin/mgocryptfs`::
+
+   # mv /patH/donde/este/mgocryptfs /usr/local/bin
+   # chmod +x /usr/local/bin/mgocryptfs
+
+y preparar |PAM| para que se ejecute al abrir y cerrar sesión en el sistema. La
+forma más limpia de hacerlo es creando un :download:`plugin de configuración
+como éste <files/pam-gocryptfs>` que puede habilitarse del siguiente modo::
+
+   # mv /path/donde/este/pam-gocryptfs /usr/share/pam-configs
+   # pam-auth-update
+
+El *script*, además, incluye un aspecto accesorio más: sólo afecta a los
+usuarios que pertenezcan al grupo *crypto*, de modo que si queremos que un
+usuario monte automáticamente un directorio para guardar cifrados los datos,
+necesitaremos antes haberlo incluido en este directorio.
+
+Por último, está el problema del cambio de contraseña. Tal y como está
+configurado por defecto, cuando un usuario del grupo *crypto* accede al sistema
+y no tiene directorio de cifrado, éste se crea utilizando la contraseña de
+acceso. En consecuencia, contraseña y clave de cifrado coinciden y todo
+funciona correctamente. Ahora bien, si se nos antoja cambiar nuestra
+contraseña, la clave de cifrado seguirá siendo la antigua, por lo que para que
+el montaje automático continúe funcionado, también deberemos cambiar la clave
+de forma separada. Para ello podemos crear un *script* que haga de envoltorio a
+la orden que usemos para cambiar la contraseña. Por ejemplo, si es :ref:`passwd
+<passwd>`, una posible solución (no demasiado elegante, todo sea dicho) es
+:download:`ésta <files/passwd>`.
+
 .. rubric:: Notas al pie
 
 .. [#] También puede ser un volumen lógico de |LVM|.
@@ -580,6 +624,12 @@ rastro de los archivos sin cifrar.
 .. |GRUB| replace:: :abbr:`GRUB (GRand Unified Bootloader)`
 .. |DOS| replace:: :abbr:`DOS (Disk Operating System)`
 .. |SED| replace:: :abbr:`SED (Self-Encrypting Drive)`
+.. |CPU| replace:: :abbr:`CPU (Central Processing Unit)`
+.. |RAM| replace:: :abbr:`RAM (Random Access Memory)`
+.. |MEK| replace:: :abbr:`MEK (Media Encryption Key)`
+.. |KEK| replace:: :abbr:`KEK (Key Encryption Key)`
+.. |BIOS| replace:: :abbr:`BIOS (Basic I/O System)`
+.. |TGC| replace:: :abbr:`TGC (Trusted Computing Group)`
 
 .. _FUSE: https://es.wikipedia.org/wiki/Sistema_de_archivos_en_el_espacio_de_usuario
 .. _encfs: https://github.com/vgough/encfs

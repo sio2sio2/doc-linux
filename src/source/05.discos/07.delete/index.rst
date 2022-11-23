@@ -252,6 +252,10 @@ de eliminar de manera segura los datos contenidos en ellos.
    .. warning:: La información contenida aquí es aplicable exclusivamente a discos
       |SATA|, no a discos |SCSI|, |SAS| o |NVMe|.
 
+   .. seealso:: Para hacer un borrado análogo con discos |NVMe| puede consultar `el
+      artículo de la wiki de Archilinux sobre borrado seguro
+      <https://wiki.archlinux.org/title/Solid_state_drive/Memory_cell_clearing#NVMe_drive>`_.
+
    Las discos modernos |SATA| disponen todos de la característica de *borrado
    seguro* (*secure erase*). Hay dos variantes, *normal* y *mejorada*, que
    vienen estupendamente explicadas en `esta respuesta de securityexchage
@@ -309,18 +313,13 @@ de eliminar de manera segura los datos contenidos en ellos.
 
    .. note:: Fijar la contraseña bloquea el disco como puede comprobarse si se
       echa un vistazo a la salida de :command:`hdparm`. Si tras el borrado el
-      disco side bloqueado, aunque puede desbloquearse (consulte la página del
+      disco sigue bloqueado, aún puede desbloquearse (consulte la página del
       manual).
 
    .. note:: Los fabricantes de discos suelen facilitar aplicaciones que
       permiten el borrado seguro de sus propios discos. En principio, deberían
       hacer exactamente lo mismo que nosotros hacemos con :command:`hdparm`,
       pero con una interfaz más amigable.
-
-   .. seealso:: Para hacer un borrado análogo con discos |NVMe| puede consultar `el
-      artículo de la wiki de Archilinux sobre borrado seguro
-      <https://wiki.archlinux.org/title/Solid_state_drive/Memory_cell_clearing#NVMe_drive>`_.
-   
 
 .. https://grok.lsu.edu/article.aspx?articleid=16716
    https://linuxhint.com/securely-delete-files-from-my-ssd/
