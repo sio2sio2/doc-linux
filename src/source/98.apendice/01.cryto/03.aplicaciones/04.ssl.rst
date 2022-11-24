@@ -39,7 +39,7 @@ de servidor y cliente tanto mediante el uso de simples claves como mediante el
 uso de certificados, aunque éstos tienen un formato propio ajeno al estándar de
 los :ref:`certificados digitales X.509 <cert-digital>`.
 
-Es pertienente para este epígrafe estudiar cómo funciona la :ref:`autenticación
+Es pertinente para este epígrafe estudiar cómo funciona la :ref:`autenticación
 de clave pública <ssh-cert>` y sus dos variantes:
 
 + :ref:`Autenticación con claves <ssh-auth-keys>`.
@@ -58,9 +58,9 @@ encapsular el protocolo |HTTP| (y crear |HTTP|\ s) en los navegadores Netscape_.
 establece un encapsulamiento cifrado bajo el cual circula el protocolo plano sin
 modificaciones. Su funcionamiento básicamente es el siguiente:
 
-* Los extremos establecen una conexión segura según explicado en para el
-  :ref:`cifrado híbrido <hibrido>`. de manera que cuando la clave simétrica se
-  encuentra en ambos extremos, el túnel está listo para funcionar.
+* Los extremos establecen una conexión segura según lo explicado en el
+  :ref:`cifrado híbrido <hibrido>` a fin de que la clave simétrica esté presente
+  en ambos extremos y pueda establecerse el túnel.
 * En el cliente, la comunicación en el protocolo arbitrario se cifra gracias a
   |SSL| y se envía al servidor donde el protocolo |SSL| se encarga de descifrar
   y entregar la comunicación en claro al servidor.
@@ -290,7 +290,7 @@ servidor hacemos::
 
    u@servidor:~$ openssl s_server -port 12345 -cert tunnel.pem -key tunnel.pem -quiet
 
-quedará escuchando el servicio en el puerto **10443**. Por su parte, en el
+quedará escuchando el servicio en el puerto **12345**. Por su parte, en el
 cliente podemos hacer::
 
    u@cliente:~$ openssl s_client -connect IP.DEL.SERVIDOR:12345 -quiet
@@ -298,18 +298,18 @@ cliente podemos hacer::
 Y podremos conversar entre ambas máquinas de manera que lo se escribe en un
 extremo se ve en el otro, pero los mensajes viajarán cifrados entre ambos
 extremos. Nuestra intención, no obstante, no es ésta, sino tunelizar cualquier
-servicio. Para ello supongamos que tenemos un servicio en el servidor escuchando
-en el puerto **12345**\ [#]_::
+servicio. Para ello supongamos que tenemos un servicio inseguro escuchando
+en el puerto **10443**\ [#]_ del servidor::
 
-   u@servidor:~$ netcat -l -s localhost -p 12345
+   u@servidor:~$ netcat -l -s localhost -p 10443
 
 :kbd:`openssl s_server`. desgraciadamente, sólo puede escribir en pantalla y
 leer de teclado, así que no tiene capacidad para utilizar como entrada/salida el
-puerto **12345** que es en realidad lo que realmente necesitamos. Sin embargo,
+puerto **10443** que es en realidad lo que realmente necesitamos. Sin embargo,
 podemos :ref:`usar con destreza las redirecciones <exec>` para suplir esta carencia::
 
-   u@servidor:~$ exec 3<>/dev/tcp/localhost/12345
-   u@servidor:~$ openssl s_server -port 10443 -cert cert.pem -key cert.key -quiet <&3 >&3
+   u@servidor:~$ exec 3<>/dev/tcp/localhost/10443
+   u@servidor:~$ openssl s_server -port 12345 -cert cert.pem -key cert.key -quiet <&3 >&3
 
 esto es, hacemos que el descriptor **3** lea y escriba en el puerto en el que
 escucha nuestro servicio y redirigimos :command:`openssl` para que lea y escriba
@@ -320,15 +320,23 @@ En el cliente tenemos el mismo problema: :kbd:`openssl s_client` utiliza entrada
 y salida estándar y no hay forma de que exponga un puerto de escucha para que un
 cliente (el cliente correspondiente al servicio anterior) pueda comunicarse
 con él para que le sirva de intérprete. Sin embargo también tenemos una
-argucia\ [#]_::
+argucia::
 
-   u@cliente:~$ netcat -l -s localhost -p 11111 -c "openssl s_client -connect IP.DEL.SERVIDOR:10443 -quiet"
+   u@cliente:~$ netcat -l -s localhost -p 11111 -c "openssl s_client -connect IP.DEL.SERVIDOR:12345 -quiet"
 
-Ahora bastará con usar el programa cliente para que se conecte al puerto
-**11111** de la interfaz local. Como hemos usado como servidor
-:command:`netcat`, tendremos que usar también :command:`netcat` en el cliente::
+que consiste en poner a escuchar a :command:`netcat` en un puerto local pero
+haciendo que su entrada/salida no sea la entrada y salida estándar sino la
+entrada/salida de :command:`openssl`, que se encarga de cifrar/descifrar y
+comunicarse con el otro extremo.  Ahora bastará con usar el programa cliente
+para que se conecte al puerto **11111** de la interfaz local. Como nuestro
+servicio en el servidor lo montamos con :command:`netcat`, tendremos que usar
+como cliente :command:`netcat`::
 
    u@cliente:~$ netcat localhost 11111
+
+El esquema de conexiones es el siguiente:
+
+.. image:: files/openssl-tunel.png
 
 .. note:: Es obvio que hemos complicado todo muchísimo en el ejemplo para acabar
    teniendo el mismo resultado que cuando se usaron :kbd:`openssl s_client` y
@@ -405,11 +413,6 @@ Y listo, la comunicación ya puede establecerse::
 .. [#] En realidad, sólo escucha en la interfaz de *loopback*, ya que como el
    servicio es inseguro, no queremos que nadie externo a la máquina se conecte a
    él.
-
-.. [#] Aunque esta argucia, a diferencia de la que se usó en la parte servidor,
-   no es una solución general. Con otros clientes habría que estudiar otra
-   triquiñuela distinta (p.e. con :ref:`ssh <ssh>` puede usarse
-   :ref:`ProxyCommand <ssh-https>`).
 
 .. |TLS| replace:: :abbr:`TLS (Transport Layer Security)`
 .. |SSL| replace:: :abbr:`SSL (Secure Socket Layer)`

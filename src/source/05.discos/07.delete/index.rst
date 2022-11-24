@@ -321,33 +321,18 @@ de eliminar de manera segura los datos contenidos en ellos.
       hacer exactamente lo mismo que nosotros hacemos con :command:`hdparm`,
       pero con una interfaz más amigable.
 
-.. https://grok.lsu.edu/article.aspx?articleid=16716
-   https://linuxhint.com/securely-delete-files-from-my-ssd/
-   https://www.tomshardware.com/how-to/secure-erase-ssd-or-hard-drive  --> para windows
-   https://tinyapps.org/docs/wipe_drives_hdparm.html
+.. Enlaces de interés:
 
-   + Explica cómo usar hdparm para borrar discos PATA/SATA (sean HDD o SSD).
-   + Investigar también nwipe (que usa dban y sirve para discos magnéticos).
-   + Investigar Erase Secure Command, que es la funcionalidad del firmware de los
-     discos que permite su borrado. Hay dos modalidades:
+   1. Para añadir al apartado correspondiente del módulo de Seguridad (la parte de
+      diskpart en Windows):
+      https://www.tomshardware.com/how-to/secure-erase-ssd-or-hard-drive
 
-     - Normal: Que equivale a  sobrescribir con 0.
-     - Mejorada: Que debería servir para borrar datos de forma segura.
+   2. Leerlo para comprobar si es de interés la información técnica:
+      https://blog.elcomsoft.com/2019/01/life-after-trim-using-factory-access-mode-for-imaging-ssd-drives/
 
-   - ¿Y cambiar la clave de cifrado? ¿A qué equivale eso? ¿Cómo se consulta si
-     el disco lo soporta?
-
-.. https://unix.stackexchange.com/questions/659931/how-secure-is-blkdiscard
-   https://blog.elcomsoft.com/2019/01/life-after-trim-using-factory-access-mode-for-imaging-ssd-drives/
-   https://geekland.eu/trim-debemos-activarlo-ssd/
-   https://www.zeitgeist.se/2014/09/07/enabling-ata-security-on-a-self-encrypting-ssd/
-   # Para NVMe
-   https://unix.stackexchange.com/questions/472211/list-features-of-nvme-drive-like-hdparm-i-for-non-nvme
-   https://wiki.archlinux.org/title/Solid_state_drive/Memory_cell_clearing
-
-.. Herramientas de borrado:
-   https://www.genbeta.com/herramientas/siete-herramientas-gratis-para-borrar-de-forma-segura-tus-discos-duros-hdd-o-ssd
-
+   3. Cómo activar TRIM cada semana (quizás poner el cómo en un pie de página):
+      https://geekland.eu/trim-debemos-activarlo-ssd/
+   
 .. rubric:: Notas al pie
 
 .. [#] De ahí, que existan :ref:`aplicaciones para recuperar archivos
