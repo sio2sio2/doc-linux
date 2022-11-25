@@ -30,8 +30,8 @@ tenemos dos opciones:
 
 .. _borrado-sobre:
 
-Técnicas basadas en sobrescritura
-=================================
+Estrategia basada en sobrescritura
+==================================
 .. warning:: No use estas técnicas con dispositivos |SSD|. En realidad, tampoco
    son recomendables para discos magnéticos (|HDD|) modernos por las razones que
    se expondrán a continuación. Son más recomendables las :ref:`técnicas basadas
@@ -57,6 +57,9 @@ de escritura estándar. Son técnicas **nada recomendables**, puesto que:
     probable es que el *firmware* del disco elija escribir otros bloques
     distintos a los que ocupa el archivo y los bloques en que se encontraban
     éstos, simplemente, los marque como vacíos.
+ 
+- Desde hace tiempo todos los discos permiten usar la segunda estrategia, así
+  que utilizar esta carece de sentido. 
 
 :ref:`dd <dd>`  (o :ref:`cat <cat>`)
    Ya se ha explicado su uso. Ambas herramientas nos servirían para
@@ -161,8 +164,8 @@ de escritura estándar. Son técnicas **nada recomendables**, puesto que:
 
 .. _borrado-firmware:
 
-Técnicas basadas en *firmware*
-==============================
+Estrategia basada en el *firmware*
+==================================
 Los discos modernos poseen *firmware* con capacidad para ayudarnos en la tarea
 de eliminar de manera segura los datos contenidos en ellos.
 
@@ -193,6 +196,22 @@ de eliminar de manera segura los datos contenidos en ellos.
    podría obtenerse un nuevo bloque vacío:
 
    .. image:: files/flash-nand-post.png
+
+   .. note:: Si no se utiliza *TRIM*, el *firmware* tendrá que realizar esta
+      operación de liberar bloques para poder escribir cuando no tenga más
+      remedio; y eso es bastante menos eficiente que lanzar periódicamente este
+      comando y que el disco reagrupe datos para liberar bloques cuando no tenga
+      excesiva carga. En consecuencia, es muy recomendable configurar el sistema
+      operativo para que cada semana dé una orden *TRIM* a los discos |SSD|.
+      Puede consultar cómo hacerlo en `este artículo de geekland
+      <https://geekland.eu/activar-trim-correctemente-linux/>`_.
+
+   .. seealso:: El `blog de Elcomsoft <https://blog.elcomsoft.com/>`_ tiene
+      una interesantísima `entrada de Oleg Afonin sobre cómo funciona el borrado
+      en los SSD
+      <https://blog.elcomsoft.com/2019/01/life-after-trim-using-factory-access-mode-for-imaging-ssd-drives/>`_.
+      En realidad, son `tres las entradas dedicadas a las unidades SSD
+      <https://blog.elcomsoft.com/tag/ssd/>`_.
 
    .. _blkdiscard:
 
@@ -229,9 +248,9 @@ de eliminar de manera segura los datos contenidos en ellos.
       respuesta de unix.stackexchange.com sobre el asunto
       <https://unix.stackexchange.com/q/472211>`_.
 
-   Este mismo comando TRIM nos sirve para conseguir el borrado seguro de uno o
+   Este mismo comando *TRIM* nos sirve para conseguir el borrado seguro de uno o
    varios archivos. La estrategia consiste en borrar los archivos que deseemos
-   y, a continuación, enviar una orden TRIM al disco para que descarte las
+   y, a continuación, enviar una orden *TRIM* al disco para que descarte las
    páginas con ínformación borrada::
 
       # rm -f /home/usuario/archivo.secretisimo.txt
@@ -251,6 +270,11 @@ de eliminar de manera segura los datos contenidos en ellos.
 **Borrado seguro**
    .. warning:: La información contenida aquí es aplicable exclusivamente a discos
       |SATA|, no a discos |SCSI|, |SAS| o |NVMe|.
+
+   .. note:: Los fabricantes de discos suelen facilitar aplicaciones que
+      permiten el borrado seguro de sus propios discos. En principio, deberían
+      hacer exactamente lo mismo que nosotros hacemos con :command:`hdparm`,
+      pero con una interfaz más amigable.
 
    .. seealso:: Para hacer un borrado análogo con discos |NVMe| puede consultar `el
       artículo de la wiki de Archilinux sobre borrado seguro
@@ -316,23 +340,11 @@ de eliminar de manera segura los datos contenidos en ellos.
       disco sigue bloqueado, aún puede desbloquearse (consulte la página del
       manual).
 
-   .. note:: Los fabricantes de discos suelen facilitar aplicaciones que
-      permiten el borrado seguro de sus propios discos. En principio, deberían
-      hacer exactamente lo mismo que nosotros hacemos con :command:`hdparm`,
-      pero con una interfaz más amigable.
+   .. seealso:: La introducción de una contraseña tiene que ver con la seguridad
+      |ATA|. Si quiere saber más sobre el asunto puede leer el esclarecedor
+      artículo `Using the ATA security features of modern hard disks and SSDs
+      <https://www.admin-magazine.com/Archive/2014/19/Using-the-ATA-security-features-of-modern-hard-disks-and-SSDs>`_.
 
-.. Enlaces de interés:
-
-   1. Para añadir al apartado correspondiente del módulo de Seguridad (la parte de
-      diskpart en Windows):
-      https://www.tomshardware.com/how-to/secure-erase-ssd-or-hard-drive
-
-   2. Leerlo para comprobar si es de interés la información técnica:
-      https://blog.elcomsoft.com/2019/01/life-after-trim-using-factory-access-mode-for-imaging-ssd-drives/
-
-   3. Cómo activar TRIM cada semana (quizás poner el cómo en un pie de página):
-      https://geekland.eu/trim-debemos-activarlo-ssd/
-   
 .. rubric:: Notas al pie
 
 .. [#] De ahí, que existan :ref:`aplicaciones para recuperar archivos
@@ -345,6 +357,7 @@ de eliminar de manera segura los datos contenidos en ellos.
 .. |SAS| replace:: :abbr:`SAS (Serial Attached SCSI)`
 .. |SCSI| replace:: :abbr:`SCSI (Small Computer System Interface)`
 .. |NVMe| replace:: :abbr:`NVMe (Non-Volatile Memory Express)`
+.. |ATA| replace:: :abbr:`ATA (Advanced Technology Attachment)`
 
 .. _DBAN: https://hipertextual.com/2018/12/borrado-seguro-disco-dban
 .. _DoD 5220.22-M: https://www.bitraser.com/article/DoD-5220-22-m-standard-for-drive-erasure.php
