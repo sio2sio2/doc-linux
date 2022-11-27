@@ -27,7 +27,7 @@ En el caso que queremos resolver, tenemos tres agentes:
    pues.  como intermediario entre el *solicitante* y el servidor |RADIUS|.
    
 
-.. image:: /guias/02.seg/04.redes/files/radius.png
+.. image:: /guias/0226.seg/04.redes/files/radius.png
 
 Para establecer un canal seguro de comunicación sobre el que discurra el
 proceso de autenticación y autorización se utiliza |EAP|, que más que un

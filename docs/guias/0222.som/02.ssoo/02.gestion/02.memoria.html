@@ -1,0 +1,337 @@
+
+
+
+<!DOCTYPE html>
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>2.2.2. Gestión de memoria &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/classic.css" />
+    <link rel="stylesheet" href="../../../../_static/custom.css" type="text/css" />
+    
+    <script data-url_root="../../../../" id="documentation_options" src="../../../../_static/documentation_options.js"></script>
+    <script src="../../../../_static/jquery.js"></script>
+    <script src="../../../../_static/underscore.js"></script>
+    <script src="../../../../_static/doctools.js"></script>
+    <script src="../../../../_static/translations.js"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <link rel="index" title="Índice" href="../../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../../search.html" />
+    <link rel="next" title="2.2.3. Gestión de Entrada/Salida" href="03.io.html" />
+    <link rel="prev" title="2.2.1. Gestión de procesos" href="01.procesos.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="03.io.html" title="2.2.3. Gestión de Entrada/Salida"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="01.procesos.html" title="2.2.1. Gestión de procesos"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Sistemas Operativos Monopuesto</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" ><span class="section-number">2. </span>Sistemas operativos</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../02.gestion.html" accesskey="U"><span class="section-number">2.2. </span>Funciones</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">2.2.2. </span>Gestión de memoria</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="gestion-de-memoria">
+<h1><span class="section-number">2.2.2. </span>Gestión de memoria<a class="headerlink" href="#gestion-de-memoria" title="Enlazar permanentemente con este título">¶</a></h1>
+<p>Antes de estudiar cómo gestiona el sistema operativo la memoria, es preciso
+recordar dos aspectos ya señalados:</p>
+<ul>
+<li><p>La ejecución de todo programa supone que tanto su código como los datos que
+manipula se copien en la memoria <abbr title="Random Access Memory">RAM</abbr>.</p></li>
+<li><p>La memoria está dividida en celdas cuyo contenido constituye una
+<em class="dfn">palabra</em>, por lo general de un byte, cada una de las cuales se
+referencia mediante una dirección de memoria única. Al total de la memoria se
+lo denomina <em class="dfn">espacio físico de memoria</em>. Por ejemplo, para una memoria
+<abbr title="Random Access Memory">RAM</abbr> de 16 MiB, el espacio de memoria va desde la dirección <code class="docutils literal notranslate"><span class="pre">0x000000</span></code> a la
+dirección <code class="docutils literal notranslate"><span class="pre">0xFFFFFF</span></code>:</p>
+<img alt="../../../../_images/espaciomemoria.png" src="../../../../_images/espaciomemoria.png" />
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Obsérvese que si la última dirección de memoria es la <code class="docutils literal notranslate"><span class="pre">0xFFFFFF</span></code>,
+existen <span class="math notranslate nohighlight">\(2^4*2^4*2^4*2^4*2^4*2^4 = 2^{24}\)</span> celdas de memoria. Como cada
+celda es de 1 <em>byte</em>, el tamaño de la memoria es de <span class="math notranslate nohighlight">\(2^{24} =
+2^4*2^{10}*2^{10}\)</span> B o, lo que es lo mismo, 16 MB.</p>
+</div>
+<p>A las direcciones que identifican a cada una de las celdas posibles del
+<em>espacio físico de memoria</em> se las denomina <em class="dfn">direcciones físicas de
+memoria</em>.</p>
+</li>
+</ul>
+<p>El espacio físico de memoria está bastante limitado (la memoria <abbr title="Random Access Memory">RAM</abbr> es cara),
+por lo que una labor muy importante del sistema operativo es gestionar cómo los
+procesos utilizarán esta memoria.</p>
+<section id="ocupacion-de-memoria">
+<h2><span class="section-number">2.2.2.1. </span>Ocupación de memoria<a class="headerlink" href="#ocupacion-de-memoria" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Al crear un proceso, sus necesidades de memoria son las siguientes:</p>
+<ul class="simple">
+<li><p>Un <abbr title="Process Control Block">PCB</abbr>, cuyos metadatos requiere el sistema operativo para gestionarlo.</p></li>
+<li><p>Un <strong>espacio virtual de memoria</strong> en el que se almacenan el código y
+los datos que manipula. El <em class="dfn">espacio virtual de memoria</em> de un proceso es
+la parte del <em>espacio físico de memoria</em> que ocupa dicho proceso. Las celdas
+de este espacio virtual se referencian mediante <em class="dfn">direcciones virtuales de
+memoria</em> relativas a su comienzo.</p></li>
+</ul>
+<p>Estas <em>direcciones virtuales</em> son con las que trabaja internamente cada
+proceso.por lo que es necesario hacer una traducción entre ellas y las
+direcciones físicas. La encargada de ello es una parte del procesador llamada
+<em class="dfn">Unidad de manejo de memoria</em> (<abbr title="Memory Management Unit">MMU</abbr> por sus siglas en inglés).</p>
+<p>Por otra parte, el espacio virtual, a su vez, se compone de cuatro espacios:</p>
+<ul class="simple">
+<li><p><strong>Código</strong>, que es espacio reservado para las instrucciones del programa
+y que, obviamente, no varía a lo largo de la ejecución del proceso.</p></li>
+<li><p><strong>Datos</strong>, que se corresponden con los datos iniciales del programa
+y que, aunque puedan cambiar de valor, no cambian su tamaño.</p></li>
+<li><p><strong>Montículo</strong>, que contiene los datos que se crean dinámicamente durante
+la ejecución. Este espacio es dinámico y, por tanto, de tamaño variable
+durante la ejecución.</p></li>
+<li><p><strong>Pila</strong>, que contiene las llamadas anidadas a fragmentos distintos de código
+cada uno de los cuales tiene un contexto propio, esto es, un conjunto de datos
+distintos. Es necesario mantener la pila, porque un fragmento de código, sin
+haber terminado su ejecución, puede crear otro y pasar a ejecutar este. Como
+al terminar este segundo, se vuelve al primer fragmento, es necesario recordar
+por cuál instrucción iba la ejecución en el momento del salto y cuáles eran
+los datos que se manejaban entonces. Este espacio también es variable:
+comienza no ocupando memoria y crece y decrece durante la ejecución según haya
+más o menos contextos anidados.</p></li>
+</ul>
+<p>Al comienzo del espacio virtual, esto es, en la dirección virtual <code class="docutils literal notranslate"><span class="pre">0x0</span></code>, se
+colocan el <em>código</em> y los <em>datos</em>, ambos espacios de tamaño fijo. El
+<em>monticulo</em>, que al iniciar el programa no tendrá ningún tamaño empieza a crecer
+a continuación y la <em>pila</em>, que también es variable, se coloca al final del
+espacio y empieza a crecer hacia direcciones virtuales de memoria más bajas.</p>
+<img alt="../../../../_images/segmeprog.png" src="../../../../_images/segmeprog.png" />
+</section>
+<section id="tecnicas">
+<h2><span class="section-number">2.2.2.2. </span>Técnicas<a class="headerlink" href="#tecnicas" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Existen distintas técnicas para asignar memoria a los procesos, dependiendo de
+si un espacio virtual debe ocupar direcciones contiguas de memoria física, o
+si los espacios virtuales pueden trocearse y cada trozo albergase en en
+posiciones no contiguas de memoria física:</p>
+<table class="gestion-memoria docutils align-default" id="id1">
+<caption><span class="caption-text">Resumen de técnicas de gestión de memoria</span><a class="headerlink" href="#id1" title="Enlace permanente a esta tabla">¶</a></caption>
+<colgroup>
+<col style="width: 31%" />
+<col style="width: 42%" />
+<col style="width: 27%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Espacio virtual</p></th>
+<th class="head"><p>Técnica</p></th>
+<th class="head"><p>Fragmentación</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td rowspan="2"><p>Indivisible</p></td>
+<td><p>Particiones fijas</p></td>
+<td><p>Interna</p></td>
+</tr>
+<tr class="row-odd"><td><p>Particiones dinámicas</p></td>
+<td><p>Externa</p></td>
+</tr>
+<tr class="row-even"><td rowspan="2"><p>Divisble</p></td>
+<td><p>Paginación</p></td>
+<td><p>Interna</p></td>
+</tr>
+<tr class="row-odd"><td><p>Segmentación</p></td>
+<td><p>Externa</p></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition seealso">
+<p class="admonition-title">Ver también</p>
+<p>Como complemento a las explicaciones vertidas aquí sobre las
+técnicas de gestión puede consultar <a class="reference external" href="https://www.youtube.com/watch?v=hMhPTWUJX_M">este esclarecedor vídeo de Juan V.
+Carrilo sobre asignación de memoria</a>.</p>
+</div>
+<section id="particiones">
+<h3><span class="section-number">2.2.2.2.1. </span>Particiones<a class="headerlink" href="#particiones" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>En esta solución la memoria se divide en bloques que ocupan direcciones
+contiguas de memoria física, a los que se denomina <em class="dfn">partición</em>. Cada
+partición comienza en una dirección de memoria, que se denomina <em class="dfn">registro
+base</em> y tiene un tamaño concreto que determina cuál es su <em class="dfn">registro
+límite</em>. En esta técnica a cada proceso se le asigna una única partición y una
+partición sólo puede estar ocupada por un único proceso. El sistema operativo
+se encarga de mantener el registro de dónde comienza cada partición, cuánto
+tamaño tiene y qué proceso la está ocupando. Como todo proceso debe caber en un
+partición, esto obliga a que los espacios virtuales de memoria sean pequeños
+(como máximo el tamaño de la partición mayor).</p>
+<p>El particionado puede ser de dos tipos:</p>
+<dl>
+<dt><strong>Fijo</strong></dt><dd><p>La memoria se particiona de antemano, de manera que las particiones son
+fijas, aunque no todas tienen por qué tener el mismo tamaño. Su principal
+desventaja es que los espacios virtuales de los procesos no casan en tamaño
+exactamente con las particiones, por lo que la parte de la partición que no
+haya sido ocupada por el proceso al que se le ha asignado, no puede
+aprovecharse. Esta circunstancia se denomina <em class="dfn">fragmentación interna</em>.</p>
+<img alt="../../../../_images/part-fijas.png" src="../../../../_images/part-fijas.png" />
+</dd>
+<dt><strong>Dinámico</strong></dt><dd><p>Las particiones se van creando ajustándose al tamaño de cada proceso. En
+este caso, no existe <em>fragmentación interna</em>; pero, cuando un proceso acaba,
+se libera la partición que ocupa el proceso extinto con lo que resulta un
+espacio libre igual al tamaño de su espacio virtual de memoria. Este espacio
+puede ser ocupado parcialmente por otro nuevo proceso que requiere algo menos
+de memoria, lo que quizás suponga que el hueco aún libre sea tan pequeño que
+no pueda albergar nuevos procesos. En este caso se habla de
+<em class="dfn">fragmentación externa</em>.</p>
+<img alt="../../../../_images/part-dinamicas.png" src="../../../../_images/part-dinamicas.png" />
+</dd>
+</dl>
+</section>
+<section id="paginacion">
+<h3><span class="section-number">2.2.2.2.2. </span>Paginación<a class="headerlink" href="#paginacion" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>En la técnica de las particiones cada proceso ocupa siempre direcciones de
+memoria contiguas. La paginación, en cambio, no exige eso. En ella, el sistema
+operativo divide el espacio de memoria física en bloques de tamaño fijo, a los
+que se denomina <em class="dfn">frames</em>, y el espacio virtual de memoria de cada proceso
+en bloques llamados <em class="dfn">páginas</em> que tienen el mismo tamaño que los <em>frames</em>.
+Tanto páginas como <em>frames</em> se numeran correlativamente.</p>
+<p>La técnica consiste en asociar a cada página un <em>frame</em> distinto, pero sin la
+necesidad de que a las páginas de un proceso se le asignen <em>frames</em> contiguos.
+Para ello el sistema operativo crea para cada proceso una tabla de paginación
+que lleva el control de estas asignaciones. En el <abbr title="Process Control Block">PCB</abbr> deberá existir un
+puntero a la correspondiente tabla de paginación.</p>
+<p>La técnica sigue produciendo <em>fragmentación interna</em>, pero en mucha menor medida
+que la técnica de particiones fijas, ya que las páginas son de manor tamaño que
+las particiones.</p>
+<img alt="../../../../_images/paginacion.png" src="../../../../_images/paginacion.png" />
+</section>
+<section id="segmentacion">
+<h3><span class="section-number">2.2.2.2.3. </span>Segmentación<a class="headerlink" href="#segmentacion" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Esta técnica consiste en fragmentar el espacio virtual de memoria en bloques,
+llamados <em class="dfn">segmentos</em> (que no tienen que tener igual tamaño) dentro de los
+cuales se almacena información que comparta algo en común. Estos segmentos se
+asignan a espacio en la memoria física que no tiene que ser contiguo, de manera
+que el sistema operativo irá buscando huecos libres para ubicarlos.</p>
+<p>El sistema operativo debe crear para cada proceso una tabla con todos los
+segmentos de los que se compone indicando qué dirección física ocupa y cuál es
+su tamaño. Esta técnica, como la de <em>particiones dinámicas</em> presenta
+<em>fragmentación externa</em>, pero en mucha menor medida; puesto que los segmentos
+son más pequeños que las particiones dinámicas.</p>
+</section>
+<section id="memoria-virtual">
+<h3><span class="section-number">2.2.2.2.4. </span>Memoria virtual<a class="headerlink" href="#memoria-virtual" title="Enlazar permanentemente con este título">¶</a></h3>
+<p>Esta técnica, que se compagina con la de paginación o segmentación, permite
+alojar en memoria <abbr title="Random Access Memory">RAM</abbr> no todo el proceso, sino sólo las páginas o segmentos
+del fragmento de código y los datos que se estén ejecutando; el resto se guarda
+en memoria secundaria y se rescata de ella, cuando se necesite.</p>
+<p>Ahora bien, como la memoria secundaria es muchísimo más lenta, la memoria
+virtual sólo se usa en caso de que sea estrictamente necesario, esto es, cuando
+el proceso que se quiere cargar en memoria necesita más espacio de la memoria
+disponible. También es posible que el sistema decida que de otro proceso ya
+cargado en memoria <abbr title="Random Access Memory">RAM</abbr> todo o parte pase a memoria virtual. Al volver a la
+memoria principal, no tendrá por qué ocupar las mismas direcciones de memorias.</p>
+<p>La zona de la memoria secundaria que se usa como memoria de intercambio no es
+caprichosa, es una zona especial reservada para tal fin que se llama memoria de
+intercambio, memoria <em>swap</em> o, simplemente, <em>swap</em>. En los sistemas <em>Windows</em>
+se usa un fichero definido para tal fin; en los sistemas <em>linux</em>, aunque es
+posible el uso del fichero, es común, la creación de una partición especial en
+el disco duro dedicada exclusivamente a este fin.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Hacer demasiado uso de la memoria de intercambio penaliza el
+rendimiento, y es señal de que debemos ir pensando en aumentar la memoria
+<abbr title="Random Access Memory">RAM</abbr> del equipo.</p>
+</div>
+</section>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="../../../../index.html">Tabla de contenido</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">2.2.2. Gestión de memoria</a><ul>
+<li><a class="reference internal" href="#ocupacion-de-memoria">2.2.2.1. Ocupación de memoria</a></li>
+<li><a class="reference internal" href="#tecnicas">2.2.2.2. Técnicas</a><ul>
+<li><a class="reference internal" href="#particiones">2.2.2.2.1. Particiones</a></li>
+<li><a class="reference internal" href="#paginacion">2.2.2.2.2. Paginación</a></li>
+<li><a class="reference internal" href="#segmentacion">2.2.2.2.3. Segmentación</a></li>
+<li><a class="reference internal" href="#memoria-virtual">2.2.2.2.4. Memoria virtual</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Tema anterior</h4>
+    <p class="topless"><a href="01.procesos.html"
+                          title="capítulo anterior"><span class="section-number">2.2.1. </span>Gestión de procesos</a></p>
+  </div>
+  <div>
+    <h4>Próximo tema</h4>
+    <p class="topless"><a href="03.io.html"
+                          title="próximo capítulo"><span class="section-number">2.2.3. </span>Gestión de Entrada/Salida</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../../_sources/guias/0222.som/02.ssoo/02.gestion/02.memoria.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="03.io.html" title="2.2.3. Gestión de Entrada/Salida"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="01.procesos.html" title="2.2.1. Gestión de procesos"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" >Sistemas Operativos Monopuesto</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" ><span class="section-number">2. </span>Sistemas operativos</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../02.gestion.html" ><span class="section-number">2.2. </span>Funciones</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">2.2.2. </span>Gestión de memoria</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor CC BY 4.0, 2016-2022, José Miguel Sánchez Alés.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.5.0.
+    </div>
+  </body>
+</html>
