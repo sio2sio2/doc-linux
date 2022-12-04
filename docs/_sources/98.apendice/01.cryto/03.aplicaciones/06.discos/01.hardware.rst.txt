@@ -1,0 +1,432 @@
+Cifrado por *hardware*
+======================
+También conocido como *autocifrado*. Gracias a que es propio *hardware* del
+disco el que encarga de su cifrado, la estrategia es totalmente transparente
+para el sistema operativo y es la más eficiente, puesto que no consume |CPU| ni
+memoria |RAM|. Ahora bien, requiere que el disco implemente esta funcionalidad
+y no todos lo hacen.
+
+.. note:: El artículo `¿Qué es SED? (en inglés)
+   <https://www.fmad.io/blog/what-is-a-self-encrypting-disk-sed>`_ explica
+   cuáles son las tres posibilidades respecto al cifrado que podemos encontrar
+   en los dispositivos de almacenamiento. Este apartado refiere la última
+   (cifrado con bloqueo), mientras que la segunda (cifrado sin bloqueo) refiere
+   la que se trata en el :ref:`epígrafe sobre borrado seguro <hdparm>`. De
+   hecho, en un cifrado sin bloqueo  puede habilitarse la seguridad |ATA| que
+   utiliza también una contraseña para bloquear el acceso a disco. Sin embargo,
+   esta contraseña no tiene relación criptográfica con la clave de cifrado:
+   simplemente el *firmware* impide el acceso si no se proporciona la contraseña,
+
+.. warning:: En el cifrado por *hardware* pueden parecer todo ventajas, pero
+   el *firmware* puede presentar vulnerabilidades `como ya ha ocurrido en varias
+   ocasiones
+   <https://www.stationx.net/think-your-ssd-offers-rock-solid-encryption-heres-why-its-time-to-think-again/>`_.
+   Y es que, a diferencia de un cifrado por *software* donde este puede ser
+   libre (todas las alternativas que se presentan aquí lo son), el cifrado por
+   *hardware* lo realiza el *firmware* cerrado del dispositivo, que es mucho más
+   difícilmente auditable.
+
+A esta capacidad del disco para cifrar sus propios datos y bloquear así el
+acceso no autorizado se la denomina |SED| y se desarrolla en la especificación
+|TGC|/Opal. Para almacenamiento de servidor existe otra especificación llamada
+|TGC| Enterprise.
+
+.. seealso:: Puede ver algunas de las diferencias entre ambas especificaciones
+   en el artículo `Trusted Computing Group Opal vs Enterprise SEDs
+   <https://winmagic.com/blog/trusted-computing-group-opal-vs-seds/>`_.
+
+Los principios de este cifrado son los siguientes:
+
+#. Todos los datos se guardan cifrados mediante una clave simétrica llamada
+   |MEK| (clave de cifrado del medio).
+#. La clave anterior se guarda en el dispositivo, pero cifrada mediante otra
+   clave denominada |KEK| (clave de cifrado de la clave) que se obtiene a partir
+   de una contraseña proporcionada por el usuario.
+#. Al perder su alimentación el disco, se pierde el descifrado de la |MEK| y los
+   datos quedan otra vez ilegibles.
+#. Si el disco cifrado es disco de arranque, es preciso que se pida antes de
+   su lectura la contraseña, por lo que su introducción requiere una
+   |BIOS| con soporte o cargar un *software* competente.
+
+Para ponerlo en práctica esta estrategia necesitaremos:
+
+#. Un disco con soporte. Para ello deberemos leer con detenimiento las
+   características y comprobar si soporta |TGC|/Opal. En las características
+   resumidas que nos proporcione una tienda online es probable que sólo lo
+   refiera como "*Algoritmo de seguridad soportado AES-256*" o una redacción
+   similar.
+#. Una herramienta para habilitar y manipular la seguridad:
+
+   + En *Linux*, podemos usar `sedutil
+     <https://github.com/Drive-Trust-Alliance/sedutil>`_ proporcionada por la
+     `Drive Trust Alliance <https://drivetrust.com>`_.
+   + En *Windows*, BitLocker_ permite seleccionar el uso de cifrado por
+     *hardware*.
+
+Conceptos previos
+-----------------
+Antes de intentar manipular el acceso a un disco con cifrado es importante
+conocer algunos conceptos que se encuentran ampliamente explicados en el
+documento `A Practical Guide to Use of Opal Drives
+<http://develop.trustedcomputinggroup.org/wp-content/uploads/2019/05/Opal_Drive_Guide_v1_Final_20190515.pdf>`_.
+
+:dfn:`PBA`
+   Es el *software* encargado de pedir la contraseña que desbloquea un disco
+   de arranque. Si la placa tiene soporte para Opal el propio *firmware* de la
+   placa puede asumir esta función, pero, si no es así, este *software* deberá
+   ejecutarse antes de cualquier lectura sobre el disco, de ahí su nombre
+   |PBA|: *autorización previa al arranque*.
+
+.. _sed-shadowmbr:
+
+:dfn:`Shadow  MBR`
+   No es propiamente un |MBR| (en el sentido clásico del término), sino un
+   espacio de 128 MiB que, cuando está habilitado, suplanta los 128 MiB
+   iniciales del disco y las lecturas y escrituras se redirigen hacia estos 128
+   MiB en vez de a los 128 MiB habituales. Las escrituras, no obstante, están
+   vetadas y sólo se pueden llevar a cabo a través del :ref:`software
+   especialidado para SED <sedutil-cli>`.
+
+   En realidad, no basta con que esté habilitado, puesto que existe otro
+   parámetro llamado "Done" que puede estar habilitado o deshabilitado. Cuando
+   está deshabilitado, es cuando propiamente el *Shadow* |MBR| suplanta el
+   inicio del disco.
+
+   Dicho lo cual, ¿cuál es la razón de todo esto? Es sencilla: la de poder
+   albergar un |PBA| que permita el desbloqueo del disco. Así, de fábrica el
+   bloqueo está deshabilitado  y, consecuentemente, también lo está el *Shadow*
+   |MBR|. Al bloquear con contraseña el dispositivo, se habilita el *Shadow*
+   |MBR| (que debe contener el |PBA|) y se deshabilita el "Done". Debido a esto,
+   al arrancar por ese disco, se leerá el |PBA| del *Shadow* |MBR| y se nos
+   pedirá la contraseña. Si ésta es correcta, se podrá descifrar el disco, se
+   habilitará el "Done" y se hará un reinicio automático. Este reinicio vuelve
+   a arrancar por el disco, pero al encontrarse habilitado "Done", se leerá el
+   inicio del disco que ocultaba el *Shadow* |MBR| y podrá iniciarse el sistema
+   operativo que contuviera el disco. El disco permenecerá en ese estado de
+   desbloqueo hasta que pierda alimentación. Cuando eso ocurre, será imposible
+   descifrarlo y se deshabilitará "Done" para que un arranque posterior permita
+   de nuevo la introducción de la contraseña.
+
+.. _sed-rangos:
+
+:dfn:`Rangos` (o :dfn:`Bandas`)
+   Son distintas áreas de disco constituidas por espacio contiguo, que no se
+   solapan entre sí y que pueden ser bloqueadas de manera independiente. El
+   *Shadow* |MBR|, queda fuera de la definición de estas áreas. Hay predefinida
+   una, la **0**, que se denomina :dfn:`rango global` y que abarca todo el
+   disco, y 15 más que pueden ser definidas por el usuario. Lo más lógico es que
+   su definición, de hacerse, coincidiera con particiones de disco.
+
+**Proveedores de seguridad**
+   En Opal hay definidos dos |SP| hasta la fecha:
+
+   **Admin SP**
+      cuyos usuario se encargan de administrar el resto de |SP|.
+
+   **Locking SP**
+      cuyos usuarios gestionan los rangos del disco.
+
+.. _sed-usuarios:
+
+**Usuarios**
+   Dado que hay dos |SP|, hay usuarios distintos definidos dentro de ambos:
+
+   **Admin SP**
+      Tiene definidos dos:
+
+      + el |SID|, que tiene todos los permisos de administración y cuyo valor
+        coincide inicialmente con el |MSID|, consultable a través de la |API|.
+      + el |PSID|, que se encuentra escrito habitualmente sobre el propio frontal
+        del disco y sólo tiene el permiso de :ref:`resetear por completo el
+        disco <sed-reset>` en caso de haber olvidado todas las contraseñas.
+        Gracias a él, podremos reutilizar un disco del que se hayan olvidado o
+        se desconozcan las contraseñas.
+
+   **Locking SP**
+      Que puede llegar a tener hasta 20 usuarios de dos tipos:
+
+      + Cuatro administradores (**admin1**, .. , **admin4**), de los cuales sólo
+        el primero esta inicialmente habilitado con la contraseña del |MSID|.
+
+      + Hasta 16 usuarios denominados **user1**, .. **user16**, deshabilitados
+        todos inicialmente. Cada usuario podría gestionar el bloqueo de los
+        rangos que le hubieran sido conferidos.
+
+.. Probar a crear usuarios: https://github.com/ladar/sedutil#user-passwords
+
+.. _sedutil-cli:
+
+Configuración
+-------------
+.. _sed-rescue-img:
+
+.. note:: Las herramientas ya compiladas podemos descargarlas del `github de
+   sedutil
+   <https://github.com/Drive-Trust-Alliance/sedutil/wiki/Executable-Distributions>`_
+   y utilizarlas en cualquier linux, pero lo más recomendable es descargar la imagen
+   :file:`RESCUE64.img.gz` y pasarla a un pincho |USB|::
+
+      # zcat RESCUE64.img.gz > /dev/sdz
+
+   Luego, podremos arrancar el ordenador desde este *Linux* mínimo que contiene
+   todas las herramientas necesarias.
+
+.. seealso:: Las `instrucciones oficiales
+   <https://github.com/Drive-Trust-Alliance/sedutil/wiki/Encrypting-your-drive>`_
+   se encuentran en   la wiki de sedutil.
+
+**Comprobaciones de soporte**
+   .. note:: Si no se usa el disco de rescate, antes de intentar cualquier
+      operación, es necesario que estén habilitados los |ATA| *trusted commands*, lo
+      cual se logra fijando el valor del parámetro del núcleo ``libata.allow_tpm``
+      a **1** mediante la adición de la opción :kbd:`libata.allow_tpm=1` en el
+      arranque.
+
+   Supuesto esto, podremos usar ya la orden :command:`sedutil-cli` para
+   comprobar el soporte de nuestros discos::
+
+      # sedutil-cli --scan
+      Scanning for Opal compliant disks
+      /dev/sda    2  Samsung SSD 870 EVO 250GB                SVT02B6Q
+      /dev/sdb   No  Flash Disk       8.07
+      No more disks present ending scan
+
+   Tenemos, pues, que nuestro :file:`sda` soporta cifrado por *hardware*: el
+   **2** indica que soporta la |TGC|/Opal 2.0\ [#]_. Ahora bien, ¿en qué estado
+   se encuentra?::
+
+      # sedutil-cli --query | grep Locked
+         Locked = N, LockingEnabled = N, LockingSupported = Y, MBRDone = N, MBREnabled = N, MediaEncfrypt = Y
+
+   El disco no está bloqueado (``Locked``), no tienen habilitado el bloqueo,
+   (``LockingEnabled``) y, por supuesto, no tiene habilitado el *Shadow* |MBR|
+   (``MBREnabled``)\ [#]_. En estas circunstancias (que son las que trae de
+   fábrica), el disco se comportará como cualquier otro sin soporte para Opal.
+
+   Además, el disco de rescate proporciona la orden :command:`linuxpba` que
+   realiza la acción equivalente al |PBA| y, por tanto, permite desbloquear el
+   disco tras introducir la contraseña. Si la usamos ahora que no hemos aún
+   configurado nada:
+
+   .. code-block:: bash
+      :emphasize-lines: 3
+
+      # linuxpba
+      Please enter pass-phrase to unlock  OPAL drives:
+      Drive /dev/sda Samsung SSD 870 EVO 250GB                 is OPAL NOT LOCKED
+      Drive /dev/sdb                                           not OPAL
+
+   que requiere como contraseña *debug*, ya que aún no hemos establecido
+   ninguna. El sistema, además, no reiniciaría en estas circunstancias.
+
+**Habilitación del bloqueo**
+   Una vez que hemos hecho las comprobaciones iniciales y sabiendo ya que
+   :file:`sda` tiene soporte para Opal, deberemos:
+
+   #. Habilitar el bloqueo (haremos un bloqueo global sobre todo el disco)::
+
+         # sedutil-cli --initialsetup debug /dev/sda
+         # sedutil-cli --enablelockingrange 0 debug /dev/sda
+         # sedutil-cli --setlockingrange 0 lk debug /dev/sda
+
+      .. note:: En el caso de que el disco, al intentar inicializar el bloqueo,
+         nos devuelva el error::
+
+            # sedutil-cli --initialsetup debug /dev/sda
+            method status code NOT_AUTHORIZED
+
+         debemos antes ejecutar la siguiente orden::
+
+            # sedutil-cli --psidrevert CODIGO.LARGUISIMO /dev/sda
+
+         El código se encuentra escrito en la parte frontal del propio disco.
+
+   #. Instalar el |PBA| en el *Shadow* |MBR|::
+
+         # gunzip /usr/sedutil/UEFI64-1.20.img.gz
+         # sedutil-cli --loadpbaimage debug /usr/sedutil/UEFI64-1.20.img /dev/sda
+
+      Si comprobamos el estado de bloqueo::
+
+         # sedutil-cli --query | grep Locked
+            Locked = Y, LockingEnabled = Y, LockingSupported = Y, MBRDone = Y, MBREnabled = Y, MediaEncfrypt = Y
+
+      Lo cual implica que el disco está ya bloqueado y el *Shadow* |MBR|
+      habilitado. Sin embargo, el "Done" está también habilitado, por lo que
+      el *Shadow* |MBR| no será visible y el |PBA| no se ejecutará al arrancar.
+      Podemos, no obstante, solucionarlo fácilmente::
+
+         # sedutil-cli --setmbrdone off debug /dev/sda
+
+      Ahora sí podemos probar a reiniciar y arrancar por el disco :file:`sda`.
+      Debería pedirnos la contraseña de desbloqueo (que sigue siendo "*debug*").
+      Sin embargo, como aún seguimos con la contraseña predeterminada, el
+      equipo no reiniciará, sino que nos presentará una *shell* como la del
+      disco de rescate. Consultemos el estado::
+
+         # sedutil-cli --query | grep Locked
+            Locked = N, LockingEnabled = Y, LockingSupported = Y, MBRDone = N, MBREnabled = Y, MediaEncfrypt = Y
+
+      Es hora de que establezcamos una contraseña:
+
+   #. Establecer la contraseña::
+
+         # sedutil-cli --setsidpassword debug micontraseñasecreta /dev/sda
+         # sedutil-cli --setadmin1pwd debug micontraseñasecreta /dev/sda
+
+      .. warning:: |PBA| sólo soporta teclado americano. Téngalo presente: un ";"
+         estará en la tecla :kbd:`Ñ`, no en donde indique nuestro teclado hispano.
+
+   #. Bloquear y desbloquear:
+
+      Como el disco se encuentra desbloqueado, volvamos a bloquearlo::
+
+         # sedutil-cli --setlockingrange 0 lk micontraseñasecreta /dev/sda
+
+      .. note:: Obsérvese que ya tenemos que usar la nueva contraseña para
+         gestionar |SED|.
+
+      Finalmente::
+
+         # sedutil-cli --query | grep Locked
+            Locked = Y, LockingEnabled = Y, LockingSupported = Y, MBRDone = N, MBREnabled = Y, MediaEncfrypt = Y
+
+      Ahora al reiniciar e intentar arrancar el disco, debería pedirnos la nueva
+      contraseña y, tras introducirla correctamente, desbloquear y reiniciar el
+      equipo con el *Shadow* |MBR| invisible. 
+
+      Si arrancamos algún sistema en el que podamos ejecutar
+      :command:`sedutil-cli` (por ejemplo, el disco de rescate), el estado habrá
+      quedado así::
+
+         # sedutil-cli --query | grep Locked
+            Locked = N, LockingEnabled = Y, LockingSupported = Y, MBRDone = Y, MBREnabled = Y, MediaEncfrypt = Y
+
+      El desbloqueo debería mantenerse mientras el disco reciba alimentación. Si
+      en algún momento la cortamos, el disco pasará de nuevo a estar bloqueado::
+
+         # sedutil-cli --query | grep Locked
+            Locked = Y, LockingEnabled = Y, LockingSupported = Y, MBRDone = N, MBREnabled = Y, MediaEncfrypt = Y
+
+      Y así continuará mientras no se introduzca la contraseña.
+
+**Desbloqueo manual**
+   Si no hemos usado el |PBA|, podemos desbloquear un disco con un *Linux* haciendo::
+
+      # sedutil-cli --setlockingrange 0 rw micontraseñasecreta /dev/sda
+      # sedutil-cli --setmbrdone on micontraseñasecreta /dev/sda
+      # partx -d /dev/sda  # Eliminamos la tabla de particiones obsoleta.
+      # partx -a /dev/sda  # Leemos la nueva tabla de particiones.
+
+**Bloqueo manual**
+   Si queremos bloquear un disco desbloqueado sin necesidad de cortarle la
+   alimentación::
+
+      # sedutil-cli --setlockingrange 0 lk micontraseñasecreta /dev/sda
+      # sedutil-cli --setmbrdone off micontraseñasecreta /dev/sda
+      # reboot
+
+   Y al reiniciar deberíamos observar que, efectivamente, está bloqueado.
+
+**Deshabilitar/habilitar el bloqueo**
+   Si decidimos deshabilitar el bloqueo indefinidamente, podemos hacer lo
+   siguiente::
+
+      # sedutil-cli --disablelockingrange 0 micontraseñasecreta /dev/sda
+      # sedutil-cli --setmbrenable off micontraseñasecreta /dev/sda
+
+   o sea, deshabilitamos en sí el bloqueo y también el *Shadow* |MBR| para que
+   no moleste, con lo que el estado queda::
+
+         # sedutil-cli --query | grep Locked
+            Locked = N, LockingEnabled = Y, LockingSupported = Y, MBRDone = N, MBREnabled = N, MediaEncfrypt = Y
+
+   La operación contraria será::
+
+      # sedutil-cli --enablelockingrange 0 micontraseñasecreta /dev/sda
+      # sedutil-cli --setmbrenable on micontraseñasecreta /dev/sda
+      # sedutil-cli --setmbrdone off micontraseñasecreta /dev/sda
+
+   Y el estado resultante::
+
+         # sedutil-cli --query | grep Locked
+            Locked = Y, LockingEnabled = Y, LockingSupported = Y, MBRDone = N, MBREnabled = Y, MediaEncfrypt = Y
+
+.. _sed-reset:
+
+**Reseteo**
+   Por último, puede interesarnos volver a dejar el disco en el estado inicial,
+   para lo cual antes debemos asegurarnos de que el disco **está desbloqueado**
+   (:kbd:`Locked = N`). En principio, hay dos posibilidades:
+
+   a. Resetearlo eliminando todos los datos que pudiera contener::
+
+         # sedutil-cli --resettper micontraseña /dev/sda
+
+      lo cual provocará el estado inicial::
+
+         # sedutil-cli --query | grep Locked
+            Locked = N, LockingEnabled = N, LockingSupported = Y, MBRDone = N, MBREnabled = N, MediaEncfrypt = Y
+
+      esto es, :kbd:`LockingEnable = N`.
+
+   #. Resetearlo manteniendo los datos (aunque esto `pueden no soportarlo todos
+      los discos y borrarlos igualmente
+      <https://github.com/Drive-Trust-Alliance/sedutil/wiki/Remove-OPAL>`_)::
+
+         # sedutil-cli --revertnoerase micontraseña /dev/sda
+      
+      Ahora debemos comprobar el estado::
+
+         # sedutil-cli --query | grep Locked
+            Locked = N, LockingEnabled = N, LockingSupported = Y, MBRDone = N, MBREnabled = N, MediaEncfrypt = Y
+
+      y solo en caso de que esté deshabilitado el bloqueo (:kbd:`LockingEnable = N`), rematar con::
+
+         # sedutil-cli --reverttper micontraseña /dev/sda
+
+      porque, de lo contrario, este último paso **borrará todos los datos**.
+
+      .. note:: Lo que sí se borra es el |PBA| del *Shadow* |MBR|, por lo que si
+         vuelve a querer habilitarse el bloqueo, no podremos saltar el paso de
+         su instalación.
+
+   Ahora bien, ¿qué pasa si no podemos desbloquearlo ni sabemos las contraseñas?
+   Entonces tenemos una última posibilidad:
+
+   c. Resetearlo por completo eliminando todos los datos, pero sin conocer la
+      contraseña. Esta circunstancia puede darse cuando la hemos olvidado o
+      recibimos un disco cifrado del que desconocemos la contraseña, pero
+      queremos aprovecharlo llenándolo con nuevos datos::
+
+         # sedutil-cli --yesireallywanttoeraseallmydatausingthepsid PSID /dev/sda 
+
+      Del PSID ya hemos hablado al :ref:`tratar los usuarios <sed-usuarios>`.
+
+.. rubric:: Notas al pie
+
+.. [#] También podremos encontrar un **12** que indica que soporta tanto la
+   versión 1.0 como la 2.0.
+.. [#] Pero sí esta cifrado. En realidad, la información en disco siempre se
+   cifra. De hecho, gracias a eso :ref:`puede realizarse un borrado seguro y
+   rápido del disco <hdparm>`.
+
+.. |USB| replace:: :abbr:`USB (Universal Serial Bus)`
+.. |SED| replace:: :abbr:`SED (Self-Encrypting Drive)`
+.. |MBR| replace:: :abbr:`MBR (Master Boot Record)`
+.. |CPU| replace:: :abbr:`CPU (Central Processing Unit)`
+.. |RAM| replace:: :abbr:`RAM (Random Access Memory)`
+.. |MEK| replace:: :abbr:`MEK (Media Encryption Key)`
+.. |KEK| replace:: :abbr:`KEK (Key Encryption Key)`
+.. |BIOS| replace:: :abbr:`BIOS (Basic I/O System)`
+.. |TGC| replace:: :abbr:`TGC (Trusted Computing Group)`
+.. |ATA| replace:: :abbr:`ATA (Advanced Technology Attachment)`
+.. |SATA| replace:: :abbr:`SATA (Serial Advanced Technology Attachment)`
+.. |PBA| replace:: :abbr:`PBA (Pre Boot Authorization)`
+.. |SP| replace:: :abbr:`SP (Service Provider)`
+.. |API| replace:: :abbr:`API (Application Programming Interface)`
+.. |SID| replace:: :abbr:`SID (Security IDentifier)`
+.. |PSID| replace:: :abbr:`PSID (Physical Security IDentifier)`
+.. |MSID| replace:: :abbr:`PSID (Manufacter's Secure IDentifier)`
+
+.. _Bitlocker: https://es.wikipedia.org/wiki/BitLocker_Drive_Encryption

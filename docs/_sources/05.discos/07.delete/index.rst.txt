@@ -24,9 +24,9 @@ tenemos dos opciones:
 #. Utilizar **técnicas de borrado efectivo** de los datos, que será a lo que
    propiamente dediquemos el epígrafe.
 
-.. warning:: Si realmente se dispone de datos sensibles, cífralos. Eso evitará
-   problemas cuando quiera prescindir del dispositivo de almacenamiento, pero
-   también durante su vida útil.
+.. warning:: Si realmente dispone de datos sensibles, :ref:`cífrelos
+   <disk-encrypt>`. Eso evitará problemas cuando quiera prescindir del
+   dispositivo de almacenamiento, pero también durante su vida útil.
 
 .. _borrado-sobre:
 

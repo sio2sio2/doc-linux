@@ -56,6 +56,8 @@ Citaremos dos clasificaciones:
 
   .. image:: files/proxytransparente.png
 
+.. _proxies-freq:
+
 *Proxies* frecuentes
 --------------------
 :dfn:`Proxy DNS`,
