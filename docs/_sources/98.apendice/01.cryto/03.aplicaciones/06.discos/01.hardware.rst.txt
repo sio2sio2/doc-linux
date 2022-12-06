@@ -1,21 +1,25 @@
 Cifrado por *hardware*
 ======================
-También conocido como *autocifrado*. Gracias a que es propio *hardware* del
+También conocido como *autocifrado*. Gracias a que es el propio *hardware* del
 disco el que encarga de su cifrado, la estrategia es totalmente transparente
 para el sistema operativo y es la más eficiente, puesto que no consume |CPU| ni
-memoria |RAM|. Ahora bien, requiere que el disco implemente esta funcionalidad
-y no todos lo hacen.
+memoria |RAM|. Ahora bien, requiere que el disco implemente esta funcionalidad y
+no todos lo hacen.
 
 .. note:: El artículo `¿Qué es SED? (en inglés)
    <https://www.fmad.io/blog/what-is-a-self-encrypting-disk-sed>`_ explica
    cuáles son las tres posibilidades respecto al cifrado que podemos encontrar
    en los dispositivos de almacenamiento. Este apartado refiere la última
-   (cifrado con bloqueo), mientras que la segunda (cifrado sin bloqueo) refiere
-   la que se trata en el :ref:`epígrafe sobre borrado seguro <hdparm>`. De
-   hecho, en un cifrado sin bloqueo  puede habilitarse la seguridad |ATA| que
-   utiliza también una contraseña para bloquear el acceso a disco. Sin embargo,
-   esta contraseña no tiene relación criptográfica con la clave de cifrado:
-   simplemente el *firmware* impide el acceso si no se proporciona la contraseña,
+   (*cifrado con bloqueo*), mientras que la segunda (*cifrado sin bloqueo*) refiere
+   la que se trata en el :ref:`epígrafe sobre borrado seguro <hdparm>`. También
+   es conveniente saber que puede existir un *bloqueo sin cifrado* que es
+   el que ofrece la seguridad |ATA| cuando permite establecer una contraseña que
+   permite bloquear el acceso a disco. Este bloqueo es un mero bloqueo lógico
+   que realiza el *firmware* y, de hecho, el acceso es posible si se logra
+   leer el disco sin utilizar su *firmware*. Incluso en el caso de que el disco
+   realice un *cifrado sin bloqueo* para facilitar el borrado seguro, y se
+   establezca la contraseña |ATA|, esta no tiene relación criptográfica con la
+   clave de cifrado.
 
 .. warning:: En el cifrado por *hardware* pueden parecer todo ventajas, pero
    el *firmware* puede presentar vulnerabilidades `como ya ha ocurrido en varias
@@ -58,7 +62,7 @@ Para ponerlo en práctica esta estrategia necesitaremos:
 #. Una herramienta para habilitar y manipular la seguridad:
 
    + En *Linux*, podemos usar `sedutil
-     <https://github.com/Drive-Trust-Alliance/sedutil>`_ proporcionada por la
+     <https://github.com/Drive-Trust-Alliance/sedutil>`_ (o mejor `sus ejecutables <https://github.com/Drive-Trust-Alliance/sedutil/wiki/Executable-Distributions>`_), proporcionada por la
      `Drive Trust Alliance <https://drivetrust.com>`_.
    + En *Windows*, BitLocker_ permite seleccionar el uso de cifrado por
      *hardware*.
@@ -145,12 +149,12 @@ documento `A Practical Guide to Use of Opal Drives
    **Locking SP**
       Que puede llegar a tener hasta 20 usuarios de dos tipos:
 
-      + Cuatro administradores (**admin1**, .. , **admin4**), de los cuales sólo
+      + Cuatro administradores (**Admin1**, .. , **Admin4**), de los cuales sólo
         el primero esta inicialmente habilitado con la contraseña del |MSID|.
 
-      + Hasta 16 usuarios denominados **user1**, .. **user16**, deshabilitados
-        todos inicialmente. Cada usuario podría gestionar el bloqueo de los
-        rangos que le hubieran sido conferidos.
+      + Hasta 16 usuarios denominados **User1**, .. **User16**, deshabilitados
+        todos inicialmente. Cada usuario podría gestionar su rango
+        correspondiente.
 
 .. Probar a crear usuarios: https://github.com/ladar/sedutil#user-passwords
 
@@ -203,6 +207,12 @@ Configuración
    (``MBREnabled``)\ [#]_. En estas circunstancias (que son las que trae de
    fábrica), el disco se comportará como cualquier otro sin soporte para Opal.
 
+   .. note:: Si este no es el estado del disco, entonces es porque ya se
+      configuró su bloqueo anteriormente y pueden ocurrir que no sepamos las
+      contraseñas de administración. Si es así, la única posibilidad para que
+      podamos reconfigurar el bloqueo es :ref:`resetear con el PSID
+      <sed-psidrevert>`, lo que supone **perder todos los datos**.
+
    Además, el disco de rescate proporciona la orden :command:`linuxpba` que
    realiza la acción equivalente al |PBA| y, por tanto, permite desbloquear el
    disco tras introducir la contraseña. Si la usamos ahora que no hemos aún
@@ -235,11 +245,11 @@ Configuración
             # sedutil-cli --initialsetup debug /dev/sda
             method status code NOT_AUTHORIZED
 
-         debemos antes ejecutar la siguiente orden::
-
-            # sedutil-cli --psidrevert CODIGO.LARGUISIMO /dev/sda
-
-         El código se encuentra escrito en la parte frontal del propio disco.
+         tendremos el problema de que tal disco ya se configuró para su bloqueo
+         y la configuración no quedó completamente limpia. En este caso, no hay
+         otro modo de habilitar su configuración que :ref:`reseteándolo con el
+         PSID <sed-psidrevert>` (lo cual supondrá la **pérdida de todos los
+         datos**).
 
    #. Instalar el |PBA| en el *Shadow* |MBR|::
 
@@ -269,19 +279,31 @@ Configuración
 
       Es hora de que establezcamos una contraseña:
 
-   #. Establecer la contraseña::
+   #. Establecer las contraseñas del |SID| y el *Admin1*::
 
-         # sedutil-cli --setsidpassword debug micontraseñasecreta /dev/sda
-         # sedutil-cli --setadmin1pwd debug micontraseñasecreta /dev/sda
+         # sedutil-cli --setsidpassword debug soysid /dev/sda
+         # sedutil-cli --setadmin1pwd debug soyadmin1 /dev/sda
+
+      la segunda de las cuales nos permiterá a partir de ahora desbloquear el
+      disco al arrancar. En cualquier caso, si gestionamos un disco personal,
+      lo más recomendable es hacer que coincidan ambas contraseñas, para poder
+      hacer todas las operaciones con la misma.
+
+      .. note:: La segunda orden también podríamos haberla escrito del modo en
+         que se cambian de forma general las contraseñas de los usuarios del
+         *Locking SP*:
+
+            # sedutil-cli --setpassword debug Admin1 soyadmin1 /dev/sda
 
       .. warning:: |PBA| sólo soporta teclado americano. Téngalo presente: un ";"
-         estará en la tecla :kbd:`Ñ`, no en donde indique nuestro teclado hispano.
+         estará en la tecla :kbd:`Ñ`, no en donde indique nuestro teclado para
+         español.
 
    #. Bloquear y desbloquear:
 
       Como el disco se encuentra desbloqueado, volvamos a bloquearlo::
 
-         # sedutil-cli --setlockingrange 0 lk micontraseñasecreta /dev/sda
+         # sedutil-cli --setlockingrange 0 lk soyadmin1 /dev/sda
 
       .. note:: Obsérvese que ya tenemos que usar la nueva contraseña para
          gestionar |SED|.
@@ -313,8 +335,8 @@ Configuración
 **Desbloqueo manual**
    Si no hemos usado el |PBA|, podemos desbloquear un disco con un *Linux* haciendo::
 
-      # sedutil-cli --setlockingrange 0 rw micontraseñasecreta /dev/sda
-      # sedutil-cli --setmbrdone on micontraseñasecreta /dev/sda
+      # sedutil-cli --setlockingrange 0 rw soyadmin1 /dev/sda
+      # sedutil-cli --setmbrdone on soyadmin1 /dev/sda
       # partx -d /dev/sda  # Eliminamos la tabla de particiones obsoleta.
       # partx -a /dev/sda  # Leemos la nueva tabla de particiones.
 
@@ -322,18 +344,19 @@ Configuración
    Si queremos bloquear un disco desbloqueado sin necesidad de cortarle la
    alimentación::
 
-      # sedutil-cli --setlockingrange 0 lk micontraseñasecreta /dev/sda
-      # sedutil-cli --setmbrdone off micontraseñasecreta /dev/sda
+      # sedutil-cli --setlockingrange 0 lk soyadmin1 /dev/sda
+      # sedutil-cli --setmbrdone off soyadmin1 /dev/sda
       # reboot
 
    Y al reiniciar deberíamos observar que, efectivamente, está bloqueado.
 
 **Deshabilitar/habilitar el bloqueo**
-   Si decidimos deshabilitar el bloqueo indefinidamente, podemos hacer lo
+   Si decidimos deshabilitar el bloqueo indefinidamente para que la pérdida
+   de alimentación no provoque el bloqueo del disco, podemos hacer lo
    siguiente::
 
-      # sedutil-cli --disablelockingrange 0 micontraseñasecreta /dev/sda
-      # sedutil-cli --setmbrenable off micontraseñasecreta /dev/sda
+      # sedutil-cli --disablelockingrange 0 soyadmin1 /dev/sda
+      # sedutil-cli --setmbrenable off soyadmin1 /dev/sda
 
    o sea, deshabilitamos en sí el bloqueo y también el *Shadow* |MBR| para que
    no moleste, con lo que el estado queda::
@@ -343,9 +366,9 @@ Configuración
 
    La operación contraria será::
 
-      # sedutil-cli --enablelockingrange 0 micontraseñasecreta /dev/sda
-      # sedutil-cli --setmbrenable on micontraseñasecreta /dev/sda
-      # sedutil-cli --setmbrdone off micontraseñasecreta /dev/sda
+      # sedutil-cli --enablelockingrange 0 soyadmin1 /dev/sda
+      # sedutil-cli --setmbrenable on soyadmin1 /dev/sda
+      # sedutil-cli --setmbrdone off soyadmin1 /dev/sda
 
    Y el estado resultante::
 
@@ -374,7 +397,7 @@ Configuración
       los discos y borrarlos igualmente
       <https://github.com/Drive-Trust-Alliance/sedutil/wiki/Remove-OPAL>`_)::
 
-         # sedutil-cli --revertnoerase micontraseña /dev/sda
+         # sedutil-cli --revertnoerase soyadmin1 /dev/sda
       
       Ahora debemos comprobar el estado::
 
@@ -383,7 +406,7 @@ Configuración
 
       y solo en caso de que esté deshabilitado el bloqueo (:kbd:`LockingEnable = N`), rematar con::
 
-         # sedutil-cli --reverttper micontraseña /dev/sda
+         # sedutil-cli --reverttper soysid /dev/sda
 
       porque, de lo contrario, este último paso **borrará todos los datos**.
 
@@ -391,17 +414,23 @@ Configuración
          vuelve a querer habilitarse el bloqueo, no podremos saltar el paso de
          su instalación.
 
+   .. _sed-psidrevert:
+
    Ahora bien, ¿qué pasa si no podemos desbloquearlo ni sabemos las contraseñas?
    Entonces tenemos una última posibilidad:
 
-   c. Resetearlo por completo eliminando todos los datos, pero sin conocer la
-      contraseña. Esta circunstancia puede darse cuando la hemos olvidado o
-      recibimos un disco cifrado del que desconocemos la contraseña, pero
-      queremos aprovecharlo llenándolo con nuevos datos::
+   c. Resetearlo por completo eliminando todos los datos, pero sin conocer las
+      contraseñas. Esta circunstancia puede darse cuando las hemos olvidado o
+      recibimos un disco cifrado del no sabemos nada ni nos importa su
+      conteniedo, pero queremos aprovecharlo como almacenamiento de nuevos datos::
 
          # sedutil-cli --yesireallywanttoeraseallmydatausingthepsid PSID /dev/sda 
 
       Del PSID ya hemos hablado al :ref:`tratar los usuarios <sed-usuarios>`.
+
+      .. note:: Hay una alternartiva bastante más corta::
+
+            # sedutil-cli --psidrevert PSID /dev/sda
 
 .. rubric:: Notas al pie
 
