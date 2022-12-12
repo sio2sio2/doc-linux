@@ -57,6 +57,8 @@ Antes de empezar, no obstante, hay que introducir cuatro conceptos:
 * :dfn:`Sistema anfitrión`, que es aquel sobre el que se realiza la virtualización.
 * :dfn:`Sistema huésped`, que es aquel que se ejecuta dentro de la máquina virtual.
 
+.. _virt-completa:
+
 **Virtualización completa**
    Es aquella en la que se virtualiza por completo para el *huesped* una
    plataforma *hardware* funcional, por lo que el *huésped* debe ser tan sólo
