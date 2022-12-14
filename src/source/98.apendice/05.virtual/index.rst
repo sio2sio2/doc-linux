@@ -204,7 +204,31 @@ Software de virtualización
    |                    |                 |             |           | | MacOs   |           |       |             |
    +--------------------+-----------------+-------------+-----------+-----------+-----------+-------+-------------+
 
-De los referidos estudiaremos:
+Al utilizar un *software* de virtualización para instalar y probar sistemas
+operativos nos será muy útil, además de lo evidente:
+
+* Manipular el modo en que la máquina virtual se conecta a la red para poder
+  simular distintos escenarios. Por ejemplo, no es lo mismo que queramos
+  virtualizar un sistema de escritorio en que lo único que se necesita por lo
+  general es salida a internet que un servidor en que muy probablemente
+  necesitemos que el anfitrión pueda conectarse a él.
+
+* Preservar estados de disco para recuperarlos cuando sea preciso (lo que se
+  conoce como :dfn:`instantáneas`).
+
+* Crear discos que puedan utilizarse como plantilla para la creación de varias
+  máquinas virtuales. Por ejemplo, crear un único disco con una instalación
+  limpia de *Windows* 10, y usar éste como base para todos los discos de las
+  máquinas virtuales en que vayamos a virtualizar un *Windows* 10.
+
+* Virtualizar tanto *firmware* |BIOS| como *firmware* |UEFI|.
+
+* Tener mecanismos sencillos para poder transferir datos entre el anfitrión
+  y el huésped (p.e. un directorio compartido por ambos).
+
+* Exportar máquinas virtuales a otros anfitriones o importarlas desde ellos.
+
+En cualquier caso, de los referidos en la tabla estudiaremos:
 
 .. toctree::
    :maxdepth: 1
@@ -232,6 +256,8 @@ De los referidos estudiaremos:
 .. |SO| replace:: :abbr:`SO (Sistema operativo)`
 .. |GPL| replace:: :abbr:`GPL (GNU General Public License)`
 .. |BSD| replace:: :abbr:`BSD (Berkeley Software Distribution)`
+.. |BIOS| replace:: :abbr:`BIOS (Basic I/O System)`
+.. |UEFI| replace:: :abbr:`UEFI (Unified Extensible Firmware Interface)`
 
 .. _Docker: https://www.docker.com/
 .. _QEmu: https://www.qemu.org/

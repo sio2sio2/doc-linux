@@ -103,9 +103,35 @@ empezar a usar <strong class="program">QEmu</strong>. Puede ya mismo empezar a <
 virtuales</span></a> y regresar más tarde a este punto para conocer cómo
 pueden manipularse los discos.</p>
 </div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Si queremos crear discos pasando opciones que no son las
+predeterminadas (p.e. <a class="reference internal" href="05.misc.html#qemu-disco-cifrado"><span class="std std-ref">opciones de cifrado</span></a>)
+podemos hacer uso de la opción <kbd class="kbd docutils literal notranslate">-o</kbd>. Puede consultar cuáles son estas
+opciones en la página de manual correspondiente
+(<em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/qemu-block-drivers">qemu-block-drivers</a></em>).</p>
+</div>
+</section>
+<section id="redimension">
+<h2><span class="section-number">9.2.2.2.1.1.2. </span>Redimensión<a class="headerlink" href="#redimension" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Si no estamos satisfechos con el tamaño de un disco, podemos cambiar éste:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-img resize -f qcow2 disco.qcw +1G
+</pre></div>
+</div>
+<p>Lo cual añadirá un 1GiB al tamaño que tuviera el disco, aunque también podríamos
+haber prescindido del signo y haber escrito <kbd class="kbd docutils literal notranslate">5G</kbd> directamente. Es posible
+también reducir el tamaño, pero para eso debemos estar seguros que hemos
+reducido el tamaño de los sistemas de archivos de modo que no ocupen el espacio
+final:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-img resize -f qcow2 disco.qcw --shrink -1G
+</pre></div>
+</div>
+<p>En este caso, <strong class="command">qemu-img</strong> exige incluir la opción <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">-</kbd>-<kbd class="kbd docutils literal notranslate">shrink</kbd></kbd> como
+recordatorio para el usuario de que debio arreglar antes los sistemas de
+archivos contenidos en el disco.</p>
 </section>
 <section id="derivacion">
-<h2><span class="section-number">9.2.2.2.1.1.2. </span>Derivación<a class="headerlink" href="#derivacion" title="Enlazar permanentemente con este título">¶</a></h2>
+<h2><span class="section-number">9.2.2.2.1.1.3. </span>Derivación<a class="headerlink" href="#derivacion" title="Enlazar permanentemente con este título">¶</a></h2>
 <p>Es posible también crear un disco utilizando como base otro, de manera que el
 nuevo disco en vez de partir sin datos, partirá con el contenido del que se tome
 como base. Eso sí, deberemos asegurarnos de que el disco base no sufre ninguna
@@ -137,6 +163,15 @@ un vistazo a uno de los dos discos derivados:</p>
 respecto de la ubicación del nuevo disco, no respecto del directorio de
 trabajo.</p>
 </div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>El poder derivar discos es una característica del formato <abbr title="Qemu Copy On Write">QCOW</abbr>2,
+así que también existe la posibilidad de utilizar la opción <kbd class="kbd docutils literal notranslate">-o</kbd> que se
+refirió en la creación para lograr lo mismo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-img create -f qcow2 cliente.qcw -o <span class="s2">&quot;backing_file=bullseye.qcw,backing_fmt=qcow2&quot;</span>
+</pre></div>
+</div>
+</div>
 <p>También es interesante cambiar la base de un disco derivado en algunos casos:</p>
 <ol class="arabic">
 <li><p>Cuando la base ha cambiado de ubicación y la definimos con una ruta relativa,
@@ -155,7 +190,7 @@ Pero puede solucionarse:</p>
 <p>Téngase presente la opción <kbd class="kbd docutils literal notranslate">-u</kbd>, que es necesaria en este caso. El
 comportamiento del subcomando <strong class="command">rebase</strong> es recalcular la base, pero
 en este caso, no se quiere recalcular nada, sino simplemente cambiar la
-dirección de la base.</p>
+referencia a la base.</p>
 </li>
 <li><p>Cuando queremos cambiar realmente el disco base a otro que se encuentre en la
 misma cadena de derivación. Supongamos esta situación:</p>
@@ -169,9 +204,9 @@ misma cadena de derivación. Supongamos esta situación:</p>
 </pre></div>
 </div>
 <p>O sea, tenemos tres discos: <code class="file docutils literal notranslate"><span class="pre">bullseye.qcw</span></code>, que no deriva de ninguno,
-<code class="file docutils literal notranslate"><span class="pre">servidor.qcw</span></code> que deriva del anterior; y file:<cite>servidor2.qcw</cite> que
+<code class="file docutils literal notranslate"><span class="pre">servidor.qcw</span></code> que deriva del anterior; y <code class="file docutils literal notranslate"><span class="pre">servidor2.qcw</span></code> que
 deriva de este último. <strong class="command">rebase</strong> nos permite hacer que
-<code class="file docutils literal notranslate"><span class="pre">servidor.qcw</span></code> pueda derivar directamente de <code class="file docutils literal notranslate"><span class="pre">bullseye.qcw</span></code>:</p>
+<code class="file docutils literal notranslate"><span class="pre">servidor2.qcw</span></code> pueda derivar directamente de <code class="file docutils literal notranslate"><span class="pre">bullseye.qcw</span></code>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-img rebase -p -f qcow2  servidor2.qcw -F qcow2 -b bullseye.qcw
 </pre></div>
 </div>
@@ -188,13 +223,165 @@ ningún otro, para lo cual basta con indicar una base vacía:</p>
 </ol>
 </section>
 <section id="instantaneas">
-<h2><span class="section-number">9.2.2.2.1.1.3. </span>Instantáneas<a class="headerlink" href="#instantaneas" title="Enlazar permanentemente con este título">¶</a></h2>
+<h2><span class="section-number">9.2.2.2.1.1.4. </span>Instantáneas<a class="headerlink" href="#instantaneas" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Los discos <abbr title="Qemu Copy On Write">QCOW</abbr>2 dan también la posibilidad de conservar estados intermedios
+de un disco, de modo que se puedan recuperar más adelante. Por ejemplo,
+supongamos un disco con una debian estable recién instalado llamado
+<code class="file docutils literal notranslate"><span class="pre">debian.qcw</span></code>. Nuestra intención a continuación es hacer la instalación y
+configuración de un servidor <abbr title="Domain Name Server">DNS</abbr>, pero no lo tenemos muy claro, así que
+sospechamos que no nos saldrá a la primera y queremos tener la posibilidad de
+poder volver a hacer la configuración de cero.</p>
+<p>Una posibilidad es crear un disco derivado de file:<cite>debian.qcw</cite>, pero otra es
+crear una instantánea del estado del disco antes de empezar a toquetear:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-img snapshot -c instalado debian.qcw
+<span class="gp">$ </span>qemu-img snapshot -l debian.qcw
+<span class="go">Snapshot list:</span>
+<span class="go">ID        TAG                 VM SIZE                DATE       VM CLOCK   ICOUNT</span>
+<span class="go">1         instalado               0 B 2022-12-12 11:10:05   00:00:00.000        0</span>
+</pre></div>
+</div>
+<p>La primera orden crea una instantánea del disco que conserva el estado en que
+éste se encontraba cuando la <em>Debian</em> estaba limpia y recién instalada. Como es
+la primera que hacemos, la identifica con <strong>1</strong>. A partir de este momento,
+podremos seguir usando el disco y manipulando su contenido.</p>
+<p>Supongamos que tiempo después llegamos a la conclusión de que nuestra
+configuración está siendo un desastre y queremos regresar al estado <strong>1</strong> para
+comenzar de nuevo. En ese caso, basta con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-img snapshot -a <span class="m">1</span> debian.qcw
+</pre></div>
+</div>
+<p>Y el disco volverá a ese estado como si nunca hubiéramos intentado hacer la
+configuración. Por supuesto, podemos tener varias instantáneas asociadas a un
+mismo disco. Por ejemplo, algo así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-img snapshot -l debian.qcw
+<span class="go">Snapshot list:</span>
+<span class="go">ID        TAG                 VM SIZE                DATE       VM CLOCK   ICOUNT</span>
+<span class="go">1         instalado                 0 2022-12-12 11:10:05   00:00:00.000        0</span>
+<span class="go">2         confbasica                0 2022-12-12 13:33:54   00:00:00.000        0</span>
+<span class="go">3         completo                  0 2022-12-12 15:01:19   00:00:00.000        0</span>
+</pre></div>
+</div>
+<p>en donde estamos suponiendo que hemos hecho tres instantáneas:</p>
+<ul class="simple">
+<li><p>Cuando el sistema operativo estaba limpio.</p></li>
+<li><p>Cuando habíamos logrado completar la configuración básica del servidor <abbr title="Domain Name Server">DNS</abbr>.</p></li>
+<li><p>Cuando habíamos completado la configuración.</p></li>
+</ul>
+<p>Es posible borrar una instantánea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-img snapshot -d <span class="m">2</span> debian.qcw
+</pre></div>
+</div>
+<p>que borrará la instantánea identificada con el <strong>2</strong>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-img snapshot -l debian.qcw
+<span class="go">Snapshot list:</span>
+<span class="go">ID        TAG                 VM SIZE                DATE       VM CLOCK   ICOUNT</span>
+<span class="go">1         instalado                 0 2022-12-12 11:10:05   00:00:00.000        0</span>
+<span class="go">3         completo                  0 2022-12-12 15:01:19   00:00:00.000        0</span>
+</pre></div>
+</div>
 </section>
 <section id="conversion">
-<span id="qemu-discos-conv"></span><h2><span class="section-number">9.2.2.2.1.1.4. </span>Conversión<a class="headerlink" href="#conversion" title="Enlazar permanentemente con este título">¶</a></h2>
+<span id="qemu-discos-conv"></span><h2><span class="section-number">9.2.2.2.1.1.5. </span>Conversión<a class="headerlink" href="#conversion" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Otra operación bastante socorrida consiste en convertir el formato del disco:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-img convert -p -f qcow2 bullseye.vdi -O qcow2 bullseye.vdi
+</pre></div>
+</div>
+<p>La orden convierte el disco en formato nativo a una salida<a class="footnote-reference brackets" href="#id2" id="id1">1</a> en formato
+nativo de Virtualbox (<abbr title="Virtualbox Disk Image">VDI</abbr>). Como la operación tarda un tiempo, añadimos la
+opción <kbd class="kbd docutils literal notranslate">-p</kbd> para que <strong class="command">qemu-img</strong> que nos vaya indicando el
+progreso.</p>
+<p>Ambos discos contienen exactamente lo mismo, aunque tengan diferente formato,
+por lo que es un buen momento para introducir el subcomando <kbd class="kbd docutils literal notranslate">compare</kbd> que
+permite certificarlos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-img compare -p -f qcow2 bullseye.vdi -O qcow2 bullseye.vdi
+<span class="go">Images are identical.</span>
+</pre></div>
+</div>
+<p>Hay otro modo de escribir la orden:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-img create -f vdi -o static bullseye.vdi 4G
+<span class="gp">$ </span>qemu-img convert -p --image-opts <span class="nv">driver</span><span class="o">=</span>qcow2,file.filename<span class="o">=</span>bullseye.qcw <span class="se">\</span>
+   -n --target-image-opts <span class="nv">driver</span><span class="o">=</span>vdi,file.filename<span class="o">=</span>bullseye.vdi,static
+</pre></div>
+</div>
+<p>que es mucho más farragosa, pero permite añadir opciones adicionales (véase
+<em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/qemu-block-drivers">qemu-block-drivers</a></em>) que no hay manera de introducir mediante la
+primera alternativa (por ejemplo, <a class="reference internal" href="05.misc.html#qemu-disco-cifrado"><span class="std std-ref">el cifrado</span></a>). En el
+ejemplo, hemos añadido la  única opción que permite el formato <abbr title="Virtualbox Disk Image">VDI</abbr>:  que el
+disco sea estático, en vez de dinámico. Hay, además, aún otra manera para
+expresar las opciones del archivo de salida:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-img convert -p -f qcow2 bullseye.qcw -O qcow2 bullseye.vdi -o static
+</pre></div>
+</div>
+<p>gracias a <kbd class="kbd docutils literal notranslate">-o</kbd> cuyo argumento incluirá las opciones propias del formato en
+cuestión (<em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/qemu-block-drivers">qemu-block-drivers</a></em>) y que ya se introdujo al tratar la
+creación de discos.</p>
+<p>La suborden <strong class="command">convert</strong> no sólo permite hacer hacer conversiones entre
+formatos, sino hacer manipulaciones con un mismo formato. Por ejemplo,
+supongamos que <code class="file docutils literal notranslate"><span class="pre">servidor.qcw</span></code> derive de <code class="file docutils literal notranslate"><span class="pre">bullseye.qcw</span></code> y que,
+además, tenga definidas tres instantáneas (<strong>1</strong>, <strong>2</strong> y <strong>3</strong>). En esta
+situación podríamos obtener un archivo <code class="file docutils literal notranslate"><span class="pre">output.qcw</span></code> con el estado de la
+segunda instantánea haciendo lo siguiente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-img convert -p -f qcow2 -l <span class="m">2</span> servidor.qcw -O qcow2 output.qcw
+</pre></div>
+</div>
+<p>El archivo resultando no tendrá instantáneas y derivará de <code class="file docutils literal notranslate"><span class="pre">bullseye.qcw</span></code>,
+pero reflejará fielmente el estado <strong>2</strong> de <code class="file docutils literal notranslate"><span class="pre">servidor.qcw</span></code>. También habría
+sido posible obtener lo mismo, pero conservando la derivación de
+<code class="file docutils literal notranslate"><span class="pre">bullseye.qcw</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-img convert -p -f qcow2 -l <span class="m">2</span> servidor.qcw -O qcow2 output.qcw -B bullseye.qcw -F qcow2
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Al crear un disco de salida <abbr title="Qemu Copy On Write">QCOW</abbr>2 se puede comprimir con la
+opción <kbd class="kbd docutils literal notranslate">-c</kbd>. Esto generará un archivo sensiblemente más pequeño, aunque
+a costa de su rendimiento.</p>
+</div>
 </section>
 <section id="montaje">
-<h2><span class="section-number">9.2.2.2.1.1.5. </span>Montaje<a class="headerlink" href="#montaje" title="Enlazar permanentemente con este título">¶</a></h2>
+<h2><span class="section-number">9.2.2.2.1.1.6. </span>Montaje<a class="headerlink" href="#montaje" title="Enlazar permanentemente con este título">¶</a></h2>
+<p>Otra posibilidad interesante es la de poder acceder al contenido de los discos
+sin necesidad de arrancar una máquina virtual que los use. Para ello, debemos
+primero tener cargado el módulo del <em>kernel</em> <code class="docutils literal notranslate"><span class="pre">nbd</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>modprobe nbd <span class="nv">max_part</span><span class="o">=</span><span class="m">63</span>
+</pre></div>
+</div>
+<p>Y, una vez hecho, asociar el archivo del disco (p.e. <code class="file docutils literal notranslate"><span class="pre">disco.qcw</span></code>) a uno de
+los dispositivos generados por el módulo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>qemu-nbd -c /dev/nbd0 disco.qcw
+</pre></div>
+</div>
+<p>De este modo, a través de este archivo de bloques, tendremos acceso al disco
+virtual como si de un disco físico se tratara. Por ejemplo, podríamos usar
+<a class="reference internal" href="../../../../05.discos/01.division/03.pract.html#fdisk"><span class="std std-ref">fdisk</span></a> (o similar) para particionar. Si por el contrario el
+el disco ya tenía definidas particiones y estas se cargan automáticamente,
+entonces aparecerán los dispositivos <code class="file docutils literal notranslate"><span class="pre">/dev/nbd0p1</span></code>, <code class="file docutils literal notranslate"><span class="pre">/dev/nbd0p2</span></code>,
+etc. En caso de que no lo hagan, aún podemos ordenarle al núcleo que las
+cargue:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>partx -a /dev/nbd0
+</pre></div>
+</div>
+<p>Y, finalmente, acceder a los sistemas de las particiones:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mount /dev/nbd0p1 /mnt
+</pre></div>
+</div>
+<p>A partir de este momento, podremos hacer los cambios que estimemos oportunos en
+el sistema de archivos. Una vez que acabemos es importante liberar todo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>umount /mnt
+<span class="gp"># </span>qemu-nbd -d /dev/nbd0
+</pre></div>
+</div>
+<p>y comprobar si han desaparecido los archivos de partición (<code class="file docutils literal notranslate"><span class="pre">/dev/nbd0p1</span></code>,
+etc.). Si no es así, deberemos revisar por qué sigue ocupado el dispositivo.</p>
+<blockquote>
+<div></div></blockquote>
+<p class="rubric">Notas al pie</p>
+<dl class="footnote brackets">
+<dt class="label" id="id2"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p>Desgraciadamente, la salida debe ser un archivo regular y <a class="reference external" href="https://www.mail-archive.com/qemu-discuss&#64;nongnu.org/msg05176.html">no la salida
+estándar</a>.</p>
+</dd>
+</dl>
 </section>
 </section>
 
@@ -210,10 +397,11 @@ ningún otro, para lo cual basta con indicar una base vacía:</p>
     <ul>
 <li><a class="reference internal" href="#">9.2.2.2.1.1. Gestión de discos</a><ul>
 <li><a class="reference internal" href="#creacion">9.2.2.2.1.1.1. Creación</a></li>
-<li><a class="reference internal" href="#derivacion">9.2.2.2.1.1.2. Derivación</a></li>
-<li><a class="reference internal" href="#instantaneas">9.2.2.2.1.1.3. Instantáneas</a></li>
-<li><a class="reference internal" href="#conversion">9.2.2.2.1.1.4. Conversión</a></li>
-<li><a class="reference internal" href="#montaje">9.2.2.2.1.1.5. Montaje</a></li>
+<li><a class="reference internal" href="#redimension">9.2.2.2.1.1.2. Redimensión</a></li>
+<li><a class="reference internal" href="#derivacion">9.2.2.2.1.1.3. Derivación</a></li>
+<li><a class="reference internal" href="#instantaneas">9.2.2.2.1.1.4. Instantáneas</a></li>
+<li><a class="reference internal" href="#conversion">9.2.2.2.1.1.5. Conversión</a></li>
+<li><a class="reference internal" href="#montaje">9.2.2.2.1.1.6. Montaje</a></li>
 </ul>
 </li>
 </ul>
