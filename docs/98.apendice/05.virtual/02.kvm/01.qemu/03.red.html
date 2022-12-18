@@ -16,7 +16,9 @@
     <script data-url_root="../../../../" id="documentation_options" src="../../../../_static/documentation_options.js"></script>
     <script src="../../../../_static/jquery.js"></script>
     <script src="../../../../_static/underscore.js"></script>
+    <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js"></script>
     <script src="../../../../_static/doctools.js"></script>
+    <script src="../../../../_static/sphinx_highlight.js"></script>
     <script src="../../../../_static/translations.js"></script>
     
     <link rel="index" title="Índice" href="../../../../genindex.html" />
@@ -39,7 +41,7 @@
         <li class="nav-item nav-item-0"><a href="../../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../../index.html" ><span class="section-number">9. </span>Apéndices</a> &#187;</li>
           <li class="nav-item nav-item-2"><a href="../../index.html" ><span class="section-number">9.2. </span>Virtualización</a> &#187;</li>
-          <li class="nav-item nav-item-3"><a href="../../02.kvm.html" accesskey="U"><span class="section-number">9.2.2.2. </span>Virtualización nativa</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../../02.kvm.html" accesskey="U"><span class="section-number">9.2.2.2. </span>Nativa (<abbr title="Kernel-based Virtual Machine">KVM</abbr>)</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href=""><span class="section-number">9.2.2.2.1.3. </span>Red</a></li> 
       </ul>
     </div>  
@@ -50,7 +52,153 @@
           <div class="body" role="main">
             
   <section id="red">
-<h1><span class="section-number">9.2.2.2.1.3. </span>Red<a class="headerlink" href="#red" title="Enlazar permanentemente con este título">¶</a></h1>
+<span id="qemu-red"></span><h1><span class="section-number">9.2.2.2.1.3. </span>Red<a class="headerlink" href="#red" title="Enlace permanente a este encabezado">¶</a></h1>
+<p>Dedicamos un epígrafe completo a la red, porque, amén de muy importante, es uno
+de los dispositivos que da más juego en su configuración.</p>
+<p>Al principio, <a class="reference internal" href="02.arranque.html#qemu-nodefaults"><span class="std std-ref">al proponer los alias</span></a> para simplificar las
+órdenes, definimos una interfaz de red así:</p>
+<p><code class="code docutils literal notranslate"><span class="pre">-device</span> <span class="pre">virtio-net,netdev=nic</span> <span class="pre">-netdev</span> <span class="pre">user,id=nic</span></code></p>
+<p>donde vemos que intervienen dos opciones: <kbd class="kbd docutils literal notranslate">-device</kbd>, que como ya venimos
+viendo con otro tipo de dispositivos define el dispositivo físico que se
+virtualiza; y <kbd class="kbd docutils literal notranslate">-netdev</kbd>, que indica cómo se utilizará y que es dónde se
+encuentra fundamentalmente el meollo.</p>
+<p>En cuanto a la definición del dispositivo es importante apreciar algunos
+aspectos:</p>
+<ul class="simple">
+<li><p>El dispositivo escogido es un <em>virtio-net</em>, que <a class="reference external" href="https://www.redhat.com/en/blog/deep-dive-virtio-networking-and-vhost-net">tiene mejor rendimiento</a>
+que emular completamente una tarjeta de red. Esto exige, no obstante, que el
+driver esté incluido en el sistema huésped. Es el caso de <em>Linux</em>, pero de los
+<em>Windows</em> (al menos los <em>Windows</em> 10). En el <cite>apartado de red para Virtualbox
+&lt;virtualbox–red&gt;</cite> hay nota con un enlace desde el que se puede descargar el
+controlador.</p></li>
+<li><p>Sin embargo, el predeterminado es <em>e1000</em> que emula una tarjeta 82450EM de
+Intel, porque es más probable que el sistema anfitrión la soporte sin
+neecesidad de instalar ningún <em>hardware</em>.</p></li>
+<li><p><kbd class="kbd docutils literal notranslate">netdev=</kbd> permite asignar un nombre a la tarjeta para que podamos
+referirla luego al configurarla con la opción <kbd class="kbd docutils literal notranslate">-netdev</kbd>.</p></li>
+<li><p>Si disponemos varias tarjetas o arrancamos varias máquinas virtuales que
+comparten red, es importante que especifiquemos su dirección <abbr title="Media Access Control">MAC</abbr>, porque
+<strong class="program">QEmu</strong> <strong>siempre asigna la misma</strong>: <em>52:54:00:12:34:56</em>. Para ello,
+basta añadir la dirección al argumento de la opción:
+<code class="code docutils literal notranslate"><span class="pre">-device</span> <span class="pre">virtio-net,netdev=nic,mac=54:52:00:12:34:57</span></code>.</p></li>
+</ul>
+<p>Con esto es suficiente para declarar el dispositivo virtual. <kbd class="kbd docutils literal notranslate">-netdev</kbd> es
+otra historia que requiere un cuento bastante más largo.</p>
+<section id="red-de-usuario">
+<h2><span class="section-number">9.2.2.2.1.3.1. </span>Red de usuario<a class="headerlink" href="#red-de-usuario" title="Enlace permanente a este encabezado">¶</a></h2>
+<p>Es la configuración de la interfaz que <a class="reference internal" href="../../01.virtualbox.html#virtualbox-red"><span class="std std-ref">Virtualbox llama NAT</span></a> y por defecto crea <strong class="program">QEmu</strong>, si no la deshabiltamos con
+la opción <kbd class="kbd docutils literal notranslate">-nodefaults</kbd>. Su definición es la mostrada arriba:</p>
+<p><code class="code docutils literal notranslate"><span class="pre">-netdev</span> <span class="pre">user,id=nic</span></code></p>
+<p>donde <kbd class="kbd docutils literal notranslate">id</kbd> refiere el identificador correspondiente fijado en <kbd class="kbd docutils literal notranslate">-device</kbd>.
+Esta es la configuración mínima que supone que la máquina virtual se encuentre
+en una red definida de la siguiente forma:</p>
+<ul class="simple">
+<li><p>La dirección de red es <em>10.0.2.0/24</em>.</p></li>
+<li><p><em>QEmu</em> se encarga de traducir las peticiones al exterior como si se tratara
+de un <em>router</em> que hace enmascaramiento. La puerta de enlace que verá el <em>huésped</em>
+será la segunda <abbr title="Internet Protocol">IP</abbr> disponible (en este caso, <em>10.0.2.2</em>); y el servidor <abbr title="Domain Name Server">DNS</abbr>,
+la tercera (en este caso, <em>10.0.2.3</em>).</p></li>
+<li><p>El sistema de la máquina virtual recibirá por <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> otra <abbr title="Internet Protocol">IP</abbr> de la red y
+tendrá conectividad con el exterior.</p></li>
+<li><p>Una segunda máquina virtual se colocará en una red idéntica, pero no será la
+misma red, por lo que no existirá conectividad entre ambos huéspedes.</p></li>
+<li><p>Funciona perfectamente el tráfico <abbr title="User Datagram Protocol">UDP</abbr> y <abbr title="Transmission Control Protocol">TCP</abbr>, pero por un problema de
+privilegos no el <abbr title="Internet Control Message Protocol">ICMP</abbr>, por lo que no podemos usar éste para comprobar conectividad.</p></li>
+<li><p>Ningún puerto del sistema huésped estará expuesto.</p></li>
+</ul>
+<p>Aunque no suele ser necesario, existen distintos parámetros para alterar las
+características de esta red que pueden consultarse en el manual de
+<em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/qemu-system-x86_64">qemu-system-x86_64</a></em>. Lo que sí es interesante es solucionar los dos
+últimos inconvenientes.</p>
+<dl>
+<dt><abbr title="Internet Control Message Protocol">ICMP</abbr></dt><dd><p>Para ello lo más recomendable es crear un grupo en el anfitrión al que
+agreguemos todos los usuarios que utilicen <strong class="program">QEmu</strong> (lo cual será útil
+más adelante para otras tareas), y que permitamos a tal grupo generar tráfico
+<abbr title="Internet Control Message Protocol">ICMP</abbr>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>addgroup  --system qemusers
+<span class="gp"># </span>adduser usuario qemusers
+<span class="gp"># </span>getent group qemusers
+<span class="go">qemusers:x:115:usuario</span>
+<span class="gp"># </span><span class="nb">echo</span> <span class="s2">&quot;115 115&quot;</span> &gt; /proc/sys/net/ipv4/ping_group_range
+</pre></div>
+</div>
+<p>Este permiso es temporal y se perderá al apagar la máquina. Si queremos
+hacerlo permanente, en un sistema <em>Debian</em> podemos añadir una línea a
+<code class="file docutils literal notranslate"><span class="pre">/etc/sysctl.conf</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span><span class="nb">echo</span> <span class="s2">&quot;net.ipv4.ping_group_range = 115 155&quot;</span> &gt;&gt; /etc/sysctl.conf
+</pre></div>
+</div>
+<p>y para no tener que reiniciar, podemos sólo por esta vez cargar su configuración:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>sysctl -p
+</pre></div>
+</div>
+</dd>
+<dt><strong>Exposición de puertos</strong></dt><dd><p>Tiene mucha utilidad si el huésped ofrece un servicio al que queremos acceder
+desde el anfitrión (p.e. el servicio <abbr title="Security SHell">SSH</abbr>). Para ello, hay un parámetro
+(<kbd class="kbd docutils literal notranslate">hostfwd</kbd>) que permite redirigir un puesto del anfitrión a uno del
+cliente. Por ejemplo:</p>
+<p><code class="code docutils literal notranslate"><span class="pre">-netdev</span> <span class="pre">user,id=nic,hostfwd=tcp:127.0.0.1:10022-:22</span></code></p>
+<p>permite acceder al servidor <abbr title="Security SHell">SSH</abbr> del cliente a través del puerto <strong>10022</strong>
+del anfitrión. Para exponer más puertos, no hay más que escribir
+repetidamente el parámetro.</p>
+</dd>
+</dl>
+</section>
+<section id="red-de-maquinas-virtuales">
+<h2><span class="section-number">9.2.2.2.1.3.2. </span>Red de máquinas virtuales<a class="headerlink" href="#red-de-maquinas-virtuales" title="Enlace permanente a este encabezado">¶</a></h2>
+<p>El propósito de este subapartado es solventar otra de las limitaciones de la red
+de usuario: la falta de conectividad entre los sistemas huéspedes.</p>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Tenga presente que por defecto <strong class="program">QEmu</strong> asigna la misma
+<abbr title="Media Access Control">MAC</abbr> a todas las máquinas virtuales, por lo que tendrá que especificar
+expresamente direcciones <abbr title="Media Access Control">MAC</abbr> distintas para cada una de ellas.</p>
+</div>
+<p>Tenemos, al menos, tres alternativas: <em>socket</em>, <em>tap</em> y <em>macvlan</em>.</p>
+<section id="socket">
+<span id="qemu-red-socket"></span><h3><span class="section-number">9.2.2.2.1.3.2.1. </span>socket<a class="headerlink" href="#socket" title="Enlace permanente a este encabezado">¶</a></h3>
+<p>Es la solución más sencilla que, además, no requiere permisos de administración,
+por lo que puede implementarla un usuario sin privilegios. Para configurar una
+interfaz basta con hacerlo del siguiente modo:</p>
+<p><code class="code docutils literal notranslate"><span class="pre">-netdev</span> <span class="pre">socket,id=nic,mcast=230.0.0.1:12345</span></code></p>
+<p>en donde usamos la dirección de multicast <em>230.0.0.1</em> y el puerto <strong>12345</strong>. Con
+que todas las máquinas que participen en esa red repitan esta configuración se
+encontrarán en la misma red. Por ejemplo, las siguientes dos máquinas se
+encontrarán dentro de la misma red interna:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-system-vga -hda disco1.qcw -device virtio-net,netdev<span class="o">=</span>nic,mac<span class="o">=</span><span class="m">52</span>:54:00:12:34:56 <span class="se">\</span>
+   -netdev socket,id<span class="o">=</span>nic,mcast<span class="o">=</span><span class="m">230</span>.0.0.1:12345
+<span class="gp">$ </span>qemu-system-vga -hda disco2.qcw -device virtio-net,netdev<span class="o">=</span>nic,mac<span class="o">=</span><span class="m">52</span>:54:00:12:34:57 <span class="se">\</span>
+   -netdev socket,id<span class="o">=</span>nic,mcast<span class="o">=</span><span class="m">230</span>.0.0.1:12345
+</pre></div>
+</div>
+<p>En este caso se encontrarán aisladas y necesitaremos fijarles direcciones
+estáticas, puesto que no hay ningún servidor <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> en esa red. Si quisiéramos
+comunicar esta red con el exterior bastaría con que una de ellas hiciera de
+router. Por ejemplo, la primera de ellas podríamos haberla levantado así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-system-vga -hda disco1.qcw -device virtio-net,netdev<span class="o">=</span>nic0,mac<span class="o">=</span><span class="m">52</span>:54:00:12:34:55 -netdev user,id<span class="o">=</span>nic0  <span class="se">\</span>
+   -device virtio-net,netdev<span class="o">=</span>nic,mac<span class="o">=</span><span class="m">52</span>:54:00:12:34:56 -netdev socket,id<span class="o">=</span>nic,mcast<span class="o">=</span><span class="m">230</span>.0.0.1:12345
+</pre></div>
+</div>
+<p>Si tuviéramos necesidad de crear un segundo grupo de máquinas virtuales,
+bastaría con modificar la dirección de multicast, para que este grupo estuviera
+en una red diferente al primero. Por ejemplo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-system-vga -hda disco1.qcw -device virtio-net,netdev<span class="o">=</span>nic,mac<span class="o">=</span><span class="m">52</span>:54:00:12:34:58 <span class="se">\</span>
+   -netdev socket,id<span class="o">=</span>nic,mcast<span class="o">=</span><span class="m">230</span>.0.0.2:12345
+<span class="gp">$ </span>qemu-system-vga -hda disco2.qcw -device virtio-net,netdev<span class="o">=</span>nic,mac<span class="o">=</span><span class="m">52</span>:54:00:12:34:59 <span class="se">\</span>
+   -netdev socket,id<span class="o">=</span>nic,mcast<span class="o">=</span><span class="m">230</span>.0.0.1:12345
+</pre></div>
+</div>
+</section>
+<section id="macvlan">
+<h3><span class="section-number">9.2.2.2.1.3.2.2. </span>macvlan<a class="headerlink" href="#macvlan" title="Enlace permanente a este encabezado">¶</a></h3>
+</section>
+<section id="tap">
+<h3><span class="section-number">9.2.2.2.1.3.2.3. </span>tap<a class="headerlink" href="#tap" title="Enlace permanente a este encabezado">¶</a></h3>
+</section>
+</section>
+<section id="adaptador-puente">
+<h2><span class="section-number">9.2.2.2.1.3.3. </span>Adaptador puente<a class="headerlink" href="#adaptador-puente" title="Enlace permanente a este encabezado">¶</a></h2>
+</section>
 </section>
 
 
@@ -60,6 +208,23 @@
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="../../../../index.html">Tabla de contenido</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">9.2.2.2.1.3. Red</a><ul>
+<li><a class="reference internal" href="#red-de-usuario">9.2.2.2.1.3.1. Red de usuario</a></li>
+<li><a class="reference internal" href="#red-de-maquinas-virtuales">9.2.2.2.1.3.2. Red de máquinas virtuales</a><ul>
+<li><a class="reference internal" href="#socket">9.2.2.2.1.3.2.1. socket</a></li>
+<li><a class="reference internal" href="#macvlan">9.2.2.2.1.3.2.2. macvlan</a></li>
+<li><a class="reference internal" href="#tap">9.2.2.2.1.3.2.3. tap</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#adaptador-puente">9.2.2.2.1.3.3. Adaptador puente</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
   <div>
     <h4>Tema anterior</h4>
     <p class="topless"><a href="02.arranque.html"
@@ -86,7 +251,7 @@
     </form>
     </div>
 </div>
-<script>$('#searchbox').show(0);</script>
+<script>document.getElementById('searchbox').style.display = "block"</script>
         </div>
       </div>
       <div class="clearer"></div>
@@ -106,13 +271,13 @@
         <li class="nav-item nav-item-0"><a href="../../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../../index.html" ><span class="section-number">9. </span>Apéndices</a> &#187;</li>
           <li class="nav-item nav-item-2"><a href="../../index.html" ><span class="section-number">9.2. </span>Virtualización</a> &#187;</li>
-          <li class="nav-item nav-item-3"><a href="../../02.kvm.html" ><span class="section-number">9.2.2.2. </span>Virtualización nativa</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../../02.kvm.html" ><span class="section-number">9.2.2.2. </span>Nativa (<abbr title="Kernel-based Virtual Machine">KVM</abbr>)</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href=""><span class="section-number">9.2.2.2.1.3. </span>Red</a></li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
         &#169; Derechos de autor CC BY 4.0, 2016-2022, José Miguel Sánchez Alés.
-      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 4.5.0.
+      Creado usando <a href="https://www.sphinx-doc.org/">Sphinx</a> 5.3.0.
     </div>
   </body>
 </html>

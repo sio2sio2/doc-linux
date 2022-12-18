@@ -1,2 +1,173 @@
+.. _qemu-red:
+
 Red
-===
+***
+Dedicamos un epígrafe completo a la red, porque, amén de muy importante, es uno
+de los dispositivos que da más juego en su configuración.
+
+Al principio, :ref:`al proponer los alias <qemu-nodefaults>` para simplificar las
+órdenes, definimos una interfaz de red así:
+
+:code:`-device virtio-net,netdev=nic -netdev user,id=nic`
+
+donde vemos que intervienen dos opciones: :kbd:`-device`, que como ya venimos
+viendo con otro tipo de dispositivos define el dispositivo físico que se
+virtualiza; y :kbd:`-netdev`, que indica cómo se utilizará y que es dónde se
+encuentra fundamentalmente el meollo.
+
+En cuanto a la definición del dispositivo es importante apreciar algunos
+aspectos:
+
+* El dispositivo escogido es un *virtio-net*, que `tiene mejor rendimiento
+  <https://www.redhat.com/en/blog/deep-dive-virtio-networking-and-vhost-net>`_
+  que emular completamente una tarjeta de red. Esto exige, no obstante, que el
+  driver esté incluido en el sistema huésped. Es el caso de *Linux*, pero de los
+  *Windows* (al menos los *Windows* 10). En el `apartado de red para Virtualbox
+  <virtualbox--red>` hay nota con un enlace desde el que se puede descargar el
+  controlador.
+
+* Sin embargo, el predeterminado es *e1000* que emula una tarjeta 82450EM de
+  Intel, porque es más probable que el sistema anfitrión la soporte sin
+  neecesidad de instalar ningún *hardware*.
+
+* :kbd:`netdev=` permite asignar un nombre a la tarjeta para que podamos
+  referirla luego al configurarla con la opción :kbd:`-netdev`.
+
+* Si disponemos varias tarjetas o arrancamos varias máquinas virtuales que
+  comparten red, es importante que especifiquemos su dirección |MAC|, porque
+  :program:`QEmu` **siempre asigna la misma**: *52:54:00:12:34:56*. Para ello,
+  basta añadir la dirección al argumento de la opción:
+  :code:`-device virtio-net,netdev=nic,mac=54:52:00:12:34:57`.
+
+Con esto es suficiente para declarar el dispositivo virtual. :kbd:`-netdev` es
+otra historia que requiere un cuento bastante más largo.
+
+Red de usuario
+==============
+Es la configuración de la interfaz que :ref:`Virtualbox llama NAT
+<virtualbox-red>` y por defecto crea :program:`QEmu`, si no la deshabiltamos con
+la opción :kbd:`-nodefaults`. Su definición es la mostrada arriba:
+
+:code:`-netdev user,id=nic`
+
+donde :kbd:`id` refiere el identificador correspondiente fijado en :kbd:`-device`.
+Esta es la configuración mínima que supone que la máquina virtual se encuentre
+en una red definida de la siguiente forma:
+
+* La dirección de red es *10.0.2.0/24*.
+* *QEmu* se encarga de traducir las peticiones al exterior como si se tratara
+  de un *router* que hace enmascaramiento. La puerta de enlace que verá el *huésped*
+  será la segunda |IP| disponible (en este caso, *10.0.2.2*); y el servidor |DNS|,
+  la tercera (en este caso, *10.0.2.3*).
+* El sistema de la máquina virtual recibirá por |DHCP| otra |IP| de la red y
+  tendrá conectividad con el exterior.
+* Una segunda máquina virtual se colocará en una red idéntica, pero no será la
+  misma red, por lo que no existirá conectividad entre ambos huéspedes.
+* Funciona perfectamente el tráfico |UDP| y |TCP|, pero por un problema de
+  privilegos no el |ICMP|, por lo que no podemos usar éste para comprobar conectividad.
+* Ningún puerto del sistema huésped estará expuesto.
+
+Aunque no suele ser necesario, existen distintos parámetros para alterar las
+características de esta red que pueden consultarse en el manual de
+:manpage:`qemu-system-x86_64`. Lo que sí es interesante es solucionar los dos
+últimos inconvenientes.
+
+|ICMP|
+   Para ello lo más recomendable es crear un grupo en el anfitrión al que
+   agreguemos todos los usuarios que utilicen :program:`QEmu` (lo cual será útil
+   más adelante para otras tareas), y que permitamos a tal grupo generar tráfico
+   |ICMP|::
+
+      # addgroup  --system qemusers
+      # adduser usuario qemusers
+      # getent group qemusers
+      qemusers:x:115:usuario
+      # echo "115 115" > /proc/sys/net/ipv4/ping_group_range
+
+   Este permiso es temporal y se perderá al apagar la máquina. Si queremos
+   hacerlo permanente, en un sistema *Debian* podemos añadir una línea a
+   :file:`/etc/sysctl.conf`::
+
+      # echo "net.ipv4.ping_group_range = 115 155" >> /etc/sysctl.conf
+
+   y para no tener que reiniciar, podemos sólo por esta vez cargar su configuración::
+
+      # sysctl -p
+
+**Exposición de puertos**
+   Tiene mucha utilidad si el huésped ofrece un servicio al que queremos acceder
+   desde el anfitrión (p.e. el servicio |SSH|). Para ello, hay un parámetro
+   (:kbd:`hostfwd`) que permite redirigir un puesto del anfitrión a uno del
+   cliente. Por ejemplo:
+
+   :code:`-netdev user,id=nic,hostfwd=tcp:127.0.0.1:10022-:22`
+
+   permite acceder al servidor |SSH| del cliente a través del puerto **10022**
+   del anfitrión. Para exponer más puertos, no hay más que escribir
+   repetidamente el parámetro.
+
+Red de máquinas virtuales
+=========================
+El propósito de este subapartado es solventar otra de las limitaciones de la red
+de usuario: la falta de conectividad entre los sistemas huéspedes.
+
+.. warning:: Tenga presente que por defecto :program:`QEmu` asigna la misma
+   |MAC| a todas las máquinas virtuales, por lo que tendrá que especificar
+   expresamente direcciones |MAC| distintas para cada una de ellas.
+
+Tenemos, al menos, tres alternativas: *socket*, *tap* y *macvlan*.
+
+.. _qemu-red-socket:
+
+socket
+------
+Es la solución más sencilla que, además, no requiere permisos de administración,
+por lo que puede implementarla un usuario sin privilegios. Para configurar una
+interfaz basta con hacerlo del siguiente modo:
+
+:code:`-netdev socket,id=nic,mcast=230.0.0.1:12345`
+
+en donde usamos la dirección de multicast *230.0.0.1* y el puerto **12345**. Con
+que todas las máquinas que participen en esa red repitan esta configuración se
+encontrarán en la misma red. Por ejemplo, las siguientes dos máquinas se
+encontrarán dentro de la misma red interna::
+
+   $ qemu-system-vga -hda disco1.qcw -device virtio-net,netdev=nic,mac=52:54:00:12:34:56 \
+      -netdev socket,id=nic,mcast=230.0.0.1:12345
+   $ qemu-system-vga -hda disco2.qcw -device virtio-net,netdev=nic,mac=52:54:00:12:34:57 \
+      -netdev socket,id=nic,mcast=230.0.0.1:12345
+
+En este caso se encontrarán aisladas y necesitaremos fijarles direcciones
+estáticas, puesto que no hay ningún servidor |DHCP| en esa red. Si quisiéramos
+comunicar esta red con el exterior bastaría con que una de ellas hiciera de
+router. Por ejemplo, la primera de ellas podríamos haberla levantado así::
+
+   $ qemu-system-vga -hda disco1.qcw -device virtio-net,netdev=nic0,mac=52:54:00:12:34:55 -netdev user,id=nic0  \
+      -device virtio-net,netdev=nic,mac=52:54:00:12:34:56 -netdev socket,id=nic,mcast=230.0.0.1:12345
+
+Si tuviéramos necesidad de crear un segundo grupo de máquinas virtuales,
+bastaría con modificar la dirección de multicast, para que este grupo estuviera
+en una red diferente al primero. Por ejemplo::
+
+   $ qemu-system-vga -hda disco1.qcw -device virtio-net,netdev=nic,mac=52:54:00:12:34:58 \
+      -netdev socket,id=nic,mcast=230.0.0.2:12345
+   $ qemu-system-vga -hda disco2.qcw -device virtio-net,netdev=nic,mac=52:54:00:12:34:59 \
+      -netdev socket,id=nic,mcast=230.0.0.1:12345
+
+.. https://mcastelino.medium.com/qemu-virtual-networks-using-slirp-with-multicast-a258929944e1
+
+macvlan
+-------
+
+tap
+---
+
+Adaptador puente
+================
+
+.. http://www.kaizou.org/2018/06/qemu-bridge.html
+
+.. |TCP| replace:: :abbr:`TCP (Transmission Control Protocol)`
+.. |UDP| replace:: :abbr:`UDP (User Datagram Protocol)`
+.. |ICMP| replace:: :abbr:`ICMP (Internet Control Message Protocol)`
+.. |MAC| replace:: :abbr:`MAC (Media Access Control)`

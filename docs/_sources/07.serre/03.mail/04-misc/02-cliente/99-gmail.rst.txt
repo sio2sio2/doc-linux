@@ -245,3 +245,4 @@ anteriormente <getmail>`):
 .. |API| replace:: :abbr:`API (Application Programming Interface)`
 .. |GPG| replace:: :abbr:`GPG (GNU Privacy Guard)`
 .. |URL| replace:: :abbr:`URL (Uniform Resource Locator)`
+.. |MRA| replace:: :abbr:`MRA (Mail Retrieval Agent)`
