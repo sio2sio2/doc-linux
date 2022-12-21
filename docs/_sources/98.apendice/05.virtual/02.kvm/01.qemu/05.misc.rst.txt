@@ -1,11 +1,144 @@
-Miscelánea
-==========
+Otros aspectos
+==============
+Reservamos este epígrafe para aspectos variados que no requieren excesivo
+desarrollo, pero pueden resultar muy útiles.
+
+.. _qemu-efi:
 
 Firmware de la placa base
 -------------------------
+Por defecto, al virtualizar plataformas x86, :program:`QEmu` utiliza como
+firmware la |BIOS| de 16 *bits* proporcionada por el proyecto SeaBIOS_. Esto es
+suficiente en la mayoría de los casos (especialmente *Linux*), pero cuando el
+huésped debe correr on sistema operativo que lo exija (el caso de *Windows* 11)
+o quieren precisamente hacerse pruebas sobre el arranque, surge la necesidad
+de que el huésped arranque un firmware |EFI|.
+
+Para utilizar |EFI| basta con indicarle un archivo que contenga el *firmware*
+apropiado que habrá de descargarse o instalarse primero en el anfitrión. El
+usado habitualmente es OVMF_ para el que existe el paquete :deb:`ovmf` en
+*Debian*::
+
+   # apt install ovmf
+
+Con el paquete instalado, es tan fácil cambiar el *firmware* como añadir:
+
+:code:`-bios /usr/share/ovmf/OVMF.fd`
+
+donde la ruta es el lugar donde el paquete almacena el *firmware*.
+
+.. note:: Para emular la |NVRAM|, |OVMF| crear un archivo dentro de la partición
+   |ESP| denominado :file:`NvVars`.
+
+Es fundamental tener presente que al cargar este *firmware*, deja de tener
+efecto la secuencia de arranque establecida según lo expuesto en el
+:ref:`arranque básico <qemu-arranque-basico>`. Para manipular la secuencia es
+necesario pulsar :kbd:`F2` durante el arranque de la máquina virtual, lo cual
+permitirá entrar en un entorno desde el cuál puede escogerse qué sistema
+operativo arrancar o alterar permanentemente el orden.
+
+.. note:: La secuencia de arranque |EFI| también puede manipularse desde un
+   *Linux* huésped utilizando la orden efibootmgr_. Hay unos pocos ejemplos de
+   uso en :ref:`este epígrafe del manual <efi-entradas-grub>`.
+
+.. _qemu-usb:
+
+|USB|
+-----
+Para habilitar |USB| en el huésped es necesario arrancar la máquina con:
+
+:code:`-device qemu-xhci`\ [#]_
+
+Este epígrafe, no obstante, está dedicado a describir cómo hacer que un
+dispositivo |USB| conectado al anfitrión aparezca directamente en el huésped.
+Necesitaremos dos cosas:
+
+#. Si se usa :program:`QEmu` como usuario sin privilegios, permitir que éste
+   tenga permisos de escritura. Esto se hace de modo análogo a como :ref:`se permite
+   la escritura en dispositivos TAP de caracteres <qemu-red-puente-macvtap>`:
+   definiendo un grupo *qemusers* donde se encuentren los usuarios que
+   virtualicen y añadiendo una regla para la creación de dispositivos |USB|::
+
+      # cat >> /etc/udev/rules.d/55-qemuperm.rules
+      SUBSYSTEM=="usb", ACTION=="add", GROUP="qemusers", MODE="0660"
+
+   .. TODO: Modificar el nombre del archivo en 03.red.rst
+
+#. Pasar al huésped el dispositivo |USB| que queremos tener disponible en él,
+   para lo cual tenemos que identificar en el anfitrión tal dispositivo::
+
+      $ lsusb
+      [...]
+      Bus 001 Device 007: ID abcd:1234 Unknown UDisk
+      [...]
+
+   Supongamos que el dispositivo es éste. Si queremos tener una salida más
+   prolija de sus características, podemos hacer::
+
+      $ lsusb -v -s 1:7
+      [...]
+          idVendor           0xabcd Unknown
+          idProduct          0x1234
+      [...]
+
+   donde :kbd:`1:7` son el número de bus y dispositivo que se han observado en
+   la salida sucinta primera. Consultado estos datos podemos pasar la gestión
+   del dispositivo |USB| al huésped añadiendo:
+
+   :code:`-device usb-host,hostbus=1,hostaddr=7`\ [#]_
+
+   Estos dos números (**1** y **7**) son cambiantes. Una alternativa es
+   identificar el dispositivo con su código de vendedor y producto que sí son
+   fijos y, por tanto, no exigirán que los consultemos cada vez que conectamos
+   el dispositivo al equipo:
+
+   :code:`-device usb-host,vendorid=0xabcd,productid=0x1234`
+
+   .. note:: El dispositivo |USB| no estará disponible en el anfitrión, mientras
+      esté siendo gestionado por el huésped.
+
+.. _qemu-virtio-fs:
+
+Directorio compartido
+---------------------
+
+.. Carpetas compartidas (virtio-fs: https://www.tauceti.blog/post/qemu-kvm-share-host-directory-with-vm-with-virtio/)
+
+.. _qemu-tpm:
 
 Chip |TPM|
 ----------
+Puede ser muy interesante disponer en el huésped de un *chip* |TPM|:
+
+#. Si el anfitrión es un *Linux* y dispone de *chip*, podemos utilizar el *chip*
+   también en el huésped añadiendo las siguientes opciones:
+
+   :code:`-device tpm-tis,tpmdev=tpm0 -tpmdev passthrough,id=tpm0`
+
+#. Si no dispone del *chip*, aún podemos emularlo del siguiente modo:
+
+   a. Instalamos en el anfitrión el *software* apropiado::
+
+         # apt install swtpm-tools
+   
+   b. Creamos un directorio donde almacenar los estados del |TPM|::
+
+         $  mkdir vmtpm0 
+
+   c. Lanzamos el *software* que crea un *socket* para la comunicación\ [#]_::
+
+         $ swtpm socket --tpmstate dir=vmtpm0 --ctrl type=unixio,path=vmtpm0/swtpm-sock
+
+   d. Una vez hechos estos preparativos, ya podremos arrancar máquinas virtuales
+      con un *chip* virtual |TPM| añadiendo lo siguiente:
+
+      :code:`-chardev socket,id=chrtpm,path=vmtpm0/swtpm-sock -tpmdev emulator,id=tpm0,chardev=chrtpm -device tpm-tis,tpmdev=tpm0`
+
+      donde el *socket* es el creado por :command:`swtpm`. Si todo ha ido bien,
+      el huésped debería disponer de un dispositivo :file:`/dev/tpm0`. Además,
+      al apagar la máquina, :command:`swtpm` también completará  su ejecución.
+
+.. _qemu-disco-compact:
 
 Compactación de discos
 ----------------------
@@ -19,7 +152,25 @@ Cifrado de discos
 
 .. Cifrar la imagen con LUKS: https://bugzilla.redhat.com/show_bug.cgi?id=1406803
 
-Script de arranque
-------------------
+.. rubric:: Notas al pie
+
+.. [#] De ahí que tuviéramos que incluir esto al querer emular el comportamiento
+   del puntero en una pantalla táctil (:kbd:`-device usb-tablet`) tal como
+   recomienda el manual cuando la salida es |VNC|.
+.. [#] Obviamente, el huésped debe tener habilitado el |USB|, de modo que
+   también deberá usarse :code:`-device qemu-xhci`.
+.. [#] :command:`swtpm` tiene una opción para correr en segundo plano (:kbd:`-d`),
+   pero :program:`QEmu` no funciona cuando se usa. ?:/
 
 .. |TPM| replace:: :abbr:`TPM (Trusted Platform Module)`
+.. |USB| replace:: :abbr:`USB (Universal Serial Bus)`
+.. |BIOS| replace:: :abbr:`BIOS (Basic I/O System)`
+.. |EFI| replace:: :abbr:`EFI (Extensible Firmware Interface)`
+.. |VNC| replace:: :abbr:`VNC (Virtual Network Computing)`
+.. |NVRAM| replace:: :abbr:`NVRAM (Non Volatile RAM)`
+.. |ESP| replace:: :abbr:`ESP (EFI System Partition)`
+.. |OVMF| replace:: :abbr:`OVMF (Open Virtual Machine Firmware)`
+
+.. _SeaBIOS: https://www.seabios.org/SeaBIOS
+.. _OVMF: https://github.com/tianocore/tianocore.github.io/wiki/OVMF
+.. _efibootmgr: https://www.linuxbabe.com/command-line/how-to-use-linux-efibootmgr-examples
