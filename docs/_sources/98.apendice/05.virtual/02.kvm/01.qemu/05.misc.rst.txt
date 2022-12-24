@@ -101,8 +101,44 @@ Necesitaremos dos cosas:
 
 Directorio compartido
 ---------------------
+Un aspecto muy importante de la virtualización es tener algún mecanismo
+eficiente para compartir archivos entre el anfitrión y el huésped. Esto, en
+principio y siempre que el huésped tenga conectividad de red con el anfitrión,
+puede llevarse a cabo haciendo uso de un sistema de archivos en red como |NFS|
+o |CIFS|, pero no es eficiente. La mejor solución es utilizar `virtio-fs`_, que
+está pensado específicamente para este propósito.
 
-.. Carpetas compartidas (virtio-fs: https://www.tauceti.blog/post/qemu-kvm-share-host-directory-with-vm-with-virtio/)
+Para compartir un directorio del anfitrión debemos antes utilizar en él el
+demonio :program:`virtiofsd` como administrador::
+
+   # /usr/lib/qemu/virtiofsd --socket-path=/var/run/vm1.sock -o source=/var/lib/share --socket-group=qemusers
+
+donde estamos suponiendo, como llevamos haciendo esta ahora, que *qemusers* es
+un grupo al que pertenecen los usuarios que arrancan máquinas virtuales de
+:program:`QEmu`.
+
+Hecho lo cual, podemos arrancar el huésped, que usará el *socket* creado por la
+orden para comunicarse con el anfitrión::
+
+   $ qemu-system-vga -hda caca.qcw -chardev socket,id=char0,path=/var/run/vm1.sock \
+      -device vhost-user-fs-pci,chardev=char0,tag=anfitrion,queue-size=1024 \
+      -object memory-backend-file,id=mem,size=512M,mem-path=/dev/shm,share=on -numa node,memdev=mem
+
+"*anfitrion*" es una etiqueta que se utilizará cuando en el huésped queramos
+montar el directorio compartido::
+
+   # mount -t virtiofs anfitrion /mnt
+
+.. Carpetas compartidas (virtio-fs):
+   https://www.tauceti.blog/post/qemu-kvm-share-host-directory-with-vm-with-virtio/
+   https://github.com/virtio-win/kvm-guest-drivers-windows/wiki/VirtIO-FS:-Shared-file-system
+   https://virtio-fs.gitlab.io/howto-qemu.html
+   https://qemu.readthedocs.io/en/latest/tools/virtiofsd.html
+
+.. Para libvirt:
+
+   http://blog.vmsplice.net/2020/04/virtio-fs-has-landed-in-qemu-50.html
+   https://www.tauceti.blog/posts/qemu-kvm-share-host-directory-with-vm-with-virtio/
 
 .. _qemu-tpm:
 
@@ -142,14 +178,78 @@ Puede ser muy interesante disponer en el huésped de un *chip* |TPM|:
 
 Compactación de discos
 ----------------------
+La intención del epígrafe es lograr un disco en formato |QCOW|\ 2 con el menor
+tamaño posible, propósito que requiere tres tareas:
 
-.. zerofree
+#. Eliminar los archivos innecesarios.
+#. Rellenar con ceros los bloques del sistema de archivos que en algún momento se
+   hubieran escrito y se liberaran posteriormente.
+#. Comprimir la imagen.
+
+Para ello tomemos una imagen llamada :file:`disco.qcw` y obremos sobre ella. Las
+dos primeras tareas requieren acceso a su contenido, para lo cual lo mejor es
+:ref:`montar el disco <qemu-nbd>` en vez de arrancar el sistema huésped::
+
+   # modprobe nbd max_part=63
+   # qemu-nbd -c /dev/nbd0 disco.qcw
+   # partx -a /dev/nbd0
+
+Esto debería dejar disponibles las particiones de la imagen
+(:file:`/dev/nbd0p1`, :file:`/dev/nbd0p2`, etc.). El siguiente paso es ir
+montando uno a uno los sistemas de archivos para realizar sobre ellos las dos
+primeras acciones: borrar lo innecesario y rellenar con ceros. Lo primero es
+trivial y lo segundo depende de cuál sea el sistema de archivos:
+
+* Si es *ext4*, podemos usar :manpage:`zerofree` (incluido en el paquete del
+  mismo nombre)::
+
+   # zerofree -v /dev/nbd0p1
+
+* Si es |NTFS|, podemos usar :manpage:`ntfswipe` (incluido en el paquete
+  :deb:`ntfs-3g`)::
+
+   # ntfswipe -uvb0 /dev/nbd0p1
+
+Una vez que hayamos terminado con todos los sistemas de archivos, deberemos
+desmontar la imagen de disco::
+
+   # qemu-nbd -d /dev/nbd0
+
+Y, finalmente, hacer una :ref:`conversión de la imagen <qemu-discos-conv>` para
+comprimirla::
+
+   $ mv disco{,_z}.qcw
+   $ qemu-img convert -c -p -f qcow2 disco_z.qcw -O qcow2 disco.qcw
+   $ rm -f disco_z.qcw
+
+donde la opción :kbd:`-c` es la que obra la compresión.
 
 .. _qemu-disco-cifrado:
 
 Cifrado de discos
 -----------------
+El formato |QCOW|\ 2 ofrece la posibilidad de cifrar las propias imágenes de
+disco, de manera que su contenido esté bloqueado mientras no se conozca cuál es
+la contraseña usada para su cifrado.
 
+Para ello, lo primero es :ref:`crear una imagen <qemu-img-create>` de disco cifrada::
+
+   $ qemu-img create -f qcow2 --object "secret,id=pass,data=micontraseña" \
+      -o "encrypt.format=luks,encrypt.key-secret=pass" cifrado.qcw 4G
+
+Hecho esto, la imagen estará cifrada, por lo que cada vez que quiera usarse
+deberá proporcionarse la contraseña. Así, para :ref:`montar el disco
+<qemu-nbd>`::
+
+   # qemu-nbd -c /dev/nbd0 --object "secret,id=pass,data=micontraseña" \
+      --image-opts "driver=qcow2,encrypt.format=luks,encrypt.key-secret=pass,file.filename=cifrado.qcw"
+
+y para usarla en una máquina virtual::
+
+   $ qemu-system-vga -object "secret,id=pass,data=micontraseña" -blockdev "driver=file,node-name=disco,filename=cifrado.qcw" \
+      -blockdev "driver=qcow2,encrypt.format=luks,encrypt.key-secret=pass,node-name=hdd,file=disco" -device "virtio-blk,drive=hdd"
+
+.. echo "de:ad:be:ef"$(od -v -An -tx1 -N3 /dev/urandom | tr ' ' ':')
 .. Cifrar la imagen con LUKS: https://bugzilla.redhat.com/show_bug.cgi?id=1406803
 
 .. rubric:: Notas al pie
@@ -170,7 +270,12 @@ Cifrado de discos
 .. |NVRAM| replace:: :abbr:`NVRAM (Non Volatile RAM)`
 .. |ESP| replace:: :abbr:`ESP (EFI System Partition)`
 .. |OVMF| replace:: :abbr:`OVMF (Open Virtual Machine Firmware)`
+.. |NFS| replace:: :abbr:`NFS (Network File System)`
+.. |CIFS| replace:: :abbr:`CIFS (Common Internet File System)`
+.. |NTFS| replace:: :abbr:`NTFS (New Technology File System)`
+.. |QCOW| replace:: :abbr:`QCOW (Qemu Copy-On-Write)`
 
 .. _SeaBIOS: https://www.seabios.org/SeaBIOS
 .. _OVMF: https://github.com/tianocore/tianocore.github.io/wiki/OVMF
 .. _efibootmgr: https://www.linuxbabe.com/command-line/how-to-use-linux-efibootmgr-examples
+.. _virtio-fs: https://virtio-fs.gitlab.io

@@ -145,6 +145,32 @@ esté siendo gestionado por el huésped.</p>
 </section>
 <section id="directorio-compartido">
 <span id="qemu-virtio-fs"></span><h2><span class="section-number">9.2.2.2.1.4.3. </span>Directorio compartido<a class="headerlink" href="#directorio-compartido" title="Enlace permanente a este encabezado">¶</a></h2>
+<p>Un aspecto muy importante de la virtualización es tener algún mecanismo
+eficiente para compartir archivos entre el anfitrión y el huésped. Esto, en
+principio y siempre que el huésped tenga conectividad de red con el anfitrión,
+puede llevarse a cabo haciendo uso de un sistema de archivos en red como <abbr title="Network File System">NFS</abbr>
+o <abbr title="Common Internet File System">CIFS</abbr>, pero no es eficiente. La mejor solución es utilizar <a class="reference external" href="https://virtio-fs.gitlab.io">virtio-fs</a>, que
+está pensado específicamente para este propósito.</p>
+<p>Para compartir un directorio del anfitrión debemos antes utilizar en él el
+demonio <strong class="program">virtiofsd</strong> como administrador:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>/usr/lib/qemu/virtiofsd --socket-path<span class="o">=</span>/var/run/vm1.sock -o <span class="nv">source</span><span class="o">=</span>/var/lib/share --socket-group<span class="o">=</span>qemusers
+</pre></div>
+</div>
+<p>donde estamos suponiendo, como llevamos haciendo esta ahora, que <em>qemusers</em> es
+un grupo al que pertenecen los usuarios que arrancan máquinas virtuales de
+<strong class="program">QEmu</strong>.</p>
+<p>Hecho lo cual, podemos arrancar el huésped, que usará el <em>socket</em> creado por la
+orden para comunicarse con el anfitrión:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-system-vga -hda caca.qcw -chardev socket,id<span class="o">=</span>char0,path<span class="o">=</span>/var/run/vm1.sock <span class="se">\</span>
+   -device vhost-user-fs-pci,chardev<span class="o">=</span>char0,tag<span class="o">=</span>anfitrion,queue-size<span class="o">=</span><span class="m">1024</span> <span class="se">\</span>
+   -object memory-backend-file,id<span class="o">=</span>mem,size<span class="o">=</span>512M,mem-path<span class="o">=</span>/dev/shm,share<span class="o">=</span>on -numa node,memdev<span class="o">=</span>mem
+</pre></div>
+</div>
+<p>«<em>anfitrion</em>» es una etiqueta que se utilizará cuando en el huésped queramos
+montar el directorio compartido:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mount -t virtiofs anfitrion /mnt
+</pre></div>
+</div>
 </section>
 <section id="chip-tpm">
 <span id="qemu-tpm"></span><h2><span class="section-number">9.2.2.2.1.4.4. </span>Chip <abbr title="Trusted Platform Module">TPM</abbr><a class="headerlink" href="#chip-tpm" title="Enlace permanente a este encabezado">¶</a></h2>
@@ -184,9 +210,76 @@ al apagar la máquina, <strong class="command">swtpm</strong> también completar
 </section>
 <section id="compactacion-de-discos">
 <span id="qemu-disco-compact"></span><h2><span class="section-number">9.2.2.2.1.4.5. </span>Compactación de discos<a class="headerlink" href="#compactacion-de-discos" title="Enlace permanente a este encabezado">¶</a></h2>
+<p>La intención del epígrafe es lograr un disco en formato <abbr title="Qemu Copy-On-Write">QCOW</abbr>2 con el menor
+tamaño posible, propósito que requiere tres tareas:</p>
+<ol class="arabic simple">
+<li><p>Eliminar los archivos innecesarios.</p></li>
+<li><p>Rellenar con ceros los bloques del sistema de archivos que en algún momento se
+hubieran escrito y se liberaran posteriormente.</p></li>
+<li><p>Comprimir la imagen.</p></li>
+</ol>
+<p>Para ello tomemos una imagen llamada <code class="file docutils literal notranslate"><span class="pre">disco.qcw</span></code> y obremos sobre ella. Las
+dos primeras tareas requieren acceso a su contenido, para lo cual lo mejor es
+<a class="reference internal" href="01.discos.html#qemu-nbd"><span class="std std-ref">montar el disco</span></a> en vez de arrancar el sistema huésped:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>modprobe nbd <span class="nv">max_part</span><span class="o">=</span><span class="m">63</span>
+<span class="gp"># </span>qemu-nbd -c /dev/nbd0 disco.qcw
+<span class="gp"># </span>partx -a /dev/nbd0
+</pre></div>
+</div>
+<p>Esto debería dejar disponibles las particiones de la imagen
+(<code class="file docutils literal notranslate"><span class="pre">/dev/nbd0p1</span></code>, <code class="file docutils literal notranslate"><span class="pre">/dev/nbd0p2</span></code>, etc.). El siguiente paso es ir
+montando uno a uno los sistemas de archivos para realizar sobre ellos las dos
+primeras acciones: borrar lo innecesario y rellenar con ceros. Lo primero es
+trivial y lo segundo depende de cuál sea el sistema de archivos:</p>
+<ul>
+<li><p>Si es <em>ext4</em>, podemos usar <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/zerofree">zerofree</a></em> (incluido en el paquete del
+mismo nombre):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>zerofree -v /dev/nbd0p1
+</pre></div>
+</div>
+</li>
+<li><p>Si es <abbr title="New Technology File System">NTFS</abbr>, podemos usar <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/ntfswipe">ntfswipe</a></em> (incluido en el paquete
+<a class="reference external" href="https://packages.debian.org/stable/ntfs-3g">ntfs-3g</a>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>ntfswipe -uvb0 /dev/nbd0p1
+</pre></div>
+</div>
+</li>
+</ul>
+<p>Una vez que hayamos terminado con todos los sistemas de archivos, deberemos
+desmontar la imagen de disco:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>qemu-nbd -d /dev/nbd0
+</pre></div>
+</div>
+<p>Y, finalmente, hacer una <a class="reference internal" href="01.discos.html#qemu-discos-conv"><span class="std std-ref">conversión de la imagen</span></a> para
+comprimirla:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>mv disco<span class="o">{</span>,_z<span class="o">}</span>.qcw
+<span class="gp">$ </span>qemu-img convert -c -p -f qcow2 disco_z.qcw -O qcow2 disco.qcw
+<span class="gp">$ </span>rm -f disco_z.qcw
+</pre></div>
+</div>
+<p>donde la opción <kbd class="kbd docutils literal notranslate">-c</kbd> es la que obra la compresión.</p>
 </section>
 <section id="cifrado-de-discos">
 <span id="qemu-disco-cifrado"></span><h2><span class="section-number">9.2.2.2.1.4.6. </span>Cifrado de discos<a class="headerlink" href="#cifrado-de-discos" title="Enlace permanente a este encabezado">¶</a></h2>
+<p>El formato <abbr title="Qemu Copy-On-Write">QCOW</abbr>2 ofrece la posibilidad de cifrar las propias imágenes de
+disco, de manera que su contenido esté bloqueado mientras no se conozca cuál es
+la contraseña usada para su cifrado.</p>
+<p>Para ello, lo primero es <a class="reference internal" href="01.discos.html#qemu-img-create"><span class="std std-ref">crear una imagen</span></a> de disco cifrada:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-img create -f qcow2 --object <span class="s2">&quot;secret,id=pass,data=micontraseña&quot;</span> <span class="se">\</span>
+   -o <span class="s2">&quot;encrypt.format=luks,encrypt.key-secret=pass&quot;</span> cifrado.qcw 4G
+</pre></div>
+</div>
+<p>Hecho esto, la imagen estará cifrada, por lo que cada vez que quiera usarse
+deberá proporcionarse la contraseña. Así, para <a class="reference internal" href="01.discos.html#qemu-nbd"><span class="std std-ref">montar el disco</span></a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>qemu-nbd -c /dev/nbd0 --object <span class="s2">&quot;secret,id=pass,data=micontraseña&quot;</span> <span class="se">\</span>
+   --image-opts <span class="s2">&quot;driver=qcow2,encrypt.format=luks,encrypt.key-secret=pass,file.filename=cifrado.qcw&quot;</span>
+</pre></div>
+</div>
+<p>y para usarla en una máquina virtual:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-system-vga -object <span class="s2">&quot;secret,id=pass,data=micontraseña&quot;</span> -blockdev <span class="s2">&quot;driver=file,node-name=disco,filename=cifrado.qcw&quot;</span> <span class="se">\</span>
+   -blockdev <span class="s2">&quot;driver=qcow2,encrypt.format=luks,encrypt.key-secret=pass,node-name=hdd,file=disco&quot;</span> -device <span class="s2">&quot;virtio-blk,drive=hdd&quot;</span>
+</pre></div>
+</div>
 <p class="rubric">Notas al pie</p>
 <dl class="footnote brackets">
 <dt class="label" id="id4"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>

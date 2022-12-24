@@ -202,7 +202,7 @@ hecho al crear el alias *qemu-system-vga*.
      capturó.
    * :kbd:`Ctrl+Alt+1`, :kbd:`Ctrl+Alt+2`, :kbd:`Ctrl+Alt+3`, que cambian de
      consola virtual. En la **1** está el anfitrión; el la **2**, el monitor (si
-     definimos la salida del monitor como *vc*) y en **3** el puerto serie.
+     definimos la salida del monitor como *vc*); y en **3**, el puerto serie.
 
    Además, dado que el anfitrión aparece en una ventana aparte, la terminal
    donde estemos ejecutado :program:`QEmu` quedará inútilmente ocupada hasta que
@@ -323,12 +323,65 @@ hecho al crear el alias *qemu-system-vga*.
       instrucciones. El caso de justamente arriba funciona porque se supone que
       se está escribiendo interactivamente la orden  y entre la primera línea
       (*root*) y la segunda (*su contraseña*) pasará un tiempo. En cambio, si
-      las tres líneas estuvieran previamente escritas es un archivo y se
+      las tres líneas estuvieran previamente escritas en un archivo y se
       redirigiera éste a la tubería, no lograríamos ingresar.
 
 .. https://fadeevab.com/how-to-setup-qemu-output-to-console-and-automate-using-shell-script/#3inputoutputthroughanamedpipefile
 
 **Spice**
+   Cuando el huésped dispone de entorno gráfico esta salida es la más adecuada,
+   ya que ofrece varias ventajas y, entre ellas, la posibilidad de copiar y
+   pegar con el ratón entre anfitrión y huésped.
+
+   La máquina debe arrancarse del siguiente modo::
+
+      $ qemu-system -spice unix=on,addr=/var/run/vm_spice.socket,disable-ticketing=on -device qxl-vga -display spice-app \
+         -device virtio-serial -chardev spicevmc,id=vdagent,debug=0,name=vdagent \
+         -device virtserialport,chardev=vdagent,name=com.redhat.spice.0
+
+   donde la primera línea es la estrictamente necesaria para usar spice utilizando
+   como comunicación con el anfitrión un *socket*, y las dos siguientes permiten
+   que funcione el cortapega entre anfitrión y huesped.
+
+   Lo necesario, no obstante, no acaba aquí. En el **anfitrión** necesitamos un
+   cliente *spice* (p.e. :deb:`spice-client-gtk` o :deb:`virt-viewer`) para
+   acceder al huésped. :code:`-display spice-app` intenta lanzar automáticamente
+   uno al arrancar la máquina, pero requiere que tal cliente esté asociado al tipo
+   |MIME| :kbd:`x-scheme-handler/spice+unix`. :command:`spicy` (el cliente que
+   incluye el paquete :deb:`spice-client-gtk`) tiene la ventaja de que no incluye
+   ninguna dependencia de :ref:`libvirt <libvirt>`, pero al menos hasta
+   *Bullseye*  no tiene ningún archivo :kbd:`.desktop` que permita establecer la
+   asociación\ [#]_. La solución  es sencilla si se repasa el epígrafe sobre
+   :ref:`aplicaciones predeterminadas en entorno GUI <mimetypes-gui>` y se siguen
+   sus instrucciones, para la cual necesitaremos crear primero un archivo
+   :file:`spicy.desktop` en :file:`~/.local/share/applications` con este
+   contenido:
+
+   .. code-block:: ini
+
+      [Desktop Entry]
+      Comment=Cliente spice
+      Type=Application
+      Exec=spicy --uri=%u
+      Name=spicy
+      MimeType=x-scheme-handler/spice+unix
+
+   En el **huésped**, por su parte, hay también tareas que hacer:
+
+   #. El entorno gráfico del cliente debe usar el driver |QXL|
+      (si el cliente es un sistema *Debian*, tendrá que estár instalado el
+      paquete :deb:`xserver-xorg-video-qxl`)\ [#]_.
+
+   #. Para compartir el portapapeles es necesario instalar::
+
+       # apt install spice-vdagent
+
+      y comprobar que el servicio homónimo se encuentra en funcionamiento::
+
+       $ systemctl status spice-vdagent
+
+.. https://wiki.archlinux.org/title/QEMU
+   https://www.admin-magazine.com/Archive/2013/13/Controlling-virtual-machines-with-VNC-and-Spice/(offset)/6
 
 .. rubric:: Notas al pie
 
@@ -339,6 +392,14 @@ hecho al crear el alias *qemu-system-vga*.
 .. [#] Hasta hace no tanto tiempo el *display* era "sdl".
 .. [#] De hecho, es muy recomendable haber instalado el :ref:`servicio SSH
    <ssh-inst>` y acceder de este modo a él.
+.. [#] :command:`remove-viewer`, el cliente incluido en :deb:`virt-viewer` sí lo
+   tiene por lo que su mera instalación dejará convenientemente preparado el
+   anfitrión.
+.. [#] Esto debería ocurrir con que estuviera disponible el paquete, pero si no
+   es así, puede forzarse `manipulando la configuración del servidor X
+   <https://www.admin-magazine.com/Archive/2013/13/Controlling-virtual-machines-with-VNC-and-Spice/(offset)/6>`_.
+   Es ese mismo enlace hay información sobre cómo instalarlo en sistemas
+   *Windows*.
 
 .. |VGA| replace:: :abbr:`VGA (Video Graphics Array)`
 .. |RAM| replace:: :abbr:`RAM (Random Access Memory)`
@@ -353,5 +414,7 @@ hecho al crear el alias *qemu-system-vga*.
 .. |ICMP| replace:: :abbr:`ICMP (Internet Control Message Protocol)`
 .. |GRUB| replace:: :abbr:`GRUB (GNU GRand Unified Bootloader)`
 .. |CLI| replace:: :abbr:`CLI (Command Line Interface)`
+.. |MIME| replace:: :abbr:`MIME (Multipurpose Internet Mail Extensions)`
+.. |QXL| replace:: :abbr:`QXL (Qemu X Library)`
 
 .. _minicom: https://es.wikipedia.org/wiki/Minicom
