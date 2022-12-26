@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
-    <title>9.2.2.2.1.5. Script de arranque &#8212; documentación de Linuxnomicón - rolling</title>
+    <title>9.2.2.2.1.5. Script &#8212; documentación de Linuxnomicón - rolling</title>
     <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css" />
     <link rel="stylesheet" type="text/css" href="../../../../_static/classic.css" />
     <link rel="stylesheet" href="../../../../_static/custom.css" type="text/css" />
@@ -42,7 +42,7 @@
           <li class="nav-item nav-item-1"><a href="../../../index.html" ><span class="section-number">9. </span>Apéndices</a> &#187;</li>
           <li class="nav-item nav-item-2"><a href="../../index.html" ><span class="section-number">9.2. </span>Virtualización</a> &#187;</li>
           <li class="nav-item nav-item-3"><a href="../../02.kvm.html" accesskey="U"><span class="section-number">9.2.2.2. </span>Nativa (<abbr title="Kernel-based Virtual Machine">KVM</abbr>)</a> &#187;</li>
-        <li class="nav-item nav-item-this"><a href=""><span class="section-number">9.2.2.2.1.5. </span><em>Script</em> de arranque</a></li> 
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">9.2.2.2.1.5. </span><em>Script</em></a></li> 
       </ul>
     </div>  
 
@@ -51,8 +51,232 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <section id="script-de-arranque">
-<span id="qemu-script"></span><h1><span class="section-number">9.2.2.2.1.5. </span><em>Script</em> de arranque<a class="headerlink" href="#script-de-arranque" title="Enlace permanente a este encabezado">¶</a></h1>
+  <section id="script">
+<span id="qemu-script"></span><h1><span class="section-number">9.2.2.2.1.5. </span><em>Script</em><a class="headerlink" href="#script" title="Enlace permanente a este encabezado">¶</a></h1>
+<p>Ya que usar directamente <strong class="program">QEmu</strong> es incómodo y complicado, como se habrá
+podido comprobar sobradamente, proponemos <a class="reference external" href="https://github.com/sio2sio2/vm">un script</a> que ayude a lanzarlo de manera más sencilla.
+Admite opciones propias y aquellas que no entiende las considera de
+<strong class="command">qemu-system-x86_64</strong> con lo que se las pasará sin alterar. Además, si
+algunas de las opciones es <kbd class="kbd docutils literal notranslate">--</kbd> todas las que vengan detrás de ella las
+supondrá de <strong class="command">qemu-system-x86_64</strong> y las pasará sin interpretar, aunque
+tengan un significado propio.</p>
+<p>Antes de utilizarlo, no obstante, son necesarias cuatro acciones:</p>
+<ol class="arabic">
+<li><p>Crear el grupo <em>qemusers</em> para que pertenezcan a él todos los usuarios que
+utilicen el <em>script</em>.</p></li>
+<li><p>Crear un archivo <code class="file docutils literal notranslate"><span class="pre">/etc/sudoers.d/qemu</span></code> con el siguiente contenido:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Cmnd_Alias     NQEMU=/ruta/absoluta/a/vm -up *, /ruta/absoluta/a/vm -down *</span>
+<span class="gp">%</span>qemusers      <span class="nv">ALL</span><span class="o">=</span>NOPASSWD: QEMU, NQEMU
+</pre></div>
+</div>
+<p>que permitirá a los integrantes del grupo anterior crear las interfaces
+en los casos que sea necesario.</p>
+</li>
+<li><p>Ajustar los permisos de <code class="file docutils literal notranslate"><span class="pre">/usr/lib/qemu/qemu-helper</span></code> como se explica
+<a class="reference internal" href="03.red.html#qemu-red-tap"><span class="std std-ref">más atrás</span></a>.</p></li>
+<li><p>Si se quiere poder utilizar directamente los dispositivos <abbr title="Universal Serial Bus">USB</abbr> en el
+anfitrión  alterar las reglas de <strong class="program">udev</strong> como se propone en el
+<a class="reference internal" href="05.misc.html#qemu-usb"><span class="std std-ref">apartado sobre USB</span></a>.</p></li>
+</ol>
+<p>El script permite definir (de menor a mayor preferencia):</p>
+<ol class="arabic simple">
+<li><p>Opciones prefijadas:</p>
+<ul class="simple">
+<li><p>Acelaración por <em>hardware</em></p></li>
+<li><p>Memoria de 512MiB.</p></li>
+</ul>
+</li>
+<li><p>Opciones de <strong class="command">qemu-system-x86_64</strong> tras <kbd class="kbd docutils literal notranslate">--</kbd> (si las hubiera).</p></li>
+<li><p>Opciones de <strong class="command">qemu-system-x86_64</strong> incluidas junto a las propias.</p></li>
+<li><p>Opciones propias.</p></li>
+</ol>
+<p>Por tanto, para que la máquina virtual tuviera más memoria, bastaría con incluir
+con incluir <kbd class="kbd docutils literal notranslate">-m</kbd> en algún lugar de la orden:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -disk disco.qcw -m 1G
+</pre></div>
+</div>
+<p>Y si, además, quisiéramos que tuviera dos procesadores:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -disk disco.qcw -m 1G -smp <span class="m">2</span>
+</pre></div>
+</div>
+<p>Las opciones propias empiezan todas con un único guión, no pueden fusionarse y
+facilitan, fundamentalmente, la introducción de cuatro aspectos:</p>
+<dl>
+<dt><strong>Almacenamiento</strong></dt><dd><p>Mediante la opción <kbd class="kbd docutils literal notranslate">-disk</kbd>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -disk disco.qcw
+</pre></div>
+</div>
+<p>Pueden incluirse varias veces para indicar varios discos y, si el firmware es
+<abbr title="Basic I/O System">BIOS</abbr>, irán antes en la secuencia de arranque los referidos antes. Por
+ejemplo, esto arrancaría con un disco y un cedé, teniendo preferencia el
+segundo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -disk gparted.iso -disk disco.qcw
+</pre></div>
+</div>
+<p>Es posible referir dispositivos de bloques, en vez de archivos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -disk /dev/sr0 -disk disco.qcw
+</pre></div>
+</div>
+<p>Para cargar los discos sigue las siguientes reglas:</p>
+<ul class="simple">
+<li><p>Se utilizan como dispositivos <em>virtio-blk</em>.</p></li>
+<li><p>Sólo se soportan discos <abbr title="Qemu Copy-On-Write">QCOW</abbr>2, imágenes <em>ISO</em> y dispositivos de
+bloques.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Obviamente, pueden seguir usándose las opciones cortas de
+<strong class="command">qemu-system-x86_64</strong>,  aunque convendría no mezclarlas con
+<kbd class="kbd docutils literal notranslate">-disk</kbd>, porque no se ha comprobado el efecto de tal mezcla:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -hda disco.qcw -cdrom gparted.iso -boot <span class="nv">order</span><span class="o">=</span>d
+</pre></div>
+</div>
+</div>
+</dd>
+<dt><strong>Salida de vídeo</strong></dt><dd><p>Mediante la opción <kbd class="kbd docutils literal notranslate">-display</kbd>. Admite varias:</p>
+<dl>
+<dt><code class="code docutils literal notranslate"><span class="pre">-display</span> <span class="pre">none</span></code></dt><dd><p>No hay salida de vídeo. El único mode de acceder a la máquina será a
+través de la red (p.e. porque se haya instalado un servidor <abbr title="Security SHell">SSH</abbr>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -disk disco.qcw -display none
+</pre></div>
+</div>
+</dd>
+<dt><code class="code docutils literal notranslate"><span class="pre">-display</span> <span class="pre">vga</span></code></dt><dd><p>El dispositivo de salida es <em>virtio-vga</em>/<em>gtk</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -disk disco.qcw -display vga
+</pre></div>
+</div>
+<p>La ventana queda bloqueada para que no pueda cerrarse accidentalmente
+pulsando el botón de cierre (el aspa) que gestiona el gestor de ventanas.
+Es el valor predeterminado, si no se especifica opción <kbd class="kbd docutils literal notranslate">-display</kbd></p>
+</dd>
+<dt><code class="code docutils literal notranslate"><span class="pre">-display</span> <span class="pre">spice</span></code></dt><dd><p>Prepara la salida para el uso de <em>spice</em>. Internamente usa la salida
+<em>spice-app</em>, por lo que necesita que haya un <a class="reference internal" href="02.arranque.html#qemu-video-spice"><span class="std std-ref">cliente instalado y
+asociado al tipo x-scheme-handler/spice+unix</span></a>. También
+permite el cortapega, así que el cliente deberá tener instalado
+<strong class="program">spice-vdagent</strong>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -disk disco.qcw -display spice
+</pre></div>
+</div>
+<p>El monitor estará disponible a través de <em>telnet</em> por un puerto igual o
+superior a <strong>2345</strong>.</p>
+</dd>
+<dt><code class="code docutils literal notranslate"><span class="pre">-display</span> <span class="pre">vnc</span></code></dt><dd><p>El anfitrión se encuentra disposible a través de <abbr title="Virtual Network Computing">VNC</abbr> por un puerto igual
+o superior a <strong>10000</strong>.</p>
+</dd>
+<dt><code class="code docutils literal notranslate"><span class="pre">-display</span> <span class="pre">stdio</span></code></dt><dd><p>La salida es la propia terminal de texto  para lo cual es necesario que se
+haya <a class="reference internal" href="02.arranque.html#qemu-video-texto"><span class="std std-ref">preparado el cliente para ofrezca salida y entrada a través del
+puerto serie</span></a>. Es la única salida que no libera la
+terminal por razones obvias:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -disk disco.qcw -display stdio
+</pre></div>
+</div>
+<p>El monitor es accesible pulsando <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">Control</kbd>-<kbd class="kbd docutils literal notranslate">A</kbd>+<kbd class="kbd docutils literal notranslate">h</kbd></kbd>.</p>
+</dd>
+<dt><code class="code docutils literal notranslate"><span class="pre">-display</span> <span class="pre">telnet</span></code></dt><dd><p>Semejante a la anterior, pero la salida se hace disponible a través de
+telnet por un puerto igual o superior a <strong>10000</strong>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -disk disco.qcw -display telnet
+</pre></div>
+</div>
+<p>Si se quiere elegir expresamente el puerto de escucha:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -disk disco.qcw -display telnet:2020
+</pre></div>
+</div>
+</dd>
+</dl>
+<p>El comportamiento (salvo para <kbd class="kbd docutils literal notranslate">stdio</kbd>) es dejar libre la terminal
+pasando a segundo plano la ejecución de la máquina. Si se quiere evitar este
+comportamiento puede añadirse la opción <kbd class="kbd docutils literal notranslate">-f</kbd>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -f -disk disco.qcw
+</pre></div>
+</div>
+<p>En este caso, el huésped aparecerá en una ventana gráfica <em>gtk</em>, pero la
+terminal quedará ocupada por la orden hasta que no la apaguemos.</p>
+</dd>
+<dt><strong>Red</strong></dt><dd><p>Mediante la opción <kbd class="kbd docutils literal notranslate">-net</kbd>. El argumento puede ser una combinación de «u»
+(red de usuario), «p» (interfaz puente) y digitos hexadecimales <em>0-9a-f</em>
+(redes internas). También puede escribirse <kbd class="kbd docutils literal notranslate">none</kbd> para que la máquina no
+disponga de interfaz de red. Por ejemplo:</p>
+<ul class="simple">
+<li><p>Una sola interfaz en red de usuario: <code class="code docutils literal notranslate"><span class="pre">-net</span> <span class="pre">u</span></code></p></li>
+<li><p>Dos interfaces, una en red de usuario y otra en la red interna <strong>0</strong>:
+<code class="code docutils literal notranslate"><span class="pre">-net</span>&#160; <span class="pre">u0</span></code>.</p></li>
+<li><p>Tres interfaces, una en adaptador puente, otra en la red interna <strong>0</strong> y la
+última en la red interna <strong>a</strong>: <code class="code docutils literal notranslate"><span class="pre">-net</span> <span class="pre">p0a</span></code>.</p></li>
+</ul>
+<p>Se siguen las siguientes reglas:</p>
+<ul class="simple">
+<li><p>En ausencia de la opción se supone una interfaz en red de usuario.</p></li>
+<li><p>La red de usuario siempre redirige el primer puerto libre del anfitrión a partir
+del <strong>10022</strong> al puerto <strong>22</strong> del huésped.</p></li>
+<li><p>Para la interfaz puente se escoge automáticamente la solución apropiada
+(puente o macvtap) según esté definida la interfaz en el anfitrión.</p></li>
+<li><p>Las redes internas se construyen con <em>socket</em>, pero si quieren usarse
+puentes es posible hacerlo añadiendo <kbd class="kbd docutils literal notranslate">tap</kbd> al argumento (p.e.
+<code class="code docutils literal notranslate"><span class="pre">-net</span>&#160; <span class="pre">p0a,tap</span></code>).</p></li>
+</ul>
+<p>Por ejemplo:</p>
+<ol class="arabic">
+<li><p>Máquina con una interfaz en red de usuario:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -disk caca.qcw
+</pre></div>
+</div>
+</li>
+<li><p>Máquina sin red:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -net none -disk caca.qcw
+</pre></div>
+</div>
+</li>
+<li><p>Máquina con una interfaz en adaptador puente y otra en la red interna «<strong>2</strong>»:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -net p2 -disk caca.qcw
+</pre></div>
+</div>
+</li>
+<li><p>Ídem pero la red interna se crea mediante un puente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -net p2,tap -disk caca.qcw
+</pre></div>
+</div>
+</li>
+</ol>
+</dd>
+<dt><strong>USB</strong></dt><dd><p>Mediante la opción <kbd class="kbd docutils literal notranslate">-usb</kbd> se pueden pasar al huésped los dispositivos <abbr title="Universal Serial Bus">USB</abbr>
+que queremos que estén disponibles para él:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -disk disco.qcw -usb <span class="m">1234</span>:abcd
+</pre></div>
+</div>
+<p>donde <strong>1234</strong> es el identificador del vendedor y <strong>abcd</strong> el identificador
+del producto tal y cómo los vemos en la salida de <strong class="command">lsusb</strong>. Para
+pasar varios dispositivos basta con repetir la opción.</p>
+</dd>
+</dl>
+<p>Aún hay algunas opciones más que alteran el comportamiento de la máquina:</p>
+<dl>
+<dt><kbd class="kbd docutils literal notranslate">-U</kbd></dt><dd><p>que provoca que la máquina tenga firmware <abbr title="Extensible Firmware Interface">EFI</abbr>. La ubicación del archivo
+de <em>firmware</em> en el anfitrión es <code class="file docutils literal notranslate"><span class="pre">/usr/share/qemu/OVMF.fd</span></code>, esto es, la
+propia de <em>Debian</em>. Si es otra puede editarse el comienzo del <em>script</em> para
+modificarla.</p>
+</dd>
+<dt><kbd class="kbd docutils literal notranslate">-v</kbd></dt><dd><p>que muestra por la salida estándar todas las órdenes necesarias para
+arrancar. Véase <kbd class="kbd docutils literal notranslate">-s</kbd>.</p>
+</dd>
+<dt><kbd class="kbd docutils literal notranslate">-s</kbd></dt><dd><p>como <kbd class="kbd docutils literal notranslate">-v</kbd> muestra las órdenes, pero no llega a ejecutar ninguna:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -v -hda disco.qcw2
+<span class="go">qemu-system-x86_64 -nodefaults -m 512 -machine accel=kvm -hda caca.qcw \</span>
+<span class="go">   -device virtio-net,netdev=nic0,mac=de:ad:be:ef:d0:5f -netdev user,id=nic0,hostfwd=tcp:127.0.0.1:10022-:22 \</span>
+<span class="go">   -device virtio-vga -display gtk,window-close=off -monitor vc</span>
+</pre></div>
+</div>
+<p>Si la línea supone órdenes adicionales, también se mostrarán:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -v -hda disco.qcw2 -net <span class="m">0</span>,tap
+<span class="go">ip link add name vmnet0 type bridge</span>
+<span class="go">ip link set vmnet0 up</span>
+<span class="go">qemu-system-x86_64 -nodefaults -m 512 -machine accel=kvm -hda disco.qcw2 \</span>
+<span class="go">   -device virtio-net,netdev=nic0,mac=de:ad:be:ef:21:b0 -netdev bridge,id=nic0,br=vmnet0 \</span>
+<span class="go">   -device virtio-vga -display gtk,window-close=off -monitor vc</span>
+<span class="go">ip link del vmnet0</span>
+</pre></div>
+</div>
+</dd>
+</dl>
 </section>
 
 
@@ -109,7 +333,7 @@
           <li class="nav-item nav-item-1"><a href="../../../index.html" ><span class="section-number">9. </span>Apéndices</a> &#187;</li>
           <li class="nav-item nav-item-2"><a href="../../index.html" ><span class="section-number">9.2. </span>Virtualización</a> &#187;</li>
           <li class="nav-item nav-item-3"><a href="../../02.kvm.html" ><span class="section-number">9.2.2.2. </span>Nativa (<abbr title="Kernel-based Virtual Machine">KVM</abbr>)</a> &#187;</li>
-        <li class="nav-item nav-item-this"><a href=""><span class="section-number">9.2.2.2.1.5. </span><em>Script</em> de arranque</a></li> 
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">9.2.2.2.1.5. </span><em>Script</em></a></li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">

@@ -267,21 +267,42 @@ o certificados para cifrar la conexión. Échele un vistazo a:</p>
 </div>
 </div>
 </dd>
+</dl>
+<dl id="qemu-video-texto">
 <dt><strong>Texto</strong></dt><dd><p>Si nuestro huésped es un servidor sin entorno gráfico, no necesitamos en
 realidad una ventana gráfica en la que ni siquiera podemos copiar y pegar
 (y esto incluye el acceso <abbr title="Virtual Network Computing">VNC</abbr> que acabamos de ver)<a class="footnote-reference brackets" href="#id10" id="id4">4</a>. Una buena
 alternativa es sustituir dicha ventana por la salida y entrada estándares de
 la propia terminal del anfitrión. Tendremos, no obstante, dos desventajas:</p>
-<ul class="simple">
+<ul>
 <li><p>Sólo podremos tener una sesión abierta (a menos que habilitemos accesos
 adicionales por <abbr title="Security SHell">SSH</abbr>) a diferencia de la ventana gráfica o <abbr title="Virtual Network Computing">VNC</abbr>, en los
 que podemos abrir las seudoterminales típicas a través de <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">Alt</kbd>+<kbd class="kbd docutils literal notranslate">F1</kbd></kbd>,
 <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">Alt</kbd>+<kbd class="kbd docutils literal notranslate">F2</kbd></kbd>, etc.</p></li>
-<li><p>No tendremos acceso al <abbr title="GNU GRand Unified Bootloader">GRUB</abbr> de arranque.</p></li>
-<li><p>Requerimos que el <em>kernel</em> del huésped muestre una consola a través de tal
-puerto serie, lo cual se logra añadiendo <code class="code docutils literal notranslate"><span class="pre">console=/dev/ttyS0</span></code> a los
-parámetros de arranque del núcleo (véase cómo se hace esto con <cite>:ref:`este
-otro caso explicado para Docker &lt;dokcer-lim-kernel&gt;</cite>).</p></li>
+<li><p>Tendremos que modificar el huésped para que se muestre a través del
+puerto serie. En un huésped <em>Linux</em> que arranque con <abbr title="GNU GRand Unified Bootloader">GRUB</abbr> esto se logra
+editando <code class="file docutils literal notranslate"><span class="pre">/etc/default/grub</span></code> de modo que incluya estas tres líneas:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1">#GRUB_CMDLINE_LINUX_DEFAULT=&quot;quiet&quot;</span>
+<span class="nv">GRUB_CMDLINE_LINUX</span><span class="o">=</span><span class="s2">&quot;console=ttyS0&quot;</span>
+
+<span class="nv">GRUB_TERMINAL</span><span class="o">=</span><span class="s2">&quot;console serial&quot;</span>
+<span class="nv">GRUB_SERIAL_COMMAND</span><span class="o">=</span><span class="s2">&quot;serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1&quot;</span>
+
+<span class="nv">GRUB_GFXPAYLOAD_LINUX</span><span class="o">=</span><span class="s2">&quot;text&quot;</span>
+</pre></div>
+</div>
+<p>La primera línea suele encontrarse descomentada y, simplemente, evita que
+el núcleo informe demasiado durante el arranque. Como yo prefiero verlos,
+he comentado la línea. La segunda añade un parámetro al arranque del núcleo
+y puede ya encontrarse en el archivo con algún otro valor. Si es así, no
+habrá más que añadir el nuevo (<kbd class="kbd docutils literal notranslate">console=ttyS0</kbd>).  Las dos siguientes
+líneas provocan que el propio <abbr title="GNU GRand Unified Bootloader">GRUB</abbr> también se muestre por el puerto
+serie. La última línea le indica al núcleo que arranque en modo texto.
+Finalmente, habrá que regenerar la configuración:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>update-grub
+</pre></div>
+</div>
+</li>
 </ul>
 <p>Una primera forma es usar la opción <code class="code docutils literal notranslate"><span class="pre">-nographic</span></code>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-system-x86_64 -machine <span class="nv">accel</span><span class="o">=</span>kvm -m <span class="m">512</span> -hda disco.qcw -nographic
@@ -289,14 +310,11 @@ otro caso explicado para Docker &lt;dokcer-lim-kernel&gt;</cite>).</p></li>
 </div>
 <p>que requiere los dispositivos predeterminados por lo que no usamos los alias
 creados anteriormente, que hacen uso de <kbd class="kbd docutils literal notranslate">-nodefaults</kbd>.</p>
-<p>Una alternativa es, simplemente, redirigir el puerto serie del huésped a la
-salida y entrada estándares del anfitrión:</p>
+<p>Una alternativa mejor es, simplemente, redirigir el puerto serie del huésped
+a la salida y entrada estándares del anfitrión:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-system -hda disco.qcw -serial stdio
 </pre></div>
 </div>
-<p>lo que provocará que en cuanto el núcleo del huésped esté listo y empiece
-a recibir información por su puerto serie, la misma terminal en la
-que se ejecuta <strong class="command">qemu-system</strong> empiece a mostrar información.</p>
 <div class="admonition note">
 <p class="admonition-title">Nota</p>
 <p>Obsérvese que no hemos usado el alias <em>qemu-system-vga</em>. En este
@@ -318,6 +336,13 @@ situado en un determinado puerto (p.e. el <strong>12345</strong>):</p>
 <p>al cual podremos conectarnos desde el anfitrión con <strong class="command">telnet</strong>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>telnet localhost <span class="m">12345</span>
 </pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Si añadimos a la línea el dispositivo gráfico <code class="code docutils literal notranslate"><span class="pre">-device</span> <span class="pre">sga</span></code>,
+que es precisamente lo que hace la opción <kbd class="kbd docutils literal notranslate">-nographic</kbd>, veremos
+también los mensajes de arranque de la <abbr title="Basic I/O System">BIOS</abbr>, pero no es recomendable
+porque afecta a toda la salida posterior.</p>
 </div>
 </dd>
 <dt><strong>Tubería</strong></dt><dd><p>Una variante para la interfaz <abbr title="Command Line Interface">CLI</abbr> anterior, es manipular la salida para
@@ -355,7 +380,7 @@ redirigiera éste a la tubería, no lograríamos ingresar.</p>
 </div>
 </dd>
 </dl>
-<dl>
+<dl id="qemu-video-spice">
 <dt><strong>Spice</strong></dt><dd><p>Cuando el huésped dispone de entorno gráfico esta salida es la más adecuada,
 ya que ofrece varias ventajas y, entre ellas, la posibilidad de copiar y
 pegar con el ratón entre anfitrión y huésped.</p>

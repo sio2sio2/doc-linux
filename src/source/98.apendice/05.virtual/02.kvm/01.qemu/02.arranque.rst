@@ -239,6 +239,8 @@ hecho al crear el alias *qemu-system-vga*.
 
          $ qemu-system-x86_64 -display vnc=help
 
+.. _qemu-video-texto:
+
 **Texto**
    Si nuestro huésped es un servidor sin entorno gráfico, no necesitamos en
    realidad una ventana gráfica en la que ni siquiera podemos copiar y pegar
@@ -251,12 +253,30 @@ hecho al crear el alias *qemu-system-vga*.
      que podemos abrir las seudoterminales típicas a través de :kbd:`Alt+F1`,
      :kbd:`Alt+F2`, etc.
 
-   * No tendremos acceso al |GRUB| de arranque.
+   * Tendremos que modificar el huésped para que se muestre a través del
+     puerto serie. En un huésped *Linux* que arranque con |GRUB| esto se logra
+     editando :file:`/etc/default/grub` de modo que incluya estas tres líneas:
 
-   * Requerimos que el *kernel* del huésped muestre una consola a través de tal
-     puerto serie, lo cual se logra añadiendo :code:`console=/dev/ttyS0` a los
-     parámetros de arranque del núcleo (véase cómo se hace esto con `:ref:`este
-     otro caso explicado para Docker <dokcer-lim-kernel>`).
+     .. code:: bash
+
+        #GRUB_CMDLINE_LINUX_DEFAULT="quiet"
+        GRUB_CMDLINE_LINUX="console=ttyS0"
+
+        GRUB_TERMINAL="console serial"
+        GRUB_SERIAL_COMMAND="serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1"
+
+        GRUB_GFXPAYLOAD_LINUX="text"
+
+     La primera línea suele encontrarse descomentada y, simplemente, evita que
+     el núcleo informe demasiado durante el arranque. Como yo prefiero verlos,
+     he comentado la línea. La segunda añade un parámetro al arranque del núcleo
+     y puede ya encontrarse en el archivo con algún otro valor. Si es así, no
+     habrá más que añadir el nuevo (:kbd:`console=ttyS0`).  Las dos siguientes
+     líneas provocan que el propio |GRUB| también se muestre por el puerto
+     serie. La última línea le indica al núcleo que arranque en modo texto.
+     Finalmente, habrá que regenerar la configuración::
+
+      # update-grub
 
    Una primera forma es usar la opción :code:`-nographic`::
 
@@ -265,14 +285,10 @@ hecho al crear el alias *qemu-system-vga*.
    que requiere los dispositivos predeterminados por lo que no usamos los alias
    creados anteriormente, que hacen uso de :kbd:`-nodefaults`.
 
-   Una alternativa es, simplemente, redirigir el puerto serie del huésped a la
-   salida y entrada estándares del anfitrión::
+   Una alternativa mejor es, simplemente, redirigir el puerto serie del huésped
+   a la salida y entrada estándares del anfitrión::
 
       $ qemu-system -hda disco.qcw -serial stdio
-
-   lo que provocará que en cuanto el núcleo del huésped esté listo y empiece
-   a recibir información por su puerto serie, la misma terminal en la
-   que se ejecuta :command:`qemu-system` empiece a mostrar información.
 
    .. note:: Obsérvese que no hemos usado el alias *qemu-system-vga*. En este
       caso, no queremos ninguna salida de vídeo.
@@ -293,6 +309,11 @@ hecho al crear el alias *qemu-system-vga*.
    al cual podremos conectarnos desde el anfitrión con :command:`telnet`::
 
       $ telnet localhost 12345
+
+   .. note:: Si añadimos a la línea el dispositivo gráfico :code:`-device sga`,
+      que es precisamente lo que hace la opción :kbd:`-nographic`, veremos
+      también los mensajes de arranque de la |BIOS|, pero no es recomendable
+      porque afecta a toda la salida posterior.
 
 **Tubería**
    Una variante para la interfaz |CLI| anterior, es manipular la salida para
@@ -327,6 +348,8 @@ hecho al crear el alias *qemu-system-vga*.
       redirigiera éste a la tubería, no lograríamos ingresar.
 
 .. https://fadeevab.com/how-to-setup-qemu-output-to-console-and-automate-using-shell-script/#3inputoutputthroughanamedpipefile
+
+.. _qemu-video-spice:
 
 **Spice**
    Cuando el huésped dispone de entorno gráfico esta salida es la más adecuada,
