@@ -39,6 +39,8 @@ Hubo tanteos para cambiar este sistema de gestión con irregular éxito
 con las excepciones de *slackware* y *gentoo*. *debian* fue la última que lo
 adoptó y arrastró con su decisión a *ubuntu*, que abandonó *upstart*.
 
+.. _sysv:
+
 SysV
 ----
 

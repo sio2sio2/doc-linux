@@ -42,10 +42,10 @@ correspondiente:
 
 La interfaz de texto
 --------------------
-Los sistemas *UNIX* (y entre ellos *linux*) son comúnmente administrados a
+Los sistemas *UNIX* (y entre ellos *Linux*) son comúnmente administrados a
 través de una interfaz de texto\ [#]_, aunque puedan disponer también de una
 interfaz gráfica. Estas interfaces de texto se caracterizan por ejecutar un
-intérprete de órdenes, que en el caso de linux es muy comúnmente *bash*\ [#]_,
+intérprete de órdenes, que en el caso de *Linux* es muy comúnmente *bash*\ [#]_,
 después de que el usuario se ha validado en el sistema. La labor del intérprete
 de órdenes es esperar que el usuario introduzca una orden. Para ello presentará
 una línea más o menos así::
@@ -315,7 +315,7 @@ podríamos pensar que al usar :command:`test` estamos usando una orden externa,
 pero la *shell* también incorpora su propia versión interna de :command:`test`,
 así que cuando ejecutemos :command:`test` sin más dentro de una sesión de
 :command:`bash` lo que haremos en realidad es utilizar la orden interna. Lo
-mejor siempre es fiarnos mejor de la orden interna:
+más recomendable es fiarnos de la siguiente orden interna:
 
 .. _type:
 .. index:: type
@@ -404,7 +404,7 @@ Si lo que se pretende es apagar el sistema, existen varias alternativas:
    
    Apagará la máquina a los diez minutos de haberse ejecutado. Si no se
    especifica qué se quiere hacer, se sobrentienda ``-P``. Es posible escribir
-   :kbd:``now`` en vez del tiempo, para indicar que se quiere que el proceso se
+   :kbd:`now` en vez del tiempo, para indicar que se quiere que el proceso se
    inicie inmediatamente.
 
 .. rubric:: Notas al pie
@@ -424,7 +424,7 @@ Si lo que se pretende es apagar el sistema, existen varias alternativas:
 .. [#] En realidad, en las distribuciones basadas en *debian*, el intérprete de
        comandos que usan los script del sistema es **dash**, no **bash**, que es
        sólo el predeterminado para las sesiones interactivas que abren los
-       usuarios.  Esto es así, pòrque **dash** es mucho más simple y ligero que
+       usuarios.  Esto es así, porque **dash** es mucho más simple y ligero que
        **bash** (y menos potente también). Debido a esto, :file:`/bin/sh` es un
        enlace simbólico a **dash**; por lo que al escribir nuestros propios
        *scripts* debemos tener cuidado a la hora de escribir la línea de
@@ -438,7 +438,7 @@ Si lo que se pretende es apagar el sistema, existen varias alternativas:
        las demás aparecen sólo si se intenta acceder a ellas. El entorno gráfico
        aparece en la primera que esté libre, así que en un sistema en el que se
        lance el entorno gráfico en el arranque (prácticamente la totalidad de
-       los linux de escritorio), éste ocupará la segunda posición. Aún así,
+       los *Linux* de escritorio), éste ocupará la segunda posición. Aún así,
        pueden aparecer terminales de texto en las posiciones 3, 4, 5 y 6. Si
        quiere acceder a las terminales tenga en cuenta que si se encuentra en el
        entorno gráfico no basta con pulsar :kbd:`Alt`; si quiere acceder a la
@@ -465,5 +465,6 @@ Si lo que se pretende es apagar el sistema, existen varias alternativas:
       $ (logout)
       -bash: logout: no es un shell de entrada: use `exit'`
 
-.. [#] Hasta su versión 7, cuando *debian* usaba *System V* como sistema de inicio y 
-   no :program:`systemd`, :program:`halt` también apagaba la máquina.
+.. [#] Hasta su versión 7, cuando *debian* usaba :ref:`System V <sysv>` como
+   sistema de inicio y no :ref:`systemd <systemd>`, :program:`halt` también
+   apagaba la máquina.
