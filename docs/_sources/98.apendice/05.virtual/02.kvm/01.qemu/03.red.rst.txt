@@ -8,36 +8,42 @@ de los dispositivos que da más juego en su configuración.
 Al principio, :ref:`al proponer los alias <qemu-nodefaults>` para simplificar las
 órdenes, definimos una interfaz de red así:
 
-:code:`-device virtio-net,netdev=nic -netdev user,id=nic`
+:code:`-netdev user,id=nic -device virtio-net,netdev=nic`
 
-donde vemos que intervienen dos opciones: :kbd:`-device`, que como ya venimos
-viendo con otro tipo de dispositivos define el dispositivo físico que se
-virtualiza; y :kbd:`-netdev`, que indica cómo se utilizará y que es dónde se
-encuentra fundamentalmente el meollo.
+donde vemos que intervienen dos opciones complementarias: :kbd:`-device`, que
+como ya venimos viendo con otro tipo de dispositivos define el dispositivo
+físico que se virtualiza; y :kbd:`-netdev`, que indica cómo se utilizará y que
+es dónde se encuentra fundamentalmente el meollo.
 
-En cuanto a la definición del dispositivo es importante apreciar algunos
-aspectos:
-
+En cuanto a la definición del dispositivo (:kbd:`-device`) es importante
+apreciar algunos aspectos:
+ 
 * El dispositivo escogido es un *virtio-net*, que `tiene mejor rendimiento
   <https://www.redhat.com/en/blog/deep-dive-virtio-networking-and-vhost-net>`_
-  que emular completamente una tarjeta de red. Esto exige, no obstante, que el
+  que emular completamente una tarjeta de red\ [#]_. Esto exige, no obstante, que el
   driver esté incluido en el sistema huésped. Es el caso de *Linux*, pero de los
-  *Windows* (al menos los *Windows* 10). En el `apartado de red para Virtualbox
-  <virtualbox--red>` hay nota con un enlace desde el que se puede descargar el
-  controlador.
+  *Windows* (al menos los *Windows* 10). En el :ref:`apartado de red para
+  Virtualbox <virtualbox-red>` hay nota con un enlace desde el que se puede
+  descargar el controlador.
 
 * Sin embargo, el predeterminado es *e1000* que emula una tarjeta 82450EM de
   Intel, porque es más probable que el sistema anfitrión la soporte sin
-  neecesidad de instalar ningún *hardware*.
+  necesidad de instalar ningún *hardware*.
 
-* :kbd:`netdev=` permite asignar un nombre a la tarjeta para que podamos
-  referirla luego al configurarla con la opción :kbd:`-netdev`.
+* :kbd:`netdev=` permite referir el identificador incluido con :kbd:`id=` en la
+  opción :kbd:`-netdev` asociada.
 
 * Si disponemos varias tarjetas o arrancamos varias máquinas virtuales que
   comparten red, es importante que especifiquemos su dirección |MAC|, porque
   :program:`QEmu` **siempre asigna la misma**: *52:54:00:12:34:56*. Para ello,
   basta añadir la dirección al argumento de la opción:
   :code:`-device virtio-net,netdev=nic,mac=54:52:00:12:34:57`.
+
+.. warning:: Todas las configuraciones se hacen usando *virtio-net*, pero para
+   que realmente sea ventajosa para el rendimiento su elección, es necesario
+   también que :ref:`se habilite el uso del módulo vhost_net <qemu-vhost-net>`.
+   Podemos pues seguir sin preocuparnos de esto último, pero es conveniente, una
+   vez que se controle bien cómo configurar la red, que se remate habilitándolo.
 
 Con esto es suficiente para declarar el dispositivo virtual. :kbd:`-netdev` es
 otra historia que requiere un cuento bastante más largo.
@@ -50,9 +56,9 @@ la opción :kbd:`-nodefaults`. Su definición es la mostrada arriba:
 
 :code:`-netdev user,id=nic`
 
-donde :kbd:`id` refiere el identificador correspondiente fijado en :kbd:`-device`.
-Esta es la configuración mínima que supone que la máquina virtual se encuentre
-en una red definida de la siguiente forma:
+donde :kbd:`id` refiere el identificador al que se hará en el :kbd:`-device`
+asociado. Esta es la configuración mínima que supone que la máquina virtual se
+encuentre en una red definida de la siguiente forma:
 
 * La dirección de red es *10.0.2.0/24*.
 * *QEmu* se encarga de traducir las peticiones al exterior como si se tratara
@@ -80,7 +86,7 @@ características de esta red que pueden consultarse en el manual de
    más adelante para otras tareas), y que permitamos a tal grupo generar tráfico
    |ICMP|::
 
-      # addgroup  --system qemusers
+      # addgroup --system qemusers
       # adduser usuario qemusers
       # getent group qemusers
       qemusers:x:115:usuario
@@ -99,7 +105,7 @@ características de esta red que pueden consultarse en el manual de
 **Exposición de puertos**
    Tiene mucha utilidad si el huésped ofrece un servicio al que queremos acceder
    desde el anfitrión (p.e. el servicio |SSH|). Para ello, hay un parámetro
-   (:kbd:`hostfwd`) que permite redirigir un puesto del anfitrión a uno del
+   (:kbd:`hostfwd`) que permite redirigir un puerto del anfitrión a uno del
    cliente. Por ejemplo:
 
    :code:`-netdev user,id=nic,hostfwd=tcp:127.0.0.1:10022-:22`
@@ -217,8 +223,8 @@ como *router*, de modo análogo a como :ref:`ya se hizo cuando ilustramos la red
 con socket <qemu-red-router>`.
 
 .. note:: Obviamente, si quisiéramos crear un segundo grupo de máquinas en un
-   red distinta, bastaría con crear una interfaz puente distinta y asociar tales
-   máquinas a ella. (p.e. *vmnet1*).
+   red distinta, bastaría con crear una interfaz puente distinta (p.e. *vmnet1*)
+   y asociar tales máquinas a ella.
 
 Es posible que, cuando las máquinas estén en funcionamiento, queramos poder
 establecer conexión con ellas directamente desde el anfitrión. Para ello, no
@@ -262,11 +268,13 @@ Esta alternativa exige que ya tengamos preparado el anfitrión, y hayamos
 agregado la interfaz física a un puente. En *Debian* esto se traduciría en una
 configuración dentro de :file:`/etc/network/interfaces` semejante a esta::
 
+   # Interfaz física.
    allow-hotplug eth0
    iface eth0 inet manual
       up  ip link set $IFACE up
       down ip link set $IFACE down
 
+   # Interfaz puente en que se incluye la anterior
    auto br0
    iface br0 inet dhcp
       bridge_ports eth0
@@ -281,15 +289,16 @@ siguiente::
 
 supuesto, claro está, que hayamos preparado
 :file:`/usr/lib/qemu/qemu-brigde-helper`, como se explicó en el epígrafe
-anterior, para que sea capaz de crear las interfaces TAP
+anterior, para que sea capaz de crear las interfaces TAP.
 
 .. _qemu-red-puente-macvtap:
 
 MACVLAN
 -------
 La otra alternativa es más eficiente y, en principio, no exige configurar la
-interfaz física del anfitrión de un modo especial. Simplemente, al arrancar la
-máquina deberemos preparar una interfaz derivada del siguiente modo::
+interfaz física del anfitrión de un modo especial. Simplemente, antes de
+arrancar la máquina deberemos preparar una interfaz derivada del siguiente
+modo::
 
    # ip link add link eth0 name macvtap0 address 52:54:00:12:34:56 type macvtap mode bridge
    # ip link set macvtap0 up
@@ -300,8 +309,8 @@ es un número que puede consultarse en
 deberá poder leer y escribir en él, si queremos que funcione este método.  Para
 ello podemos cambiar los permisos cada vez que creamos una nueva interfaz::
 
-   # chgrp qemusers /dev/tap$(/sys/class/net/macvtap0/ifindex)
-   # chmod g+w /dev/tap$(/sys/class/net/macvtap0/ifindex)
+   # chgrp qemusers /dev/tap$(</sys/class/net/macvtap0/ifindex)
+   # chmod g+w /dev/tap$(</sys/class/net/macvtap0/ifindex)
 
 o bien crear una regla para que cuando se cree un dispositivo de este tipo lo
 haga siempre con estos permisos::
@@ -309,18 +318,18 @@ haga siempre con estos permisos::
    # cat >> /etc/udev/rules.d/55-qemuperm.rules
    KERNEL=="tap*", ACTION=="add", GROUP="qemusers", MODE="0660"
 
-.. note::  Hemos supuesto que hemos creado un grup *qemusers* donde se
-   encontrarán todos usuarios que usen :program:`QEmu` tal como sugerimos
+.. note:: Hemos supuesto que hemos creado un grupo *qemusers* donde se
+   encontrarán todos los usuarios que usen :program:`QEmu` tal como sugerimos
    para :ref:`resolver el ping en una red de usuario <qemu-qemusers>`.
 
 Preparado el sistema, podremos arrancar la máquina de este modo::
 
-   $ qemu-system-vga -hda caca.qcw -device virtio-net,netdev=nic,mac=52:54:00:12:34:56 \
-        -netdev tap,id=nic,fd=3 3<>/dev/tap$(cat "/sys/class/net/macvtap0/ifindex")
+   $ qemu-system-vga -hda disco.qcw -device virtio-net,netdev=nic,mac=$(</sys/class/net/macvtap0/address) \
+        -netdev tap,id=nic,fd=3 3<>/dev/tap$(</sys/class/net/macvtap0/ifindex)
 
-donde puede observarse que la |MAC| de la interfaz macvtap debe coincidir con la
-|MAC| que se asigne a la interfaz virtualizada del anfitrión y, además, se usa
-el descriptor de archivo **3**.
+donde puede observarse que la |MAC| de la interfaz macvtap coincide con la |MAC|
+que se asigne a la interfaz virtualizada del anfitrión y, además, se usa el
+descriptor de archivo **3**.
 
 El problema de esta solución es que las interfaces derivadas carecen de
 conectividad con la interfaz física. Esto supone que los huéspedes (en caso de que
@@ -329,18 +338,25 @@ con el propio anfitrión (y viceversa). La solución es que el anfitrión no use
 interfaz física, sino también una interfaz macvlan. En consecuencia, su
 configuración para *Debian* debería ser así::
 
+   # Interfaz física.
    allow-hotplug eth0
    iface eth0 inet manual
       up   ip link set dev $IFACE up
       down ip link set dev $IFACE down
 
+   # Interfaz derivada de la anterior
    auto ethost
    iface ethost inet dhcp
       pre-up    ip link add link eth0 name $IFACE type macvtap mode bridge
       post-down ip link del dev $IFACE
 
-De este modo, el anfitrión se comunicará a través de la interfaz macvtap
-*ethost*, no eth0, y, por tanto, no quedará aislada de los huéspedes.
+De este modo, el anfitrión se comunicará también a través de una interfaz macvtap
+(*ethost*) y, en consecuencia, no quedará aislado de los huéspedes.
+
+.. rubric:: Notas al pie
+
+.. [#] Pero esto será realmente cierto si también se :ref:`usa el módulo del
+       kernel vhost_net <qemu-vhost-net>`.
 
 .. |TCP| replace:: :abbr:`TCP (Transmission Control Protocol)`
 .. |UDP| replace:: :abbr:`UDP (User Datagram Protocol)`

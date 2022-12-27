@@ -47,6 +47,62 @@ operativo arrancar o alterar permanentemente el orden.
    *Linux* huésped utilizando la orden efibootmgr_. Hay unos pocos ejemplos de
    uso en :ref:`este epígrafe del manual <efi-entradas-grub>`.
 
+.. _qemu-vhost-net:
+
+Soporte para *vhost-net*
+------------------------
+La mejora en el rendimiento que supone *virtio-net* sólo será efectiva si puede
+comunicarse directamente con el núcleo del anfitrión a través de su módulo
+*vhost-net*. Para ello es necesario asegurarse de que el módulo se cargará
+durante el arranque del anfitrión\ [#]_::
+
+   # echo "vhost_net" >> /etc/modules
+
+Y asegurarnos, además, de que el dispositivo de caracteres que crea
+(:file:`/dev/vhost-net`) es accesible por el usuario que utiliza
+:program:`QEmu`, para lo cual podemos valernos un mecanismo ya utilizado para
+otros casos::
+
+   # cat >> /etc/udev/rules.d/55-qemuperm.rules
+   KERNEL=="vhost-net", ACTION=="add", GROUP="qemusers", MODE="0660"
+
+que concede permisos al grupo *qemusers*.
+
+Con estos mimbres ya podremos hacer uso del módulo. Recordemos que, usando el
+dispositivo *virtio-net*, utilizábamos una :ref:`interfaz macvtap0 para dejar la
+interfaz como adaptador puente <qemu-red-puente-macvtap>` así:
+
+:code:`-netdev tap,id=nic,fd=3`
+
+Pues bien, ahora la tendremos que utilizar así:
+
+:code:`-netdev tap,id=nic,fd=3,vhost=on,vhostfd=4`
+
+donde **4** es el descriptor de archivo usado a cuya entrada/salida
+redirigiremos :file:`/dev/vhost-net`. Por tanto, la orden quedaría ahora así::
+
+   $ qemu-system-vga -hda disco.qcw -device virtio-net,netdev=nic,mac=$(</sys/class/net/macvtap0/address) \
+      -netdev tap,id=nic,fd=3,vhost=on,vhostfd=4 3<>/dev/tap$(</sys/class/net/macvtap0/ifindex) 4<>/dev/vhost-net
+
+En el caso de una interfaz *TAP*, hay más diferencias. Propusimos:
+
+:code:`-netdev bridge,id=nic,br=br0`
+
+El problema es que *bridge* no admite :kbd:`vhost` ni :kbd:`vhostfd`, así que
+tenemos que echar mano de *tap*. La línea equivalente es:
+
+:code:`-netdev tap,id=nic,br=br0,helper=/usr/lib/qemu/qemu-bridge-helper`
+
+en que hay explícitamente que especificar el *helper*. Escrito así, sí podemos
+hacer el añadido:
+
+:code:`-netdev tap,id=nic,br=br0,helper=/usr/lib/qemu/qemu-bridge-helper,vhost=on,vhostfd=4`
+
+con lo que la orden completa quedaría así::
+
+   $ qemu-system-vga -hda disco.qcw -device virtio-net,netdev=nic \
+      -netdev tap,id=nic,br=br0,helper=/usr/lib/qemu/qemu-bridge-helper,vhost=on,vhostfd=4 4<>/dev/vhost-net
+
 .. _qemu-usb:
 
 |USB|
@@ -103,6 +159,12 @@ Necesitaremos dos cosas:
    .. note:: El dispositivo |USB| no estará disponible en el anfitrión, mientras
       esté siendo gestionado por el huésped.
 
+En definitiva, que si queremos que un huésped se haga cargo de la gestión de un
+dispositivo |USB| (con identificador de vendedor **0xabcd** e identicador de
+producto **0x1234**), deberemos arrancarlo así::
+
+   $ qemu-system-vga -hda disco.qcw -device qemu-xhci -device usb-host,vendorid=0xabcd,productid=0x1234
+
 .. _qemu-virtio-fs:
 
 Directorio compartido
@@ -126,7 +188,7 @@ un grupo al que pertenecen los usuarios que arrancan máquinas virtuales de
 Hecho lo cual, podemos arrancar el huésped, que usará el *socket* creado por la
 orden para comunicarse con el anfitrión::
 
-   $ qemu-system-vga -hda caca.qcw -chardev socket,id=char0,path=/var/run/vm1.sock \
+   $ qemu-system-vga -hda disco.qcw -chardev socket,id=char0,path=/var/run/vm1.sock \
       -device vhost-user-fs-pci,chardev=char0,tag=anfitrion,queue-size=1024 \
       -object memory-backend-file,id=mem,size=512M,mem-path=/dev/shm,share=on -numa node,memdev=mem
 
@@ -145,40 +207,6 @@ montar el directorio compartido::
 
    http://blog.vmsplice.net/2020/04/virtio-fs-has-landed-in-qemu-50.html
    https://www.tauceti.blog/posts/qemu-kvm-share-host-directory-with-vm-with-virtio/
-
-.. _qemu-tpm:
-
-Chip |TPM|
-----------
-Puede ser muy interesante disponer en el huésped de un *chip* |TPM|:
-
-#. Si el anfitrión es un *Linux* y dispone de *chip*, podemos utilizar el *chip*
-   también en el huésped añadiendo las siguientes opciones:
-
-   :code:`-device tpm-tis,tpmdev=tpm0 -tpmdev passthrough,id=tpm0`
-
-#. Si no dispone del *chip*, aún podemos emularlo del siguiente modo:
-
-   a. Instalamos en el anfitrión el *software* apropiado::
-
-         # apt install swtpm-tools
-   
-   b. Creamos un directorio donde almacenar los estados del |TPM|::
-
-         $  mkdir vmtpm0 
-
-   c. Lanzamos el *software* que crea un *socket* para la comunicación\ [#]_::
-
-         $ swtpm socket --tpmstate dir=vmtpm0 --ctrl type=unixio,path=vmtpm0/swtpm-sock
-
-   d. Una vez hechos estos preparativos, ya podremos arrancar máquinas virtuales
-      con un *chip* virtual |TPM| añadiendo lo siguiente:
-
-      :code:`-chardev socket,id=chrtpm,path=vmtpm0/swtpm-sock -tpmdev emulator,id=tpm0,chardev=chrtpm -device tpm-tis,tpmdev=tpm0`
-
-      donde el *socket* es el creado por :command:`swtpm`. Si todo ha ido bien,
-      el huésped debería disponer de un dispositivo :file:`/dev/tpm0`. Además,
-      al apagar la máquina, :command:`swtpm` también completará  su ejecución.
 
 .. _qemu-disco-compact:
 
@@ -255,10 +283,93 @@ y para usarla en una máquina virtual::
    $ qemu-system-vga -object "secret,id=pass,data=micontraseña" -blockdev "driver=file,node-name=disco,filename=cifrado.qcw" \
       -blockdev "driver=qcow2,encrypt.format=luks,encrypt.key-secret=pass,node-name=hdd,file=disco" -device "virtio-blk,drive=hdd"
 
-.. echo "de:ad:be:ef"$(od -v -An -tx1 -N3 /dev/urandom | tr ' ' ':')
 .. Cifrar la imagen con LUKS: https://bugzilla.redhat.com/show_bug.cgi?id=1406803
 
+.. _qemu-tpm:
+
+Chip |TPM|
+----------
+Puede ser muy interesante disponer en el huésped de un *chip* |TPM|:
+
+#. Si el anfitrión es un *Linux* y dispone de *chip*, podemos utilizar el *chip*
+   también en el huésped añadiendo las siguientes opciones:
+
+   :code:`-device tpm-tis,tpmdev=tpm0 -tpmdev passthrough,id=tpm0`
+
+#. Si no dispone del *chip*, aún podemos emularlo del siguiente modo:
+
+   a. Instalamos en el anfitrión el *software* apropiado::
+
+         # apt install swtpm-tools
+   
+   b. Creamos un directorio donde almacenar los estados del |TPM|::
+
+         $  mkdir vmtpm0 
+
+   c. Lanzamos el *software* que crea un *socket* para la comunicación\ [#]_::
+
+         $ swtpm socket --tpmstate dir=vmtpm0 --ctrl type=unixio,path=vmtpm0/swtpm-sock
+
+   d. Una vez hechos estos preparativos, ya podremos arrancar máquinas virtuales
+      con un *chip* virtual |TPM| añadiendo lo siguiente:
+
+      :code:`-chardev socket,id=chrtpm,path=vmtpm0/swtpm-sock -tpmdev emulator,id=tpm0,chardev=chrtpm -device tpm-tis,tpmdev=tpm0`
+
+      donde el *socket* es el creado por :command:`swtpm`. Si todo ha ido bien,
+      el huésped debería disponer de un dispositivo :file:`/dev/tpm0`. Además,
+      al apagar la máquina, :command:`swtpm` también completará  su ejecución.
+
+Pausado
+-------
+Supongamos que de una máquina arrancada con::
+
+   $ qemu-system-vga -hda disco.qcw -device virtio-net,netdev=nic -netdev user,id=nic
+
+quiere pausarse su ejecución. Para ello, basta con acudir al monitor y ejecutar
+la orden:
+
+.. code-block:: none
+
+   (qemu) stop
+
+Si se quiere volver a poner en ejecución, basta con:
+
+.. code-block:: none
+
+   (qemu) cont
+
+Esto proceder, no obstante, sólo es válido mientras no se aborte la ejecución
+de la máquina. Si nuestra intención,  es pausar la máquina, abortar la ejecución
+y tiempo más adelante volver a arrancar la máquina con el estado justo que tenía
+cuando se pausó es necesario más:
+
+.. code-block:: none
+
+   (qemu) stop
+   (qemu) migrate "exec:xz -c > estado_disco.xz"
+   (qemu) quit
+
+Con esto habremos no solo parado la máquina, sino guardado su estado en el
+archivo :file:`estado_disco.xz`.  Si al reiniciar la máquina queremos recuperar el
+estado de ejecución, deberemos arrancar la máquina exactamente del mismo modo::
+
+   $ qemu-system-vga -hda disco.qcw -device virtio-net,netdev=nic -netdev user,id=nic \
+      -incoming "exec:xz -dc estado_disco.xz"
+
+pero añadiendo la opción :kbd:`-incoming`. Obviamente, la máquina se encontrará
+pausada, porque fue así como estaba cuando guardamos su estado, así que será
+necesario abrir el monitor y:
+
+.. code-block:: none
+
+   (qemu) cont
+
 .. rubric:: Notas al pie
+
+.. [#] Hasta que arranquemos no se cargará, así que si queremos hacer pruebas
+   sobre la marcha, habrá que cargarlo por esta vez a mano::
+
+      # modprobe vhost_net
 
 .. [#] De ahí que tuviéramos que incluir esto al querer emular el comportamiento
    del puntero en una pantalla táctil (:kbd:`-device usb-tablet`) tal como

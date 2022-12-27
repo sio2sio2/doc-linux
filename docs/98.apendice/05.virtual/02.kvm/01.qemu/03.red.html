@@ -57,31 +57,39 @@
 de los dispositivos que da más juego en su configuración.</p>
 <p>Al principio, <a class="reference internal" href="02.arranque.html#qemu-nodefaults"><span class="std std-ref">al proponer los alias</span></a> para simplificar las
 órdenes, definimos una interfaz de red así:</p>
-<p><code class="code docutils literal notranslate"><span class="pre">-device</span> <span class="pre">virtio-net,netdev=nic</span> <span class="pre">-netdev</span> <span class="pre">user,id=nic</span></code></p>
-<p>donde vemos que intervienen dos opciones: <kbd class="kbd docutils literal notranslate">-device</kbd>, que como ya venimos
-viendo con otro tipo de dispositivos define el dispositivo físico que se
-virtualiza; y <kbd class="kbd docutils literal notranslate">-netdev</kbd>, que indica cómo se utilizará y que es dónde se
-encuentra fundamentalmente el meollo.</p>
-<p>En cuanto a la definición del dispositivo es importante apreciar algunos
-aspectos:</p>
+<p><code class="code docutils literal notranslate"><span class="pre">-netdev</span> <span class="pre">user,id=nic</span> <span class="pre">-device</span> <span class="pre">virtio-net,netdev=nic</span></code></p>
+<p>donde vemos que intervienen dos opciones complementarias: <kbd class="kbd docutils literal notranslate">-device</kbd>, que
+como ya venimos viendo con otro tipo de dispositivos define el dispositivo
+físico que se virtualiza; y <kbd class="kbd docutils literal notranslate">-netdev</kbd>, que indica cómo se utilizará y que
+es dónde se encuentra fundamentalmente el meollo.</p>
+<p>En cuanto a la definición del dispositivo (<kbd class="kbd docutils literal notranslate">-device</kbd>) es importante
+apreciar algunos aspectos:</p>
 <ul class="simple">
 <li><p>El dispositivo escogido es un <em>virtio-net</em>, que <a class="reference external" href="https://www.redhat.com/en/blog/deep-dive-virtio-networking-and-vhost-net">tiene mejor rendimiento</a>
-que emular completamente una tarjeta de red. Esto exige, no obstante, que el
+que emular completamente una tarjeta de red<a class="footnote-reference brackets" href="#id4" id="id1">1</a>. Esto exige, no obstante, que el
 driver esté incluido en el sistema huésped. Es el caso de <em>Linux</em>, pero de los
-<em>Windows</em> (al menos los <em>Windows</em> 10). En el <cite>apartado de red para Virtualbox
-&lt;virtualbox–red&gt;</cite> hay nota con un enlace desde el que se puede descargar el
-controlador.</p></li>
+<em>Windows</em> (al menos los <em>Windows</em> 10). En el <a class="reference internal" href="../../01.virtualbox.html#virtualbox-red"><span class="std std-ref">apartado de red para
+Virtualbox</span></a> hay nota con un enlace desde el que se puede
+descargar el controlador.</p></li>
 <li><p>Sin embargo, el predeterminado es <em>e1000</em> que emula una tarjeta 82450EM de
 Intel, porque es más probable que el sistema anfitrión la soporte sin
-neecesidad de instalar ningún <em>hardware</em>.</p></li>
-<li><p><kbd class="kbd docutils literal notranslate">netdev=</kbd> permite asignar un nombre a la tarjeta para que podamos
-referirla luego al configurarla con la opción <kbd class="kbd docutils literal notranslate">-netdev</kbd>.</p></li>
+necesidad de instalar ningún <em>hardware</em>.</p></li>
+<li><p><kbd class="kbd docutils literal notranslate">netdev=</kbd> permite referir el identificador incluido con <kbd class="kbd docutils literal notranslate">id=</kbd> en la
+opción <kbd class="kbd docutils literal notranslate">-netdev</kbd> asociada.</p></li>
 <li><p>Si disponemos varias tarjetas o arrancamos varias máquinas virtuales que
 comparten red, es importante que especifiquemos su dirección <abbr title="Media Access Control">MAC</abbr>, porque
 <strong class="program">QEmu</strong> <strong>siempre asigna la misma</strong>: <em>52:54:00:12:34:56</em>. Para ello,
 basta añadir la dirección al argumento de la opción:
 <code class="code docutils literal notranslate"><span class="pre">-device</span> <span class="pre">virtio-net,netdev=nic,mac=54:52:00:12:34:57</span></code>.</p></li>
 </ul>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Todas las configuraciones se hacen usando <em>virtio-net</em>, pero para
+que realmente sea ventajosa para el rendimiento su elección, es necesario
+también que <a class="reference internal" href="05.misc.html#qemu-vhost-net"><span class="std std-ref">se habilite el uso del módulo vhost_net</span></a>.
+Podemos pues seguir sin preocuparnos de esto último, pero es conveniente, una
+vez que se controle bien cómo configurar la red, que se remate habilitándolo.</p>
+</div>
 <p>Con esto es suficiente para declarar el dispositivo virtual. <kbd class="kbd docutils literal notranslate">-netdev</kbd> es
 otra historia que requiere un cuento bastante más largo.</p>
 <section id="red-de-usuario">
@@ -89,9 +97,9 @@ otra historia que requiere un cuento bastante más largo.</p>
 <p>Es la configuración de la interfaz que <a class="reference internal" href="../../01.virtualbox.html#virtualbox-red"><span class="std std-ref">Virtualbox llama NAT</span></a> y por defecto crea <strong class="program">QEmu</strong>, si no la deshabiltamos con
 la opción <kbd class="kbd docutils literal notranslate">-nodefaults</kbd>. Su definición es la mostrada arriba:</p>
 <p><code class="code docutils literal notranslate"><span class="pre">-netdev</span> <span class="pre">user,id=nic</span></code></p>
-<p>donde <kbd class="kbd docutils literal notranslate">id</kbd> refiere el identificador correspondiente fijado en <kbd class="kbd docutils literal notranslate">-device</kbd>.
-Esta es la configuración mínima que supone que la máquina virtual se encuentre
-en una red definida de la siguiente forma:</p>
+<p>donde <kbd class="kbd docutils literal notranslate">id</kbd> refiere el identificador al que se hará en el <kbd class="kbd docutils literal notranslate">-device</kbd>
+asociado. Esta es la configuración mínima que supone que la máquina virtual se
+encuentre en una red definida de la siguiente forma:</p>
 <ul class="simple">
 <li><p>La dirección de red es <em>10.0.2.0/24</em>.</p></li>
 <li><p><em>QEmu</em> se encarga de traducir las peticiones al exterior como si se tratara
@@ -115,7 +123,7 @@ características de esta red que pueden consultarse en el manual de
 agreguemos todos los usuarios que utilicen <strong class="program">QEmu</strong> (lo cual será útil
 más adelante para otras tareas), y que permitamos a tal grupo generar tráfico
 <abbr title="Internet Control Message Protocol">ICMP</abbr>:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>addgroup  --system qemusers
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>addgroup --system qemusers
 <span class="gp"># </span>adduser usuario qemusers
 <span class="gp"># </span>getent group qemusers
 <span class="go">qemusers:x:115:usuario</span>
@@ -135,7 +143,7 @@ hacerlo permanente, en un sistema <em>Debian</em> podemos añadir una línea a
 </dd>
 <dt><strong>Exposición de puertos</strong></dt><dd><p>Tiene mucha utilidad si el huésped ofrece un servicio al que queremos acceder
 desde el anfitrión (p.e. el servicio <abbr title="Security SHell">SSH</abbr>). Para ello, hay un parámetro
-(<kbd class="kbd docutils literal notranslate">hostfwd</kbd>) que permite redirigir un puesto del anfitrión a uno del
+(<kbd class="kbd docutils literal notranslate">hostfwd</kbd>) que permite redirigir un puerto del anfitrión a uno del
 cliente. Por ejemplo:</p>
 <p><code class="code docutils literal notranslate"><span class="pre">-netdev</span> <span class="pre">user,id=nic,hostfwd=tcp:127.0.0.1:10022-:22</span></code></p>
 <p>permite acceder al servidor <abbr title="Security SHell">SSH</abbr> del cliente a través del puerto <strong>10022</strong>
@@ -188,7 +196,7 @@ en una red diferente al primero. Por ejemplo:</p>
    -netdev socket,id<span class="o">=</span>nic,mcast<span class="o">=</span><span class="m">230</span>.0.0.2:12345
 </pre></div>
 </div>
-<div class="admonition-todo admonition" id="id1">
+<div class="admonition-todo admonition" id="id2">
 <p class="admonition-title">Por hacer</p>
 <p>Es interesante poder acceder directamente a esta red desde el
 anfitrión. El <a class="reference external" href="https://mcastelino.medium.com/qemu-virtual-networks-using-slirp-with-multicast-a258929944e1#06c9">blog de mcastelino propone una solución con socat</a>
@@ -244,8 +252,8 @@ con socket</span></a>.</p>
 <div class="admonition note">
 <p class="admonition-title">Nota</p>
 <p>Obviamente, si quisiéramos crear un segundo grupo de máquinas en un
-red distinta, bastaría con crear una interfaz puente distinta y asociar tales
-máquinas a ella. (p.e. <em>vmnet1</em>).</p>
+red distinta, bastaría con crear una interfaz puente distinta (p.e. <em>vmnet1</em>)
+y asociar tales máquinas a ella.</p>
 </div>
 <p>Es posible que, cuando las máquinas estén en funcionamiento, queramos poder
 establecer conexión con ellas directamente desde el anfitrión. Para ello, no
@@ -283,15 +291,17 @@ un puente en el que también esté incluida la interfaz física del anfitrión.<
 <li><p>Echar mano de las interfaces <em>macvlan</em>.</p></li>
 </ul>
 <section id="qemu-red-puente-tap">
-<span id="id2"></span><h3><span class="section-number">9.2.2.2.1.3.3.1. </span>Puente<a class="headerlink" href="#qemu-red-puente-tap" title="Enlace permanente a este encabezado">¶</a></h3>
+<span id="id3"></span><h3><span class="section-number">9.2.2.2.1.3.3.1. </span>Puente<a class="headerlink" href="#qemu-red-puente-tap" title="Enlace permanente a este encabezado">¶</a></h3>
 <p>Esta alternativa exige que ya tengamos preparado el anfitrión, y hayamos
 agregado la interfaz física a un puente. En <em>Debian</em> esto se traduciría en una
 configuración dentro de <code class="file docutils literal notranslate"><span class="pre">/etc/network/interfaces</span></code> semejante a esta:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">allow-hotplug eth0</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>Interfaz física.
+<span class="go">allow-hotplug eth0</span>
 <span class="go">iface eth0 inet manual</span>
 <span class="go">   up  ip link set $IFACE up</span>
 <span class="go">   down ip link set $IFACE down</span>
 
+<span class="gp"># </span>Interfaz puente en que se incluye la anterior
 <span class="go">auto br0</span>
 <span class="go">iface br0 inet dhcp</span>
 <span class="go">   bridge_ports eth0</span>
@@ -307,13 +317,14 @@ siguiente:</p>
 </div>
 <p>supuesto, claro está, que hayamos preparado
 <code class="file docutils literal notranslate"><span class="pre">/usr/lib/qemu/qemu-brigde-helper</span></code>, como se explicó en el epígrafe
-anterior, para que sea capaz de crear las interfaces TAP</p>
+anterior, para que sea capaz de crear las interfaces TAP.</p>
 </section>
 <section id="macvlan">
 <span id="qemu-red-puente-macvtap"></span><h3><span class="section-number">9.2.2.2.1.3.3.2. </span>MACVLAN<a class="headerlink" href="#macvlan" title="Enlace permanente a este encabezado">¶</a></h3>
 <p>La otra alternativa es más eficiente y, en principio, no exige configurar la
-interfaz física del anfitrión de un modo especial. Simplemente, al arrancar la
-máquina deberemos preparar una interfaz derivada del siguiente modo:</p>
+interfaz física del anfitrión de un modo especial. Simplemente, antes de
+arrancar la máquina deberemos preparar una interfaz derivada del siguiente
+modo:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>ip link add link eth0 name macvtap0 address <span class="m">52</span>:54:00:12:34:56 <span class="nb">type</span> macvtap mode bridge
 <span class="gp"># </span>ip link <span class="nb">set</span> macvtap0 up
 </pre></div>
@@ -323,8 +334,8 @@ es un número que puede consultarse en
 <code class="file docutils literal notranslate"><span class="pre">/sys/class/net/nombre_interfaz/ifindex</span></code>. El problema es que el usuario
 deberá poder leer y escribir en él, si queremos que funcione este método.  Para
 ello podemos cambiar los permisos cada vez que creamos una nueva interfaz:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>chgrp qemusers /dev/tap<span class="k">$(</span>/sys/class/net/macvtap0/ifindex<span class="k">)</span>
-<span class="gp"># </span>chmod g+w /dev/tap<span class="k">$(</span>/sys/class/net/macvtap0/ifindex<span class="k">)</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>chgrp qemusers /dev/tap<span class="k">$(</span>&lt;/sys/class/net/macvtap0/ifindex<span class="k">)</span>
+<span class="gp"># </span>chmod g+w /dev/tap<span class="k">$(</span>&lt;/sys/class/net/macvtap0/ifindex<span class="k">)</span>
 </pre></div>
 </div>
 <p>o bien crear una regla para que cuando se cree un dispositivo de este tipo lo
@@ -335,37 +346,46 @@ haga siempre con estos permisos:</p>
 </div>
 <div class="admonition note">
 <p class="admonition-title">Nota</p>
-<p>Hemos supuesto que hemos creado un grup <em>qemusers</em> donde se
-encontrarán todos usuarios que usen <strong class="program">QEmu</strong> tal como sugerimos
+<p>Hemos supuesto que hemos creado un grupo <em>qemusers</em> donde se
+encontrarán todos los usuarios que usen <strong class="program">QEmu</strong> tal como sugerimos
 para <a class="reference internal" href="#qemu-qemusers"><span class="std std-ref">resolver el ping en una red de usuario</span></a>.</p>
 </div>
 <p>Preparado el sistema, podremos arrancar la máquina de este modo:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-system-vga -hda caca.qcw -device virtio-net,netdev<span class="o">=</span>nic,mac<span class="o">=</span><span class="m">52</span>:54:00:12:34:56 <span class="se">\</span>
-     -netdev tap,id<span class="o">=</span>nic,fd<span class="o">=</span><span class="m">3</span> <span class="m">3</span>&lt;&gt;/dev/tap<span class="k">$(</span>cat <span class="s2">&quot;/sys/class/net/macvtap0/ifindex&quot;</span><span class="k">)</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-system-vga -hda disco.qcw -device virtio-net,netdev<span class="o">=</span>nic,mac<span class="o">=</span><span class="k">$(</span>&lt;/sys/class/net/macvtap0/address<span class="k">)</span> <span class="se">\</span>
+     -netdev tap,id<span class="o">=</span>nic,fd<span class="o">=</span><span class="m">3</span> <span class="m">3</span>&lt;&gt;/dev/tap<span class="k">$(</span>&lt;/sys/class/net/macvtap0/ifindex<span class="k">)</span>
 </pre></div>
 </div>
-<p>donde puede observarse que la <abbr title="Media Access Control">MAC</abbr> de la interfaz macvtap debe coincidir con la
-<abbr title="Media Access Control">MAC</abbr> que se asigne a la interfaz virtualizada del anfitrión y, además, se usa
-el descriptor de archivo <strong>3</strong>.</p>
+<p>donde puede observarse que la <abbr title="Media Access Control">MAC</abbr> de la interfaz macvtap coincide con la <abbr title="Media Access Control">MAC</abbr>
+que se asigne a la interfaz virtualizada del anfitrión y, además, se usa el
+descriptor de archivo <strong>3</strong>.</p>
 <p>El problema de esta solución es que las interfaces derivadas carecen de
 conectividad con la interfaz física. Esto supone que los huéspedes (en caso de que
 haya varios) podrán comunicarse entre sí y comunicarse con el exterior, pero no
 con el propio anfitrión (y viceversa). La solución es que el anfitrión no use directamente la
 interfaz física, sino también una interfaz macvlan. En consecuencia, su
 configuración para <em>Debian</em> debería ser así:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">allow-hotplug eth0</span>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>Interfaz física.
+<span class="go">allow-hotplug eth0</span>
 <span class="go">iface eth0 inet manual</span>
 <span class="go">   up   ip link set dev $IFACE up</span>
 <span class="go">   down ip link set dev $IFACE down</span>
 
+<span class="gp"># </span>Interfaz derivada de la anterior
 <span class="go">auto ethost</span>
 <span class="go">iface ethost inet dhcp</span>
 <span class="go">   pre-up    ip link add link eth0 name $IFACE type macvtap mode bridge</span>
 <span class="go">   post-down ip link del dev $IFACE</span>
 </pre></div>
 </div>
-<p>De este modo, el anfitrión se comunicará a través de la interfaz macvtap
-<em>ethost</em>, no eth0, y, por tanto, no quedará aislada de los huéspedes.</p>
+<p>De este modo, el anfitrión se comunicará también a través de una interfaz macvtap
+(<em>ethost</em>) y, en consecuencia, no quedará aislado de los huéspedes.</p>
+<p class="rubric">Notas al pie</p>
+<dl class="footnote brackets">
+<dt class="label" id="id4"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p>Pero esto será realmente cierto si también se <a class="reference internal" href="05.misc.html#qemu-vhost-net"><span class="std std-ref">usa el módulo del
+kernel vhost_net</span></a>.</p>
+</dd>
+</dl>
 </section>
 </section>
 </section>
