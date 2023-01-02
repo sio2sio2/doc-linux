@@ -1,0 +1,339 @@
+.. _qemu-discos:
+
+Gestión de discos
+=================
+:program:`QEmu` tiene su propio formato nativo de discos llamado |QCOW|\ 2 (el
+**2** es por la versión) y ese debería ser el que se usara por eficiencia y
+rendimiento. Para gestionarlo tenemos fundamentalmente una orden:
+:manpage:`qemu-img`.
+
+.. _qemu-img-create:
+
+Creación
+--------
+El modo más sencillo de crear un disco es el siguiente::
+
+   $ qemu-img create -f qcow2 disco.qcw 4G
+
+donde el último parámetro es el tamaño del disco. El archivo, sin embargo, no
+ocupará tal cantidad de disco, puesto que el disco es de tamaño dinámico e irá
+creciendo según se llene con datos. La expresión del formato (|QCOW|\ 2) con la
+opcion :kbd:`-f` es indispensable, porque de otra forma se creará un disco en
+formato \"cruda\" (*raw*). Existen otro formatos soportados (como |VDI| de
+Virtualbox), pero si nuestra intención es usar este *software* no tiene sentido
+no usar el nativo. Una vez creado, podemos consultar la información sobre el
+disco::
+
+   $ qemu-img info disco.qcow2
+   image: /tmp/caca.qcow2
+   file format: qcow2
+   virtual size: 4 GiB (4294967296 bytes)
+   disk size: 196 KiB
+   cluster_size: 65536
+   Format specific information:
+       compat: 1.1
+       compression type: zlib
+       lazy refcounts: false
+       refcount bits: 16
+       corrupt: false
+       extended l2: false
+
+Básicamente, este es el modo en que se crea un disco *ex novo*. Ahora bien, si
+se quiere hacer un disco con un tamaño compatible con el antiquísimo
+direccionamiento |CHS| de |BIOS|, entonces es necesario mantener la relación de
+**512** *bytes* por sector, **63** sectores por pista  y **255** pistas por
+cilindro; y el disco se tendrá que crear así::
+
+   $ qemu-img create -f qcow2 disco.qcw $((x*255*63*512))B
+
+donde "x" es un entero que debemos calcular para que el producto de todas las
+cantidades sea el tamaño más aproximado al que deseamos (en nuestro ejemplo,
+4GiB). Por tanto, :math:`\frac{4*1024^3}{255*63*512} \approx 523`.
+
+.. note:: Esto es lo mínimo que necesitamos saber sobre discos para poder
+   empezar a usar :program:`QEmu`. Puede ya mismo empezar a :ref:`crear máquinas
+   virtuales <qemu-uso>` y regresar más tarde a este punto para conocer cómo
+   pueden manipularse los discos.
+
+.. note:: Si queremos crear discos pasando opciones que no son las
+   predeterminadas (p.e. :ref:`opciones de cifrado <qemu-disco-cifrado>`)
+   podemos hacer uso de la opción :kbd:`-o`. Puede consultar cuáles son estas
+   opciones en la página de manual correspondiente
+   (:manpage:`qemu-block-drivers`).
+
+Redimensión
+-----------
+Si no estamos satisfechos con el tamaño de un disco, podemos cambiar éste::
+
+   $ qemu-img resize -f qcow2 disco.qcw +1G
+
+Lo cual añadirá un 1GiB al tamaño que tuviera el disco, aunque también podríamos
+haber prescindido del signo y haber escrito :kbd:`5G` directamente. Es posible
+también reducir el tamaño, pero para eso debemos estar seguros que hemos
+reducido el tamaño de los sistemas de archivos de modo que no ocupen el espacio
+final::
+
+   $ qemu-img resize -f qcow2 disco.qcw --shrink -1G
+
+En este caso, :command:`qemu-img` exige incluir la opción :kbd:`--shrink` como
+recordatorio para el usuario de que debio arreglar antes los sistemas de
+archivos contenidos en el disco.
+
+Derivación
+----------
+Es posible también crear un disco utilizando como base otro, de manera que el
+nuevo disco en vez de partir sin datos, partirá con el contenido del que se tome
+como base. Eso sí, deberemos asegurarnos de que el disco base no sufre ninguna
+alteración. Tiene especial utilidad si hacemos la instalación de un sistema
+operativo en un disco y, a partir de ese momento, queremos tomar esta
+instalación como plantilla en varias máquinas virtuales distintas.
+
+Por ejemplo, supongamos que en el disco :file:`bullseye.qcw` hemos hecho una
+instalación básica de la última *Debian* estable y queremos tomar el disco como
+base para dos máquinas: una en la que instalaremos un servidor |DHCP| y otra que
+usaremos como cliente para comprobar las configuraciones de la primera::
+
+   $ chmod 440 bullseye.qcw
+   $ qemu-img create -f qcow2 -F qcow2 servidor.qcw  -b bullseye.qcw
+   $ qemu-img create -f qcow2 -F qcow2 cliente.qcw  -b bullseye.qcw
+
+La primera orden impide que posteriormente por descuido arranquemos una máquina
+con el disco :file:`bullseye.qcw` y que esta torpeza lo modifique y arruine los
+dos discos derivados. Por otra parte debemos declarar explícitamente los
+formatos del disco base (el introducido con :kbd:`-b`) y el derivado. Si echamos
+un vistazo a uno de los dos discos derivados::
+
+   $ qemu-img info servidor.qcw | grep backing
+   backing file: bullseye.qcw
+   backing file format: qcow2
+
+.. warning:: Las rutas relativas (como es el caso del ejemplo) se calculan
+   respecto de la ubicación del nuevo disco, no respecto del directorio de
+   trabajo.
+
+.. note:: El poder derivar discos es una característica del formato |QCOW|\ 2,
+   así que también existe la posibilidad de utilizar la opción :kbd:`-o` que se
+   refirió en la creación para lograr lo mismo::
+
+      $ qemu-img create -f qcow2 cliente.qcw -o "backing_file=bullseye.qcw,backing_fmt=qcow2"
+
+También es interesante cambiar la base de un disco derivado en algunos casos:
+
+#. Cuando la base ha cambiado de ubicación y la definimos con una ruta relativa,
+   como en el ejemplo anterior. Supongamos que tiempo después cambiamos de
+   ubicación :file:`bullseye.qcw`::
+
+      $ mkdir Plantillas
+      $ mv bullseye.qcw Plantillas/
+
+   Completado este movimiento, el disco derivado dejará de funcionar, porque
+   buscará la plantilla en el directorio en que se encuentra y eso ya no es así.
+   Pero puede solucionarse::
+
+      $ qemu-img rebase -f qcow2 servidor.qcw -F qcow2 -u -b Plantillas/bullseye.qcw
+
+   Téngase presente la opción :kbd:`-u`, que es necesaria en este caso. El
+   comportamiento del subcomando :command:`rebase` es recalcular la base, pero
+   en este caso, no se quiere recalcular nada, sino simplemente cambiar la
+   referencia a la base.
+
+#. Cuando queremos cambiar realmente el disco base a otro que se encuentre en la
+   misma cadena de derivación. Supongamos esta situación::
+
+      $ qemu-img info bullseye.qcw | grep backing
+      $ qemu-img info servidor.qcw | grep backing
+      backing file: bullseye.qcw
+      backing file format: qcow2
+      $ qemu-img info servidor2.qcw | grep backing
+      backing file: servidor.qcw
+      backing file format: qcow2
+
+   O sea, tenemos tres discos: :file:`bullseye.qcw`, que no deriva de ninguno,
+   :file:`servidor.qcw` que deriva del anterior; y :file:`servidor2.qcw` que
+   deriva de este último. :command:`rebase` nos permite hacer que
+   :file:`servidor2.qcw` pueda derivar directamente de :file:`bullseye.qcw`::
+
+     $ qemu-img rebase -p -f qcow2  servidor2.qcw -F qcow2 -b bullseye.qcw 
+
+   La opción :kbd:`-p` no es necesaria, pero sí muy útil, porque nos mostrará el
+   porcentaje de progreso mientras dura la operación. Obviamente el disco
+   :file:`servidor2.qcw` sufrirá cambios, de modo que se fusionarán en él los
+   cambios que haya en este propio disco y en :file:`servidor.qcw`.
+
+   Un caso particular es aquel en que se quiere que el disco ya no derive de
+   ningún otro, para lo cual basta con indicar una base vacía::
+
+      $ qemu-img rebase -p -f qcow2 servidor2.qcw -b ""
+
+.. _qemu-img-snapshot:
+
+Instantáneas
+------------
+Los discos |QCOW|\ 2 dan también la posibilidad de conservar estados intermedios
+de un disco, de modo que se puedan recuperar más adelante. Por ejemplo,
+supongamos un disco con una debian estable recién instalado llamado
+:file:`debian.qcw`. Nuestra intención a continuación es hacer la instalación y
+configuración de un servidor |DNS|, pero no lo tenemos muy claro, así que
+sospechamos que no nos saldrá a la primera y queremos tener la posibilidad de
+poder volver a hacer la configuración de cero.
+
+Una posibilidad es crear un disco derivado de file:`debian.qcw`, pero otra es
+crear una instantánea del estado del disco antes de empezar a toquetear::
+
+   $ qemu-img snapshot -c instalado debian.qcw
+   $ qemu-img snapshot -l debian.qcw
+   Snapshot list:
+   ID        TAG                 VM SIZE                DATE       VM CLOCK   ICOUNT
+   1         instalado               0 B 2022-12-12 11:10:05   00:00:00.000        0
+
+La primera orden crea una instantánea del disco que conserva el estado en que
+éste se encontraba cuando la *Debian* estaba limpia y recién instalada. Como es
+la primera que hacemos, la identifica con **1**. A partir de este momento,
+podremos seguir usando el disco y manipulando su contenido.
+
+Supongamos que tiempo después llegamos a la conclusión de que nuestra
+configuración está siendo un desastre y queremos regresar al estado **1** para
+comenzar de nuevo. En ese caso, basta con::
+
+   $ qemu-img snapshot -a 1 debian.qcw
+
+Y el disco volverá a ese estado como si nunca hubiéramos intentado hacer la
+configuración. Por supuesto, podemos tener varias instantáneas asociadas a un
+mismo disco. Por ejemplo, algo así::
+
+   $ qemu-img snapshot -l debian.qcw
+   Snapshot list:
+   ID        TAG                 VM SIZE                DATE       VM CLOCK   ICOUNT
+   1         instalado                 0 2022-12-12 11:10:05   00:00:00.000        0
+   2         confbasica                0 2022-12-12 13:33:54   00:00:00.000        0
+   3         completo                  0 2022-12-12 15:01:19   00:00:00.000        0
+
+en donde estamos suponiendo que hemos hecho tres instantáneas:
+
+* Cuando el sistema operativo estaba limpio.
+* Cuando habíamos logrado completar la configuración básica del servidor |DNS|.
+* Cuando habíamos completado la configuración.
+
+Es posible borrar una instantánea::
+
+   $ qemu-img snapshot -d 2 debian.qcw
+
+que borrará la instantánea identificada con el **2**::
+
+   $ qemu-img snapshot -l debian.qcw
+   Snapshot list:
+   ID        TAG                 VM SIZE                DATE       VM CLOCK   ICOUNT
+   1         instalado                 0 2022-12-12 11:10:05   00:00:00.000        0
+   3         completo                  0 2022-12-12 15:01:19   00:00:00.000        0
+
+.. _qemu-discos-conv:
+
+Conversión
+----------
+Otra operación bastante socorrida consiste en convertir el formato del disco::
+
+   $ qemu-img convert -p -f qcow2 bullseye.vdi -O qcow2 bullseye.vdi
+
+La orden convierte el disco en formato nativo a una salida\ [#]_ en formato
+nativo de Virtualbox (|VDI|). Como la operación tarda un tiempo, añadimos la
+opción :kbd:`-p` para que :command:`qemu-img` que nos vaya indicando el
+progreso.
+
+Ambos discos contienen exactamente lo mismo, aunque tengan diferente formato,
+por lo que es un buen momento para introducir el subcomando :kbd:`compare` que
+permite certificarlos::
+
+   $ qemu-img compare -p -f qcow2 bullseye.vdi -O qcow2 bullseye.vdi
+   Images are identical.
+
+Hay otro modo de escribir la orden::
+
+   $ qemu-img create -f vdi -o static bullseye.vdi 4G
+   $ qemu-img convert -p --image-opts driver=qcow2,file.filename=bullseye.qcw \
+      -n --target-image-opts driver=vdi,file.filename=bullseye.vdi,static
+
+que es mucho más farragosa, pero permite añadir opciones adicionales (véase
+:manpage:`qemu-block-drivers`) que no hay manera de introducir mediante la
+primera alternativa (por ejemplo, :ref:`el cifrado <qemu-disco-cifrado>`). En el
+ejemplo, hemos añadido la  única opción que permite el formato |VDI|:  que el
+disco sea estático, en vez de dinámico. Hay, además, aún otra manera para
+expresar las opciones del archivo de salida::
+
+   $ qemu-img convert -p -f qcow2 bullseye.qcw -O qcow2 bullseye.vdi -o static
+
+gracias a :kbd:`-o` cuyo argumento incluirá las opciones propias del formato en
+cuestión (:manpage:`qemu-block-drivers`) y que ya se introdujo al tratar la
+creación de discos.
+
+La suborden :command:`convert` no sólo permite hacer hacer conversiones entre
+formatos, sino hacer manipulaciones con un mismo formato. Por ejemplo,
+supongamos que :file:`servidor.qcw` derive de :file:`bullseye.qcw` y que,
+además, tenga definidas tres instantáneas (**1**, **2** y **3**). En esta
+situación podríamos obtener un archivo :file:`output.qcw` con el estado de la
+segunda instantánea haciendo lo siguiente::
+
+   $ qemu-img convert -p -f qcow2 -l 2 servidor.qcw -O qcow2 output.qcw
+
+El archivo resultando no tendrá instantáneas y derivará de :file:`bullseye.qcw`,
+pero reflejará fielmente el estado **2** de :file:`servidor.qcw`. También habría
+sido posible obtener lo mismo, pero conservando la derivación de
+:file:`bullseye.qcw`::
+
+   $ qemu-img convert -p -f qcow2 -l 2 servidor.qcw -O qcow2 output.qcw -B bullseye.qcw -F qcow2
+
+.. note:: Al crear un disco de salida |QCOW|\ 2 se puede comprimir con la
+   opción :kbd:`-c`. Esto generará un archivo sensiblemente más pequeño, aunque
+   a costa de su rendimiento.
+
+.. _qemu-nbd:
+
+Montaje
+-------
+Otra posibilidad interesante es la de poder acceder al contenido de los discos
+sin necesidad de arrancar una máquina virtual que los use. Para ello, debemos
+primero tener cargado el módulo del *kernel* ``nbd``::
+
+   # modprobe nbd max_part=63
+
+Y, una vez hecho, asociar el archivo del disco (p.e. :file:`disco.qcw`) a uno de
+los dispositivos generados por el módulo::
+
+   # qemu-nbd -c /dev/nbd0 disco.qcw
+
+De este modo, a través de este archivo de bloques, tendremos acceso al disco
+virtual como si de un disco físico se tratara. Por ejemplo, podríamos usar
+:ref:`fdisk <fdisk>` (o similar) para particionar. Si por el contrario el
+el disco ya tenía definidas particiones y estas se cargan automáticamente,
+entonces aparecerán los dispositivos :file:`/dev/nbd0p1`, :file:`/dev/nbd0p2`,
+etc. En caso de que no lo hagan, aún podemos ordenarle al núcleo que las
+cargue::
+
+   # partx -a /dev/nbd0
+
+Y, finalmente, acceder a los sistemas de las particiones::
+
+   # mount /dev/nbd0p1 /mnt
+
+A partir de este momento, podremos hacer los cambios que estimemos oportunos en
+el sistema de archivos. Una vez que acabemos es importante liberar todo::
+
+   # umount /mnt
+   # qemu-nbd -d /dev/nbd0
+
+y comprobar si han desaparecido los archivos de partición (:file:`/dev/nbd0p1`,
+etc.). Si no es así, deberemos revisar por qué sigue ocupado el dispositivo.
+
+.. note:: Para imágenes de disco más particulares que requieren la declaración
+   de sus características (como aquellas cifradas), :command:`qemu-nbd` permite
+   el uso de la opción :kbd:`--image-opts`, que es equivalente a la que tiene
+   también :ref:`el subcomando convert de qemu-img <qemu-discos-conv>`.
+
+.. rubric:: Notas al pie
+
+.. [#] Desgraciadamente, la salida debe ser un archivo regular y `no la salida
+   estándar <https://www.mail-archive.com/qemu-discuss@nongnu.org/msg05176.html>`_.
+
+.. |QCOW| replace:: :abbr:`QCOW (Qemu Copy On Write)`
+.. |VDI| replace:: :abbr:`VDI (Virtualbox Disk Image)`
+.. |CHS| replace:: :abbr:`CHS (Cylinder-Head-Sector)`
+.. |BIOS| replace:: :abbr:`BIOS (Basic I/O System)`

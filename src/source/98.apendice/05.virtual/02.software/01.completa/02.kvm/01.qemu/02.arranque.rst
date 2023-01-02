@@ -1,0 +1,455 @@
+.. _qemu-uso:
+
+Ejecución de máquinas
+*********************
+:program:`QEmu` no es un programa especialmente amigable para la ejecución de
+máquinas. No hay más que leer la presentación `La jungla de los parámetros de
+QEmu
+<https://archive.fosdem.org/2018/schedule/event/vai_qemu_jungle/attachments/slides/2539/export/events/attachments/vai_qemu_jungle/slides/2539/qemu_cli_jungle.pdf>`_.
+De hecho, no está pensado para el uso habitual de un usuario normal y ni
+siquiera pueden *crearse* máquinas virtuales, sino que al utilizar uno o varios
+discos se declaran cuáles son las características de la máquina virtual que los
+usará.
+
+.. note:: :program:`QEmu` no distingue el guión del doble guión. Por tanto,
+   :kbd:`-hda` equivale a :kbd:`--hda`.
+
+.. _qemu-arranque-basico:
+
+Básica
+======
+La ejecución más básica que podemos hacer es la siguiente::
+
+   $ qemu-system-x86_64 -machine accel=kvm -m 512 -hda disco.qcw
+
+que, habilitando la aceleración por *hardware*\ [#]_, levantará
+una máquina:
+
+* Con 512MiB de memoria |RAM| gracias a la opción :kbd:`-m`. Es necesario
+  incluirla, porque la memoria predeterminada son *128* MiB, muy escasa para
+  practicamente cualquier sistema operativo moderno. Puede incluirse
+  :kbd:`G` para significar GiB. Por ejemplo, :code:`-m 1G`.
+* Con firmware |BIOS|.
+* Con un procesador.
+* Dispone de un disco duro representado por el archivo :file:`disco.qcw`.
+* Con una tarjeta de red configurada como |NAT| (según :ref:`la terminología de Virtualbox <virtualbox-red>`)\ [#]_.
+* Con una salida de vídeo compatible con |VGA|.
+* Muestra el huésped (una opción :kbd:`-display gtk` implícita) en una ventana
+  del anfitrión.
+
+.. note:: En cualquier caso, esta forma de lanzar es un poco peligrosa, puesto
+  que la ventana se cerrará sin confirmación (y con ello la máquina virtual
+  se abortará) con tan sólo pulsar el aspa que proporciona el gestor de ventanas.
+  Es recomendable evitarlo añadiendo:
+ 
+  :code:`-display gtk,window-close=off`.
+
+Sin embargo, si el disco está vacío, de poco servirá porque la máquina no
+encontrará sistema operativo que arrancar. Así que podemos añadir un cedé y arrancar por él::
+
+   $ qemu-system-x86_64 -machine accel=kvm -m 512 -hda disco.qcw -cdrom gparted.iso -boot d
+
+donde hemos tenido que añadir la opción :kbd:`-boot` para poder arrancar desde
+el cedé en vez de el disco duro, que es el comportamiento predeterminado, ya que
+"d" significa CDRom, como "c" disco duro, y "n" red. En realidad es una
+simplificación (obsoleta, según su página de manual
+:manpage:`qemu-system-x86_64`) de:
+
+:code:`-boot order=d`
+
+Pueden indicarse varias letras para definir una secuencia de arranque. Por
+ejemplo:
+
+:code:`-boot order=ndc`
+
+intenta primero un arranque por red, si éste falla, un arranque por la unidad
+óptica y, por último, un arranque por el disco duro. También podemos optar por
+presentar un menú de selección:
+
+:code:`-boot menu=on`
+
+.. note:: :kbd:`-boot` sólo tiene efecto con *firmware* |BIOS|.
+
+.. _qemu-nodefaults:
+
+En cualquier caso, y antes de empezar a profundizar en la virtualización de
+algunos dispositivos, es recomendable introducir los siguientes alias::
+
+   $ alias qemu-system='qemu-system-x86_64 -nodefaults -display none -m 512 -machine accel=kvm'
+   $ alias qemu-system-vga='qemu-system -device virtio-vga -display gtk -monitor vc'
+
+El primero elimina cualquier dispositivo predeterminado (p.e. ya no habrá
+ninguna interfaz de red ni ninguna salida de vídeo) gracias a la opción
+:kbd:`-nodefaults`, mientras que el segundo añadirá una salida de vídeo |VGA|.
+Este segundo *alias* hace algo más: hace accesible el monitor de :program:`QEmu`
+para manipular la máquina virtual en la ventana gráfica en que se ve el huésped.
+Si nos resulta un problema  crear máquinas sin interfaz de red (el estudio de
+ellas lo posponemos al siguiente epígrafe), podemos redefinir el primer *alias*
+para que añada una :ref:`interfaz dispuesta en NAT <virtualbox-red>`::
+
+   $ alias qemu-system='qemu-system-x86_64 -nodefaults -display none -m 512 -machine accel=kvm -netdev user,id=nic -device virtio-net,netdev=nic'
+
+Sobre esta base podremos probar las opciones que se proponen a continuación.
+
+Discos
+======
+:program:`QEmu` provee un mecanismo simplificado para indicar qué discos duros
+(o unidad óptica) pretenden incorporarse a la máquina virtual, y que es el que
+hemos utilizado bajo el epígrafe anterior: las opciones :kbd:`-hda`,
+:kbd:`-hdb`, :kbd:`-hdc` :kbd:`-hdd`, y :kbd:`-cdrom`, la cual convierte el
+disco situado en *hdc* en un medio óptico, por lo que es incompatible con la
+opción :kbd:`-hdc`. Para estos cinco argumentos el parámetro es un archivo
+regular: una imagen de disco (p.e. en formato |QCOW|\ 2) para los cuatro
+primeros, y una imagen *ISO* para el último.
+
+.. note:: Como estará sospechando por estar reducido a la declaración de cuatro
+   discos, :program:`QEmu` emula, mediante esta forma simplificada, una
+   controladora |IDE|.
+
+Normalmente, bastará con expresar mediante estas opciones los medios de
+almacenamiento, pero podemos encontrarnos casos en que tengamos que conocer con
+mayor profundidad cómo se refieren éstos. Hay dos opciones que deberemos usar
+conjuntamente:
+
+:kbd:`-blockdev`
+   que define en sí el dispositivo de bloques que se utilizará como *backend*.
+   Por ejemplo, lo siguiente define un dispositivo que es un archivo de nombre
+   :file:`disco.qcw` en formato |QCOW|\ 2.
+
+   :code:`-blockdev "driver=file,node-name=f1,filename=disco.qcw" -blockdev "driver=qcow2,node-name=hdd,file=f1"`
+
+   Y, esto esto, un archivo en formato crudo:
+
+   :code:`-blockdev "driver=file,node-name=iso,filename=gparted.iso" -blockdev "driver=raw,node-name=cdrom,file=iso"`
+
+   que, obviamente, es la imagen de un cedé. Ahora bien, como *raw* es el
+   formato predeterminado podríamos habernos ahorrado el segundo
+   :kbd:`-blockdev`:
+
+   :code:`-blockdev "driver=file,node-name=cdrom,filename=gparted.iso"`
+
+   Si, en cambio, quisiéramos usar directamente el lector óptico
+   (:file:`/dev/sr0`):
+
+   :code:`-blockdev "drive=host_device,node-name=cdrom,filename=/dev/sr0"`
+
+   Sea como sea, esta opción solamente declara dispositivos de bloques sin
+   especificar qué se quiere hacer con ellos. Para que una máquina virtual los
+   use, es necesario añadir una opción más.
+
+:kbd:`-device`
+   que define cómo se usara el dispositivo. Por ejemplo, esto nos conectaría el
+   disco definido anteriormente (recordemos :kbd:`node-name=hdd`) a la controladora |IDE|:
+
+   :code:`-device "ide-hd,drive=hdd,bootindex=1"`
+
+   y, si queremos conectar también el cedé (al que nombramos con
+   :kbd:`node-name=cdrom`):
+
+   :code:`-device "ide-cd,drive=cdrom,bootindex=0"`
+
+   Obsérvese que hemos referido el orden de arranque para que arranque primero
+   el cedé. Sin embargo, por rendimiento es mejor usar `virtio-blk
+   <https://www.qemu.org/2021/01/19/virtio-blk-scsi-configuration/>`_ para los
+   discos duros en vez de emular la controladora |IDE|. En consecuencia:
+
+   :code:`-device "virtio-blk,drive=hdd,bootindex=1" -device "ide-cd,drive=cdrom,bootindex=0"`
+
+Poniendo todo junto podríamos arrancar una máquina con un disco del siguiente
+modo::
+
+   $ qemu-system-vga -blockdev "driver=file,node-name=f1,filename=disco.qcw" \
+      -blockdev "driver=qcow2,node-name=hdd,file=f1" -device "ide-hd,drive=hdd"
+
+y si queremos añadir un lector óptico con una imagen de disco incluida y que
+arranque primero::
+
+   $ qemu-system-vga -blockdev "driver=file,node-name=f1,filename=disco.qcw" \
+      -blockdev "driver=qcow2,node-name=hdd,file=f1" -device "virtio-blk,drive=hdd,bootindex=1" \
+      -blockdev "driver=file,node-name=cdrom,filename=gparted.iso" -device "ide-cd,drive=cdrom,bootindex=0"
+
+Evidentemente las formas simplificadas con que comenzamos el epígrafe son
+bastante más sencillas.
+
+Salida de vídeo
+===============
+Por defecto, o sea, en ausencia de la opción :kbd:`-nodefaults`, :program:`QEmu`
+la define así\ [#]_:
+
+:code:`-device VGA -display gtk`
+
+en que hay dos opciones: :kbd:`-device`, que hace referencia a un *hardware*
+virtualizado por la aplicación (ya vimos que también se usaba para virtualizar
+discos) y :kbd:`-display` que refiere la forma en que el vídeo se presentará al
+anfitrión. En este caso, para el huésped se virtualiza una tarjeta de vídeo con
+compatibilidad absoluta con el estándar |VGA| y en el anfitrión se muestra éste
+mediante una ventana que que presenta un menú superior con algunas opciones de
+manipulación de la máquina. En principio, podemos sustituir :kbd:`VGA` por
+:kbd:`virtio-vga`, que debería ser más  eficiente y, de hecho, es lo que se ha
+hecho al crear el alias *qemu-system-vga*.
+
+.. seealso:: Puede echarle un ojo a `otras virtualizaciones del hardware de
+   vídeo <https://www.kraxel.org/blog/2019/09/display-devices-in-qemu/>`_.
+
+.. _qemu-video-grafica:
+
+**Ventana gráfica**
+   Si no manipulamos :kbd:`-display`, el anfitrión se muestra dentro de la
+   ventana gráfica y hay algunas combinaciones de teclas que nos conviene saber:
+
+   * :kbd:`Ctrl+Alt+q`, que cancela inmediatamente la ejecución de la máquina.
+   * :kbd:`Ctrl+Alt+f`, que pone la ventana gráfica a pantalla completa (y revierte
+     el efecto si vuelve a pulsarse).
+   * :kbd:`Ctrl+Alt+g`, que recupera para el anfitrión el ratón si el huésped lo
+     capturó.
+   * :kbd:`Ctrl+Alt+1`, :kbd:`Ctrl+Alt+2`, :kbd:`Ctrl+Alt+3`, que cambian de
+     consola virtual. En la **1** está el anfitrión; el la **2**, el monitor (si
+     definimos la salida del monitor como *vc*); y en **3**, el puerto serie.
+
+   Además, dado que el anfitrión aparece en una ventana aparte, la terminal
+   donde estemos ejecutado :program:`QEmu` quedará inútilmente ocupada hasta que
+   apaguemos la máquina. Por tanto, nos convendrá normalmente añadir la opción
+   :code:`-daemonize`, que la liberará para que podamos utilizarla entretanto::
+
+      $ qemu-system-vga -hda caca.qcw -daemonize
+
+|VNC|
+   Una posibilidad es sustituir la ventana por un servidor |VNC|, de modo que
+   para observar e interactuar con el huéspedes utilicemos un :ref:`cliente VNC
+   <ser-vnc-cliente>` en el anfitrión::
+
+      $ qemu-system-vga -hda disco.qcw -display "vnc=localhost:0" -daemonize
+
+   lo cual creará un servidor |VNC| que escuchará en el puerto 5900/|TCP| de la
+   interfaz de *loopback*. Podemos ir sustituyendo el número (**0**, **1**, etc.)
+   si arrancamos varias máquinas a la vez, para que cada una se ponga a eschar
+   en un puerto distinto (**5900**, **5901**, etc.). Como en el caso de la
+   ventana gráfica, hemos añadido :kbd:`-daemonize` para liberar la terminal del
+   anfitrión.
+
+   Aunque lo anterior basta, es conveniente añadir estos parámetros:
+
+   :code:`-device qemu-xhci -device usb-tablet -k es`
+
+   que habilitan el |USB| y definen la configuración del teclado (es
+   recomendación de la propia página de manual).
+
+   .. warning:: Ejecutado así, la comunicación con la máquina virtual no será
+      cifrada ni tendrá contraseña, aunque hemos paliado el problema permitiendo
+      la conexión únicamente desde el propio cliente. Pueden usarse contraseñas
+      o certificados para cifrar la conexión. Échele un vistazo a::
+
+         $ qemu-system-x86_64 -display vnc=help
+
+.. _qemu-video-texto:
+
+**Texto**
+   Si nuestro huésped es un servidor sin entorno gráfico, no necesitamos en
+   realidad una ventana gráfica en la que ni siquiera podemos copiar y pegar
+   (y esto incluye el acceso |VNC| que acabamos de ver)\ [#]_. Una buena
+   alternativa es sustituir dicha ventana por la salida y entrada estándares de
+   la propia terminal del anfitrión. Tendremos, no obstante, dos desventajas:
+
+   * Sólo podremos tener una sesión abierta (a menos que habilitemos accesos
+     adicionales por |SSH|) a diferencia de la ventana gráfica o |VNC|, en los
+     que podemos abrir las seudoterminales típicas a través de :kbd:`Alt+F1`,
+     :kbd:`Alt+F2`, etc.
+
+   * Tendremos que modificar el huésped para que se muestre a través del
+     puerto serie. En un huésped *Linux* que arranque con |GRUB| esto se logra
+     editando :file:`/etc/default/grub` de modo que incluya estas tres líneas:
+
+     .. code:: bash
+
+        #GRUB_CMDLINE_LINUX_DEFAULT="quiet"
+        GRUB_CMDLINE_LINUX="console=ttyS0"
+
+        GRUB_TERMINAL="console serial"
+        GRUB_SERIAL_COMMAND="serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1"
+
+        GRUB_GFXPAYLOAD_LINUX="text"
+
+     La primera línea suele encontrarse descomentada y, simplemente, evita que
+     el núcleo informe demasiado durante el arranque. Como yo prefiero verlos,
+     he comentado la línea. La segunda añade un parámetro al arranque del núcleo
+     y puede ya encontrarse en el archivo con algún otro valor. Si es así, no
+     habrá más que añadir el nuevo (:kbd:`console=ttyS0`).  Las dos siguientes
+     líneas provocan que el propio |GRUB| también se muestre por el puerto
+     serie. La última línea le indica al núcleo que arranque en modo texto.
+     Finalmente, habrá que regenerar la configuración::
+
+      # update-grub
+
+     .. note::  Como alternativa a añadir :kbd:`console=ttyS0` a
+        *GRUB_CMDLINE_LINUX*, puede habilitarse el siguiente servicio::
+
+         # systemctl enable --now serial-getty@ttyS0.service
+
+        Sin embargo, esto no permitirá ver los mensajes del núcleo durante el
+        arranque, por lo que, dado que de todos modos hay que editar
+        :file:`/etc/default/grub` para lograr que :program:`grub` se vea por el
+        puerto serie, es preferible la primera opción
+
+   Una primera forma es usar la opción :code:`-nographic`::
+
+      $ qemu-system-x86_64 -machine accel=kvm -m 512 -hda disco.qcw -nographic
+
+   que requiere los dispositivos predeterminados por lo que no usamos los alias
+   creados anteriormente, que hacen uso de :kbd:`-nodefaults`.
+
+   Una alternativa mejor es, simplemente, redirigir el puerto serie del huésped
+   a la salida y entrada estándares del anfitrión::
+
+      $ qemu-system -hda disco.qcw -serial stdio
+
+   .. note:: Obsérvese que no hemos usado el alias *qemu-system-vga*. En este
+      caso, no queremos ninguna salida de vídeo.
+
+   El problema de esta comunicación con el anfitrión es que habremos perdido
+   el monitor. Para paliarlo, :program:`QEmu` permite multiplexar con el
+   monitor simplemente añadiendo el prefijo :kbd:`mon:` al valor de
+   :kbd:`-serial`::
+
+      $ qemu-system -hda disco.qcw -serial mon:stdio
+
+   Hay alternativas a mostrar directamente una terminal del huésped en la
+   terminal del anfitrión. Por ejemplo, redirigir a un servidor telnet
+   situado en un determinado puerto (p.e. el **12345**)::
+
+      $ qemu-system -hda disco.qcw -serial mon:telnet:localhost:12345,server=on,wait=off -daemonize`
+
+   al cual podremos conectarnos desde el anfitrión con :command:`telnet`::
+
+      $ telnet localhost 12345
+
+   .. note:: Si añadimos a la línea el dispositivo gráfico :code:`-device sga`,
+      que es precisamente lo que hace la opción :kbd:`-nographic`, veremos
+      también los mensajes de arranque de la |BIOS|, pero no es recomendable
+      porque afecta a toda la salida posterior.
+
+**Tubería**
+   Una variante para la interfaz |CLI| anterior, es manipular la salida para
+   poder manipular la máquina de forma no interactiva. Exige también que el
+   huésped presente una consola en el puerto serie, pero en este caso tal puerto
+   se redirige a una tubería del anfitrión::
+
+      $ mkfifo /tmp/huesped.{in,out}
+
+   arrancando la máquina con la opción::
+
+      $ qemu-system -hda disco.qcw -serial pipe:/tmp/huesped
+
+   En estas condiciones, :file:`huesped.out` mostrará la salida de la máquina::
+
+      $ cat /tmp/huesped.out
+
+   y a través de :file:`huesped.in` podremos introducir datos. Por tanto, cuando
+   aparezca el login, podremos ingresar del siguiente modo::
+
+      $ cat > /tmp/huesped.in
+      root
+      contraseñaderoot
+      whoami
+
+   .. warning:: Cada instrucción puede requerir un tiempo de procesamiento,
+      por lo que en ocasiones será necesario que exista una pausa entre
+      instrucciones. El caso de justamente arriba funciona porque se supone que
+      se está escribiendo interactivamente la orden  y entre la primera línea
+      (*root*) y la segunda (*su contraseña*) pasará un tiempo. En cambio, si
+      las tres líneas estuvieran previamente escritas en un archivo y se
+      redirigiera éste a la tubería, no lograríamos ingresar.
+
+.. https://fadeevab.com/how-to-setup-qemu-output-to-console-and-automate-using-shell-script/#3inputoutputthroughanamedpipefile
+
+.. _qemu-video-spice:
+
+**Spice**
+   Cuando el huésped dispone de entorno gráfico esta salida es la más adecuada,
+   ya que ofrece varias ventajas y, entre ellas, la posibilidad de copiar y
+   pegar con el ratón entre anfitrión y huésped.
+
+   La máquina debe arrancarse del siguiente modo::
+
+      $ qemu-system -spice unix=on,addr=/var/run/vm_spice.socket,disable-ticketing=on -device qxl-vga -display spice-app \
+         -device virtio-serial -chardev spicevmc,id=vdagent,debug=0,name=vdagent \
+         -device virtserialport,chardev=vdagent,name=com.redhat.spice.0
+
+   donde la primera línea es la estrictamente necesaria para usar spice utilizando
+   como comunicación con el anfitrión un *socket*, y las dos siguientes permiten
+   que funcione el cortapega entre anfitrión y huesped.
+
+   Lo necesario, no obstante, no acaba aquí. En el **anfitrión** necesitamos un
+   cliente *spice* (p.e. :deb:`spice-client-gtk` o :deb:`virt-viewer`) para
+   acceder al huésped. :code:`-display spice-app` intenta lanzar automáticamente
+   uno al arrancar la máquina, pero requiere que tal cliente esté asociado al tipo
+   |MIME| :kbd:`x-scheme-handler/spice+unix`. :command:`spicy` (el cliente que
+   incluye el paquete :deb:`spice-client-gtk`) tiene la ventaja de que no incluye
+   ninguna dependencia de :ref:`libvirt <libvirt>`, pero al menos hasta
+   *Bullseye*  no tiene ningún archivo :kbd:`.desktop` que permita establecer la
+   asociación\ [#]_. La solución  es sencilla si se repasa el epígrafe sobre
+   :ref:`aplicaciones predeterminadas en entorno GUI <mimetypes-gui>` y se siguen
+   sus instrucciones, para la cual necesitaremos crear primero un archivo
+   :file:`spicy.desktop` en :file:`~/.local/share/applications` con este
+   contenido:
+
+   .. code-block:: ini
+
+      [Desktop Entry]
+      Comment=Cliente spice
+      Type=Application
+      Exec=spicy --uri=%u
+      Name=spicy
+      MimeType=x-scheme-handler/spice+unix
+
+   En el **huésped**, por su parte, hay también tareas que hacer:
+
+   #. El entorno gráfico del cliente debe usar el driver |QXL|
+      (si el cliente es un sistema *Debian*, tendrá que estár instalado el
+      paquete :deb:`xserver-xorg-video-qxl`)\ [#]_.
+
+   #. Para compartir el portapapeles es necesario instalar::
+
+       # apt install spice-vdagent
+
+      y comprobar que el servicio homónimo se encuentra en funcionamiento::
+
+       $ systemctl status spice-vdagent
+
+.. https://wiki.archlinux.org/title/QEMU
+   https://www.admin-magazine.com/Archive/2013/13/Controlling-virtual-machines-with-VNC-and-Spice/(offset)/6
+
+.. rubric:: Notas al pie
+
+.. [#] También puede usarse la forma :code:`-enable-kvm`
+.. [#] Esta disposición de la interfaz permite tráfico |TCP| y |UDP|, pero no
+   |ICMP|, así que no podremos usar la orden :command:`ping` para comprobar
+   conectividades.
+.. [#] Hasta hace no tanto tiempo el *display* era "sdl".
+.. [#] De hecho, es muy recomendable haber instalado el :ref:`servicio SSH
+   <ssh-inst>` y acceder de este modo a él.
+.. [#] :command:`remove-viewer`, el cliente incluido en :deb:`virt-viewer` sí lo
+   tiene por lo que su mera instalación dejará convenientemente preparado el
+   anfitrión.
+.. [#] Esto debería ocurrir con que estuviera disponible el paquete, pero si no
+   es así, puede forzarse `manipulando la configuración del servidor X
+   <https://www.admin-magazine.com/Archive/2013/13/Controlling-virtual-machines-with-VNC-and-Spice/(offset)/6>`_.
+   Es ese mismo enlace hay información sobre cómo instalarlo en sistemas
+   *Windows*.
+
+.. |VGA| replace:: :abbr:`VGA (Video Graphics Array)`
+.. |RAM| replace:: :abbr:`RAM (Random Access Memory)`
+.. |NAT| replace:: :abbr:`NAT (Network Address Translation)`
+.. |BIOS| replace:: :abbr:`BIOS (Basic I/O System)`
+.. |QCOW| replace:: :abbr:`QCOW (Qemu Copy On Write)`
+.. |IDE| replace:: :abbr:`IDE (Integrated Device Electronic)`
+.. |VNC| replace:: :abbr:`VNC (Virtual Network Computing)`
+.. |USB| replace:: :abbr:`USB (Universal Serial Bus)`
+.. |TCP| replace:: :abbr:`TCP (Transmission Control Protocol)`
+.. |UDP| replace:: :abbr:`UDP (User Datagram Protocol)`
+.. |ICMP| replace:: :abbr:`ICMP (Internet Control Message Protocol)`
+.. |GRUB| replace:: :abbr:`GRUB (GNU GRand Unified Bootloader)`
+.. |CLI| replace:: :abbr:`CLI (Command Line Interface)`
+.. |MIME| replace:: :abbr:`MIME (Multipurpose Internet Mail Extensions)`
+.. |QXL| replace:: :abbr:`QXL (Qemu X Library)`
+
+.. _minicom: https://es.wikipedia.org/wiki/Minicom

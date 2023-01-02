@@ -1,0 +1,314 @@
+.. _libvirt-manage:
+
+Gestión
+*******
+Hasta ahora sólo hemos introducido cómo crear máquinas virtuales, pero nada de
+lo referente a arrancarlas, pararlas o modificarlas: el propósito de este
+epígrafe es desarrollar esto otro.
+
+.. _virsh-start:
+
+Arranque
+========
+Para arrancar una máquina virtual basta con::
+
+   $ virsh start bullseye
+
+donde "*bullseye*" es el nombre que le dimos al crearla con :ref:`virt-install
+<libvirt-create>` (opción :kbd:`-n`). La orden entenderá que se creó la máquina
+con el hipervisor definido por defecto, porque de lo contrario habrá que
+incluirlo en la orden a través de :kbd:`--connect` (o simplemente, :kbd:`-c`)::
+
+   $ virsh -c qemu:///system start bullseye 
+
+Esto, no obstante, aunque lo arranque, no nos hará aparecer el huésped. Para
+conectar a él deberemos utilizar :command:`virt-viewer`::
+
+   $ virt-viewer bullseye
+
+orden que también entenderá que la máquina utiliza el hipervisor por defecto,
+con lo que, si no lo hace, lo tendremos que especificar expresamente::
+
+   $ virt-viewer -c qemu:///system bullseye 
+
+.. note:: No abundaremos más en ello. Entiéndase a partir de ahora  que es
+   preciso especificar el hipervisor, si este no es el predeterminado.
+
+:command:`virt-viewer` es capaz de determinar :ref:`qué acceso al huésped
+<libvirt-install-video>` se definió (:ref:`VNC <libvirt-install-video-vnc>`,
+:ref:`Spice <libvirt-install-video-spice>`) con lo que no es necesario
+especificar más. De hecho, si no se expresa el nombre de la máquina, abrirá una
+ventana previa con la que permitirá escoger a cuál de las máquinas arrancadas se
+quiere conectar. En cualquier caso, si se quiere cónocer cómo el visor accede a
+la máquina puede ejecutarse::
+
+   $ virsh domdisplay bullseye
+   spice://127.0.0.1:5900
+
+La única excepción es si renunciamos a la salida gráfica y escogimos el
+:ref:`acceso a través del puerto serie <libvirt-install-video-texto>`, en cuyo
+caso deberemos conectar así::
+
+   $ virsh console bullseye
+
+.. _virsh-list:
+
+Información
+===========
+La lista de máquinas disponibles puede consultarse con::
+
+   $ virsh list --all --title
+
+en que debemos añadir :kbd:`--all` si queremos que también se muestren las
+máquinas apagadas. Se pueden aplicar distintos filtros que pueden consultarse
+con la orden\ [#]_::
+
+   $ virsh help list
+
+.. warning:: Se listan sólo máquinas de un hipervisor (en este caso el
+   predeterminado). Deberá utilizar :kbd:`--connect` para consultar máquinas de
+   otros hipervisores.
+
+UUna vez localizada una máquina quizás querramos conocer más información de ella
+al respecto::
+
+   $ virsh dominfo bullseye
+   $ virsh domblklist bullseye
+   $ virsh domstats bullseye
+
+.. _virsh-shutdown:
+
+Parada
+======
+Si quiere enviarse una señal de apagado ordenado al huésped::
+
+   $ virsh shutdown bullseye
+
+Y también existe la variante con :kbd:`reboot` para reiniciarlo. Si nuestra
+intención es apagarlo a las bravas con todas las consecuencias que ello pueda
+acarrear entonces debe usarse otra forma::
+
+   $ virsh destroy bullseye
+
+Si lo que se pretende es suspender y posteriormente restablecer su ejecución,
+pero sin apagarlo::
+
+   $ virsh suspend bullseye
+   $ virsh resume bullseye
+
+En cambio, si se desea que la suspensión sea prolongada y recuperar en un
+momento posterior el punto en que se encontraba el anfitrión, se deberá guardar en un archivo
+el estado::
+
+   $ virsh save bullseye /lo/guardo/donde/quiero/bullseye.save
+
+Posteriormente se podrá recuperar::
+
+   $ virsh restore /lo/guardo/donde/quiero/bullseye.save
+   $ virt-viewer bullseye
+
+orden en que puede comprobarse que no es necesario especificar a qué máquina nos
+referimos.
+
+.. _virsh-undefine:
+
+Borrado
+=======
+Para borrar una máquina::
+
+   $ virsh undefine bullseye
+
+.. _virsh-snapshots:
+
+Instantáneas
+============
+Como en otras aplicaciones del género, también existe la posibilidad de crear y
+gestionar instantáneas. Para crear una::
+
+   $ virsh snapshot-create-as bullseye --name "primera" --description "Mi primera instantánea"
+
+La instantánea se traducirá en una instantánea de disco (que como está en
+formato |QCOW|\ 2, podremos comprobar con :ref:`qemu-img snapshot
+<qemu-img-snapshot>`) y una instantánea de la características de la máquina
+virtual. Podemos a continuación arrancar la máquina, hacer algunos cambios y
+crear una nueva instantánea::
+
+   $ virsh snapshot-create-as bullseye --name "segunda" --description "Mi segunda instantánea"
+
+Para listar las instantáneas asociadas a la máquina::
+
+   $ virsh snapshot-list bullseye
+    Nombre    Hora de creación            Estado
+   ------------------------------------------------
+    primera   2023-01-01 10:51:48 +0100   shutoff
+    segunda   2023-01-01 11:08:59 +0100   shutoff
+
+Cuando, como es el caso, existen varias instantáneas podemos dudar cuál de ellas
+es la instantánea a partir de la cual se genera el estado actual de la máquina::
+
+   $ virsh snapshot-current bullseye --name
+   segunda
+   $ virsh snapshot-info bullseye --current
+   Nombre:         segunda
+   Dominio:        bullseye
+   Actual:         si
+   Estado:         shutoff
+   Ubicación:     interno
+   Padre:          primera
+   Hijos:          0
+   Descendientes:  0
+   Metadatos:      si
+
+Para cambiar la instantánea actual::
+
+   $ virsh snapshot-revert bullseye --snapshotname primera
+   $ virsh snapshot-current bullseye --name                                                                                              
+   primera
+
+Y, si arrancamos la máquina, nos encontraremos con el estado en que se
+encontraba la máquina cuando hicimos la primera instantánea. Ya sólo nos queda
+saber cómo eliminarlas::
+
+   $ virsh snapshot-delete bullseye --snapshotname segunda
+   Instantánea de dominio segunda borrada
+
+Modificación
+============
+Una vez que se ha creado la máquina virtual, es posible rectificar alguna de sus
+características. La forma general de hacerlo es editando el archivo |XML| de
+configuración y modificando alguno de sus valores::
+
+   $ virsh edit bullseye
+
+.. _virsh-net:
+
+Ciertamente, es bastante más fácil utilizar :command:`virt-manager` para esta
+tarea, así que nos centramos aquí en definir redes a fin de que podamos asociar
+interfaces de huéspedes a ellas.
+
+.. warning:: Con el hipervisor :kbd:`qemu:///session` no tendremos suficientes
+   permisos para esta tarea, así que se supondrá que hemos definido
+   :kbd:`qemu:///system` como el :ref:`hipervisor predeterminado
+   <virt-install-hipervisor>`::
+
+      $ export LIBVIRT_DEFAULT_URI='qemu:///system'
+
+Estas redes se corresponden con las que en :program:`QEmu` identificamos como
+:ref:`redes internas con interfaz puente <qemu-red-tap>`. Lo primero es
+comprobar qué redes hay predefinidas::
+
+   $ virsh net-list --all
+    Nombre    Estado   Inicio automático   Persistente
+   -----------------------------------------------------
+    default   activo   si                  si
+
+.. note::  La razón de usar :kbd:`--all` se debe a que sin la opción sólo se
+   muestran redes activas.
+
+O sea, la   red  "*default*", que tiene las siguientes características::
+
+   $ virsh net-info default
+   Nombre:         default
+   UUID:           720444bf-50b1-4d7e-a317-eee4c110f5f4
+   Activar:        si
+   Persistente:    si
+   Autoinicio:     si
+   Puente:         virbr0
+
+Y, efectivamente,  existe una interfaz puente en el sistema así definida::
+
+   $ ip link show dev virbr0
+   5: virbr0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN
+       mode DEFAULT group default qlen 1000 link/ether 52:54:00:d3:79:28 brd ff:ff:ff:ff:ff:ff
+
+Estas redes suelen estar configuradas, de suerte que se le asocia a la interfaz
+puente la primera |IP| de la red y se define un rango para que los huésped
+reciban una configuración automáticamente. Esto puede comprobarse con la orden::
+
+   $ virsh net-dumpxml default
+
+que nos mostrará el siguiente |XML|:
+
+.. code-block:: xml
+
+   <network>
+     <name>default</name>
+     <uuid>720444bf-50b1-4d7e-a317-eee4c110f5f4</uuid>
+     <forward mode='nat'>
+       <nat>
+         <port start='1024' end='65535'/>
+       </nat>
+     </forward>
+     <bridge name='virbr0' stp='on' delay='0'/>
+     <mac address='52:54:00:d3:79:28'/>
+     <ip address='192.168.122.1' netmask='255.255.255.0'>
+       <dhcp>
+         <range start='192.168.122.2' end='192.168.122.254'/>
+       </dhcp>
+     </ip>
+   </network>
+
+Para crear una segunda red, lo más sencillo es tomar esta definición como
+plantilla::
+
+   $ virsh  net-dumpxml default > /tmp/redinterna1.xml
+
+Editar el archivo para alterar, al menos, algunas características (nombre, uuid,
+direcciones |IP|  y definición de la interfaz puente):
+
+.. code-block:: xml
+
+   <network>
+     <name>interna1</name>
+     <uuid>42fe3446-b5cf-4704-93e7-63f2b30b0ed8</uuid>
+     <forward mode='nat'>
+       <nat>
+         <port start='1024' end='65535'/>
+       </nat>
+     </forward>
+     <bridge name='virbr1' stp='on' delay='0'/>
+     <mac address='52:54:00:d3:79:29'/>
+     <ip address='192.168.123.1' netmask='255.255.255.0'>
+       <dhcp>
+         <range start='192.168.123.20' end='192.168.123.254'/>
+       </dhcp>
+     </ip>
+   </network>
+
+.. note:: Un uuid (pseudo)aleatorio podemos obtenerlo cada ver que leemos el
+   siiguiente archivo::
+
+      $ cat /proc/sys/kernel/random/uuid 
+      42fe3446-b5cf-4704-93e7-63f2b30b0ed8
+
+Hecho lo cual podremos crear la nueva red::
+
+   $ virsh net-define /tmp/redinterna1.xml
+   La red interna1 se encuentra definida desde /tmp/redinterna1.xml
+   $ virsh net-list --all
+    Nombre     Estado   Inicio automático   Persistente
+   ------------------------------------------------------
+    default    activo   si                  si
+    interna1   activo   no                  si
+
+.. note:: Existe la alternativa :code:`virsh net-create`, pero genera redes no
+   persistentes.
+
+La red ya estará disponible para que la usemos en máquinas virtuales, pero al
+reiniciar se encontrará inactiva y habrá que activarla con el subcomando
+:kbd:`net-start`. Puede alterarse esto con::
+
+   $ virsh net-autostart interna1
+
+Sea como sea, la red ya estará disponible para que la usemos::
+
+   $ virt-install --osinfo debian11 -n bullseye --metadata title="Debian Bullseye" --memory 1024 --vcpus 2 \
+      --network network=interna1 --disk disco.qcw --import --noreboot --autoconsole none
+
+.. rubric:: Notas al pie
+
+.. [#] En general, la ayuda de cualquier subcomando de :command:`virsh` puede
+   consultarse gracias al subcomando :kbd:`help`.
+
+.. |QCOW| replace:: :abbr:`QCOW (Qemu Copy-On-Write)`
+.. |XML| replace:: :abbr:`XML (eXtensible Markup Language)`
