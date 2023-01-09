@@ -1,0 +1,593 @@
+
+
+
+<!DOCTYPE html>
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>9.2.2.2.1.1.1. Contenedores privilegiados &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../../../../../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../../../../../../_static/classic.css" />
+    <link rel="stylesheet" href="../../../../../../_static/custom.css" type="text/css" />
+    
+    <script data-url_root="../../../../../../" id="documentation_options" src="../../../../../../_static/documentation_options.js"></script>
+    <script src="../../../../../../_static/jquery.js"></script>
+    <script src="../../../../../../_static/underscore.js"></script>
+    <script src="../../../../../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="../../../../../../_static/doctools.js"></script>
+    <script src="../../../../../../_static/sphinx_highlight.js"></script>
+    <script src="../../../../../../_static/translations.js"></script>
+    
+    <link rel="index" title="Índice" href="../../../../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../../../../search.html" />
+    <link rel="next" title="9.2.2.2.1.1.2. Contenedores no privilegiados" href="02.unpriv.html" />
+    <link rel="prev" title="9.2.2.2.1. LXC" href="../../02.lxc.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="02.unpriv.html" title="9.2.2.2.1.1.2. Contenedores no privilegiados"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="../../02.lxc.html" title="9.2.2.2.1. LXC"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../../../index.html" ><span class="section-number">9. </span>Apéndices</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../../../index.html" ><span class="section-number">9.2. </span>Virtualización</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../../../../02.software.html" ><span class="section-number">9.2.2. </span>Software de virtualización</a> &#187;</li>
+          <li class="nav-item nav-item-4"><a href="../../02.lxc.html" accesskey="U"><span class="section-number">9.2.2.2.1. </span><abbr title="LinuX Containers">LXC</abbr></a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">9.2.2.2.1.1.1. </span>Contenedores privilegiados</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="contenedores-privilegiados">
+<h1><span class="section-number">9.2.2.2.1.1.1. </span>Contenedores privilegiados<a class="headerlink" href="#contenedores-privilegiados" title="Enlace permanente a este encabezado">¶</a></h1>
+<p>Dedicaremos este epígrafe a la gestión de contenedores privilegiados creados y
+gestionados por el propio administrador<a class="footnote-reference brackets" href="#id7" id="id1">1</a> y, conocidos estos, introduciremos
+en el próximo la dificultad de crear contenedores no privilegiados con un
+usuario normal.</p>
+<section id="preliminares">
+<h2><span class="section-number">9.2.2.2.1.1.1.1. </span>Preliminares<a class="headerlink" href="#preliminares" title="Enlace permanente a este encabezado">¶</a></h2>
+<p>Comencemos aclarando algunas particularidades que nos ayudarán a entender el
+desarrollo posterior:</p>
+<ol class="arabic">
+<li><p>El demonio <strong class="program">lxc-net</strong> gestiona la creación de interfaces puentes (que
+se estudiarán bajo el <a class="reference internal" href="#lxc-red"><span class="std std-ref">epígrafe dedicado a la red</span></a>) y,
+<a class="reference internal" href="../../../01.completa/02.kvm/02.libvirt/02.gestion.html#virsh-red"><span class="std std-ref">como hace libvirtd</span></a>, proporciona direcciones <abbr title="Internet Protocol">IP</abbr> dinámicas
+valiéndose de <a class="reference internal" href="../../../../../../06.infraestructura/02.dhcp/03.dnsmasq.html#dnsmasq-dhcp"><span class="std std-ref">dnsmasq</span></a>.</p></li>
+<li><p>Los contenedores contienen un conjunto de archivos y directorios que
+constituyen el sistema de archivos del sistema huésped. Por tanto, cada
+contenedor recreará una estructura típica de directorios (<code class="file docutils literal notranslate"><span class="pre">/bin</span></code>,
+<code class="file docutils literal notranslate"><span class="pre">/etc</span></code>, <code class="file docutils literal notranslate"><span class="pre">/usr</span></code>, etc) que variará según sea la distribución que el
+huésped imita.</p></li>
+<li><p>Para construir este árbol de directorios, <abbr title="LinuX Containers">LXC</abbr> proporciona <a class="reference external" href="https://uk.lxd.images.canonical.com/">una serie
+de plantillas predefinidas</a>.</p></li>
+<li><p>Al crear un contenedor con una de ellas, la plantilla se descargará y se
+ejecutará un <em>script</em> que preparará el contenedor utilizando la configuración
+local y la información de la plantilla. Las plantillas se almacenan en
+principio en <code class="file docutils literal notranslate"><span class="pre">/var/cache/lxc</span></code>, aunque pueden borrarse posteriormente
+sin escrúpulo.</p></li>
+<li><p>A diferencia de <a class="reference internal" href="../../../01.completa/02.kvm.html#qemu"><span class="std std-ref">QEmu</span></a> o <a class="reference internal" href="../../../01.completa/01.virtualbox.html#virtualbox"><span class="std std-ref">Virtualbox</span></a>, no existe
+un archivo de disco (<abbr title="Qemu Copy-On-Write">QCOW</abbr>2, <abbr title="Virtual Disk Image">VDI</abbr>) que contenga un sistema de archivos
+totalmente ajeno al anfitrión, sino que el contenido del contenedor son
+archivos y directorios incluidos en una parte del árbol de directorios del
+anfitrión (por defecto, <code class="file docutils literal notranslate"><span class="pre">/var/lib/lxc/nombre_contenedor</span></code>). Esto supone
+que <abbr title="LinuX Containers">LXC</abbr> actúe dependiendo de cuál sea el sistema de archivos sobre el que se
+encuentra esa parte del árbol, esto es, dependiendo de cuál sea el formato de
+su almacenamiento (<em>backing store</em> en su terminología):</p>
+<dl class="simple">
+<dt>«<em>none</em>» (o también «<em>dir</em>»)</dt><dd><p>este formato es el que se presenta cuando los archivos del contenedor los
+trata como archivos sin más consideración. Por ejemplo, si el sistema de
+archivos del anfitrión es <em>ext4</em> y <code class="file docutils literal notranslate"><span class="pre">/var/lib/lxc</span></code> forma parte de
+este sistema de archivos, no habrá más remedio que usar este formato. No
+es lo más apropiado, desde luego:</p>
+<ul class="simple">
+<li><p>Las instantáneas consisten en hacer una copia completa de todos los
+archivos.</p></li>
+<li><p>No hay forma de limitar el tamaño del contenedor y, si
+<code class="file docutils literal notranslate"><span class="pre">/var/lib/lxc</span></code> no constituye un sistema de archivos aparte, los
+contenedores pueden crecer hasta ocupar todo el espacio disponible de
+<code class="file docutils literal notranslate"><span class="pre">/</span></code>.</p></li>
+</ul>
+</dd>
+<dt>«<em>btrfs</em>»/«<em>zfs</em>»</dt><dd><p>Si <code class="file docutils literal notranslate"><span class="pre">/var/lib/lxc</span></code> se encuentra en un sistema de archivos <abbr title="B-TRee File System">BTRFS</abbr> o
+<abbr title="Zettabyte File System">ZFS</abbr> (p.e. porque hayamos dispuesto esa ruta en partición aparte y le
+hayamos dado formato con alguno de estos dos sistemas), entonces podremos
+informar a <abbr title="LinuX Containers">LXC</abbr> de que puede hacer uso de sus características especiales
+(p.e. soporte nativo para instantáneas, subvolúmenes).</p>
+</dd>
+<dt>«<em>lvm</em>»</dt><dd><p>Podemos optar por incluir cada contenedor en un <a class="reference internal" href="../../../../../../05.discos/01.division/04.virt.html#lvm"><span class="std std-ref">volumen lógico de
+LVM</span></a>. <abbr title="Logical Volume Management">LVM</abbr> soporta instantáneas y, si utilizamos
+<a class="reference internal" href="../../../../../../05.discos/01.division/04.virt.html#lvm-snapshots"><span class="std std-ref">aprovisionamiento fino</span></a>, las ventajas se
+multiplican.</p>
+</dd>
+<dt>«<em>loop</em>»</dt><dd><p>Este es el formato más cercano al estilo de las dos virtualizaciones
+completas que hemos citados anteriormente: los archivos del contenedor se
+guardaran dentro de un archivo regular del anfitrión
+(<code class="file docutils literal notranslate"><span class="pre">/var/lib/lxc/nombre_contenedor/rootdev</span></code>).</p>
+</dd>
+</dl>
+</li>
+</ol>
+</section>
+<section id="creacion">
+<span id="lxc-create"></span><h2><span class="section-number">9.2.2.2.1.1.1.2. </span>Creación<a class="headerlink" href="#creacion" title="Enlace permanente a este encabezado">¶</a></h2>
+<p>Para la creación de un contenedor tenemos que tener presente de inicio dos
+aspectos: qué sistema <em>Linux</em> queremos incluir y cuál será el formato de
+almacenamiento. Existe otro más (la limitación de recursos), pero lo trataremos
+<a class="reference internal" href="#lxc-limit"><span class="std std-ref">más adelante</span></a>. Comencemos, pues, por lo más sencillo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-create -n <span class="nb">test</span> -t download -- -d alpine -r <span class="m">3</span>.17 -a amd64
+</pre></div>
+</div>
+<p>donde hay que notar:</p>
+<ul class="simple">
+<li><p>Somos el administrador.</p></li>
+<li><p>Nuestro contenedor se llamará «<em>test</em>».</p></li>
+<li><p>Hacemos la instalación a través de una plantilla llamada <em>download</em> que facilita
+la operación y nos permite seleccionar de forma sencilla una de <a class="reference external" href="https://uk.lxd.images.canonical.com/">las imágenes disponibles en
+los servidores</a>. Sin añadir más, la
+imagen ejecuta un <em>script</em> que nos muestra y, a continuación, nos permite
+seleccionar cuál es la plantilla que deseamos utilizar, pero…</p></li>
+<li><p>Tras <kbd class="kbd docutils literal notranslate">--</kbd> se pueden incluir las opciones que permita la plantilla (en
+este caso, <em>download</em>). Pues bien, si observamos la lista de plantillas
+veremos que cada una se define por cuatro características: <em>distribución</em>
+(<kbd class="kbd docutils literal notranslate">-d</kbd>), <em>versión</em> (<kbd class="kbd docutils literal notranslate">-r</kbd>), <em>arquitectura</em> (<kbd class="kbd docutils literal notranslate">-a</kbd>) y variante
+(<kbd class="kbd docutils literal notranslate">-v</kbd>), que son precisamente las opciones que permite añadir <em>download</em>
+para restringir la lista de selección que nos muestra. Así, si
+incluyéramos únicamente <code class="code docutils literal notranslate"><span class="pre">-a</span> <span class="pre">amd64</span></code> aparecerían sólo las plantillas para
+esta arquitectura. Si añadimos las opciones suficientes como para restringir
+la lista a una sola plantilla, entonces la instalación se realizará
+inmediatamente sin más preguntas. Esto es precisamente lo que logra la orden
+de arriba, porque aunque falta especificar la variante, cuando esta no se
+indica, se entiende que es «<em>default</em>».</p></li>
+</ul>
+<p>Por tanto, hemos instalado una distribución la variante <em>default</em> de la versión
+3.17 de <a class="reference external" href="https://www.alpinelinux.org/">Alpine</a> para arquitectura <a class="reference external" href="https://es.wikipedia.org/wiki/X86-64">x64_64</a><a class="footnote-reference brackets" href="#id8" id="id2">2</a>.</p>
+<p id="lxc-create-none">Ahora bien, ¿qué pasa con el segundo aspecto, esto es, el formato de
+almacenamiento? El formato se introduce con la opción <kbd class="kbd docutils literal notranslate">-B</kbd> antes de
+<kbd class="kbd docutils literal notranslate">--</kbd>, puesto que es algo que nada tiene que ver con la plantilla que se
+use. Cuando no se especifica nada, <strong class="program">lxc-create</strong> entiende <code class="code docutils literal notranslate"><span class="pre">-B</span>
+<span class="pre">none</span></code> (o <code class="code docutils literal notranslate"><span class="pre">-B</span> <span class="pre">dir</span></code>, que es lo mismo) y, por tanto, <abbr title="LinuX Containers">LXC</abbr> entenderá que
+nuestro contenedor es una mera colección de archivos y directorios sin nada
+especial de lo que pueda aprovecharse. La traducción de esto es que se habrá
+creado lo siguiente:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>/var/lib/lxc
+     +-- test
+           +---- config
+           +---- rootfs/
+                    +-- ...
+                    +-- Estructura de directorios de Alpine
+                    +-- ...
+</pre></div>
+</div>
+<p>O sea, un directorio dentro de <code class="file docutils literal notranslate"><span class="pre">/var/lib/lxc</span></code> cuyo nombre coincide con el
+nombre del contenedor que, a su vez, contiene:</p>
+<ul class="simple">
+<li><p>Un directorio que incluye la estructura de archivos del contenedor
+(<code class="file docutils literal notranslate"><span class="pre">rootfs</span></code>). Cuando entremos en el huésped, nos encontraremos
+enjaulados dentro de él.</p></li>
+<li><p>Un archivo (<code class="file docutils literal notranslate"><span class="pre">config</span></code>) con la configuración del contenedor para la que se
+toma como referencia la que se encuentra en <code class="file docutils literal notranslate"><span class="pre">/etc/lxc/default.conf</span></code>.</p></li>
+</ul>
+<p id="lxc-create-loop">Probemos crear con otro formato:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-destroy -n <span class="nb">test</span>  <span class="c1"># Primero borramos el anterior</span>
+<span class="gp"># </span>lxc-create -n <span class="nb">test</span> -t download -B loop --fssize<span class="o">=</span>50M -- -d alpine -r <span class="m">3</span>.17 -a amd64
+</pre></div>
+</div>
+<p>La orden es idéntica a la anterior, pero hemos añadido las opciones para que el
+almacenamiento sea un único archivo (<code class="code docutils literal notranslate"><span class="pre">-B</span> <span class="pre">loop</span></code>). <abbr title="LinuX Containers">LXC</abbr> crea un archivo,
+pero ¿de qué tamaño y con qué sistema de archivos lo formatea? Para el tamaño
+existe la opción <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">-</kbd>-<kbd class="kbd docutils literal notranslate">fssize</kbd></kbd>, que sí se ha indicado porque lo predeterminado
+es 1GiB y nosotros no necesitamos tanto para una minidistribución. El sistema de
+archivos se especifica con <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">-</kbd>-<kbd class="kbd docutils literal notranslate">fstype</kbd></kbd> y su valor predeterminado es <em>ext4</em>.
+Si gulismeamos nos encontraremos lo siguiente:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>/var/lib/lxc
+     +-- test
+           +---- config
+           +---- rootdev  [Aquí dentro está nuestra Alpine]
+           +---- rootfs/
+</pre></div>
+</div>
+<p>La estructura es semejante, pero ahora <code class="file docutils literal notranslate"><span class="pre">rootfs</span></code> está vacío, puesto que es
+el archivo <code class="file docutils literal notranslate"><span class="pre">rootdev</span></code> el que contiene dentro de sí toda la estructura de
+directorios. En este caso, cuando arranquemos el contenedor, <abbr title="LinuX Containers">LXC</abbr> montará el
+contenido de <code class="file docutils literal notranslate"><span class="pre">rootdev</span></code> sobre <code class="file docutils literal notranslate"><span class="pre">rootfs</span></code>. También es preciso notar que,
+si el sistema de archivos lo soporta, el archivo <code class="file docutils literal notranslate"><span class="pre">rootdev</span></code> es <a class="reference internal" href="../../../../../../05.discos/01.division/03.pract.html#truncate"><span class="std std-ref">un
+archivo disperso como el que podemos crear nosotros con truncate</span></a>,
+por lo que inicialmente no ocupará todo el tamaño que le asignamos, e irá
+creciendo según añadamos contenido.</p>
+<p id="lxc-create-zfs"><span id="lxc-create-btrfs"></span>Si <code class="file docutils literal notranslate"><span class="pre">/var/lib/lxc</span></code> se encuentra en un sistema de archivos <abbr title="B-TRee File System">BTRFS</abbr>, podremos
+indicarle a <abbr title="LinuX Containers">LXC</abbr> que lo tenga en cuenta. Sin embargo, para ello deberemos
+tener antes instalado:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>apt install btrfs-progs
+</pre></div>
+</div>
+<p>Ahora sí, procedamos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-destroy -n <span class="nb">test</span>
+<span class="gp"># </span>lxc-create -n <span class="nb">test</span> -t download -B btrfs -- -d alpine -r <span class="m">3</span>.17 -a amd64
+</pre></div>
+</div>
+<p>En principio, no observaremos diferencias respecto a <a class="reference internal" href="#lxc-create-none"><span class="std std-ref">no especificar
+formato</span></a> (la estructura de archivos es idéntica), pero
+existen. De hecho:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>btrfs subvolume list /var/lib/lxc
+<span class="go">ID 258 gen 102 top level 5 path test/rootfs</span>
+</pre></div>
+</div>
+<p><abbr title="LinuX Containers">LXC</abbr> ha definido un subvolumen para la estructura de directorios del
+contenedor. Esta es la clave que permite luego crear instantáneas o limitar el
+espacio de disco del contenedor.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Con <abbr title="Zettabyte File System">ZFS</abbr> ocurre algo similar.</p>
+</div>
+<p id="lxc-create-lvm">Por último, podemos escoger como formato de almacenamiento <abbr title="Logical Volume Management">LVM</abbr>. Para ello es
+obvio que necesitamos disponer de un grupo de volúmenes (al que llamaremos
+<em>VGtest</em>) y, aunque no es extrictamente necesario, supondremos que dentro de él
+también tenemos un pool llamado <em>lxc</em> para aprovisionamiento fino<a class="footnote-reference brackets" href="#id9" id="id3">3</a>. En
+estas circunstancias, podemos crear un contenedor así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-destroy -n <span class="nb">test</span>
+<span class="gp"># </span>lxc-create -n <span class="nb">test</span> -t download -B lvm --vgname VGtest --thinpool lxc --fssize<span class="o">=</span>50M -- -d alpine -r <span class="m">3</span>.17 -a amd64
+</pre></div>
+</div>
+<p>Esto supone que dentro del <em>pool</em> <code class="file docutils literal notranslate"><span class="pre">VGtest/lxc</span></code> se cree un volumen lógico
+de 50 MiB (<kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">-</kbd>-<kbd class="kbd docutils literal notranslate">fssize</kbd></kbd>) para albergar el contenedor. El nombre del volumen
+lógico se toma del nombre del contenedor. Por tanto, si consultamos los
+volúmenes existentes:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># lvs</span>
+  LV        VG     Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  home      VGraid Vwi-aotz-- <span class="m">500</span>,00m lxc         <span class="m">6</span>,45
+  log       VGraid -wi-ao----  <span class="m">64</span>,00m
+  lxc       VGraid twi-aotz-- <span class="m">768</span>,00m             <span class="m">12</span>,59  <span class="m">12</span>,40
+  mysql     VGraid Vwi-aotz-- <span class="m">500</span>,00m lxc         <span class="m">6</span>,41
+  raiz      VGraid -wi-ao----   <span class="m">1</span>,75g
+  srv       VGraid Vwi-aotz-- <span class="m">500</span>,00m lxc         <span class="m">6</span>,41
+  swap      VGraid -wc-ao----  <span class="m">32</span>,00m
+<span class="hll">  <span class="nb">test</span>      VGraid Vwi-aotz--  <span class="m">50</span>,00m lxc         <span class="m">3</span>,14
+</span></pre></div>
+</div>
+<p>Como no hemos especificado sistema de archivos (<kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">-</kbd>-<kbd class="kbd docutils literal notranslate">fstype</kbd></kbd>), el volumen
+lógico se formatea en <em>ext4</em>. La orden crea un estructura como la anterior:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>/var/lib/lxc
+     +-- test
+           +---- config
+           +---- rootfs/
+</pre></div>
+</div>
+<p>pero <code class="file docutils literal notranslate"><span class="pre">rootfs</span></code> se encontrará vacío puesto los archivos del contenedor se
+encuentran en el volumen lógico.</p>
+</section>
+<section id="gestion">
+<span id="lxc-manage"></span><h2><span class="section-number">9.2.2.2.1.1.1.3. </span>Gestión<a class="headerlink" href="#gestion" title="Enlace permanente a este encabezado">¶</a></h2>
+<p>Una vez usado <a class="reference internal" href="#lxc-create"><span class="std std-ref">lxc-create</span></a>, se creará el contenedor:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-ls
+<span class="go">test</span>
+</pre></div>
+</div>
+<p>pero se encontrará parado, lo cual puede comprobarse añadiendo la opción
+<kbd class="kbd docutils literal notranslate">-f</kbd>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-ls -f
+<span class="go">NAME STATE   AUTOSTART GROUPS IPV4 IPV6 UNPRIVILEGED</span>
+<span class="go">test STOPPED 0         -      -    -    false</span>
+</pre></div>
+</div>
+<p>o bien, <strong class="command">lxc-info</strong>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-info -n <span class="nb">test</span>
+<span class="go">Name:           test</span>
+<span class="go">State:          STOPPED</span>
+</pre></div>
+</div>
+<p>Para <strong>arrancar</strong> el contenedor es preciso:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-start -n <span class="nb">test</span>
+</pre></div>
+</div>
+<p>lo cual cambia el estado del contenedor:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-ls -f
+<span class="go">NAME STATE   AUTOSTART GROUPS IPV4          IPV6 UNPRIVILEGED</span>
+<span class="go">test RUNNING 0         -      10.0.3.108    -    false</span>
+<span class="gp"># </span>lxc-info -n <span class="nb">test</span>
+<span class="go">Name:           test</span>
+<span class="go">State:          RUNNING</span>
+<span class="go">PID:            3156</span>
+<span class="go">IP:             10.0.3.108</span>
+<span class="go">Link:           vethL6i8cY</span>
+<span class="go"> TX bytes:      2.09 KiB</span>
+<span class="go"> RX bytes:      2.56 KiB</span>
+<span class="go"> Total bytes:   4.65 KiB</span>
+</pre></div>
+</div>
+<p>Esta orden lo arranca, pero por defecto lo deja en segundo plano<a class="footnote-reference brackets" href="#id10" id="id4">4</a>, por lo
+que tendremos que conectarnos al contenedor. La manera fetén de hacerlo es
+utilizando la orden <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/lxc-console">lxc-console</a></em> que nos presentará un <em>login</em> de
+acceso. Sin embargo, ¿cuál es la contraseña? Lo primero, pues, es preparar el
+acceso para que nos sea posible. Para ello disponemos de <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/lxc-attach">lxc-attach</a></em>,
+que permite ejecutar directamente órdenes dentro del contenedor, así que podemos
+empezar por ponerle una contraseña al administrador:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-attach -n <span class="nb">test</span> -- passwd
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>En otras distribuciones bastará con esto, pero en el caso
+particular de <em>Alpine</em>, seguiremos teniendo problemas de acceso, porque en
+ella, cuando se accede como administrador, se consulta <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/securetty">securetty</a></em>
+para comprobar si la consola de acceso es considerada segura y las que usamos
+con <strong class="command">lxc-console</strong> (<code class="file docutils literal notranslate"><span class="pre">/dev/lxc/tty1</span></code>, <code class="file docutils literal notranslate"><span class="pre">/dev/lxc/tty2</span></code>,
+etc.) no están. Podemos optar por crear un usuario sin privilegios (y ya en
+el contenedor convertirnos en administrador con <a class="reference internal" href="../../../../../../02.conbas/05.seguridad/05a.usuarios.html#su"><span class="std std-ref">su</span></a>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-attach -n <span class="nb">test</span> -- adduser -s /bin/ash -g <span class="s2">&quot;&quot;</span> usuario
+</pre></div>
+</div>
+<p>o eliminar el archivo <code class="file docutils literal notranslate"><span class="pre">/etc/securetty</span></code> para evitar la comprobación:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-attach -n <span class="nb">test</span> -- mv /etc/securetty /etc/securetty.move
+</pre></div>
+</div>
+</div>
+<p>Hecho lo cual, podremos ingresar en el contenedor:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-console -n <span class="nb">test</span>
+
+<span class="go">Connected to tty 1</span>
+<span class="go">Type &lt;Ctrl+a q&gt; to exit the console, &lt;Ctrl+a Ctrl+a&gt; to enter Ctrl+a itself</span>
+
+<span class="go">Welcome to Alpine Linux 3.17</span>
+<span class="go">Kernel 5.10.0-19-amd64 on an x86_64 (/dev/tty1)</span>
+
+<span class="go">test login: root</span>
+<span class="go">Password:</span>
+
+<span class="go">[...]</span>
+
+<span class="gp">test:~# </span>_
+</pre></div>
+</div>
+<p>Obsérvese, cómo se nos advierte de que para salir de la consola (que es la
+<strong>1</strong>) podemos teclear <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">Ctrl</kbd>-<kbd class="kbd docutils literal notranslate">A</kbd>+<kbd class="kbd docutils literal notranslate">q</kbd></kbd>. Esto se debe a que si cerramos la sesión
+(por ejemplo, con <a class="reference internal" href="../../../../../../02.conbas/01.preliminares/index.html#exit"><span class="std std-ref">exit</span></a>), se nos volverá a pedir el <em>login</em> como
+ocurre en un sistema habitualmente; y. si optamos por apagar (<a class="reference internal" href="../../../../../../02.conbas/01.preliminares/index.html#poweroff"><span class="std std-ref">poweroff</span></a>). lo que lograremos es apagar el sistema huésped, o sea, parar el
+contenedor. La combinación de teclas  nos permite desconectarnos del huésped
+para volver al sistema anfitrión. Posteriormente, podremos volver a conectarnos
+con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-console -n <span class="nb">test</span> -t1
+</pre></div>
+</div>
+<p>donde especificamos el número de consola a la que queremos conectar para evitar
+que <strong class="command">lxc-consola</strong> pueda escoger una distinta<a class="footnote-reference brackets" href="#id11" id="id5">5</a>. También es útil
+tener presente que es posible cambiar la tecla de control por si <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">Ctrl</kbd>+<kbd class="kbd docutils literal notranslate">A</kbd></kbd>,
+ya la usamos para algo especial en el anfitrión (p.e. porque usemos <a class="reference external" href="https://www.gnu.org/software/screen/">screen</a>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-console -e <span class="s1">&#39;^k&#39;</span> -n <span class="nb">test</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>El <em>gorrito</em> (<kbd class="kbd docutils literal notranslate">^</kbd>) se ha escrito literalmente.</p>
+</div>
+<p>Ya sólo nos queda saber cómo parar y eliminar el contenedor. Lo primero se logra
+bien apagando el contenedor desde el propio huésped (p.e. con <a class="reference internal" href="../../../../../../02.conbas/01.preliminares/index.html#poweroff"><span class="std std-ref">poweroff</span></a>) como ya hemos visto, o bien desde el anfitrión utilizando la
+orden:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-stop -n <span class="nb">test</span>
+</pre></div>
+</div>
+<p>Una vez que hayamos parado el contenedor, podremos eliminarlo con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-destroy -n <span class="nb">test</span>
+</pre></div>
+</div>
+</section>
+<section id="limitacion">
+<span id="lxc-limit"></span><h2><span class="section-number">9.2.2.2.1.1.1.4. </span>Limitación<a class="headerlink" href="#limitacion" title="Enlace permanente a este encabezado">¶</a></h2>
+<p>Al tratar de limitar recursos tenemos que distinguir entre limitar el espacio de
+disco, que es algo que dependerá del formato de almacenamiento, y limitar el
+resto de recursos (<abbr title="Random Access Memory">RAM</abbr>, <abbr title="Central Processing Unit">CPU</abbr>, etc) que depende de <em>cgroups</em>.</p>
+<p class="rubric">Espacio de disco</p>
+<p>Dos de los formatos que hemos revisado (<a class="reference internal" href="#lxc-create-loop"><span class="std std-ref">loop</span></a> y
+<a class="reference internal" href="#lxc-create-lvm"><span class="std std-ref">lvm</span></a>) ya limitan <em>per se</em> el tamaño del contenedor por
+vía de la opción <code class="file docutils literal notranslate"><span class="pre">--fssize</span></code>. <a class="reference internal" href="#lxc-create-none"><span class="std std-ref">none</span></a>, por su parte,
+es incapaz de fijar una limitación, puesto que los archivos irán creciendo
+mientras haya espacio disponible dentro del sistema de archivos en el que se
+encuentre <code class="file docutils literal notranslate"><span class="pre">/var/lib/lxc</span></code>. Por tanto, esta exposición se reduce a conocer
+cómo limitarlo con <a class="reference internal" href="#lxc-create-btrfs"><span class="std std-ref">brtfs</span></a> y (<a class="reference internal" href="#lxc-create-zfs"><span class="std std-ref">zfs</span></a>).  En ambos casos, la limitación  se fija haciendo uso de las
+herramientas propias del sistema de archivos y no del propio <abbr title="LinuX Containers">LXC</abbr>, así que es
+más un problema de conocer tal sistema de archivos que de conocer esta
+tecnología de contenedores. Estudiemos cómo hacerlo con <abbr title="B-TRee File System">BTRFS</abbr>.</p>
+<p>Ya se adelantó que al crear un contenedor sobre un sistema <abbr title="B-TRee File System">BTRFS</abbr> (e indicarle
+con <code class="code docutils literal notranslate"><span class="pre">:B</span> <span class="pre">btrfs</span></code> que así es), se crea automáticamente un subvolumen para el
+contenido del contenedor:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>btrfs subvolume list /var/lib/lxc
+<span class="go">ID 258 gen 102 top level 5 path test/rootfs</span>
+</pre></div>
+</div>
+<p>Pues bien, para poder limitar el espacio que ocupará este subvolumen,
+necesitamos habilitar las cuotas en el sistema de archivos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>btrfs quota <span class="nb">enable</span> /var/lib/lxc
+</pre></div>
+</div>
+<p>y establecer una cuota para el subvolumen:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>btrfs qgroup limit 50m /var/lib/lxc/test/rootfs
+</pre></div>
+</div>
+<p>con lo cual:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>btrfs qgroup show -r /var/lib/lxc
+<span class="go">qgroupid         rfer         excl     max_rfer</span>
+<span class="go">--------         ----         ----     --------</span>
+<span class="go">0/5          16.00KiB     16.00KiB         none</span>
+<span class="hll"><span class="go">0/258         9.65MiB      9.65MiB     50.00MiB</span>
+</span></pre></div>
+</div>
+<p>Y, efectivamente, si intentamos dentro del huésped escribir 50MiB:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">test:~$  </span>dd &lt; /dev/zero &gt; ceros <span class="nv">bs</span><span class="o">=</span>1M <span class="nv">count</span><span class="o">=</span><span class="m">50</span>
+<span class="go">dd: error writing &#39;standard output&#39;: Quota exceeded</span>
+<span class="go">41+0 records in</span>
+<span class="go">40+0 records out</span>
+</pre></div>
+</div>
+<p>seeremos incapaces de completar la operación, porque  ya había más de 9MiB
+ocupados por la propia <em>Alpine</em>.</p>
+<p>Podemos redefinir cualquier otro valor para la cuota y, si decidimos eliminarla,
+basta con usar la palabra <em>none</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>btrfs qgroup limit none /var/lib/lxc/test/rootfs
+</pre></div>
+</div>
+<p class="rubric">Otros recursos</p>
+<p>El resto de recursos (p.e. la memoria <abbr title="Random Access Memory">RAM</abbr>) se limitan haciendo uso de
+<em>cgroups</em>. Las modernas versiones de <em>Debian</em> (a partir de <em>Bullseye</em>) usan
+<em>v2</em>, así que sobre esta segunda versión es sobre la que trabajaremos. En
+principio, no hay definida ninguna limitación, así que si sobre mi sistema de
+512MiB, entro al contenedor y consulto la memoria disponible:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">test:~$  </span>grep ^MemT /proc/meminfo
+<span class="go">MemTotal:         484704 kB</span>
+</pre></div>
+</div>
+<p>obtendremos más o menos esa cantidad de memoria disponible. ¿Cómo establecer las
+limitaciones? Para ello debemos hacer uso de <strong class="command">lxc-cgroups</strong> (con la
+contenedor arrancado) y saber <a class="reference external" href="https://facebookmicrosites.github.io/cgroup2/docs/memory-controller.html">qué controlador</a>
+debemos tocar:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-groups -n <span class="nb">test</span> memory.max 100m
+<span class="gp"># </span>lxc-groups -n <span class="nb">test</span> memory.swap.max 25m
+<span class="gp"># </span>lxc-cgroup -n <span class="nb">test</span> cpuset.cpus <span class="m">0</span>,2
+</pre></div>
+</div>
+<p>Estos, por ejemplo, limitan la <abbr title="Random Access Memory">RAM</abbr>, la <em>swap</em> y el uso de la <abbr title="Central Processing Unit">CPU</abbr> a solamente
+al primero y tercero de los núcleos. Podemos comprobar estos límites
+consultando:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>cat /sys/fs/cgroup/lxc.payload.test/memory.max
+<span class="go">104857600</span>
+</pre></div>
+</div>
+<p>o sea, 10MiB expresados en <em>bytes</em>. Los límites, sin embargo, son efímeros y se
+perderán al apagar la máquina. Para hacerlos permanentes, pueden añadirse al
+archivo de configuración del contenedor (en este caso,
+<code class="file docutils literal notranslate"><span class="pre">/var/lib/lxc/test/config</span></code>):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>lxc.cgroup2.memory.max <span class="o">=</span> 100m
+lxc.cgroup2.memory.swap.max <span class="o">=</span> 25m
+lxc.cgroup2.cpuset.cpus <span class="o">=</span> <span class="m">0</span>,2
+</pre></div>
+</div>
+<div class="admonition-todo admonition" id="id6">
+<p class="admonition-title">Por hacer</p>
+<p><a class="reference internal" href="../../../../../../02.conbas/99.misc/01.anahw.html#free"><span class="std std-ref">free</span></a>, sin embargo, devuelve datos del anfitrión. Debe
+ser algo relacionado con el servicio <em>lxcfs</em>. Debe comprobarse si se mantiene
+este problema con <abbr title="LinuX containers Daemon">LXD</abbr>.</p>
+</div>
+</section>
+<section id="instantaneas">
+<span id="lxc-snapshot"></span><h2><span class="section-number">9.2.2.2.1.1.1.5. </span>Instantáneas<a class="headerlink" href="#instantaneas" title="Enlace permanente a este encabezado">¶</a></h2>
+</section>
+<section id="configuracion">
+<span id="lxc-conf"></span><h2><span class="section-number">9.2.2.2.1.1.1.6. </span>Configuración<a class="headerlink" href="#configuracion" title="Enlace permanente a este encabezado">¶</a></h2>
+<span class="target" id="lxc-red"></span><p class="rubric">Notas al pie</p>
+<dl class="footnote brackets">
+<dt class="label" id="id7"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p>Si un contenedor privilegiado no lo gestiona un administrador, no
+podremos actuar dentro de él como tal y, en consecuencia, es imposible que
+gestione un sistema completo.</p>
+</dd>
+<dt class="label" id="id8"><span class="brackets"><a class="fn-backref" href="#id2">2</a></span></dt>
+<dd><p><em>Alpine</em> es una distribución mínima con lo cual es ideal para hacer
+crear nuestros contenedores de prueba.</p>
+</dd>
+<dt class="label" id="id9"><span class="brackets"><a class="fn-backref" href="#id3">3</a></span></dt>
+<dd><p>Se supone que estamos <a class="reference internal" href="../../../../../../05.discos/01.division/04.virt.html#lvm"><span class="std std-ref">familiarizados con estos conceptos</span></a>.</p>
+</dd>
+<dt class="label" id="id10"><span class="brackets"><a class="fn-backref" href="#id4">4</a></span></dt>
+<dd><p>En versiones antiguas, el comportamiento predeterminado era justamente el
+contrario y para no conectarse al contenedor había que añadir la opción
+<kbd class="kbd docutils literal notranslate">-d</kbd>.</p>
+</dd>
+<dt class="label" id="id11"><span class="brackets"><a class="fn-backref" href="#id5">5</a></span></dt>
+<dd><p>Circunstancia que en este caso particular no ocurrirá, pero que podría
+ocurrir cuando la situación fuera distinta.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="../../../../../../index.html">Tabla de contenido</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">9.2.2.2.1.1.1. Contenedores privilegiados</a><ul>
+<li><a class="reference internal" href="#preliminares">9.2.2.2.1.1.1.1. Preliminares</a></li>
+<li><a class="reference internal" href="#creacion">9.2.2.2.1.1.1.2. Creación</a></li>
+<li><a class="reference internal" href="#gestion">9.2.2.2.1.1.1.3. Gestión</a></li>
+<li><a class="reference internal" href="#limitacion">9.2.2.2.1.1.1.4. Limitación</a></li>
+<li><a class="reference internal" href="#instantaneas">9.2.2.2.1.1.1.5. Instantáneas</a></li>
+<li><a class="reference internal" href="#configuracion">9.2.2.2.1.1.1.6. Configuración</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Tema anterior</h4>
+    <p class="topless"><a href="../../02.lxc.html"
+                          title="capítulo anterior"><span class="section-number">9.2.2.2.1. </span><abbr title="LinuX Containers">LXC</abbr></a></p>
+  </div>
+  <div>
+    <h4>Próximo tema</h4>
+    <p class="topless"><a href="02.unpriv.html"
+                          title="próximo capítulo"><span class="section-number">9.2.2.2.1.1.2. </span>Contenedores no privilegiados</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../../../../_sources/98.apendice/05.virtual/02.software/03.contenedores/02.lxc/01.nativas/01.priv.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="02.unpriv.html" title="9.2.2.2.1.1.2. Contenedores no privilegiados"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="../../02.lxc.html" title="9.2.2.2.1. LXC"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../../../index.html" ><span class="section-number">9. </span>Apéndices</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../../../index.html" ><span class="section-number">9.2. </span>Virtualización</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../../../../02.software.html" ><span class="section-number">9.2.2. </span>Software de virtualización</a> &#187;</li>
+          <li class="nav-item nav-item-4"><a href="../../02.lxc.html" ><span class="section-number">9.2.2.2.1. </span><abbr title="LinuX Containers">LXC</abbr></a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">9.2.2.2.1.1.1. </span>Contenedores privilegiados</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Derechos de autor CC BY 4.0, 2016-2023, José Miguel Sánchez Alés.
+      Creado usando <a href="https://www.sphinx-doc.org/">Sphinx</a> 5.3.0.
+    </div>
+  </body>
+</html>

@@ -20,6 +20,7 @@
     <script src="../../_static/doctools.js"></script>
     <script src="../../_static/sphinx_highlight.js"></script>
     <script src="../../_static/translations.js"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     
     <link rel="index" title="Índice" href="../../genindex.html" />
     <link rel="search" title="Búsqueda" href="../../search.html" />
@@ -55,7 +56,7 @@
 <p>De las múltiples soluciones disponibles en <em>Linux</em> incluimos guía de unas pocas
 de ellas, que en algunos casos serán meras notas, y en otros relaciones más extensas.</p>
 <section id="virtualizacion-completa">
-<h2><span class="section-number">9.2.2.1. </span>Virtualización completa<a class="headerlink" href="#virtualizacion-completa" title="Enlace permanente a este encabezado">¶</a></h2>
+<span id="software-virt-completa"></span><h2><span class="section-number">9.2.2.1. </span>Virtualización completa<a class="headerlink" href="#virtualizacion-completa" title="Enlace permanente a este encabezado">¶</a></h2>
 <p>Al utilizar un <em>software</em> de virtualización para instalar y probar sistemas
 operativos nos será muy útil conocer varios aspectos (además de los evidentes):</p>
 <ul class="simple">
@@ -86,16 +87,96 @@ solución integrada oficialmente en el propio núcleo de <em>Linux</em>:</p>
 </div>
 </section>
 <section id="contenedores">
-<h2><span class="section-number">9.2.2.2. </span>Contenedores<a class="headerlink" href="#contenedores" title="Enlace permanente a este encabezado">¶</a></h2>
+<span id="software-contenedores"></span><h2><span class="section-number">9.2.2.2. </span>Contenedores<a class="headerlink" href="#contenedores" title="Enlace permanente a este encabezado">¶</a></h2>
+<p>Los contenedores son una solución infinitamente más ligera y eficiente con la
+limitación de que tendrán que contener un sistema de idéntica naturaleza a la
+del anfitrión, puesto que carecen de sistema operativo propio.</p>
+<p>En los sistemas <em>Linux</em> este tipo de virtualización, muy esquemáticamente, se
+basa en dos conceptos:</p>
+<ol class="arabic simple">
+<li><p>El <strong>aislamiento</strong> a través de:</p>
+<ul class="simple">
+<li><p>los <em class="dfn">espacios de nombres</em> (<em>namespaces</em>) del núcleo, que proporcionan
+a los procesos una visión parcial de los procesos y recursos que gestiona
+el sistema operativo. Todo aquello que no haya sido incluido en el mismo
+espacio de nombres, no es accesible ni aparentemente existe. Para entender
+este conceptos resulta indispensable la lectura del artículo <a class="reference external" href="https://blog.quarkslab.com/digging-into-linux-namespaces-part-1.html">Digging into
+Linux namespaces</a> (y <a class="reference external" href="https://blog.quarkslab.com/digging-into-linux-namespaces-part-2.html">su segunda parte</a>)<a class="footnote-reference brackets" href="#id2" id="id1">1</a>.</p></li>
+<li><p>el <em class="dfn">enjaulamiento</em> (<em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/chroot">chroot</a></em>, <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/pivot_root">pivot_root</a></em>) dentro de
+un árbol de directorios, que logra su aislamiento del resto del sistema de
+archivos.</p></li>
+</ul>
+</li>
+<li><p>La <strong>limitación</strong> de recursos a través de los <em class="dfn">grupos de control</em>
+(abreviado <em>cgroups</em>). Gracias a ellos, por ejemplo, podremos impedir que un
+proceso ocupe más de 128MiB de memoria <abbr title="Random Access Memory">RAM</abbr>, aunque la máquina disponga de
+mucha más. Para profundizar en ellos es conveniente el artículo <a class="reference external" href="https://www.lewisgaul.co.uk/blog/coding/2022/05/13/cgroups-intro/">Cgroups
+Introduction</a>.</p></li>
+</ol>
+<p>En consecuencia, la creación de un contenedor supone:</p>
+<ul class="simple">
+<li><p>Crearle un conjunto de espacios de nombres propios (uno para su red, otro para
+sus procesos, etc). De esta manera, dentro del contenedor sólo se tiene acceso
+a aquello que el sistema operativo del anfitrión gestiona para el propio
+contenedor.</p></li>
+<li><p>Enjaularlo dentro la porción del árbol de directorios que constituya su
+&quot;sistema de archivos&quot;.</p></li>
+<li><p>Crearle los grupos de control propios para limitar su uso de recursos.</p></li>
+</ul>
+<p>Antes de comenzar, no obstante, es preciso hacer una distinción entre dos tipos
+de contenedores:</p>
+<dl class="simple">
+<dt><em class="dfn">Contenedor privilegiado</em> (<em>privileged container</em>)</dt><dd><p>es aquel en que no se hace uso del concepto de <em>espacio de nombres de
+usuario</em>  y, en consecuencia, los usuarios y grupos del contenedor se
+corresponden con los usuarios y grupos del anfitrión (aunque en el
+contenedor puedan no tener nombre asignado). Dicho de otro modo, la
+acción que realice el usuario <em>root</em> en el contenedor es una acción que
+el sistema operativo del anfitrión considera que está realmente ejecutando
+<em>root</em>.</p>
+</dd>
+<dt><em class="dfn">Contenedor no privilegiado</em> (<em>unprivileged container</em>)</dt><dd><p>es aquel que hace uso de tal concepto, por lo que se mapean identificadores
+de usuarios y grupos. El mapeo consiste en considerar que
+<span class="math notranslate nohighlight">\(\mathit{UID}_a = \mathit{UID}_c + N\)</span>, esto es, que el usuario del
+contenedor con un determinado identificador es, en realidad, el usuario del
+anfitrión que tiene ese identificador más una cantidad fija. Otro tanto
+ocurre con los <abbr title="Group IDentifier">GID</abbr> de grupos. Por ejemplo, el administrador del contenedor
+(<strong>0</strong>) podría ser en el anfitrión el usuario con identificador (<strong>1000</strong>),
+con lo que en este caso «N» valdría 1000. Esto abre la posibilidad a que un
+usuario normal sin privilegios (con identificador <strong>1000</strong>) gestione un
+contenedor sin restricciones (dentro de él será el administrador con
+identificador <strong>0</strong>).</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Todos estos conceptos se entienden muy bien si se leen con
+detenimiento las explicaciones ya recomendadas del artículo <a class="reference external" href="https://blog.quarkslab.com/digging-into-linux-namespaces-part-1.html">Digging into
+Linux namespaces</a> y, en especial, <a class="reference external" href="https://blog.quarkslab.com/digging-into-linux-namespaces-part-2.html">su segunda parte</a> en que se desarrolla
+el concepto de espacio de nombres de usuario (<em>user namespace</em>).</p>
+</div>
 <p>De entre las soluciones de virtualización basadas en contenedores trataremos una
 de contenedores de aplicación (<strong class="program">Docker</strong>) y otra de contenedores de
 sistema (<abbr title="LinuX Containers">LXC</abbr>).</p>
 <div class="toctree-wrapper compound">
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="02.software/03.contenedores/03.docker.html">9.2.2.2.1. Docker</a></li>
-<li class="toctree-l1"><a class="reference internal" href="02.software/03.contenedores/04.lxc.html">9.2.2.2.2. <abbr title="LinuX Containers">LXC</abbr></a></li>
+<li class="toctree-l1"><a class="reference internal" href="02.software/03.contenedores/02.lxc.html">9.2.2.2.1. <abbr title="LinuX Containers">LXC</abbr></a></li>
+<li class="toctree-l1"><a class="reference internal" href="02.software/03.contenedores/03.docker.html">9.2.2.2.2. Docker</a></li>
 </ul>
 </div>
+<p class="rubric">Notas al pie</p>
+<dl class="footnote brackets">
+<dt class="label" id="id2"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p>Esto incluye también a usuarios y grupos, de manera que un usuario que
+dentro del contenedor actuara como usuario privilegiado (o sea, con el <abbr title="User IDentifier">UID</abbr>
+0) fuera de él podría no serlo en absoluto. El interesantísimo artículo
+mencionado ilustra <a class="reference external" href="https://blog.quarkslab.com/digging-into-linux-namespaces-part-2.html#combining-almost-everything">cómo crear a mano un entorno absolutamente aislado</a>
+que nos puede ayudar a entender cómo funciona la <em>magia</em> de los contenedores.
+Si a ese procedimiento se le añade limitación con <em>cgroups</em> (véase <a class="reference external" href="https://tbhaxor.com/docker-resource-management-in-detail/">Docker
+Resource Management in Detail</a>), obtendremos
+un contenedor <em>artesanal</em> sin necesidad de haber utilizado <em>software</em>
+específico como <abbr title="LinuX Containers">LXC</abbr> o <em>Docker</em>.</p>
+</dd>
+</dl>
 </section>
 </section>
 
