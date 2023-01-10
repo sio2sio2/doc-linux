@@ -43,8 +43,6 @@ Gestión de usuarios
      <https://forsenergy.com/es-es/lug/html/8b53e8eb-37e8-4728-9e24-768348b8b32f.htm>`_
      se explican todos los usuarios predefinidos.
 
-* A diferencia de *Linux*, puede añadirse un grupo como miembro de otro.
-
 * Los usuarios tienen su perfil personal en la ruta
   :file:`C:\\Users\\nombre_usuario`, de manera que:
 
@@ -180,7 +178,7 @@ avanzados que permite definir *Windows* sobre |NTFS|:
    #. Modificar los atributos de un fichero.
    #. Modificar los atributos extendidos de un fichero.
    #. Eliminar el propio archivo.
-   #. Eliminar archivos dentro de un directorio.
+   #. Eliminar archivos dentro de un directorio (no aparece listado en archivos regulares).
 
 **Otros**
    Hay por último dos permisos que en *UNIX*, simplemente, son privativos del

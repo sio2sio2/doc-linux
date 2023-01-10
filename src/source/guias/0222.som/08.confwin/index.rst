@@ -40,9 +40,10 @@ Puntos de restauración
 *Windows* 10 permite crear puntos de restauración de sistema operativo (no del
 sistema de archivos, para lo cual tendríamos que crear copias de seguridad) a
 través del programa :program:`SystemPropertiesProtection.exe`, accesible desde
-las "Propiedades" de "Este Equipo" o la sección "Sistema" del "Panel de
-Control". La creación de estos puntos exige primero habilitar la posibilidad reservando
-una cantidad de espacio en disco para ello.
+las "Propiedades>Protección del sistema" de "Este Equipo" o la sección
+"Seguridad y matenimiento" del "Panel de Control". La creación de estos puntos
+exige primero habilitar la posibilidad reservando una cantidad de espacio en
+disco para ello.
 
 .. seealso:: Puede consultar `este artículo de genbeta.com sobre restauración
    <https://www.genbeta.com/paso-a-paso/como-crear-punto-restauracion-windows-10>`_.
