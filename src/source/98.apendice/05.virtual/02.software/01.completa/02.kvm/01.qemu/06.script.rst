@@ -8,13 +8,13 @@ podido comprobar sobradamente, proponemos `un script
 Admite opciones propias y aquellas que no entiende las considera de
 :command:`qemu-system-x86_64` con lo que se las pasará sin alterar. Además, si
 algunas de las opciones es :kbd:`--` todas las que vengan detrás de ella las
-supondrá de :command:`qemu-system-x86_64` y las pasará sin interpretar, aunque
-tengan un significado propio.
+supondrá de :command:`qemu-system-x86_64` y las pasará también sin interpretar,
+tengan o no significado propio.
 
-Antes de utilizarlo, no obstante, son necesarias cinco requisitos:
+Antes de utilizarlo, no obstante, son necesarios cinco requisitos:
 
 #. Crear el grupo *qemusers* para que pertenezcan a él todos los usuarios que
-   utilicen el *script*.
+   utilicen el *script* (puede editarse el código para cambiar el nombre).
 
 #. Crear un archivo :file:`/etc/sudoers.d/qemu` con el siguiente contenido::
 
@@ -45,7 +45,7 @@ donde las opciones son de los siguientes tipos (de menor a mayor precedencia):
 #. Añadidas por defecto:
 
    * Acelaración por *hardware*
-   * Memoria de 512MiB.
+   * Memoria de 512MiB (manipulable a través de la variable de ambiente :kbd:`VM_MEM`)
 
 #. Propias  del *script*.
 #. Propias de :command:`qemu-system-x86_64` colocadas tras :kbd:`--`.
@@ -66,15 +66,22 @@ También podríamos haber hecho::
 
 pero no habría ninguna diferencia. El uso de :kbd:`--` sólo es estrictamente
 necesario cuando una misma opción es propia y de :program:`QEmu` como es el caso
-de :kbd:`-display`. Por ejemplo::
+de :kbd:`-display`::
 
    $ vm -disk disco.qcw -display none -- -device cirrus-vga -display sdl -monitor vc
+
+En este caso, el primer :kbd:`-display` será interpretado por el *script* y
+provocará que no defina ninguna salida de vídeo (por defecto, es *vga*), lo cual
+deja el camino expedito a las opciones tras :kbd:`--`, que definen una no incluida
+entre las :ref:`definidas por el script <qemu-script-video>`\ [#]_.
 
 Las opciones propias empiezan todas con un único guión, no pueden fusionarse y
 facilitan, fundamentalmente, la introducción de cuatro aspectos:
 
+.. _qemu-script-disco:
+
 **Almacenamiento**
-   Mediante la opción :kbd:`-disk` y :kbd:`-cdrom` (unidades ópticas)::
+   Definido mediante las opciones :kbd:`-disk`.
 
       $ vm -disk disco.qcw
 
@@ -83,24 +90,46 @@ facilitan, fundamentalmente, la introducción de cuatro aspectos:
    ejemplo, esto arrancaría con un disco y un cedé, teniendo preferencia la
    unidad optica::
 
-      $ vm -cdrom gparted.iso -disk disco.qcw
+      $ vm -disk gparted.iso -disk disco.qcw
 
    Es posible referir dispositivos de bloques, en vez de archivos::
 
-      $ vm -cdrom /dev/sr0 -disk disco.qcw
+      $ vm -disk /dev/sr0 -disk disco.qcw
 
    Para cargar los discos sigue las siguientes reglas:
 
-   * Se utiliza *virtio-blk* para discos duros e *ide-cd* para unidades
-     ópticas.
-   * Sólo se soportan discos |QCOW|\ 2, imágenes *ISO* y dispositivos de
-     bloques.
+   * Por defecto, se utiliza *virtio-scsi* para discos u unidades ópticas,
+     pero con la variable de ambiente :code:`VM_HDDRIVER=virtio-blk`,
+     se utilizará *virtio-blk* para discos e *ide-cd* para unidades ópticas.
+   * Se usa *usb-storage* para dispositivos |USB| de almacenamiento.
+   * Sólo se soportan discos |QCOW|\ 2, imágenes crudas, imágenes *ISO* y
+     dispositivos de bloques.
+   * A la expresión del disco pueden anteponerse dos prefijos:
+
+     * :kbd:`cdrom:`, que fuerza a que el disco sea interpretado como un
+       dispositivo óptico. En principio, no debería ser necesario, puesto
+       que *script* intenta adivinarlo atendiendo a la naturaleza del archivo
+       regular o dispositivo de bloques.
+
+     * :kbd:`usb:`, que es necesario si se quiere que el disco se interprete
+       como un dispositivo |USB|. 
+
+   Por tanto, otras posibilidades son::
+
+        $ vm -disk cdrom:/dev/sr0 -disk disco.qcw
+
+   que no es necesaria, puesto que el *script* reconocerá el dispositivo de bloques
+   como propio de un almacenamiento óptico, o::
+
+        $ vm -disk usb:slax.img -disk disco.qcw
 
    .. note:: Obviamente, pueden seguir usándose las opciones cortas de
       :command:`qemu-system-x86_64`,  aunque convendría no mezclarlas con
       :kbd:`-disk`, porque no se ha comprobado el efecto de tal mezcla::
 
          $ vm -hda disco.qcw -- -cdrom gparted.iso -boot order=d
+
+.. _qemu-script-video:
 
 **Salida de vídeo**
    Mediante la opción :kbd:`-display`. Admite varias:
@@ -119,12 +148,15 @@ facilitan, fundamentalmente, la introducción de cuatro aspectos:
       La ventana queda bloqueada para que no pueda cerrarse accidentalmente
       pulsando el botón de cierre (el aspa) que gestiona el gestor de ventanas.
       Es el valor predeterminado, si no se especifica opción :kbd:`-display`
+      o se define la variable :kbd:`VM_VIDEO` con otro valor::
+
+        $ VM_VIDEO=spice vm -disk disco.qcw
 
    :code:`-display spice`
       Prepara la salida para el uso de *spice*. Internamente usa la salida
       *spice-app*, por lo que necesita que haya un :ref:`cliente instalado y
       asociado al tipo x-scheme-handler/spice+unix <qemu-video-spice>`. También
-      permite el cortapega, así que el cliente deberá tener instalado
+      permite el cortapega, si el cliente tiene instalado
       :program:`spice-vdagent`::
 
          $ vm -disk disco.qcw -display spice
@@ -138,9 +170,9 @@ facilitan, fundamentalmente, la introducción de cuatro aspectos:
 
    :code:`-display stdio`
       La salida es la propia terminal de texto  para lo cual es necesario que se
-      haya :ref:`preparado el cliente para ofrezca salida y entrada a través del
-      puerto serie <qemu-video-texto>`. Es la única salida que no libera la
-      terminal por razones obvias::
+      haya :ref:`preparado el cliente para que ofrezca salida y entrada a
+      través del puerto serie <qemu-video-texto>`. Es la única salida que no
+      libera la terminal por razones obvias::
 
          $ vm -disk disco.qcw -display stdio
 
@@ -184,16 +216,14 @@ facilitan, fundamentalmente, la introducción de cuatro aspectos:
      del **10022** al puerto **22** del huésped.
    * Para la interfaz puente se escoge automáticamente la solución apropiada
      (puente o macvtap) según esté definida la interfaz en el anfitrión.
-   * Las redes internas se construyen con *socket*, pero si quieren usarse
-     puentes es posible hacerlo añadiendo :kbd:`tap` al argumento (p.e.
-     :code:`-net  p0a,tap`).
+   * Las redes internas se construyen con *socket*, pero se basan en puentes
+     si se añade el prefijo :kbd:`tap:` al argumento (p.e. :code:`-net  tap:p0a`).
 
    Por ejemplo:
 
    #. Máquina con una interfaz en red de usuario::
 
          $ vm -disk caca.qcw
-
 
    #. Máquina sin red::
 
@@ -205,7 +235,7 @@ facilitan, fundamentalmente, la introducción de cuatro aspectos:
 
    #. Ídem pero la red interna se crea mediante un puente::
 
-         $ vm -net p2,tap -disk caca.qcw
+         $ vm -net tap:p2 -disk caca.qcw
 
 **USB**
    Mediante la opción :kbd:`-usb` se pueden pasar al huésped los dispositivos |USB|
@@ -217,20 +247,22 @@ facilitan, fundamentalmente, la introducción de cuatro aspectos:
    del producto tal y cómo los vemos en la salida de :command:`lsusb`. Para
    pasar varios dispositivos basta con repetir la opción.
 
+   .. note:: :code:`-disk usb:1234:abcd` se traduce a :kbd:`-usb 1234:abcd`, sin
+      entrar a valorar la naturaleza del dispositivo (que puede no serlo de
+      almacenamiento).
+
 Aún hay algunas opciones más que alteran el comportamiento de la máquina:
 
 :kbd:`-U`
    que provoca que la máquina tenga firmware |EFI|. La ubicación del archivo
    de *firmware* en el anfitrión es :file:`/usr/share/qemu/OVMF.fd`, esto es, la
-   propia de *Debian*. Si es otra puede editarse el comienzo del *script* para
-   modificarla.
+   propia de *Debian*. Si es otra, puede definirse a través de la variable
+   :kbd:`VM_UEFIFIRM`::
 
-:kbd:`-v`
-   que muestra por la salida estándar todas las órdenes necesarias para
-   arrancar. Véase :kbd:`-s`.
+      $ VM_UEFIFIRM="/otra/ruta/a/OVMF.fd" vm -U -disk disco.qcw
 
 :kbd:`-s`
-   como :kbd:`-v` muestra las órdenes, pero no llega a ejecutar ninguna::
+   muestra las órdenes por pantalla, pero no llega a ejecutar ninguna::
 
       $ vm -s -hda disco.qcw2
       qemu-system-x86_64 -nodefaults -m 512 -machine accel=kvm \
@@ -239,13 +271,20 @@ Aún hay algunas opciones más que alteran el comportamiento de la máquina:
 
    Si la línea supone órdenes adicionales, también se mostrarán::
 
-      $ vm -s -hda disco.qcw2 -net 0,tap
+      $ vm -s -hda disco.qcw2 -net tap:0
       ip link add name vmnet0 type bridge 
       ip link set vmnet0 up 
       qemu-system-x86_64 -nodefaults -m 512 -machine accel=kvm \ 
          -device virtio-net,netdev=nic0,mac=de:ad:be:ef:21:b0 -netdev bridge,id=nic0,br=vmnet0 \
          -device virtio-vga -display gtk,window-close=off -monitor vc -hda disco.qcw2
       ip link del vmnet0
+
+:kbd:`-v`
+   que muestra las órdenes como :kbd:`-s`, pero a diferencia de ella sí las ejecuta.
+
+.. rubric:: Notas al pie
+
+.. [#] Estrictamente, sólo :code:`-display sdl` es necesario que se encuentre tras :kbd:`--`.
 
 .. |USB| replace:: :abbr:`USB (Universal Serial Bus)`
 .. |BIOS| replace:: :abbr:`BIOS (Basic I/O System)`

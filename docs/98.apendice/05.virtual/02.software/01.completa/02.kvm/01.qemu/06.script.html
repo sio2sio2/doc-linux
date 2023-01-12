@@ -59,12 +59,12 @@ podido comprobar sobradamente, proponemos <a class="reference external" href="ht
 Admite opciones propias y aquellas que no entiende las considera de
 <strong class="command">qemu-system-x86_64</strong> con lo que se las pasará sin alterar. Además, si
 algunas de las opciones es <kbd class="kbd docutils literal notranslate">--</kbd> todas las que vengan detrás de ella las
-supondrá de <strong class="command">qemu-system-x86_64</strong> y las pasará sin interpretar, aunque
-tengan un significado propio.</p>
-<p>Antes de utilizarlo, no obstante, son necesarias cinco requisitos:</p>
+supondrá de <strong class="command">qemu-system-x86_64</strong> y las pasará también sin interpretar,
+tengan o no significado propio.</p>
+<p>Antes de utilizarlo, no obstante, son necesarios cinco requisitos:</p>
 <ol class="arabic">
 <li><p>Crear el grupo <em>qemusers</em> para que pertenezcan a él todos los usuarios que
-utilicen el <em>script</em>.</p></li>
+utilicen el <em>script</em> (puede editarse el código para cambiar el nombre).</p></li>
 <li><p>Crear un archivo <code class="file docutils literal notranslate"><span class="pre">/etc/sudoers.d/qemu</span></code> con el siguiente contenido:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Cmnd_Alias     NQEMU=/ruta/absoluta/a/vm -up *, /ruta/absoluta/a/vm -down *</span>
 <span class="gp">%</span>qemusers      <span class="nv">ALL</span><span class="o">=</span>NOPASSWD: QEMU, NQEMU
@@ -90,7 +90,7 @@ anfitrión, alterar las reglas de <strong class="program">udev</strong> como se 
 <li><p>Añadidas por defecto:</p>
 <ul class="simple">
 <li><p>Acelaración por <em>hardware</em></p></li>
-<li><p>Memoria de 512MiB.</p></li>
+<li><p>Memoria de 512MiB (manipulable a través de la variable de ambiente <kbd class="kbd docutils literal notranslate">VM_MEM</kbd>)</p></li>
 </ul>
 </li>
 <li><p>Propias  del <em>script</em>.</p></li>
@@ -112,35 +112,60 @@ con incluir <kbd class="kbd docutils literal notranslate">-m</kbd> en algún lug
 </div>
 <p>pero no habría ninguna diferencia. El uso de <kbd class="kbd docutils literal notranslate">--</kbd> sólo es estrictamente
 necesario cuando una misma opción es propia y de <strong class="program">QEmu</strong> como es el caso
-de <kbd class="kbd docutils literal notranslate">-display</kbd>. Por ejemplo:</p>
+de <kbd class="kbd docutils literal notranslate">-display</kbd>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -disk disco.qcw -display none -- -device cirrus-vga -display sdl -monitor vc
 </pre></div>
 </div>
+<p>En este caso, el primer <kbd class="kbd docutils literal notranslate">-display</kbd> será interpretado por el <em>script</em> y
+provocará que no defina ninguna salida de vídeo (por defecto, es <em>vga</em>), lo cual
+deja el camino expedito a las opciones tras <kbd class="kbd docutils literal notranslate">--</kbd>, que definen una no incluida
+entre las <a class="reference internal" href="#qemu-script-video"><span class="std std-ref">definidas por el script</span></a><a class="footnote-reference brackets" href="#id2" id="id1">1</a>.</p>
 <p>Las opciones propias empiezan todas con un único guión, no pueden fusionarse y
 facilitan, fundamentalmente, la introducción de cuatro aspectos:</p>
-<dl>
-<dt><strong>Almacenamiento</strong></dt><dd><p>Mediante la opción <kbd class="kbd docutils literal notranslate">-disk</kbd> y <kbd class="kbd docutils literal notranslate">-cdrom</kbd> (unidades ópticas):</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -disk disco.qcw
-</pre></div>
-</div>
+<dl id="qemu-script-disco">
+<dt><strong>Almacenamiento</strong></dt><dd><p>Definido mediante las opciones <kbd class="kbd docutils literal notranslate">-disk</kbd>.</p>
+<blockquote>
+<div><p>$ vm -disk disco.qcw</p>
+</div></blockquote>
 <p>Pueden incluirse varias veces para indicar varias unidades y, si el firmware
 es <abbr title="Basic I/O System">BIOS</abbr>, irán antes en la secuencia de arranque los referidos antes. Por
 ejemplo, esto arrancaría con un disco y un cedé, teniendo preferencia la
 unidad optica:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -cdrom gparted.iso -disk disco.qcw
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -disk gparted.iso -disk disco.qcw
 </pre></div>
 </div>
 <p>Es posible referir dispositivos de bloques, en vez de archivos:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -cdrom /dev/sr0 -disk disco.qcw
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -disk /dev/sr0 -disk disco.qcw
 </pre></div>
 </div>
 <p>Para cargar los discos sigue las siguientes reglas:</p>
 <ul class="simple">
-<li><p>Se utiliza <em>virtio-blk</em> para discos duros e <em>ide-cd</em> para unidades
-ópticas.</p></li>
-<li><p>Sólo se soportan discos <abbr title="Qemu Copy-On-Write">QCOW</abbr>2, imágenes <em>ISO</em> y dispositivos de
-bloques.</p></li>
+<li><p>Por defecto, se utiliza <em>virtio-scsi</em> para discos u unidades ópticas,
+pero con la variable de ambiente <code class="code docutils literal notranslate"><span class="pre">VM_HDDRIVER=virtio-blk</span></code>,
+se utilizará <em>virtio-blk</em> para discos e <em>ide-cd</em> para unidades ópticas.</p></li>
+<li><p>Se usa <em>usb-storage</em> para dispositivos <abbr title="Universal Serial Bus">USB</abbr> de almacenamiento.</p></li>
+<li><p>Sólo se soportan discos <abbr title="Qemu Copy-On-Write">QCOW</abbr>2, imágenes crudas, imágenes <em>ISO</em> y
+dispositivos de bloques.</p></li>
+<li><p>A la expresión del disco pueden anteponerse dos prefijos:</p>
+<ul>
+<li><p><kbd class="kbd docutils literal notranslate">cdrom:</kbd>, que fuerza a que el disco sea interpretado como un
+dispositivo óptico. En principio, no debería ser necesario, puesto
+que <em>script</em> intenta adivinarlo atendiendo a la naturaleza del archivo
+regular o dispositivo de bloques.</p></li>
+<li><p><kbd class="kbd docutils literal notranslate">usb:</kbd>, que es necesario si se quiere que el disco se interprete
+como un dispositivo <abbr title="Universal Serial Bus">USB</abbr>.</p></li>
 </ul>
+</li>
+</ul>
+<p>Por tanto, otras posibilidades son:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -disk cdrom:/dev/sr0 -disk disco.qcw
+</pre></div>
+</div>
+<p>que no es necesaria, puesto que el <em>script</em> reconocerá el dispositivo de bloques
+como propio de un almacenamiento óptico, o:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -disk usb:slax.img -disk disco.qcw
+</pre></div>
+</div>
 <div class="admonition note">
 <p class="admonition-title">Nota</p>
 <p>Obviamente, pueden seguir usándose las opciones cortas de
@@ -151,6 +176,8 @@ bloques.</p></li>
 </div>
 </div>
 </dd>
+</dl>
+<dl id="qemu-script-video">
 <dt><strong>Salida de vídeo</strong></dt><dd><p>Mediante la opción <kbd class="kbd docutils literal notranslate">-display</kbd>. Admite varias:</p>
 <dl>
 <dt><code class="code docutils literal notranslate"><span class="pre">-display</span> <span class="pre">none</span></code></dt><dd><p>No hay salida de vídeo. El único mode de acceder a la máquina será a
@@ -165,12 +192,16 @@ través de la red (p.e. porque se haya instalado un servidor <abbr title="Securi
 </div>
 <p>La ventana queda bloqueada para que no pueda cerrarse accidentalmente
 pulsando el botón de cierre (el aspa) que gestiona el gestor de ventanas.
-Es el valor predeterminado, si no se especifica opción <kbd class="kbd docutils literal notranslate">-display</kbd></p>
+Es el valor predeterminado, si no se especifica opción <kbd class="kbd docutils literal notranslate">-display</kbd>
+o se define la variable <kbd class="kbd docutils literal notranslate">VM_VIDEO</kbd> con otro valor:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nv">VM_VIDEO</span><span class="o">=</span>spice vm -disk disco.qcw
+</pre></div>
+</div>
 </dd>
 <dt><code class="code docutils literal notranslate"><span class="pre">-display</span> <span class="pre">spice</span></code></dt><dd><p>Prepara la salida para el uso de <em>spice</em>. Internamente usa la salida
 <em>spice-app</em>, por lo que necesita que haya un <a class="reference internal" href="02.arranque.html#qemu-video-spice"><span class="std std-ref">cliente instalado y
 asociado al tipo x-scheme-handler/spice+unix</span></a>. También
-permite el cortapega, así que el cliente deberá tener instalado
+permite el cortapega, si el cliente tiene instalado
 <strong class="program">spice-vdagent</strong>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -disk disco.qcw -display spice
 </pre></div>
@@ -182,9 +213,9 @@ superior a <strong>2345</strong>.</p>
 o superior a <strong>10000</strong>.</p>
 </dd>
 <dt><code class="code docutils literal notranslate"><span class="pre">-display</span> <span class="pre">stdio</span></code></dt><dd><p>La salida es la propia terminal de texto  para lo cual es necesario que se
-haya <a class="reference internal" href="02.arranque.html#qemu-video-texto"><span class="std std-ref">preparado el cliente para ofrezca salida y entrada a través del
-puerto serie</span></a>. Es la única salida que no libera la
-terminal por razones obvias:</p>
+haya <a class="reference internal" href="02.arranque.html#qemu-video-texto"><span class="std std-ref">preparado el cliente para que ofrezca salida y entrada a
+través del puerto serie</span></a>. Es la única salida que no
+libera la terminal por razones obvias:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -disk disco.qcw -display stdio
 </pre></div>
 </div>
@@ -228,9 +259,8 @@ disponga de interfaz de red. Por ejemplo:</p>
 del <strong>10022</strong> al puerto <strong>22</strong> del huésped.</p></li>
 <li><p>Para la interfaz puente se escoge automáticamente la solución apropiada
 (puente o macvtap) según esté definida la interfaz en el anfitrión.</p></li>
-<li><p>Las redes internas se construyen con <em>socket</em>, pero si quieren usarse
-puentes es posible hacerlo añadiendo <kbd class="kbd docutils literal notranslate">tap</kbd> al argumento (p.e.
-<code class="code docutils literal notranslate"><span class="pre">-net</span>&#160; <span class="pre">p0a,tap</span></code>).</p></li>
+<li><p>Las redes internas se construyen con <em>socket</em>, pero se basan en puentes
+si se añade el prefijo <kbd class="kbd docutils literal notranslate">tap:</kbd> al argumento (p.e. <code class="code docutils literal notranslate"><span class="pre">-net</span>&#160; <span class="pre">tap:p0a</span></code>).</p></li>
 </ul>
 <p>Por ejemplo:</p>
 <ol class="arabic">
@@ -250,7 +280,7 @@ puentes es posible hacerlo añadiendo <kbd class="kbd docutils literal notransla
 </div>
 </li>
 <li><p>Ídem pero la red interna se crea mediante un puente:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -net p2,tap -disk caca.qcw
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -net tap:p2 -disk caca.qcw
 </pre></div>
 </div>
 </li>
@@ -264,19 +294,25 @@ que queremos que estén disponibles para él:</p>
 <p>donde <strong>1234</strong> es el identificador del vendedor y <strong>abcd</strong> el identificador
 del producto tal y cómo los vemos en la salida de <strong class="command">lsusb</strong>. Para
 pasar varios dispositivos basta con repetir la opción.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p><code class="code docutils literal notranslate"><span class="pre">-disk</span> <span class="pre">usb:1234:abcd</span></code> se traduce a <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">-usb</kbd> <kbd class="kbd docutils literal notranslate">1234:abcd</kbd></kbd>, sin
+entrar a valorar la naturaleza del dispositivo (que puede no serlo de
+almacenamiento).</p>
+</div>
 </dd>
 </dl>
 <p>Aún hay algunas opciones más que alteran el comportamiento de la máquina:</p>
 <dl>
 <dt><kbd class="kbd docutils literal notranslate">-U</kbd></dt><dd><p>que provoca que la máquina tenga firmware <abbr title="Extensible Firmware Interface">EFI</abbr>. La ubicación del archivo
 de <em>firmware</em> en el anfitrión es <code class="file docutils literal notranslate"><span class="pre">/usr/share/qemu/OVMF.fd</span></code>, esto es, la
-propia de <em>Debian</em>. Si es otra puede editarse el comienzo del <em>script</em> para
-modificarla.</p>
+propia de <em>Debian</em>. Si es otra, puede definirse a través de la variable
+<kbd class="kbd docutils literal notranslate">VM_UEFIFIRM</kbd>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nv">VM_UEFIFIRM</span><span class="o">=</span><span class="s2">&quot;/otra/ruta/a/OVMF.fd&quot;</span> vm -U -disk disco.qcw
+</pre></div>
+</div>
 </dd>
-<dt><kbd class="kbd docutils literal notranslate">-v</kbd></dt><dd><p>que muestra por la salida estándar todas las órdenes necesarias para
-arrancar. Véase <kbd class="kbd docutils literal notranslate">-s</kbd>.</p>
-</dd>
-<dt><kbd class="kbd docutils literal notranslate">-s</kbd></dt><dd><p>como <kbd class="kbd docutils literal notranslate">-v</kbd> muestra las órdenes, pero no llega a ejecutar ninguna:</p>
+<dt><kbd class="kbd docutils literal notranslate">-s</kbd></dt><dd><p>muestra las órdenes por pantalla, pero no llega a ejecutar ninguna:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -s -hda disco.qcw2
 <span class="go">qemu-system-x86_64 -nodefaults -m 512 -machine accel=kvm \</span>
 <span class="go">   -device virtio-net,netdev=nic0,mac=de:ad:be:ef:d0:5f -netdev user,id=nic0,hostfwd=tcp:127.0.0.1:10022-:22 \</span>
@@ -284,7 +320,7 @@ arrancar. Véase <kbd class="kbd docutils literal notranslate">-s</kbd>.</p>
 </pre></div>
 </div>
 <p>Si la línea supone órdenes adicionales, también se mostrarán:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -s -hda disco.qcw2 -net <span class="m">0</span>,tap
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>vm -s -hda disco.qcw2 -net tap:0
 <span class="go">ip link add name vmnet0 type bridge</span>
 <span class="go">ip link set vmnet0 up</span>
 <span class="go">qemu-system-x86_64 -nodefaults -m 512 -machine accel=kvm \</span>
@@ -293,6 +329,14 @@ arrancar. Véase <kbd class="kbd docutils literal notranslate">-s</kbd>.</p>
 <span class="go">ip link del vmnet0</span>
 </pre></div>
 </div>
+</dd>
+<dt><kbd class="kbd docutils literal notranslate">-v</kbd></dt><dd><p>que muestra las órdenes como <kbd class="kbd docutils literal notranslate">-s</kbd>, pero a diferencia de ella sí las ejecuta.</p>
+</dd>
+</dl>
+<p class="rubric">Notas al pie</p>
+<dl class="footnote brackets">
+<dt class="label" id="id2"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p>Estrictamente, sólo <code class="code docutils literal notranslate"><span class="pre">-display</span> <span class="pre">sdl</span></code> es necesario que se encuentre tras <kbd class="kbd docutils literal notranslate">--</kbd>.</p>
 </dd>
 </dl>
 </section>

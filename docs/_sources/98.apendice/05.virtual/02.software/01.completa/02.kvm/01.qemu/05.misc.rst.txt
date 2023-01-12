@@ -103,6 +103,43 @@ con lo que la orden completa quedaría así::
    $ qemu-system-vga -hda disco.qcw -device virtio-net,netdev=nic \
       -netdev tap,id=nic,br=br0,helper=/usr/lib/qemu/qemu-bridge-helper,vhost=on,vhostfd=4 4<>/dev/vhost-net
 
+.. _qemu-virtio-scsi:
+
+virtio-scsi
+-----------
+Es un *driver* bastante eficiente que emula completamente una controladora
+|SCSI|. Para utilizarlo con un este disco:
+
+:code:`-blockdev "driver=file,node-name=f1,filename=disco.qcw" -blockdev "driver=qcow2,node-name=hdd,file=f1"`
+
+podemos añadir lo siguiente:
+
+:code:`-device virtio-scsi,id=scsi0 -device scsi-hd,drive=hdd,bus=scsi0.0,channel=0,scsi-id=0,lun=0`
+
+donde podemos ir cambiando el valor de :kbd:`lun`, si añadimos más discos; o
+:kbd:`scsi-hd` por :kbd:`scsi-cd`, si de lo que se trata es de una unidad
+óptica. De este modo, una máquina con una disco y un dispositivo óptico
+podríamos arrancarla así::
+
+   $ qemu-system-vga -device virtio-scsi,id=scsi0 \
+      -blockdev "driver=file,node-name=f1,filename=disco.qcw" -blockdev "driver=qcow2,node-name=hdd,file=f1" \
+      -device scsi-hd,drive=hdd,bus=scsi0.0,channel=0,scsi-id=0,lun=0,bootindex=1 \
+      -blockdev "driver=file,node-name=cdrom,filename=gparted.iso" \
+      -device scsi-cd,drive=cdrom,bus=scsi0.0,channel=0,scsi-id=0,lun=1,bootindex=0
+
+Puede obtenerse mejoras en el rendimiento añadiendo 4 colas:
+
+:code:`-device virtio-scsi,id=scsi0,num_queues=4`
+
+y, tanto para este driver como para *virtio-blk*, hay mejora también si se
+define el objeto:
+
+:code:`-object iothread,id=iothread0`
+
+y se añade su uso a *virtio-scsi* (o *virtio-blk*):
+
+:code:`-device virtio-scsi,id=scsi0,iothread=iothread0`
+
 .. _qemu-usb:
 
 |USB|
@@ -123,8 +160,6 @@ Necesitaremos dos cosas:
 
       # cat >> /etc/udev/rules.d/55-qemuperm.rules
       SUBSYSTEM=="usb", ACTION=="add", GROUP="qemusers", MODE="0660"
-
-   .. TODO: Modificar el nombre del archivo en 03.red.rst
 
 #. Pasar al huésped el dispositivo |USB| que queremos tener disponible en él,
    para lo cual tenemos que identificar en el anfitrión tal dispositivo::
@@ -391,6 +426,7 @@ necesario abrir el monitor y:
 .. |CIFS| replace:: :abbr:`CIFS (Common Internet File System)`
 .. |NTFS| replace:: :abbr:`NTFS (New Technology File System)`
 .. |QCOW| replace:: :abbr:`QCOW (Qemu Copy-On-Write)`
+.. |SCSI| replace:: :abbr:`SCSI (Small Computer System Interface)`
 
 .. _SeaBIOS: https://www.seabios.org/SeaBIOS
 .. _OVMF: https://github.com/tianocore/tianocore.github.io/wiki/OVMF
