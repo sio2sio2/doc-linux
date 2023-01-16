@@ -106,7 +106,8 @@ contenedores pueden crecer hasta ocupar todo el espacio disponible de
 <abbr title="Zettabyte File System">ZFS</abbr> (p.e. porque hayamos dispuesto esa ruta en partición aparte y le
 hayamos dado formato con alguno de estos dos sistemas), entonces podremos
 informar a <abbr title="LinuX Containers">LXC</abbr> de que puede hacer uso de sus características especiales
-(p.e. soporte nativo para instantáneas, subvolúmenes).</p>
+(p.e. soporte nativo para instantáneas, subvolúmenes). Por sus
+posibilidades, es la opción más conviente.</p>
 </dd>
 <dt>«<em>lvm</em>»</dt><dd><p>Podemos optar por incluir cada contenedor en un <a class="reference internal" href="../../../../../../05.discos/01.division/04.virt.html#lvm"><span class="std std-ref">volumen lógico de
 LVM</span></a>. <abbr title="Logical Volume Management">LVM</abbr> soporta instantáneas y, si utilizamos
@@ -269,8 +270,8 @@ lógico se formatea en <em>ext4</em>. La orden crea un estructura como la anteri
 <p>pero <code class="file docutils literal notranslate"><span class="pre">rootfs</span></code> se encontrará vacío puesto los archivos del contenedor se
 encuentran en el volumen lógico.</p>
 </section>
-<section id="gestion">
-<span id="lxc-manage"></span><h2><span class="section-number">9.2.2.2.1.1.1.3. </span>Gestión<a class="headerlink" href="#gestion" title="Enlace permanente a este encabezado">¶</a></h2>
+<section id="manejo">
+<span id="lxc-manage"></span><h2><span class="section-number">9.2.2.2.1.1.1.3. </span>Manejo<a class="headerlink" href="#manejo" title="Enlace permanente a este encabezado">¶</a></h2>
 <p>Una vez usado <a class="reference internal" href="#lxc-create"><span class="std std-ref">lxc-create</span></a>, se creará el contenedor:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-ls
 <span class="go">test</span>
@@ -363,7 +364,7 @@ con:</p>
 </pre></div>
 </div>
 <p>donde especificamos el número de consola a la que queremos conectar para evitar
-que <strong class="command">lxc-consola</strong> pueda escoger una distinta<a class="footnote-reference brackets" href="#id11" id="id5">5</a>. También es útil
+que <strong class="command">lxc-console</strong> pueda escoger una distinta<a class="footnote-reference brackets" href="#id11" id="id5">5</a>. También es útil
 tener presente que es posible cambiar la tecla de control por si <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">Ctrl</kbd>+<kbd class="kbd docutils literal notranslate">A</kbd></kbd>,
 ya la usamos para algo especial en el anfitrión (p.e. porque usemos <a class="reference external" href="https://www.gnu.org/software/screen/">screen</a>):</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-console -e <span class="s1">&#39;^k&#39;</span> -n <span class="nb">test</span>
@@ -431,7 +432,7 @@ necesitamos habilitar las cuotas en el sistema de archivos:</p>
 <span class="go">40+0 records out</span>
 </pre></div>
 </div>
-<p>seeremos incapaces de completar la operación, porque  ya había más de 9MiB
+<p>seremos incapaces de completar la operación, porque  ya había más de 9MiB
 ocupados por la propia <em>Alpine</em>.</p>
 <p>Podemos redefinir cualquier otro valor para la cuota y, si decidimos eliminarla,
 basta con usar la palabra <em>none</em>:</p>
@@ -475,16 +476,220 @@ lxc.cgroup2.cpuset.cpus <span class="o">=</span> <span class="m">0</span>,2
 </div>
 <div class="admonition-todo admonition" id="id6">
 <p class="admonition-title">Por hacer</p>
-<p><a class="reference internal" href="../../../../../../02.conbas/99.misc/01.anahw.html#free"><span class="std std-ref">free</span></a>, sin embargo, devuelve datos del anfitrión. Debe
+<p><a class="reference internal" href="../../../../../../02.conbas/99.misc/01.anahw.html#free"><span class="std std-ref">free</span></a>, sin embargo, devuelve datos del anfitrión. Debe de
 ser algo relacionado con el servicio <em>lxcfs</em>. Debe comprobarse si se mantiene
 este problema con <abbr title="LinuX containers Daemon">LXD</abbr>.</p>
 </div>
 </section>
+<section id="copias">
+<span id="lxc-copy"></span><h2><span class="section-number">9.2.2.2.1.1.1.5. </span>Copias<a class="headerlink" href="#copias" title="Enlace permanente a este encabezado">¶</a></h2>
+<p>La copia de un contenedor proporciona, en general, un nuevo contenedor
+independiente. La herramienta para llevarla a cabo es <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/lxc-copy">lxc-copy</a></em>, y su
+sintaxis no depende de cuál sea el formato de almacenamiento, aunque los
+detalles de cada uno nos pueden resultar interesante. Por tanto, introduciremos
+primero su uso y, ya conocido, estudiaremos cómo se comporta con cada uno de los
+formatos.</p>
+<p>La creación de un nuevo contenedor a partir de otro ya existente es bastante
+sencilla:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-copy -n <span class="nb">test</span> -N copiatest
+<span class="gp"># </span>lxc-ls -fF name,state
+<span class="go">NAME      STATE</span>
+<span class="go">copiatest STOPPED</span>
+<span class="go">test      STOPPED</span>
+</pre></div>
+</div>
+<p>Con ello tendremos dos contenedores distintos, aunque exactamente iguales, que
+podrán usarse simultáneamente y divergir a partir de ahora. Ambos, además,
+tendrán el mismo formato de almacenamiento.</p>
+<dl>
+<dt><em>none</em></dt><dd><p>Internamente lo que ocurre es que se hace una copia simple de los contenidos
+del contenedor, por lo que ocuparemos el doble de espacio. Sin embargo, este
+formato, permite al hacer una copia la inclusión de la opción <kbd class="kbd docutils literal notranslate">-s</kbd> (de
+<em>snapshot</em>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-copy -n <span class="nb">test</span> -s -N copiatest
+</pre></div>
+</div>
+<p>En este caso, el contenedor resultante depende de la existencia del
+original:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>ls -1 /var/lib/lxc/copiatest/
+<span class="go">config</span>
+<span class="go">lxc_rdepends</span>
+<span class="go">overlay</span>
+<span class="go">rootfs</span>
+<span class="gp"># </span>grep rootfs /var/lib/lxc/copiatest/config
+<span class="go">lxc.rootfs.path = overlay:/var/lib/lxc/test/rootfs:/var/lib/lxc/copiatest/overlay/delta</span>
+</pre></div>
+</div>
+<p>ya que se utiliza <a class="reference external" href="https://www.grant.pizza/blog/overlayfs/">overlayfs</a> (un
+sistema de archivos de unión) para constituirse. Por ello, el nuevo
+contenedor toma como base el antiguo y solamente contiene las diferencias
+respecto a éste. Téngase en cuenta que si se manipula el contenedor original,
+tales manipulaciones también se reflejan en el nuevo contenedor, por lo que
+debería evitarse su ejecución.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Observe que hacer esto es equivalente a crear un disco derivado
+<abbr title="Qemu Copy-On-Write">QCOW</abbr>2, o en Virtualbox definir un disco <abbr title="Virtual Disk Image">VDI</abbr> como de <em>multiconexión</em>.</p>
+</div>
+</dd>
+<dt><em>loop</em></dt><dd><p>La copia del contenedor con este formato:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-copy -n <span class="nb">test</span> -N copiatest
+</pre></div>
+</div>
+<p>crea un contenedor independiente cuyo formato es también <em>loop</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-ls -1
+<span class="go">copiatest</span>
+<span class="go">test</span>
+<span class="gp"># </span>ls -1 /var/lib/lxc/copiatest/
+<span class="go">config</span>
+<span class="go">rootdev</span>
+<span class="go">rootfs</span>
+<span class="gp"># </span>grep rootfs /var/lib/lxc/copiatest/config
+<span class="go">lxc.rootfs.path = loop:/var/lib/lxc/copiatest/rootdev</span>
+</pre></div>
+</div>
+<p>Este formato no soporta la opción <kbd class="kbd docutils literal notranslate">-s</kbd>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p><strong class="command">lxc-copy</strong> es un comando <em>mudito</em> y deja de mostrar errores
+cuando estos se producen, a menos que modifiquemos el nivel de los
+mensajes. Es el caso de intentar añadir la opción <kbd class="kbd docutils literal notranslate">-s</kbd> a la copia de
+un contenedor con este formato:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-copy -n <span class="nb">test</span> -s -N copiatest
+<span class="gp">$ </span><span class="nb">echo</span> <span class="nv">$?</span>
+<span class="go">1</span>
+</pre></div>
+</div>
+<p>y habrá que añadirle la opción <kbd class="kbd docutils literal notranslate">-l</kbd> para que lo haga:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-copy -l info -n <span class="nb">test</span> -s -N copiatest
+<span class="go">lxc-copy: test: storage/loop.c: loop_clonepaths: 45 The loop storage driver does not support snapshots</span>
+<span class="go">lxc-copy: test: storage/storage.c: storage_copy: 412 Failed creating new paths for clone of &quot;/var/lib/lxc/test/rootdev&quot;</span>
+<span class="go">lxc-copy: test: lxccontainer.c: copy_storage: 3586 Error copying storage.</span>
+<span class="go">lxc-copy: test: tools/lxc_copy.c: do_clone: 358 Failed to clone</span>
+</pre></div>
+</div>
+</div>
+</dd>
+<dt><abbr title="Logical Volume Management">LVM</abbr></dt><dd><p>La copia, simplemente, crea otro volumen lógico. No soporta la opción
+<kbd class="kbd docutils literal notranslate">-s</kbd>.</p>
+</dd>
+<dt><abbr title="B-TRee File System">BTRFS</abbr></dt><dd><p>Se añade o no la opción <kbd class="kbd docutils literal notranslate">-s</kbd> obra de un mismo modo: crea un nuevo
+subvolumen para el nuevo contenedor que es una instantánea del contenedor
+original:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-copy -n <span class="nb">test</span> -N copiatest
+<span class="gp"># </span>btrfs subvolume list -s /var/lib/lxc  <span class="c1"># -s lista sólo subvolúmenes que sean instantáneas</span>
+<span class="go">ID 269 gen 314 cgen 313 top level 5 otime 2023-01-13 19:54:20 path copiatest/rootfs</span>
+</pre></div>
+</div>
+<p>lo cual supone que, de principio, no ocupen apenas espacio adicional de disco.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Si el subvolumen asociado al contenedor tiene definido un límite de
+cuota, el subvolumen del nuevo  contenedor también tendrá definido ese
+mismo límite.</p>
+</div>
+</dd>
+</dl>
+</section>
 <section id="instantaneas">
-<span id="lxc-snapshot"></span><h2><span class="section-number">9.2.2.2.1.1.1.5. </span>Instantáneas<a class="headerlink" href="#instantaneas" title="Enlace permanente a este encabezado">¶</a></h2>
+<span id="lxc-snapshot"></span><h2><span class="section-number">9.2.2.2.1.1.1.6. </span>Instantáneas<a class="headerlink" href="#instantaneas" title="Enlace permanente a este encabezado">¶</a></h2>
+<p>Las instantáneas (como en el caso de las herramientas de virtualización
+completa) permiten guardar un estado determinado del contenedor a fin de poder
+recuperarlo en el futuro. En este caso, la herramienta es <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/lxc-snapshot">lxc-snapshot</a></em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-snapshot -n <span class="nb">test</span>
+</pre></div>
+</div>
+<p>Esto genera propiamente una instantánea (por eso no tiene nombre propio), no
+un nuevo contenedor, que se almacena dentro del propio directorio de
+«<em>test</em>»:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-ls
+<span class="go">test</span>
+<span class="gp"># </span>lxc-snapshot -n <span class="nb">test</span> -L
+<span class="go">snap0 (/var/lib/lxc/test/snaps) 2023:01:13 09:29:44</span>
+</pre></div>
+</div>
+<p>Obviamente, podremos seguir modificando el contenedor con la seguridad de poder
+regresar al estado en que sehizo la instantánea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-start -n <span class="nb">test</span>
+<span class="gp"># </span>lxc-attach -n <span class="nb">test</span> -- touch /root/saludo.txt
+<span class="gp"># </span>lxc-attach -n <span class="nb">test</span> -- ls /root/
+<span class="go">saludo.txt</span>
+<span class="gp"># </span>lxc-stop -n <span class="nb">test</span>
+</pre></div>
+</div>
+<p>Y si ahora queremos revertir los cambios:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-snapshot -n <span class="nb">test</span> -r snap0
+</pre></div>
+</div>
+<p>el contenedor volverá al estado en que se encontraba al realizar la
+instantánea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-start -n <span class="nb">test</span>
+<span class="gp"># </span>lxc-attach -n <span class="nb">test</span> -- ls /root/
+<span class="gp"># </span>lxc-stop -n <span class="nb">test</span>
+</pre></div>
+</div>
+<p>Las instantáneas, por supuesto, pueden borrarse:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-snapshot -n <span class="nb">test</span> -d snap0
+<span class="gp"># </span>lxc-snapshot -n <span class="nb">test</span> -L
+<span class="go">No snapshots</span>
+</pre></div>
+</div>
+<dl>
+<dt><em>none</em></dt><dd><p>La instantánea no es más que una copia simple del contenido del contenedor.
+Por tanto, duplicaremos la ocupación del disco.</p>
+</dd>
+<dt><em>loop</em></dt><dd><p>Como <em>none</em>, se hace una copia completa del contenido:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-snapshot -n <span class="nb">test</span>
+<span class="gp"># </span>lxc-snapshot -n <span class="nb">test</span> -L
+<span class="go">snap0 (/var/lib/lxc/test/snaps) 2023:01:13 11:06:39</span>
+<span class="gp"># </span>grep rootfs /var/lib/lxc/test/snaps/snap0/config
+<span class="go">lxc.rootfs.path = dir:/var/lib/lxc/test/snaps/snap0/rootfs</span>
+<span class="gp"># </span>ls /var/lib/lxc/test/snaps/snap0/rootfs/
+<span class="go">bin  dev  etc  home  lib  lost+found  media  mnt  opt  proc  root  run sbin  srv  sys  tmp  usr  var</span>
+</pre></div>
+</div>
+</dd>
+<dt><abbr title="Logical Volume Management">LVM</abbr></dt><dd><p>No soporta la creación de instantáneas.</p>
+</dd>
+<dt><abbr title="B-TRee File System">BTRFS</abbr></dt><dd><p>Usa también la técnica de subvolúmenes e instantáneas del sistema de
+archivos, por lo que permite ahorrar espacio de disco.</p>
+</dd>
+</dl>
 </section>
 <section id="configuracion">
-<span id="lxc-conf"></span><h2><span class="section-number">9.2.2.2.1.1.1.6. </span>Configuración<a class="headerlink" href="#configuracion" title="Enlace permanente a este encabezado">¶</a></h2>
+<span id="lxc-conf"></span><h2><span class="section-number">9.2.2.2.1.1.1.7. </span>Configuración<a class="headerlink" href="#configuracion" title="Enlace permanente a este encabezado">¶</a></h2>
+<p>Cuando se crea un contenedor, dentro de su directorio de definición (p.e.
+<code class="file docutils literal notranslate"><span class="pre">/var/lib/lxc/test</span></code> para el contenedor <em>test</em>), hay al menos dos entidades
+que se crean:</p>
+<ul class="simple">
+<li><p>un directorio <code class="file docutils literal notranslate"><span class="pre">rootfs</span></code> en el que se encontrarán los archivos que
+constituyen el contenido del contenedor.</p></li>
+<li><p>Un archivo <code class="file docutils literal notranslate"><span class="pre">config</span></code> con su definición.</p></li>
+</ul>
+<p>Este último archivo se genera a partir de dos fuentes:</p>
+<ol class="arabic">
+<li><p>La que suministra la propia orden <a class="reference internal" href="#lxc-create"><span class="std std-ref">lxc-create</span></a>. Tal es el
+caso, por ejemplo, del propio nombre del contenedor. Por ese motivo, el
+archivo contiene esta línea:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="na">lxc.uts.name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">test</span><span class="w"></span>
+</pre></div>
+</div>
+</li>
+<li><p>La configuración predeterminada suministrada a través del contenido del
+archivo <code class="file docutils literal notranslate"><span class="pre">/etc/lxc/default.conf</span></code>. El contenido de este archivo en mi
+sistema es:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="na">lxc.net.0.type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">veth</span><span class="w"></span>
+<span class="na">lxc.net.0.link</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">lxcbr0</span><span class="w"></span>
+<span class="na">lxc.net.0.flags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">up</span><span class="w"></span>
+
+<span class="na">lxc.apparmor.profile</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">generated</span><span class="w"></span>
+<span class="na">lxc.apparmor.allow_nesting</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">1</span><span class="w"></span>
+</pre></div>
+</div>
+<p>razón por la cual todos los contenedores traen en principio una única
+interfaz de red conectada a la interfaz puente <em>lxcbr0</em>.</p>
+</li>
+</ol>
 <span class="target" id="lxc-red"></span><p class="rubric">Notas al pie</p>
 <dl class="footnote brackets">
 <dt class="label" id="id7"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
@@ -525,10 +730,11 @@ ocurrir cuando la situación fuera distinta.</p>
 <li><a class="reference internal" href="#">9.2.2.2.1.1.1. Contenedores privilegiados</a><ul>
 <li><a class="reference internal" href="#preliminares">9.2.2.2.1.1.1.1. Preliminares</a></li>
 <li><a class="reference internal" href="#creacion">9.2.2.2.1.1.1.2. Creación</a></li>
-<li><a class="reference internal" href="#gestion">9.2.2.2.1.1.1.3. Gestión</a></li>
+<li><a class="reference internal" href="#manejo">9.2.2.2.1.1.1.3. Manejo</a></li>
 <li><a class="reference internal" href="#limitacion">9.2.2.2.1.1.1.4. Limitación</a></li>
-<li><a class="reference internal" href="#instantaneas">9.2.2.2.1.1.1.5. Instantáneas</a></li>
-<li><a class="reference internal" href="#configuracion">9.2.2.2.1.1.1.6. Configuración</a></li>
+<li><a class="reference internal" href="#copias">9.2.2.2.1.1.1.5. Copias</a></li>
+<li><a class="reference internal" href="#instantaneas">9.2.2.2.1.1.1.6. Instantáneas</a></li>
+<li><a class="reference internal" href="#configuracion">9.2.2.2.1.1.1.7. Configuración</a></li>
 </ul>
 </li>
 </ul>
