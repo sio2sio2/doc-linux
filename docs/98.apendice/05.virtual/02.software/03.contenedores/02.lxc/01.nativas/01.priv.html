@@ -690,7 +690,91 @@ sistema es:</p>
 interfaz de red conectada a la interfaz puente <em>lxcbr0</em>.</p>
 </li>
 </ol>
-<span class="target" id="lxc-red"></span><p class="rubric">Notas al pie</p>
+<p>Analicemos algunos aspectos relacionados con la configuración.</p>
+<p class="rubric" id="lxc-groups">Grupos</p>
+<p>Los contenedores cuya ejecución esté relacionada entre sí, pueden incluirse
+dentro de un mismo grupo con solo añadir <kbd class="kbd docutils literal notranslate">lxc.group</kbd> a la configuración.
+Supongamos, por ejemplo, estos dos contenedores:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-create -n <span class="nb">test</span> -t download -- -d alpine -r <span class="m">3</span>.17 -a amd64
+<span class="gp"># </span>lxc-copy -n <span class="nb">test</span> -N copiatest
+</pre></div>
+</div>
+<p>que hemos configurado de manera que se complementan y ambos deben estar
+arrancados. Para ello podemos incluirlos dentro de un mismo grupo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>cat &gt;&gt; /var/lib/lxc/test/config
+
+<span class="gp"># </span>Grupo de pruebas
+<span class="go">lxc.group = pruebas</span>
+<span class="go">lxc.start.order = 1</span>
+<span class="go">lxc.start.delay = 3</span>
+
+<span class="gp"># </span>cat &gt;&gt; /var/lib/lxc/copiatest/config
+
+<span class="gp"># </span>Grupo de pruebas
+<span class="go">lx.group = pruebas</span>
+<span class="go">lxc.start.order = 2</span>
+</pre></div>
+</div>
+<p>Si hemos hecho esta configuración, entonces podremos arrancar el conjunto con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-autostart -A -g pruebas
+</pre></div>
+</div>
+<p>en vez de tener que ir arrancando individualmente cada una de las máquinas.
+Gracias a <kbd class="kbd docutils literal notranslate">lxc.start.order</kbd> podremos definir el orden de arranque de los
+contenedores y, <kbd class="kbd docutils literal notranslate">lxc.start.delay</kbd> permite introducir unos segundos de
+espera para el arranque del siguiente contenedor.</p>
+<p>Para apagar el conjunto en una sola orden podemos hacer:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-autostart -A -k -g pruebas
+</pre></div>
+</div>
+<p class="rubric" id="lxc-autostart">Autoarranque</p>
+<p>Podemos configurar <abbr title="LinuX Containers">LXC</abbr> para que un contenedor arranque automáticamente al
+iniciarse en anfitrión. Para ello, debemos añadir las siguientes lineas a su
+archivo de configuración:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>cat &gt;&gt; /var/lib/lxc/test/config
+
+<span class="gp"># </span>Autoarranque
+<span class="go">lxc.start.auto = 1</span>
+<span class="go">lxc.start.delay = 5</span>
+</pre></div>
+</div>
+<p>Todo esto provocará que el contenedor aparezca como listado entre aquellos que
+arrancan automáticamente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-autostart -L
+<span class="go">test 5</span>
+</pre></div>
+</div>
+<p>donde el <strong>5</strong> es el valor de <kbd class="kbd docutils literal notranslate">lxc.start.delay</kbd>. Ahora bien, si tuviéramos
+varios contenedores con arranque automático, ¿cuál es su orden de arranque?
+Primero arrancará los contenedores con <kbd class="kbd docutils literal notranslate">lxc.start.auto</kbd> puesto a <strong>1</strong> que
+además pertenezcan al grupo «<em>onboot</em>», a continuación arrancará los
+contenedores que pertenezcan a tal grupo y finalmente aquellos con
+<kbd class="kbd docutils literal notranslate">lxc.start.auto</kbd> puesto a <strong>1</strong> que no pertenezcan a él. Para determinar el
+orden en contenedores que cumplan las mismas condiciones de arranque se atiende
+el valor de <kbd class="kbd docutils literal notranslate">lxc.start.order</kbd>.</p>
+<p class="rubric" id="lxc-compartido">Directorios compartidos</p>
+<p>Si se quiere compartir un directorio entre anfitrión y huésped puede hacerse lo
+siguiente:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">lxc</span><span class="o">.</span><span class="n">mount</span><span class="o">.</span><span class="n">entry</span> <span class="o">=</span> <span class="o">/</span><span class="n">tmp</span> <span class="n">mnt</span> <span class="n">none</span> <span class="n">bind</span><span class="p">,</span><span class="n">optional</span> <span class="mi">0</span> <span class="mi">0</span>
+</pre></div>
+</div>
+<p>que es una línea que imita la sintaxis del archivo <a class="reference internal" href="../../../../../../02.conbas/02.informacion/04.devices.html#fstab"><span class="std std-ref">/etc/fstab</span></a>. En
+este caso, montaremos el directorio temporal del anfitrión sobre el directorio
+<code class="file docutils literal notranslate"><span class="pre">/mnt/</span></code> del huésped, ya que cuando se utilizan rutas relativas, éstas se
+toman respecto a la raíz del contenedor. (en nuestro ejemplo,
+<code class="file docutils literal notranslate"><span class="pre">/var/lib/lxc/test/rootfs</span></code>).</p>
+<p>Como alternativa, si los puntos de montaje son varios, puede utilizarse otra
+variable:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">lxc</span><span class="o">.</span><span class="n">mount</span><span class="o">.</span><span class="n">fstab</span> <span class="o">=</span> <span class="o">/</span><span class="n">var</span><span class="o">/</span><span class="n">lib</span><span class="o">/</span><span class="n">lxc</span><span class="o">/</span><span class="n">test</span><span class="o">/</span><span class="n">fstab</span>
+</pre></div>
+</div>
+<p class="rubric" id="lxc-red">Red</p>
+<p>Para lograr conexión de red los contenedores usan <a class="reference external" href="https://vivek-syngh.medium.com/linux-virtual-ethernet-devices-aba9c3840d0d">interfaces VETH</a>,
+puesto que este tipo de interfaces se crean por parejas y  permiten la
+comunicación de dos espacios de nombres de red distintos (el del contenedor y el
+del anfitrión) al encontrarse cada miembro de la pareja en uno de ellos.</p>
+<img alt="../../../../../../_images/veth.png" src="../../../../../../_images/veth.png" />
+<p class="rubric">Notas al pie</p>
 <dl class="footnote brackets">
 <dt class="label" id="id7"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
 <dd><p>Si un contenedor privilegiado no lo gestiona un administrador, no

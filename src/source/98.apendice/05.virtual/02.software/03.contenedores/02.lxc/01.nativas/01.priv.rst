@@ -676,17 +676,115 @@ Este último archivo se genera a partir de dos fuentes:
    razón por la cual todos los contenedores traen en principio una única
    interfaz de red conectada a la interfaz puente *lxcbr0*.
 
+Analicemos algunos aspectos relacionados con la configuración.
+
+.. _lxc-groups:
+
+.. rubric:: Grupos
+
+Los contenedores cuya ejecución esté relacionada entre sí, pueden incluirse
+dentro de un mismo grupo con solo añadir :kbd:`lxc.group` a la configuración.
+Supongamos, por ejemplo, estos dos contenedores::
+
+   # lxc-create -n test -t download -- -d alpine -r 3.17 -a amd64
+   # lxc-copy -n test -N copiatest
+
+que hemos configurado de manera que se complementan y ambos deben estar
+arrancados. Para ello podemos incluirlos dentro de un mismo grupo::
+
+   # cat >> /var/lib/lxc/test/config
+
+   # Grupo de pruebas
+   lxc.group = pruebas
+   lxc.start.order = 1
+   lxc.start.delay = 3
+
+   # cat >> /var/lib/lxc/copiatest/config
+
+   # Grupo de pruebas
+   lx.group = pruebas
+   lxc.start.order = 2
+
+Si hemos hecho esta configuración, entonces podremos arrancar el conjunto con::
+
+   # lxc-autostart -A -g pruebas
+
+en vez de tener que ir arrancando individualmente cada una de las máquinas.
+Gracias a :kbd:`lxc.start.order` podremos definir el orden de arranque de los
+contenedores y, :kbd:`lxc.start.delay` permite introducir unos segundos de
+espera para el arranque del siguiente contenedor.
+
+Para apagar el conjunto en una sola orden podemos hacer::
+
+   # lxc-autostart -A -k -g pruebas
+
+.. _lxc-autostart:
+
+.. rubric:: Autoarranque
+
+Podemos configurar |LXC| para que un contenedor arranque automáticamente al
+iniciarse en anfitrión. Para ello, debemos añadir las siguientes lineas a su
+archivo de configuración::
+
+   # cat >> /var/lib/lxc/test/config
+
+   # Autoarranque
+   lxc.start.auto = 1
+   lxc.start.delay = 5
+
+Todo esto provocará que el contenedor aparezca como listado entre aquellos que
+arrancan automáticamente::
+
+   # lxc-autostart -L
+   test 5
+
+donde el **5** es el valor de :kbd:`lxc.start.delay`. Ahora bien, si tuviéramos
+varios contenedores con arranque automático, ¿cuál es su orden de arranque?
+Primero arrancará los contenedores con :kbd:`lxc.start.auto` puesto a **1** que
+además pertenezcan al grupo "*onboot*", a continuación arrancará los
+contenedores que pertenezcan a tal grupo y finalmente aquellos con
+:kbd:`lxc.start.auto` puesto a **1** que no pertenezcan a él. Para determinar el
+orden en contenedores que cumplan las mismas condiciones de arranque se atiende
+el valor de :kbd:`lxc.start.order`.
+
+
+.. https://serverfault.com/questions/620709/how-to-auto-start-unprivileged-lxc-containers
+
+.. _lxc-compartido:
+
+.. rubric:: Directorios compartidos
+
+Si se quiere compartir un directorio entre anfitrión y huésped puede hacerse lo
+siguiente:
+
+.. code-block:: python
+
+   lxc.mount.entry = /tmp mnt none bind,optional 0 0
+
+que es una línea que imita la sintaxis del archivo :ref:`/etc/fstab <fstab>`. En
+este caso, montaremos el directorio temporal del anfitrión sobre el directorio
+:file:`/mnt/` del huésped, ya que cuando se utilizan rutas relativas, éstas se
+toman respecto a la raíz del contenedor. (en nuestro ejemplo,
+:file:`/var/lib/lxc/test/rootfs`).
+
+Como alternativa, si los puntos de montaje son varios, puede utilizarse otra
+variable:
+
+.. code-block:: python
+
+   lxc.mount.fstab = /var/lib/lxc/test/fstab
+
 .. _lxc-red:
 
-.. + Grupos de contenedores.
+.. rubric:: Red
 
-.. LXC:
-   https://wiki.calculate-linux.org/lxc
-   https://www.josedomingo.org/pledin/2021/12/introduccion-lxc/
+Para lograr conexión de red los contenedores usan `interfaces VETH
+<https://vivek-syngh.medium.com/linux-virtual-ethernet-devices-aba9c3840d0d>`_,
+puesto que este tipo de interfaces se crean por parejas y  permiten la
+comunicación de dos espacios de nombres de red distintos (el del contenedor y el
+del anfitrión) al encontrarse cada miembro de la pareja en uno de ellos.
 
-.. LXC y LVM:
-   https://edoput.it/lxc/lvm/2016/11/13/working-with-lxc-and-lvm.html
-   https://manuelfrancoblog.wordpress.com/2018/01/12/lxc-lvm-containers-y-clonado/
+.. image:: files/veth.png
 
 .. rubric:: Notas al pie
 
