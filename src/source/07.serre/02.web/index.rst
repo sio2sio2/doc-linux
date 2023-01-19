@@ -45,7 +45,7 @@ EL protocolo |HTTP| se basa en la comunicación entre clientes (los llamados
 *navegadores web*) y servidores, que escuchan en el puerto *80/TCP*. Como
 ocurrió con otros protocolos, la necesidad de asegurar la información, provocó
 la aparición del |HTTP|\ s, esto es, del protocolo |HTTP| encapsulado en
-|SSL|/|TLS|.
+|SSL|/|TLS| (puerto *443/TCP*).
 
 .. toctree::
    :glob:

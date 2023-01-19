@@ -242,6 +242,12 @@ lógico se formatea en *ext4*. La orden crea un estructura como la anterior:
 pero :file:`rootfs` se encontrará vacío puesto los archivos del contenedor se
 encuentran en el volumen lógico.
 
+.. note:: Como lo habitual es que tanto el grupo de volúmenes como el *pool*
+   sean siempre los mismos, es posible definir un archivo
+   :file:`/etc/lxc/lxc.conf` donde se definan estos nombres a fin de no tener
+   que repetirlos constantemente al crear contenedores (véase
+   :manpage:`lxc.system.conf` para más información).
+
 .. _lxc-manage:
 
 Manejo
@@ -676,7 +682,14 @@ Este último archivo se genera a partir de dos fuentes:
    razón por la cual todos los contenedores traen en principio una única
    interfaz de red conectada a la interfaz puente *lxcbr0*.
 
-Analicemos algunos aspectos relacionados con la configuración.
+   La ruta de este archivo, sin embargo, no es inamovible. :ref:`lxc-create`
+   tiene una opción :kbd:`-f` que permite introducir una ruta alternativa para
+   el contenedor que se esté creando en ese momento y, además, es posible crear
+   un archivo :file:`/etc/lxc/lxc.conf` en donde se defina otra ruta que se use
+   permanentemente (consúltese la página de manual :manpage:`lxc.system.conf`).
+
+Analicemos algunos aspectos relacionados con la configuración. La configuración
+de la red, que es más enjundiosa, la trataremos bajo epígrafe aparte.
 
 .. _lxc-groups:
 
@@ -774,17 +787,265 @@ variable:
 
    lxc.mount.fstab = /var/lib/lxc/test/fstab
 
+.. rubric:: Configuración modular
+
+Podemos separar la configuración en archivos independientes utilizando la
+directiva:
+
+.. code-block:: python
+
+   lxc.include = /etc/lxc/net-bridge.conf
+   #lxc.include = /etc/lxc/net-macvlan.conf
+
+.. seealso:: La explicación de todas las directivas que pueden incluirse en el
+   archivo de configuración se encuentra en la página de manual :manpage:`lxc.container.conf`.
+
 .. _lxc-red:
 
-.. rubric:: Red
-
+Red
+===
 Para lograr conexión de red los contenedores usan `interfaces VETH
 <https://vivek-syngh.medium.com/linux-virtual-ethernet-devices-aba9c3840d0d>`_,
-puesto que este tipo de interfaces se crean por parejas y  permiten la
+puesto que este tipo de interfaces se crean por parejas y permiten la
 comunicación de dos espacios de nombres de red distintos (el del contenedor y el
 del anfitrión) al encontrarse cada miembro de la pareja en uno de ellos.
 
 .. image:: files/veth.png
+
+Sobre la base de este tipo de interfaces, podemos hacer la configuración de red:
+
+#. Si queremos que el contenedor comparta red con la interfaz de red de la
+   máquina, podemos incluir la interfaz |VETH| en una interfaz puente que
+   comparta con la interfaz real del anfitrión. Este es el caso ilustrado en la
+   figura anterior y que se corresponde con el caso de :ref:`adaptador puente
+   mediante puente en QEmu <qemu-red-puente-tap>`.
+
+#. Como alternativa a lo anterior, para lograr el mismo efecto podemos utilizar
+   interfaces macvlan, de modo semejante al caso de :ref:`adaptador puente
+   mediante interfaz macvtap en QEmu <qemu-red-puente-macvtap>`
+
+#. Si queremos crear redes independientes a la del anfitrión, podemos crear
+   interfaces puente, una por cada una de esas redes, del mismo que
+   :ref:`hacíamos en QEmu al crear interfaces puente <qemu-red-tap>`.
+
+Nuestro estudio analizará primero cómo está configurada la red de forma
+predeterminada para después poder profundizar en los tres clases planteados.
+
+Red predefinida
+---------------
+Al arrancar |LXC| (en *Debian* al menos) se crea automáticamente una interfaz
+puente *lxcbr0* con dirección |IP| *10.0.3.1/24*::
+
+   # ip addr show dev lxcbr0
+   3: lxcbr0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN
+   group default qlen 1000
+       link/ether 00:16:3e:00:00:00 brd ff:ff:ff:ff:ff:ff
+       inet 10.0.3.1/24 brd 10.0.3.255 scope global lxcbr0
+          valid_lft forever preferred_lft forever
+
+Los contenedores creados añaden una única interfaz a este puente y reciben
+automáticamente una dirección |IP| dentro de la red ya dicha. Además, se añaden
+algunas reglas en el cortafuegos para asegurar la conectividad. Este es el
+comportamiento observable, pero ¿a qué se debe?
+
+Para entender qué está ocurriendo es conveniente acudir a
+:file:`/etc/default/lxc` que a su vez remite a
+:file:`/etc/default/lxc-net`. Ahí se encuentra la línea:
+
+.. code-block:: bash
+
+   USE_LXC_BRIDGE="true"
+
+que, obviamente, es la responsable de que se cree la interfaz puente. En
+realidad, este línea no la lee el servicio *lxc* sino otro llamado *lxc-net*. De
+hecho, si ponemos la línea anterior a *false* y reiniciamos el servicio::
+
+   # invoke.rc.d lxc-net restart
+
+observaremos cómo desaparece la interfaz. Este red predeterminada es del tercer
+tipo que enumeramos al comienzo del epígrafe: una red independiente que, sin
+embargo, tiene comunicación con el anfitrión ya que a *lxcbr0* se le define
+dirección |IP|.
+
+Sea como sea, ¿por qué la interfaz se llama *lxcbr0* y por qué se usa la la red
+*10.0.3.0/24*? La respuesta está en el *script* :file:`/usr/libexec/lxc/lxc-net`
+en cuyo comienzo se definen esos valores, pero de modo que pueden sobrescribirse
+redefiniéndolos en el archivo de configuración :file:`/etc/default/lxc-net`. Por
+tanto, mirando cuál es el nombre de la variable en el *script*, podremos cambiar
+esos valores en :file:`/etc/default/lxc-net`. Por ejemplo:
+
+.. code-block:: bash
+
+   USE_LXC_BRIDGE="true"
+   LXC_BRIDGE="vmbr0"
+   LXC_ADDR="10.0.10.1"
+   LXC_NETMASK="255.255.255.0"
+   LXC_NETWORK="10.0.10.0/24"
+   LXC_DHCP_RANGE="10.0.10.100,10.0.10.150"
+
+Como puede verse hay una variable que define cuál es el rango de direcciones que
+se facilitan por |DHCP| a los contenedores. ¿Esto significa que el *software*
+|LXC| hace de servidor |DHCP|? La respuesta es no. El *script* ya citado se
+encarga de levantar :ref:`dnsmasq <dnsmasq-dhcp>` para que escuche
+exclusivamente en la interfaz definida por *LXC_BRIDGE*. Por esa razón el
+paquete :deb:`lxc` tiene como dependencia :deb:`dnsmasq-base`, que incluye los
+ejecutables de :command:`dnsmasq`, pero no los archivos que permiten usarlo como
+servicio, que se incluyen en el paquete :deb:`dnsmasq`.
+
+Por último, ¿por qué los contenedores, si no se manipula su configuración, tiene
+una interfaz en esta red? La razón se encuentra en
+:file:`/etc/lxc/default.conf`, que incluye las siguientes líneas:
+
+.. code-block:: python
+
+   lxc.net.0.type = veth
+   lxc.net.0.link = lxcbr0
+   lxc.net.0.flags = up
+
+las cuales determinan que todo contenedor las copie en su configuración
+adicional y, en consecuencia, presenten una único interfaz de tipo |VETH| cuya
+pareja se encuentra incluida en la interfaz puente *lxcbr0* que crea |LXC|.
+Con esta configuración la interfaz creada dentro del contenedor tiene una
+dirección |MAC| cualquiera y, además, cambia cada vez que arranquemos el
+contenedor. Si queremos que sea fija, podemos añadir al archivo
+:file:`default.conf` la siguiente línea:
+
+.. code-block:: python
+
+   lxc.network.hwaddr = de:ad:be:ef:xx:xx
+
+Esta línea, a diferencia de las anteriores no se copiarán exactamente igual en
+el archivo de configuración del contenedor, sino que las :kbd:`xx:xx` se
+sustituirán por números hexadecimales con lo que cada contenedor acabará
+teniendo una |MAC| fija.
+
+Ahora que hemos tratado la dirección |MAC| del contenedor, es bueno momento para
+discutir qué ocurre con su dirección |IP|. Como no hay expresión sobre ella, los
+contenedores la obtienen por |DHCP|. Si, en cambio, se quiere una dirección fija
+puede establecerse añadiendo al archivo de configuración del contenedor (p.e.
+:file:`/var/lib/lxc/test/config`) lo siguiente:
+
+.. code-block:: python
+
+   lxc.network.ipv4 = 10.0.10.5/24
+
+En cualquier caso, nuestro propósito es desechar la configuración de red
+predeterminada y hacerla toda manualmente para tener mayor control sobre ella.
+En consecuencia, debemos hacer tres cosas:
+
+#. Evitar la creación de la interfaz puente editando :file:`/etc/default/lxc-net`:
+
+   .. code-block:: bash
+
+      USE_LXC_BRIDGE="false"
+
+#. Instalar el paquete :deb:`dnsmasq` para que actúe como servicio::
+
+      # apt install dnsmasq
+
+#. Reorganizaremos la configuración de :file:`/etc/lxc/` del siguiente modo:
+
+   .. code-block:: none
+
+      /etc/lxc
+            +---- lxc.conf
+            +---- common.conf
+            +---- lxe-net.conf
+            +---- [.. otras configuraciones de red ..]
+
+   donde :file:`lxc.conf` es:
+
+   .. code-block:: python
+
+      lxc.default_config = /etc/lxc/lxe-net.conf
+
+   o otro archivo de red que se decida, tal como se definirán a continuación.
+   :file:`common.conf` por su parte contiene la parte de
+   :file:`/etc/lxc/default.conf` que no refiere configuración de red:
+
+   .. code-block:: python
+
+      lxc.apparmor.profile = generated
+      lxc.apparmor.allow_nesting = 1
+
+   Y, finalmente, :file:`lxe-net.conf` la configuración de red que espera el
+   servicio *lxc-net* que acabamos de deshabilitar:
+
+   .. code-block:: python
+
+      lxc.net.0.type = veth
+      lxc.net.0.link = lxcbr0
+      lxc.net.0.flags = up
+      lxc.net.0.hwaddr = de:ad:be:ef:xx:xx
+
+      lxc.include = /etc/lxc/common.conf
+
+Interfaz puente con puente
+--------------------------
+En este caso se supone que el anfitrión está configurado de modo que hay
+definida una interfaz puente (*br0*) dentro de la cual se encuentra la interfaz
+física (*eth0*) con lo que su file:`/etc/network/interfaces` tendrá el aspecto
+:ref:`referido en QEmu para este caso <qemu-red-puente-tap>`.
+
+Si es así podemos definir el siguiente archivo :file:`/etc/lxc/bridge.conf`:
+
+.. code-block:: python
+
+   lxc.net.0.type = veth
+   lxc.net.0.link = br0
+   lxc.net.0.flags = up
+   lxc.net.0.hwaddr = de:ad:be:ef:xx:xx
+
+   lxc.include = /etc/lxc/common.conf
+
+Con esto debería ser suficiente, aunque si queremos que esta sea la
+configuración predeterminada, aún tendremos que editar :file:`lxc.conf` para que
+:kbd:`lxc.default_config` señale este archivo.
+
+.. note:: Hemos supuesto que en la red del anfitrión ya existe un servidor
+   |DHCP|, así que no nos hemos preocupado por definir uno.
+
+Interfaz puente con macvlan
+---------------------------
+De nuevo, vuelve a ser pertinente lo expuesto :ref:`sobre QEmu para interfaces
+macvtap <qemu-red-puente-macvtap>`, aunque en este caso la interfaz sea de tipo
+*macvlan*. Como con *macvtap*, la configuración en el anfitrión puede ser nula,
+aunque de ser así no habrá conectividad de red entre anfitrión y huésped.
+Lo mejor, pues, es alterar la configuración del anfitrión para permitirlo:
+
+.. code-block:: none
+
+   # The primary network interface
+   allow-hotplug eth0
+   iface eth0 inet manual
+           up   ip link set $IFACE up
+           down ip link set $IFACE down
+
+   auto macvlan0
+   iface macvlan0 inet dhcp
+           pre-up    ip link add link eth0 name $IFACE type macvlan mode bridge
+           post-down ip link del dev $IFACE
+
+Sea como sea, deberemos crear un archivo :file:`/etc/lxc/macvlan.conf` con la
+siguiente configuración:
+
+.. code-block:: python
+
+   lxc.net.0.type = macvlan
+   lxc.net.0.macvlan.mode = bridge
+   lxc.net.0.link = eth0
+   lxc.net.0.flags = up
+   lxc.net.0.hwaddr = de:ad:be:ef:xx:xx
+
+   lxc.include = /etc/lxc/common.conf
+
+.. note:: Es de notar que esta configuración no provocará la aparición de
+   ninguna interfaz en el anfitrión, como sí ocurre en el caso de usar
+   interfaces |VETH|. Para una explicación de ello, puede consultar `este
+   interesante artículo de RedHat sobre interfaces virtuales en Linux
+   <https://developers.redhat.com/blog/2018/10/22/introduction-to-linux-interfaces-for-virtual-networking#macsec>`_.
+
+.. https://repositorio.upct.es/bitstream/handle/10317/11664/tfg-fer-apl.pdf
 
 .. rubric:: Notas al pie
 
@@ -813,5 +1074,7 @@ del anfitrión) al encontrarse cada miembro de la pareja en uno de ellos.
 .. |RAM| replace:: :abbr:`RAM (Random Access Memory)`
 .. |CPU| replace:: :abbr:`CPU (Central Processing Unit)`
 .. |LXD| replace:: :abbr:`LXD (LinuX containers Daemon)`
+.. |VETH| replace:: :abbr:`VETH (Virtual ETHernet)`
+.. |MAC| replace:: :abbr:`MAC (Media Access Control)`
 
 .. _Alpine: https://www.alpinelinux.org/

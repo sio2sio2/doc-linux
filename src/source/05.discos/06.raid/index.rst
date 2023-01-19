@@ -46,8 +46,9 @@ Antes de pasar a describir los más comunes, es preciso fijar la siguiente
 * :var:`p` es la probabilidad de que se rompa un disco en un periodo de tiempo
   determinado. Se supondrá la misma para todos los discos. Para estimarla
   podemos guiarnos por las estadísticas que publica la compañía Backblaze_
-  basada en los fallos de sus propios discos duros. Para 2019, `estos fueron los
-  datos <https://www.backblaze.com/blog/hard-drive-stats-for-2019/>`_.
+  basada en los fallos de sus propios discos duros. `Esta página enlazan con
+  todas las estadísticas que publica cuatrimestralmente
+  <https://www.backblaze.com/b2/hard-drive-test-data.html>`_.
 * En |RAID|\ s anidados, :var:`g` es el número de grupos de discos.
 * En |RAID|\ s anidados, :var:`m` es el número de discos del grupo anidado. Por
   tanto, :math:`n = g*m`.
