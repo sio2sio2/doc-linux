@@ -219,7 +219,7 @@ niveles de |RAID|. Los más utilizados son:
    Con esta disposición:
 
    - Hay tolerancia a fallos, ya que el sistema falla sólo cuando falla al menos
-     un mismo disco de todos los grupos en |RAID| 0.
+     un disco de todos los grupos en |RAID| 0.
    - La probabilidad de que falle irremediable el sistema\ [#]_ es :math:`P^{n,m}_{r01}(p) = P^{n/m}_{r1}(P^m_{r0}(p)) = (1 - (1 - p)^m)^{n/m}`
    - Aumenta la capacidad hasta :math:`m * s`.
    - Hay mejora en el rendimiento de lecturas y escrituras.

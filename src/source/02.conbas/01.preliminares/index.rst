@@ -9,6 +9,8 @@ ordenador. Como este será muy probablemente el caso del lector, el contenido
 bajo este epígrafe trata de explicar en qué consiste y cómo se usa un ordenador
 a través de este tipo de interfaces.
 
+.. _ingreso-inicial:
+
 Ingreso inicial
 ---------------
 
@@ -344,6 +346,43 @@ más recomendable es fiarnos de la siguiente orden interna:
       en vez de la interna? Pues sí, :ref:`sí que la hay <command>`, pero ya va
       siendo mucho para el primer tema.
 
+¿Qué *Linux* tengo?
+-------------------
+Es una de las preguntas básicas que hay que resolver cuando se han encontrado
+algún artículo en *Internet* que explica cómo hacer algo que necesitamos hacer y
+no sabemos muy bien hasta qué punto esas instrucciones será compatibles con
+nuestro sistema. Por lo general, si hemos sido nosotros quienes lo hemos
+instalado, pero puede no ser el caso. Tal información suele estar accesible
+también en la información del login de texto :ref:`tal como puede apreciarse en la
+primera captura <ingreso-inicial>`. Lo que no suele fallar en las principales
+distribuciones modernas, que siguen el `estandar LSB
+<https://es.wikipedia.org/wiki/Linux_Standard_Base>`_, es la consulta del
+archivo :file:`/etc/os-release` con la orden :ref:`cat <cat>` que introduciremos
+más adelante::
+
+   $ cat /etc/os-release
+   PRETTY_NAME="Debian GNU/Linux 11 (bullseye)"
+   NAME="Debian GNU/Linux"
+   VERSION_ID="11"
+   VERSION="11 (bullseye)"
+   VERSION_CODENAME=bullseye
+   ID=debian
+   HOME_URL="https://www.debian.org/"
+   SUPPORT_URL="https://www.debian.org/support"
+   BUG_REPORT_URL="https://bugs.debian.org/"
+
+.. _lsb_release:
+.. index:: lsb_release
+
+aunque la información del archivo se presenta mejor si se usa la orden específica
+:command:`lsb_release` (que, por lo general, también debería estar instalada)::
+
+   $ lsb_release -a
+   Distributor ID: Debian
+   Description:    Debian GNU/Linux 11 (bullseye)
+   Release:        11
+   Codename:       bullseye
+
 ¿Cómo salgo de aquí?
 --------------------
 
@@ -456,7 +495,7 @@ Si lo que se pretende es apagar el sistema, existen varias alternativas:
 .. [#] Véase la variable :ref:`PATH <PATH>` para saber más al respecto.
 
 .. [#] Aún nos viene grande hacer distinciones entre lo que es una sesión de
-   login y la que no. Cuando se vea el comando :ref:`su <su>` se verá una forma
+   login y la que no. Cuando se estudie el comando :ref:`su <su>`, se verá una forma
    de crear sesiones que no son de *login* de las que, por tanto, se podrá salir
    con :command:`exit`, pero no con :command:`logout`. Tampoco son sesiones de
    *login* las sesiones de bash creadas por un *script* o las creadas por una

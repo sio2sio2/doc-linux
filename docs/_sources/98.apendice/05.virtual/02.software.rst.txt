@@ -45,7 +45,7 @@ solución integrada oficialmente en el propio núcleo de *Linux*:
 
 Contenedores
 ------------
-Los contenedores son una solución infinitamente más ligera y eficiente con la
+Los contenedores son una solución mucho más ligera\ [#]_ y eficiente con la
 limitación de que tendrán que contener un sistema de idéntica naturaleza a la
 del anfitrión, puesto que carecen de sistema operativo propio.
 
@@ -70,7 +70,9 @@ basa en dos conceptos:
    proceso ocupe más de 128MiB de memoria |RAM|, aunque la máquina disponga de
    mucha más. Para profundizar en ellos es conveniente el artículo `Cgroups
    Introduction
-   <https://www.lewisgaul.co.uk/blog/coding/2022/05/13/cgroups-intro/>`_.
+   <https://www.lewisgaul.co.uk/blog/coding/2022/05/13/cgroups-intro/>`_. Tenga
+   presente que la versión predeterminada en *Debian* a partir de *Bulleye* es
+   la v2, así que es ésta versión la que se tomará como referencia.
 
 En consecuencia, la creación de un contenedor supone:
 
@@ -82,41 +84,65 @@ En consecuencia, la creación de un contenedor supone:
   \"sistema de archivos\".
 * Crearle los grupos de control propios para limitar su uso de recursos.
 
-Antes de comenzar, no obstante, es preciso hacer una distinción entre dos tipos
-de contenedores:
+Antes de comenzar, no obstante, es preciso saber que existen distintos tipos de
+contenedores:
 
-:dfn:`Contenedor privilegiado` (*privileged container*)
-   es aquel en que no se hace uso del concepto de *espacio de nombres de
-   usuario*  y, en consecuencia, los usuarios y grupos del contenedor se
-   corresponden con los usuarios y grupos del anfitrión (aunque en el
-   contenedor puedan no tener nombre asignado). Dicho de otro modo, la
-   acción que realice el usuario *root* en el contenedor es una acción que
-   el sistema operativo del anfitrión considera que está realmente ejecutando
-   *root*.
+Según los **permisos** de sus usuarios
+   Hay dos tipos distintos:
 
-:dfn:`Contenedor no privilegiado` (*unprivileged container*)
-   es aquel que hace uso de tal concepto, por lo que se mapean identificadores
-   de usuarios y grupos. El mapeo consiste en considerar que
-   :math:`\mathit{UID}_a = \mathit{UID}_c + N`, esto es, que el usuario del
-   contenedor con un determinado identificador es, en realidad, el usuario del
-   anfitrión que tiene ese identificador más una cantidad fija. Otro tanto
-   ocurre con los |GID| de grupos. Por ejemplo, el administrador del contenedor
-   (**0**) podría ser en el anfitrión el usuario con identificador (**1000**),
-   con lo que en este caso "N" valdría 1000. Esto abre la posibilidad a que un
-   usuario normal sin privilegios (con identificador **1000**) gestione un
-   contenedor sin restricciones (dentro de él será el administrador con
-   identificador **0**).
+   .. _contenedor-privilegiado:
 
-.. note:: Todos estos conceptos se entienden muy bien si se leen con
-   detenimiento las explicaciones ya recomendadas del artículo `Digging into
-   Linux namespaces`_ y, en especial, `su segunda parte`_ en que se desarrolla
-   el concepto de espacio de nombres de usuario (*user namespace*).
+   :dfn:`Contenedor privilegiado` (*privileged container*)
+      es aquel en que no se hace uso del concepto de *espacio de nombres de
+      usuario*  y, en consecuencia, los usuarios y grupos del contenedor se
+      corresponden con los usuarios y grupos del anfitrión. Dicho de otro modo, la
+      acción que realice el usuario *root* en el contenedor es una acción que el
+      sistema operativo del anfitrión considera que está ejecutando su propio
+      *root*.
 
-De entre las soluciones de virtualización basadas en contenedores trataremos una
-de contenedores de aplicación (:program:`Docker`) y otra de contenedores de
-sistema (|LXC|).
+   .. _contenedor-no-privilegiado:
+
+   :dfn:`Contenedor no privilegiado` (*unprivileged container*)
+      es aquel que hace uso de tal concepto, por lo que se mapean identificadores
+      de usuarios y grupos; y, en consecuencia, el administrador del contenedor
+      (|UID| **0**  en  el contenedor) no se corresponde con el administrador del
+      anfitrión (|UID| **0** en eñ anfitrión). Esto evita la posibilidad de que el
+      administrador escape del confinamiento del contenedor con permisos de
+      administrador fuera de él.
+
+   .. note:: Todos estos conceptos se entienden muy bien si se leen con
+      detenimiento las explicaciones ya recomendadas del artículo `Digging into
+      Linux namespaces`_ y, en especial, `su segunda parte`_ en que se desarrolla
+      el concepto de espacio de nombres de usuario (*user namespace*). Más
+      adelante, además, se expone :ref:`un pequeño ejemplo de espacio de nombres de
+      usuario <userns>`.
+
+Según los **procesos** que encierre
+   De nuevo, son dos los tipos:
+
+   .. _contenedor-sistema:
+
+   :dfn:`contenedor de sistema`
+      Es aquel diseñado para ejecutar aisladamente múltiples procesos a la
+      manera en que lo hace un sistema completo por lo que, en consecuencia,
+      ejecutará como primer proceso un programa :program:`init` (como
+      :ref:`systemd <systemd>`). Es, por tanto, una solución más cercana al de
+      una virtualización completa, ya que dispondremos de un espacio de usuario
+      completo que recrea fielmente una distribución de *Linux*. |LXC| provee
+      contenedores de este tipo.
+
+   .. _contenedor-aplicacion:
+
+   :dfn:`contenedor de aplicaciones`
+      Es aquel diseñado para ejecutar aisladamente una única aplicación (por lo
+      general, un servicio), por lo que ejecutará como primer proceso tal
+      aplicación y no un programa :program:`init`. Estos contenedores, por
+      tanto, no ofrecen un sistema completo que gestionar. :program:`Docker`
+      provee contenedores de este tipo.
 
 .. https://www.schutzwerk.com/en/blog/linux-container-intro/
+
+Trataremos ambos tipos de contenedores:
 
 .. toctree::
    :glob:
@@ -125,6 +151,9 @@ sistema (|LXC|).
    02.software/03.contenedores/[0-9]*
 
 .. rubric:: Notas al pie
+
+.. [#] De hecho, este tipo de virtualización también recibe el nombre de
+   *virtulización ligera*.
 
 .. [#] Esto incluye también a usuarios y grupos, de manera que un usuario que
    dentro del contenedor actuara como usuario privilegiado (o sea, con el |UID|

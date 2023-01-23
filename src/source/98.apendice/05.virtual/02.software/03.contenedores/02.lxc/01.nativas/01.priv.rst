@@ -760,9 +760,6 @@ contenedores que pertenezcan a tal grupo y finalmente aquellos con
 orden en contenedores que cumplan las mismas condiciones de arranque se atiende
 el valor de :kbd:`lxc.start.order`.
 
-
-.. https://serverfault.com/questions/620709/how-to-auto-start-unprivileged-lxc-containers
-
 .. _lxc-compartido:
 
 .. rubric:: Directorios compartidos
@@ -786,6 +783,13 @@ variable:
 .. code-block:: python
 
    lxc.mount.fstab = /var/lib/lxc/test/fstab
+
+.. rubric:: Ganchos
+
+Es posible definir *scripts* que se ejecuten ante determinados eventos del
+contenedor (arranque, parada, clonado, etc.) a través de de la directiva
+:kbd:`lxc.hook.nombre_evento`. Basta echarle un vistazo a
+:manpage:`lxc.container.conf`.
 
 .. rubric:: Configuración modular
 
@@ -825,11 +829,13 @@ Sobre la base de este tipo de interfaces, podemos hacer la configuración de red
    mediante interfaz macvtap en QEmu <qemu-red-puente-macvtap>`
 
 #. Si queremos crear redes independientes a la del anfitrión, podemos crear
-   interfaces puente, una por cada una de esas redes, del mismo que
+   interfaces puente, una por cada una de esas redes, del mismo modo que
    :ref:`hacíamos en QEmu al crear interfaces puente <qemu-red-tap>`.
 
 Nuestro estudio analizará primero cómo está configurada la red de forma
 predeterminada para después poder profundizar en los tres clases planteados.
+
+.. _lxc-red-predeterminada:
 
 Red predefinida
 ---------------
@@ -877,7 +883,7 @@ esos valores en :file:`/etc/default/lxc-net`. Por ejemplo:
 .. code-block:: bash
 
    USE_LXC_BRIDGE="true"
-   LXC_BRIDGE="vmbr0"
+   LXC_BRIDGE="lxcnet0"
    LXC_ADDR="10.0.10.1"
    LXC_NETMASK="255.255.255.0"
    LXC_NETWORK="10.0.10.0/24"
@@ -912,22 +918,34 @@ contenedor. Si queremos que sea fija, podemos añadir al archivo
 
 .. code-block:: python
 
+   #lxc.network.hwaddr = 00:16:3e:xx:xx:xx
    lxc.network.hwaddr = de:ad:be:ef:xx:xx
 
-Esta línea, a diferencia de las anteriores no se copiarán exactamente igual en
+Esta línea, a diferencia de las anteriores no se copiará exactamente igual en
 el archivo de configuración del contenedor, sino que las :kbd:`xx:xx` se
 sustituirán por números hexadecimales con lo que cada contenedor acabará
 teniendo una |MAC| fija.
 
 Ahora que hemos tratado la dirección |MAC| del contenedor, es bueno momento para
-discutir qué ocurre con su dirección |IP|. Como no hay expresión sobre ella, los
-contenedores la obtienen por |DHCP|. Si, en cambio, se quiere una dirección fija
-puede establecerse añadiendo al archivo de configuración del contenedor (p.e.
+discutir qué ocurre con su dirección |IP|. En principio no tiene, pero si el
+contenedor está preparado para pedir por defecto una por |DHCP| (como es el caso
+del de Alpine_), la obtendrá. Si, en cambio, se quiere una dirección fija puede
+establecerse añadiendo al archivo de configuración del contenedor (p.e.
 :file:`/var/lib/lxc/test/config`) lo siguiente:
+
+.. _lxc-red-ip-fija:
 
 .. code-block:: python
 
-   lxc.network.ipv4 = 10.0.10.5/24
+   lxc.network.ipv4.address = 10.0.10.5/24
+
+.. warning:: Podría ocurrir que la propia configuración del contenedor eliminara
+   esta dirección proporcionada por |LXC| a la interfaz. Es el caso del contenedor
+   de Alpine_, que desecha la |IP| fija al pedir una dirección
+   dinámica. En su caso particular, para evitarlo tendrá que modificar tal
+   configuración::
+
+      # lxc-attach -n test -- sed -i '/^iface/s:dhcp$:manual:' /etc/network/interfaces
 
 En cualquier caso, nuestro propósito es desechar la configuración de red
 predeterminada y hacerla toda manualmente para tener mayor control sobre ella.
@@ -938,6 +956,8 @@ En consecuencia, debemos hacer tres cosas:
    .. code-block:: bash
 
       USE_LXC_BRIDGE="false"
+
+   o como alternativa, deshabilitar el servicio *lxc-net.service*.
 
 #. Instalar el paquete :deb:`dnsmasq` para que actúe como servicio::
 
@@ -980,6 +1000,8 @@ En consecuencia, debemos hacer tres cosas:
 
       lxc.include = /etc/lxc/common.conf
 
+.. _lxc-red-puente-br:
+
 Interfaz puente con puente
 --------------------------
 En este caso se supone que el anfitrión está configurado de modo que hay
@@ -1004,6 +1026,8 @@ configuración predeterminada, aún tendremos que editar :file:`lxc.conf` para q
 
 .. note:: Hemos supuesto que en la red del anfitrión ya existe un servidor
    |DHCP|, así que no nos hemos preocupado por definir uno.
+
+.. _lxc-red-macvlan:
 
 Interfaz puente con macvlan
 ---------------------------
@@ -1044,6 +1068,47 @@ siguiente configuración:
    interfaces |VETH|. Para una explicación de ello, puede consultar `este
    interesante artículo de RedHat sobre interfaces virtuales en Linux
    <https://developers.redhat.com/blog/2018/10/22/introduction-to-linux-interfaces-for-virtual-networking#macsec>`_.
+
+Red independiente
+-----------------
+No es más que la configuración manual de la estrategia que usa la :ref:`red
+predeterminada <lxc-red-predeterminada>`. Para ello necesitamos definir una
+interfaz puente en :file:`/etc/network/interfaces.d/lxc`:
+
+.. code-block:: none
+
+   auto lxcnet0
+   iface lxcnet0 inet manual
+      bridge_ports    none
+      bridge_maxwait  2
+      hwaddress ether de:ad:be:ef:00:00
+
+Y a esta interfaz asociaremos las interfaces |VETH| que vayamos creando para los
+contenedores. Para ello podemos crear :file:`/etc/lxc/lxcnet0.conf`:
+
+.. code-block:: python
+
+   lxc.net.0.type = veth
+   lxc.net.0.link = lxcnet0
+   lxc.net.0.flags = up
+   lxc.net.0.hwaddr = de:ad:be:ef:xx:xx
+
+El problema de esta configuración es que cualquier contenedor que se cree con
+ella, estará totalmente aislado y, además, ni siquiera tendrá una |IP|. Incluso
+:ref:`definiéndole una dirección <lxc-red-ip-fija>`, seguirá aislado. A partir
+de aquí tebemos varias soluciones:
+
+#. Si no nos importa que la red no esté aislada, podemos asignar una dirección
+   |IP| a *lxcnet0* y configurar :program:`dnsmasq` para que sirva direcciones a
+   través de ella. De este modo, todos los contenedores en la red se configurarán
+   dinámicamente.
+
+#. Si queremos que la red esté aislada a toda costa, podemos dejar sin
+   configurar *lxcnet0* y crear un contenedor que sirva de puerta de enlace con
+   dos interfaces de red: una puesta como adaptador puente (véanse los dos
+   epígrafes anteriores) y otra en esta red independiente. Si a este contenedor
+   le instalamos, además, :program:`dnsmasq` podremos configurarlo para que
+   proporcione direcciones |IP| al resto.
 
 .. https://repositorio.upct.es/bitstream/handle/10317/11664/tfg-fer-apl.pdf
 

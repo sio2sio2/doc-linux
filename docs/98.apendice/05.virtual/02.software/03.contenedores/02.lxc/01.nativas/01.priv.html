@@ -782,6 +782,11 @@ variable:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">lxc</span><span class="o">.</span><span class="n">mount</span><span class="o">.</span><span class="n">fstab</span> <span class="o">=</span> <span class="o">/</span><span class="n">var</span><span class="o">/</span><span class="n">lib</span><span class="o">/</span><span class="n">lxc</span><span class="o">/</span><span class="n">test</span><span class="o">/</span><span class="n">fstab</span>
 </pre></div>
 </div>
+<p class="rubric">Ganchos</p>
+<p>Es posible definir <em>scripts</em> que se ejecuten ante determinados eventos del
+contenedor (arranque, parada, clonado, etc.) a través de de la directiva
+<kbd class="kbd docutils literal notranslate">lxc.hook.nombre_evento</kbd>. Basta echarle un vistazo a
+<em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/lxc.container.conf">lxc.container.conf</a></em>.</p>
 <p class="rubric">Configuración modular</p>
 <p>Podemos separar la configuración en archivos independientes utilizando la
 directiva:</p>
@@ -813,13 +818,13 @@ mediante puente en QEmu</span></a>.</p></li>
 interfaces macvlan, de modo semejante al caso de <a class="reference internal" href="../../../01.completa/02.kvm/01.qemu/03.red.html#qemu-red-puente-macvtap"><span class="std std-ref">adaptador puente
 mediante interfaz macvtap en QEmu</span></a></p></li>
 <li><p>Si queremos crear redes independientes a la del anfitrión, podemos crear
-interfaces puente, una por cada una de esas redes, del mismo que
+interfaces puente, una por cada una de esas redes, del mismo modo que
 <a class="reference internal" href="../../../01.completa/02.kvm/01.qemu/03.red.html#qemu-red-tap"><span class="std std-ref">hacíamos en QEmu al crear interfaces puente</span></a>.</p></li>
 </ol>
 <p>Nuestro estudio analizará primero cómo está configurada la red de forma
 predeterminada para después poder profundizar en los tres clases planteados.</p>
 <section id="red-predefinida">
-<h3><span class="section-number">9.2.2.2.1.1.1.8.1. </span>Red predefinida<a class="headerlink" href="#red-predefinida" title="Enlace permanente a este encabezado">¶</a></h3>
+<span id="lxc-red-predeterminada"></span><h3><span class="section-number">9.2.2.2.1.1.1.8.1. </span>Red predefinida<a class="headerlink" href="#red-predefinida" title="Enlace permanente a este encabezado">¶</a></h3>
 <p>Al arrancar <abbr title="LinuX Containers">LXC</abbr> (en <em>Debian</em> al menos) se crea automáticamente una interfaz
 puente <em>lxcbr0</em> con dirección <abbr title="Internet Protocol">IP</abbr> <em>10.0.3.1/24</em>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>ip addr show dev lxcbr0
@@ -857,7 +862,7 @@ redefiniéndolos en el archivo de configuración <code class="file docutils lite
 tanto, mirando cuál es el nombre de la variable en el <em>script</em>, podremos cambiar
 esos valores en <code class="file docutils literal notranslate"><span class="pre">/etc/default/lxc-net</span></code>. Por ejemplo:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">USE_LXC_BRIDGE</span><span class="o">=</span><span class="s2">&quot;true&quot;</span>
-<span class="nv">LXC_BRIDGE</span><span class="o">=</span><span class="s2">&quot;vmbr0&quot;</span>
+<span class="nv">LXC_BRIDGE</span><span class="o">=</span><span class="s2">&quot;lxcnet0&quot;</span>
 <span class="nv">LXC_ADDR</span><span class="o">=</span><span class="s2">&quot;10.0.10.1&quot;</span>
 <span class="nv">LXC_NETMASK</span><span class="o">=</span><span class="s2">&quot;255.255.255.0&quot;</span>
 <span class="nv">LXC_NETWORK</span><span class="o">=</span><span class="s2">&quot;10.0.10.0/24&quot;</span>
@@ -887,20 +892,33 @@ Con esta configuración la interfaz creada dentro del contenedor tiene una
 dirección <abbr title="Media Access Control">MAC</abbr> cualquiera y, además, cambia cada vez que arranquemos el
 contenedor. Si queremos que sea fija, podemos añadir al archivo
 <code class="file docutils literal notranslate"><span class="pre">default.conf</span></code> la siguiente línea:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">lxc</span><span class="o">.</span><span class="n">network</span><span class="o">.</span><span class="n">hwaddr</span> <span class="o">=</span> <span class="n">de</span><span class="p">:</span><span class="n">ad</span><span class="p">:</span><span class="n">be</span><span class="p">:</span><span class="n">ef</span><span class="p">:</span><span class="n">xx</span><span class="p">:</span><span class="n">xx</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1">#lxc.network.hwaddr = 00:16:3e:xx:xx:xx</span>
+<span class="n">lxc</span><span class="o">.</span><span class="n">network</span><span class="o">.</span><span class="n">hwaddr</span> <span class="o">=</span> <span class="n">de</span><span class="p">:</span><span class="n">ad</span><span class="p">:</span><span class="n">be</span><span class="p">:</span><span class="n">ef</span><span class="p">:</span><span class="n">xx</span><span class="p">:</span><span class="n">xx</span>
 </pre></div>
 </div>
-<p>Esta línea, a diferencia de las anteriores no se copiarán exactamente igual en
+<p>Esta línea, a diferencia de las anteriores no se copiará exactamente igual en
 el archivo de configuración del contenedor, sino que las <kbd class="kbd docutils literal notranslate">xx:xx</kbd> se
 sustituirán por números hexadecimales con lo que cada contenedor acabará
 teniendo una <abbr title="Media Access Control">MAC</abbr> fija.</p>
 <p>Ahora que hemos tratado la dirección <abbr title="Media Access Control">MAC</abbr> del contenedor, es bueno momento para
-discutir qué ocurre con su dirección <abbr title="Internet Protocol">IP</abbr>. Como no hay expresión sobre ella, los
-contenedores la obtienen por <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr>. Si, en cambio, se quiere una dirección fija
-puede establecerse añadiendo al archivo de configuración del contenedor (p.e.
+discutir qué ocurre con su dirección <abbr title="Internet Protocol">IP</abbr>. En principio no tiene, pero si el
+contenedor está preparado para pedir por defecto una por <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr> (como es el caso
+del de <a class="reference external" href="https://www.alpinelinux.org/">Alpine</a>), la obtendrá. Si, en cambio, se quiere una dirección fija puede
+establecerse añadiendo al archivo de configuración del contenedor (p.e.
 <code class="file docutils literal notranslate"><span class="pre">/var/lib/lxc/test/config</span></code>) lo siguiente:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">lxc</span><span class="o">.</span><span class="n">network</span><span class="o">.</span><span class="n">ipv4</span> <span class="o">=</span> <span class="mf">10.0.10.5</span><span class="o">/</span><span class="mi">24</span>
+<div class="highlight-python notranslate" id="lxc-red-ip-fija"><div class="highlight"><pre><span></span><span class="n">lxc</span><span class="o">.</span><span class="n">network</span><span class="o">.</span><span class="n">ipv4</span><span class="o">.</span><span class="n">address</span> <span class="o">=</span> <span class="mf">10.0.10.5</span><span class="o">/</span><span class="mi">24</span>
 </pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Podría ocurrir que la propia configuración del contenedor eliminara
+esta dirección proporcionada por <abbr title="LinuX Containers">LXC</abbr> a la interfaz. Es el caso del contenedor
+de <a class="reference external" href="https://www.alpinelinux.org/">Alpine</a>, que desecha la <abbr title="Internet Protocol">IP</abbr> fija al pedir una dirección
+dinámica. En su caso particular, para evitarlo tendrá que modificar tal
+configuración:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lxc-attach -n <span class="nb">test</span> -- sed -i <span class="s1">&#39;/^iface/s:dhcp$:manual:&#39;</span> /etc/network/interfaces
+</pre></div>
+</div>
 </div>
 <p>En cualquier caso, nuestro propósito es desechar la configuración de red
 predeterminada y hacerla toda manualmente para tener mayor control sobre ella.
@@ -910,6 +928,7 @@ En consecuencia, debemos hacer tres cosas:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">USE_LXC_BRIDGE</span><span class="o">=</span><span class="s2">&quot;false&quot;</span>
 </pre></div>
 </div>
+<p>o como alternativa, deshabilitar el servicio <em>lxc-net.service</em>.</p>
 </li>
 <li><p>Instalar el paquete <a class="reference external" href="https://packages.debian.org/stable/dnsmasq">dnsmasq</a> para que actúe como servicio:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>apt install dnsmasq
@@ -949,7 +968,7 @@ servicio <em>lxc-net</em> que acabamos de deshabilitar:</p>
 </ol>
 </section>
 <section id="interfaz-puente-con-puente">
-<h3><span class="section-number">9.2.2.2.1.1.1.8.2. </span>Interfaz puente con puente<a class="headerlink" href="#interfaz-puente-con-puente" title="Enlace permanente a este encabezado">¶</a></h3>
+<span id="lxc-red-puente-br"></span><h3><span class="section-number">9.2.2.2.1.1.1.8.2. </span>Interfaz puente con puente<a class="headerlink" href="#interfaz-puente-con-puente" title="Enlace permanente a este encabezado">¶</a></h3>
 <p>En este caso se supone que el anfitrión está configurado de modo que hay
 definida una interfaz puente (<em>br0</em>) dentro de la cual se encuentra la interfaz
 física (<em>eth0</em>) con lo que su file:<cite>/etc/network/interfaces</cite> tendrá el aspecto
@@ -973,7 +992,7 @@ configuración predeterminada, aún tendremos que editar <code class="file docut
 </div>
 </section>
 <section id="interfaz-puente-con-macvlan">
-<h3><span class="section-number">9.2.2.2.1.1.1.8.3. </span>Interfaz puente con macvlan<a class="headerlink" href="#interfaz-puente-con-macvlan" title="Enlace permanente a este encabezado">¶</a></h3>
+<span id="lxc-red-macvlan"></span><h3><span class="section-number">9.2.2.2.1.1.1.8.3. </span>Interfaz puente con macvlan<a class="headerlink" href="#interfaz-puente-con-macvlan" title="Enlace permanente a este encabezado">¶</a></h3>
 <p>De nuevo, vuelve a ser pertinente lo expuesto <a class="reference internal" href="../../../01.completa/02.kvm/01.qemu/03.red.html#qemu-red-puente-macvtap"><span class="std std-ref">sobre QEmu para interfaces
 macvtap</span></a>, aunque en este caso la interfaz sea de tipo
 <em>macvlan</em>. Como con <em>macvtap</em>, la configuración en el anfitrión puede ser nula,
@@ -1009,6 +1028,43 @@ ninguna interfaz en el anfitrión, como sí ocurre en el caso de usar
 interfaces <abbr title="Virtual ETHernet">VETH</abbr>. Para una explicación de ello, puede consultar <a class="reference external" href="https://developers.redhat.com/blog/2018/10/22/introduction-to-linux-interfaces-for-virtual-networking#macsec">este
 interesante artículo de RedHat sobre interfaces virtuales en Linux</a>.</p>
 </div>
+</section>
+<section id="red-independiente">
+<h3><span class="section-number">9.2.2.2.1.1.1.8.4. </span>Red independiente<a class="headerlink" href="#red-independiente" title="Enlace permanente a este encabezado">¶</a></h3>
+<p>No es más que la configuración manual de la estrategia que usa la <a class="reference internal" href="#lxc-red-predeterminada"><span class="std std-ref">red
+predeterminada</span></a>. Para ello necesitamos definir una
+interfaz puente en <code class="file docutils literal notranslate"><span class="pre">/etc/network/interfaces.d/lxc</span></code>:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>auto lxcnet0
+iface lxcnet0 inet manual
+   bridge_ports    none
+   bridge_maxwait  2
+   hwaddress ether de:ad:be:ef:00:00
+</pre></div>
+</div>
+<p>Y a esta interfaz asociaremos las interfaces <abbr title="Virtual ETHernet">VETH</abbr> que vayamos creando para los
+contenedores. Para ello podemos crear <code class="file docutils literal notranslate"><span class="pre">/etc/lxc/lxcnet0.conf</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">lxc</span><span class="o">.</span><span class="n">net</span><span class="mf">.0</span><span class="o">.</span><span class="n">type</span> <span class="o">=</span> <span class="n">veth</span>
+<span class="n">lxc</span><span class="o">.</span><span class="n">net</span><span class="mf">.0</span><span class="o">.</span><span class="n">link</span> <span class="o">=</span> <span class="n">lxcnet0</span>
+<span class="n">lxc</span><span class="o">.</span><span class="n">net</span><span class="mf">.0</span><span class="o">.</span><span class="n">flags</span> <span class="o">=</span> <span class="n">up</span>
+<span class="n">lxc</span><span class="o">.</span><span class="n">net</span><span class="mf">.0</span><span class="o">.</span><span class="n">hwaddr</span> <span class="o">=</span> <span class="n">de</span><span class="p">:</span><span class="n">ad</span><span class="p">:</span><span class="n">be</span><span class="p">:</span><span class="n">ef</span><span class="p">:</span><span class="n">xx</span><span class="p">:</span><span class="n">xx</span>
+</pre></div>
+</div>
+<p>El problema de esta configuración es que cualquier contenedor que se cree con
+ella, estará totalmente aislado y, además, ni siquiera tendrá una <abbr title="Internet Protocol">IP</abbr>. Incluso
+<a class="reference internal" href="#lxc-red-ip-fija"><span class="std std-ref">definiéndole una dirección</span></a>, seguirá aislado. A partir
+de aquí tebemos varias soluciones:</p>
+<ol class="arabic simple">
+<li><p>Si no nos importa que la red no esté aislada, podemos asignar una dirección
+<abbr title="Internet Protocol">IP</abbr> a <em>lxcnet0</em> y configurar <strong class="program">dnsmasq</strong> para que sirva direcciones a
+través de ella. De este modo, todos los contenedores en la red se configurarán
+dinámicamente.</p></li>
+<li><p>Si queremos que la red esté aislada a toda costa, podemos dejar sin
+configurar <em>lxcnet0</em> y crear un contenedor que sirva de puerta de enlace con
+dos interfaces de red: una puesta como adaptador puente (véanse los dos
+epígrafes anteriores) y otra en esta red independiente. Si a este contenedor
+le instalamos, además, <strong class="program">dnsmasq</strong> podremos configurarlo para que
+proporcione direcciones <abbr title="Internet Protocol">IP</abbr> al resto.</p></li>
+</ol>
 <p class="rubric">Notas al pie</p>
 <dl class="footnote brackets">
 <dt class="label" id="id7"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
@@ -1059,6 +1115,7 @@ ocurrir cuando la situación fuera distinta.</p>
 <li><a class="reference internal" href="#red-predefinida">9.2.2.2.1.1.1.8.1. Red predefinida</a></li>
 <li><a class="reference internal" href="#interfaz-puente-con-puente">9.2.2.2.1.1.1.8.2. Interfaz puente con puente</a></li>
 <li><a class="reference internal" href="#interfaz-puente-con-macvlan">9.2.2.2.1.1.1.8.3. Interfaz puente con macvlan</a></li>
+<li><a class="reference internal" href="#red-independiente">9.2.2.2.1.1.1.8.4. Red independiente</a></li>
 </ul>
 </li>
 </ul>

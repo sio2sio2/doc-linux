@@ -20,7 +20,6 @@
     <script src="../../_static/doctools.js"></script>
     <script src="../../_static/sphinx_highlight.js"></script>
     <script src="../../_static/translations.js"></script>
-    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     
     <link rel="index" title="Índice" href="../../genindex.html" />
     <link rel="search" title="Búsqueda" href="../../search.html" />
@@ -88,7 +87,7 @@ solución integrada oficialmente en el propio núcleo de <em>Linux</em>:</p>
 </section>
 <section id="contenedores">
 <span id="software-contenedores"></span><h2><span class="section-number">9.2.2.2. </span>Contenedores<a class="headerlink" href="#contenedores" title="Enlace permanente a este encabezado">¶</a></h2>
-<p>Los contenedores son una solución infinitamente más ligera y eficiente con la
+<p>Los contenedores son una solución mucho más ligera<a class="footnote-reference brackets" href="#id3" id="id1">1</a> y eficiente con la
 limitación de que tendrán que contener un sistema de idéntica naturaleza a la
 del anfitrión, puesto que carecen de sistema operativo propio.</p>
 <p>En los sistemas <em>Linux</em> este tipo de virtualización, muy esquemáticamente, se
@@ -101,7 +100,7 @@ a los procesos una visión parcial de los procesos y recursos que gestiona
 el sistema operativo. Todo aquello que no haya sido incluido en el mismo
 espacio de nombres, no es accesible ni aparentemente existe. Para entender
 este conceptos resulta indispensable la lectura del artículo <a class="reference external" href="https://blog.quarkslab.com/digging-into-linux-namespaces-part-1.html">Digging into
-Linux namespaces</a> (y <a class="reference external" href="https://blog.quarkslab.com/digging-into-linux-namespaces-part-2.html">su segunda parte</a>)<a class="footnote-reference brackets" href="#id2" id="id1">1</a>.</p></li>
+Linux namespaces</a> (y <a class="reference external" href="https://blog.quarkslab.com/digging-into-linux-namespaces-part-2.html">su segunda parte</a>)<a class="footnote-reference brackets" href="#id4" id="id2">2</a>.</p></li>
 <li><p>el <em class="dfn">enjaulamiento</em> (<em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/chroot">chroot</a></em>, <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/pivot_root">pivot_root</a></em>) dentro de
 un árbol de directorios, que logra su aislamiento del resto del sistema de
 archivos.</p></li>
@@ -111,7 +110,9 @@ archivos.</p></li>
 (abreviado <em>cgroups</em>). Gracias a ellos, por ejemplo, podremos impedir que un
 proceso ocupe más de 128MiB de memoria <abbr title="Random Access Memory">RAM</abbr>, aunque la máquina disponga de
 mucha más. Para profundizar en ellos es conveniente el artículo <a class="reference external" href="https://www.lewisgaul.co.uk/blog/coding/2022/05/13/cgroups-intro/">Cgroups
-Introduction</a>.</p></li>
+Introduction</a>. Tenga
+presente que la versión predeterminada en <em>Debian</em> a partir de <em>Bulleye</em> es
+la v2, así que es ésta versión la que se tomará como referencia.</p></li>
 </ol>
 <p>En consecuencia, la creación de un contenedor supone:</p>
 <ul class="simple">
@@ -123,28 +124,26 @@ contenedor.</p></li>
 &quot;sistema de archivos&quot;.</p></li>
 <li><p>Crearle los grupos de control propios para limitar su uso de recursos.</p></li>
 </ul>
-<p>Antes de comenzar, no obstante, es preciso hacer una distinción entre dos tipos
-de contenedores:</p>
-<dl class="simple">
+<p>Antes de comenzar, no obstante, es preciso saber que existen distintos tipos de
+contenedores:</p>
+<dl>
+<dt>Según los <strong>permisos</strong> de sus usuarios</dt><dd><p>Hay dos tipos distintos:</p>
+<dl class="simple" id="contenedor-privilegiado">
 <dt><em class="dfn">Contenedor privilegiado</em> (<em>privileged container</em>)</dt><dd><p>es aquel en que no se hace uso del concepto de <em>espacio de nombres de
 usuario</em>  y, en consecuencia, los usuarios y grupos del contenedor se
-corresponden con los usuarios y grupos del anfitrión (aunque en el
-contenedor puedan no tener nombre asignado). Dicho de otro modo, la
-acción que realice el usuario <em>root</em> en el contenedor es una acción que
-el sistema operativo del anfitrión considera que está realmente ejecutando
+corresponden con los usuarios y grupos del anfitrión. Dicho de otro modo, la
+acción que realice el usuario <em>root</em> en el contenedor es una acción que el
+sistema operativo del anfitrión considera que está ejecutando su propio
 <em>root</em>.</p>
 </dd>
+</dl>
+<dl class="simple" id="contenedor-no-privilegiado">
 <dt><em class="dfn">Contenedor no privilegiado</em> (<em>unprivileged container</em>)</dt><dd><p>es aquel que hace uso de tal concepto, por lo que se mapean identificadores
-de usuarios y grupos. El mapeo consiste en considerar que
-<span class="math notranslate nohighlight">\(\mathit{UID}_a = \mathit{UID}_c + N\)</span>, esto es, que el usuario del
-contenedor con un determinado identificador es, en realidad, el usuario del
-anfitrión que tiene ese identificador más una cantidad fija. Otro tanto
-ocurre con los <abbr title="Group IDentifier">GID</abbr> de grupos. Por ejemplo, el administrador del contenedor
-(<strong>0</strong>) podría ser en el anfitrión el usuario con identificador (<strong>1000</strong>),
-con lo que en este caso «N» valdría 1000. Esto abre la posibilidad a que un
-usuario normal sin privilegios (con identificador <strong>1000</strong>) gestione un
-contenedor sin restricciones (dentro de él será el administrador con
-identificador <strong>0</strong>).</p>
+de usuarios y grupos; y, en consecuencia, el administrador del contenedor
+(<abbr title="User IDentifier">UID</abbr> <strong>0</strong>  en  el contenedor) no se corresponde con el administrador del
+anfitrión (<abbr title="User IDentifier">UID</abbr> <strong>0</strong> en eñ anfitrión). Esto evita la posibilidad de que el
+administrador escape del confinamiento del contenedor con permisos de
+administrador fuera de él.</p>
 </dd>
 </dl>
 <div class="admonition note">
@@ -152,11 +151,33 @@ identificador <strong>0</strong>).</p>
 <p>Todos estos conceptos se entienden muy bien si se leen con
 detenimiento las explicaciones ya recomendadas del artículo <a class="reference external" href="https://blog.quarkslab.com/digging-into-linux-namespaces-part-1.html">Digging into
 Linux namespaces</a> y, en especial, <a class="reference external" href="https://blog.quarkslab.com/digging-into-linux-namespaces-part-2.html">su segunda parte</a> en que se desarrolla
-el concepto de espacio de nombres de usuario (<em>user namespace</em>).</p>
+el concepto de espacio de nombres de usuario (<em>user namespace</em>). Más
+adelante, además, se expone <a class="reference internal" href="02.software/03.contenedores/02.lxc/01.nativas/02.unpriv.html#userns"><span class="std std-ref">un pequeño ejemplo de espacio de nombres de
+usuario</span></a>.</p>
 </div>
-<p>De entre las soluciones de virtualización basadas en contenedores trataremos una
-de contenedores de aplicación (<strong class="program">Docker</strong>) y otra de contenedores de
-sistema (<abbr title="LinuX Containers">LXC</abbr>).</p>
+</dd>
+<dt>Según los <strong>procesos</strong> que encierre</dt><dd><p>De nuevo, son dos los tipos:</p>
+<dl class="simple" id="contenedor-sistema">
+<dt><em class="dfn">contenedor de sistema</em></dt><dd><p>Es aquel diseñado para ejecutar aisladamente múltiples procesos a la
+manera en que lo hace un sistema completo por lo que, en consecuencia,
+ejecutará como primer proceso un programa <strong class="program">init</strong> (como
+<a class="reference internal" href="../../04.servidor/03.init/index.html#systemd"><span class="std std-ref">systemd</span></a>). Es, por tanto, una solución más cercana al de
+una virtualización completa, ya que dispondremos de un espacio de usuario
+completo que recrea fielmente una distribución de <em>Linux</em>. <abbr title="LinuX Containers">LXC</abbr> provee
+contenedores de este tipo.</p>
+</dd>
+</dl>
+<dl class="simple" id="contenedor-aplicacion">
+<dt><em class="dfn">contenedor de aplicaciones</em></dt><dd><p>Es aquel diseñado para ejecutar aisladamente una única aplicación (por lo
+general, un servicio), por lo que ejecutará como primer proceso tal
+aplicación y no un programa <strong class="program">init</strong>. Estos contenedores, por
+tanto, no ofrecen un sistema completo que gestionar. <strong class="program">Docker</strong>
+provee contenedores de este tipo.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p>Trataremos ambos tipos de contenedores:</p>
 <div class="toctree-wrapper compound">
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="02.software/03.contenedores/02.lxc.html">9.2.2.2.1. <abbr title="LinuX Containers">LXC</abbr></a></li>
@@ -165,7 +186,11 @@ sistema (<abbr title="LinuX Containers">LXC</abbr>).</p>
 </div>
 <p class="rubric">Notas al pie</p>
 <dl class="footnote brackets">
-<dt class="label" id="id2"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dt class="label" id="id3"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p>De hecho, este tipo de virtualización también recibe el nombre de
+<em>virtulización ligera</em>.</p>
+</dd>
+<dt class="label" id="id4"><span class="brackets"><a class="fn-backref" href="#id2">2</a></span></dt>
 <dd><p>Esto incluye también a usuarios y grupos, de manera que un usuario que
 dentro del contenedor actuara como usuario privilegiado (o sea, con el <abbr title="User IDentifier">UID</abbr>
 0) fuera de él podría no serlo en absoluto. El interesantísimo artículo
