@@ -68,9 +68,10 @@ Antes de pasar a describir los más comunes, es preciso fijar la siguiente
    puñado de discos*) para identificar a un conjunto de discos del que se
    preserva la independencia de cada uno. En cambio, cuando estos discos definen
    un único disco virtual que es la concatenación de todos los discos que lo
-   constituyen, se habla de *span* o *big*\ [#]_. El *software*, simplemente, se
-   limita a crear el dispositivo virtual e ir rellenado con datos sucesivamente
-   los discos, de modo que cuando acaba de llenar uno, sigue con el siguiente.
+   constituyen, se habla de *span* o *big* o lineal\ [#]_. El *software*,
+   simplemente, se limita a crear el dispositivo virtual e ir rellenado con
+   datos sucesivamente los discos, de modo que cuando acaba de llenar uno,
+   sigue con el siguiente.
 
    .. image:: files/JBOD.png
 

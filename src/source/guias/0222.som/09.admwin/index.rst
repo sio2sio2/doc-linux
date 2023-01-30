@@ -52,12 +52,12 @@ Gestión de usuarios
 
   - Se hace accesible todo el contenido que se encuentra dentro de
     :file:`C:\\Users\\Public`. Por ejemplo, si en :file:`C:\\Users\\Public\\Desktop`
-    se añade un fichero, ese fichero lo verán todos los usuarios en su
+    se añade un archivo, ese archivo lo verán todos los usuarios en su
     escritorio.
 
   - :file:`C:\\Users\\nombre_usuario\\NTUSER.DAT` almacena la configuración
     personal del usuario, de suerte que cada vez que éste inicia sesión, se
-    carga el contenido de este fichero en el registro y se aplica la
+    carga el contenido de este archivo en el registro y se aplica la
     configuración (p.e. cuál es la imagen de fondo de escritorio).
 
 Seguridad
@@ -146,9 +146,9 @@ Permisos
 Los permisos sobre archivos de un sistema |NTFS| se definen con |ACL|\ s, por
 lo que podremos dar un determinado permiso a cualquier usuario o grupo definido
 en el sistema. La complejidad, sin embargo, deriva de que hay muchísimos más de
-tres permisos y de que estos se pueden conceder, denegar o no especificar.
-Confrontándolos con los tres permisos de *UNIX*, estos son los permisos
-avanzados que permite definir *Windows* sobre |NTFS|:
+tres permisos y de que estos se pueden conceder o no especificar, pero también
+denegar explícitamente.  Confrontándolos con los tres permisos de *UNIX*, estos
+son los permisos avanzados que permite definir *Windows* sobre |NTFS|:
 
 **Ejecución**
    Como en los sistemas *UNIX*, significa:
@@ -175,23 +175,30 @@ avanzados que permite definir *Windows* sobre |NTFS|:
       un archivo regular
    #. Crear directorios dentro de un directorio o añadir contenido a un archivo
       regular sin alterar el contenido ya existente.
-   #. Modificar los atributos de un fichero.
-   #. Modificar los atributos extendidos de un fichero.
+   #. Modificar los atributos extendidos de un archivo.
    #. Eliminar el propio archivo.
    #. Eliminar archivos dentro de un directorio (no aparece listado en archivos regulares).
 
 **Otros**
-   Hay por último dos permisos que en *UNIX*, simplemente, son privativos del
-   propietario del archivo o el administrador\ [#]_:
+   Hay, por último, tres permisos que en *UNIX* están asociados a
+   :ref:`procesos privilegiados <privilegios>` por lo que sólo se podrán obtener
+   si se dispone de las correspondientes :ref:`capacidades <capabilities-prof>`:
 
-   12. Modificar los permisos.
-   #.  Cambiar el propietario (en realidad, "Tomar posesión").
+   11. Modificar los atributos de un archivo.
+   #. Modificar los permisos.
+   #. Tomar posesión (que, aunque sea más restringido, podemos asimiliar a
+      "Cambiar el propietario")
 
-Estos 13 permisos atómicos\ [#]_, junto al de "Control total" que obtenerlos
-todos, son los permisos que pueden definirse a través de la interfaz de
-"Permisos avanzados". Sin embargo, *Windows* permite la definición de **6**
-permisos principales que incluyen a uno o varios de estos permisos atómicos y
-que además se solapan entre sí:
+   .. note:: De ellos, el primero puede requerir algunas capacidades como
+      (*CAP_LINUX_INMUTABLE* o *CAP_SYS_RESOURCE*); el segundo, que por defecto
+      lo disfruta el propietario del archivo, *CAP_FOWNER*; y el último,
+      *CAP_CHOWN*, que no disfruta nadie\ [#]_.
+
+Estos 13 permisos atómicos\ [#]_, junto al de "Control total" (tenerlos todos),
+son los permisos que pueden definirse a través de la interfaz de "Permisos
+avanzados". Sin embargo, *Windows* permite la definición de **6** permisos
+principales que incluyen a uno o varios de estos permisos atómicos y que además
+se solapan entre sí:
 
 #. *Control total*, que implica los 13 permisos atómicos.
 #. *Lectura*, que implica todos los permisos englobados de lectura.
@@ -207,8 +214,8 @@ que además se solapan entre sí:
 .. table:: Tabla resumen de permisos en Windows
    :class: win-perm
 
-   +----------------------+---+---------------+-------------------------+---------+
-   |                      | E |    Lectura    |      Escritura          |  Otros  |  
+   +----------------------+---+---------------+--------------------+--------------+
+   |                      | E |    Lectura    |   Escritura        |  Otros       |  
    |                      +---+---+---+---+---+---+---+---+---+----+----+----+----+
    |                      | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 |
    +======================+===+===+===+===+===+===+===+===+===+====+====+====+====+
@@ -220,14 +227,14 @@ que además se solapan entre sí:
    +----------------------+---+---+---+---+---+---+---+---+---+----+----+----+----+
    | Mostrar carpetas     | X | X | X | X | X |   |   |   |   |    |    |    |    |
    +----------------------+---+---+---+---+---+---+---+---+---+----+----+----+----+
-   | Escritura            |   |   |   |   | X | X | X | X | X |    |    |    |    |
+   | Escritura            |   |   |   |   | X | X | X | X |   |    | X  |    |    |
    +----------------------+---+---+---+---+---+---+---+---+---+----+----+----+----+
-   | Modificación         | X | X | X | X | X | X | X | X | X | X  |    |    |    |
+   | Modificación         | X | X | X | X | X | X | X | X | X |    | X  |    |    |
    +----------------------+---+---+---+---+---+---+---+---+---+----+----+----+----+
 
 La razón por la que se puede denegar un permiso es, precisamente, debida al
 solapamiento de los permisos. Por ejemplo, un determinado usuario puede tener
-*control total* sobre un fichero, excepto la capacidad de cambiarle el
+*control total* sobre un archivo, excepto la capacidad de cambiarle el
 propietario, porque se concedió el permiso de "Control total" y se denegó el de
 Cambiar el propietario ("Tomar posesión").
 
@@ -248,7 +255,7 @@ definida en el propio archivo, sino en un directorio antecedente.
 
 .. rubric:: Atributos
 
-Los ficheros en |NTFS| tienen, al margen de los permisos, una serie de
+Los archivos en |NTFS| tienen, al margen de los permisos, una serie de
 atributos, algunos derivados de su propia naturaleza, y otros que son aplicables
 por quien tenga permisos para ello:
 
@@ -263,9 +270,9 @@ por quien tenga permisos para ello:
     System            4         Consola         Es archivo de sistema.
     Directory         16         \-             Es un directorio.
     Archive           32        Gráfico         Modificado desde el último respaldo.
-    Compressed        2048      Gráfico\ [a]_   El fichero está comprimido.
-    NotContentIndexed 8192      Gráfico         El servicio de indexación no indexa el fichero.
-    Encrypted         16384     Gráfico\ [a]_   El fichero está cifrado.
+    Compressed        2048      Gráfico\ [a]_   El archivo está comprimido.
+    NotContentIndexed 8192      Gráfico         El servicio de indexación no indexa el archivo.
+    Encrypted         16384     Gráfico\ [a]_   El archivo está cifrado.
    ================== ========= ============== ================================================
 
 .. seealso:: Para información más extensa sobre cuáles todos los atributos y su
@@ -361,11 +368,11 @@ Compartición de recursos
 .. rubric:: Notas al pie
 
 .. [a] En realidad el atributo no es ajustable, pero la interfaz gráfica da la posibilidad de comprimir
-   o cifrar el fichero, por lo que como efecto colateral se aplicará el atributo.
+   o cifrar el archivo, por lo que como efecto colateral se aplicará el atributo.
 .. [#] La traducción al castellano del *Windows 10* refiere este permiso con el
    inexacto rótulo de "Permisos de lectura".
-.. [#] En realidad, en *Linux* pueden asignarse estos permisos a otros usuarios
-   mediante la manipulación de las :ref:`capacidades <capabilities-prof>`.
+.. [#] Nadie, excepto el administrador, porque a fin de cuentas, las capacidades
+   no son más que una estrategia para dividir los permisos omnímodos de *root*.
 .. [#] Atómicos en el sentido de que no pueden descomponerse en otros más
    simples.
 
