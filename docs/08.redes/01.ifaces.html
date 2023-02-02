@@ -6,7 +6,7 @@
 <html lang="es">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
     <title>8.1. Interfaces &#8212; documentación de Linuxnomicón - rolling</title>
     <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
@@ -50,15 +50,213 @@
           <div class="body" role="main">
             
   <section id="interfaces">
-<h1><span class="section-number">8.1. </span>Interfaces<a class="headerlink" href="#interfaces" title="Enlace permanente a este encabezado">¶</a></h1>
+<span id="ifaces"></span><h1><span class="section-number">8.1. </span>Interfaces<a class="headerlink" href="#interfaces" title="Enlace permanente a este encabezado">¶</a></h1>
+<p>El <em>kernel</em> de <em>Linux</em> nombra las interfaces físicas de red con un nombre que
+identifica su tipo seguido de un ordinal que permite distinguirlas en caso de
+que haya varias de un mismo tipo. De este modo, las interfaces <em>ethernet</em> se
+nombran <em>eth0</em>, <em>eth1</em>, <em>eth2</em>, etc. o las interfaces inalámbricas <em>wlan0</em>,
+<em>wlan1</em>, etc. Por su parte, la <cite>interfaz virtual de loopback
+&lt;https://es.wikipedia.org/wiki/Loopback&gt;</cite> siempre recibe el nombre <em>lo</em>.</p>
+<p>El problema de esta nomenclatura es su impredecibilidad. Sus nombres se asignan
+al cargar su driver correspondiente después de haber sido detectadas y, si hay
+varias, no hay garantías de que la asignación de nombres se producza siempre en
+el mismo orden. Por ello, en un equipo con dos interfaces <em>ethernet^</em> podría ocurrir
+que una interfaz que en un arranque se detectó como <em>eth0</em> se detecte como
+<em>eth1</em> en un arranque posterior, lo cual puede tener consecuencias catastróficas
+si se usaron los nombres de las interfaces para definir reglas en el
+<a class="reference internal" href="07.cortafuegos/index.html#firewall"><span class="std std-ref">cortafuegos</span></a>. Es por esto que <a class="reference internal" href="../04.servidor/03.init/index.html#systemd"><span class="std std-ref">SystemD</span></a>, desde
+su versión <strong>147</strong> y en conjunción con <strong class="program">udev</strong>, definición un sistema
+predecible de nombres que <a class="reference internal" href="#iface-names"><span class="std std-ref">más adelante discutiremos</span></a><a class="footnote-reference brackets" href="#id5" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a>.</p>
+<section id="deteccion">
+<span id="iface-detect"></span><h2><span class="section-number">8.1.1. </span>Detección<a class="headerlink" href="#deteccion" title="Enlace permanente a este encabezado">¶</a></h2>
+<p>Como ocurre con todo el <em>hardware</em> durante el proceso de arranque, las tarjetas
+se detectan automáticamente y podemos consultar en el registro o a través de
+alguna utilidad adecuada cómo se identificaron ante el núcleo. Por ejemplo, si
+las tarjetas son <abbr title="Peripheral Component Interconnect">PCI</abbr>, podremos usar <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/lspci">lspci</a></em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lspci<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-i<span class="w"> </span>controler
+<span class="go">[...]</span>
+<span class="go">01:00.0 Network controller: Qualcomm Atheros QCA6174 802.11ac Wireless Network Adapter (rev 32)</span>
+<span class="go">02:00.0 Ethernet controller: Realtek Semiconductor Co., Ltd.  RTL8111/8168/8411 PCI Express Gigabit Ethernet Controller (rev 15)</span>
+<span class="go">[...]</span>
+</pre></div>
+</div>
+<p>Las tarjetas que estén soportadas (esto es aquellas para las que existe un
+controlador), recibirán un nombre y aparecen listadas dentro de la jerarquía de
+<code class="file docutils literal notranslate"><span class="pre">/sys</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ls<span class="w"> </span>/sys/class/net
+<span class="go">eno1 lo wlp1s0</span>
+</pre></div>
+</div>
+<p>Como puede verse ahí aparecen las dos tarjetas físicas, <em>eno1</em> y <em>wlp1s0</em><a class="footnote-reference brackets" href="#id6" id="id2" role="doc-noteref"><span class="fn-bracket">[</span>2<span class="fn-bracket">]</span></a>,
+(y la interfaz de <em>loopback</em>), señal de que para ambas había un <em>driver</em>
+adecuado.</p>
+<p>También es posible consultar las interfaces con <a class="reference internal" href="../02.conbas/09.admbasica/11.red.html#ip"><span class="std std-ref">ip</span></a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ip<span class="w"> </span>link<span class="w"> </span>show
+<span class="go">1: lo: &lt;LOOPBACK,UP,LOWER_UP&gt; mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT</span>
+<span class="go">group default qlen 1000</span>
+<span class="go">    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00</span>
+<span class="go">2: eno1: &lt;NO-CARRIER,BROADCAST,MULTICAST,UP&gt; mtu 1500 qdisc fq_codel state DOWN</span>
+<span class="go">mode DEFAULT group default qlen 1000</span>
+<span class="go">    link/ether 8c:47:be:45:9a:06 brd ff:ff:ff:ff:ff:ff</span>
+<span class="go">3: wlp1s0: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt; mtu 1500 qdisc noqueue state UP</span>
+<span class="go">mode DORMANT group default qlen 1000</span>
+<span class="go">    link/ether 5c:ba:ef:5c:9e:bf brd ff:ff:ff:ff:ff:ff</span>
+</pre></div>
+</div>
+<p>Esta orden devuelve más información. Por ejemplo, podemos saber que <em>eno1</em> no
+tiene conectado el cable, puesto que no aparece <em>LOWER_UP</em> en su descripción.</p>
+</section>
 <section id="nombre">
-<h2><span class="section-number">8.1.1. </span>Nombre<a class="headerlink" href="#nombre" title="Enlace permanente a este encabezado">¶</a></h2>
+<span id="iface-names"></span><h2><span class="section-number">8.1.2. </span>Nombre<a class="headerlink" href="#nombre" title="Enlace permanente a este encabezado">¶</a></h2>
+<p>¿Cómo nombran los <em>linuces</em> actuales que utilizan <strong class="program">SystemD</strong> las
+interfaces de red? La explicación superficial se encuentra en el artículo
+<a class="reference external" href="https://systemd.io/PREDICTABLE_INTERFACE_NAMES/">Predictable Network Interface Names</a>, que conviene complementar
+al menos con la página de manual de <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/systemd.net-naming-scheme">systemd.net-naming-scheme</a></em>.</p>
+<p>Para construir el nombre se utilizan dos letras para identificar el tipo de
+interfaz física (<em>en</em> para <em>ethernet</em> o <em>wl</em> para interfaz <em>wifi</em>)<a class="footnote-reference brackets" href="#id7" id="id3" role="doc-noteref"><span class="fn-bracket">[</span>3<span class="fn-bracket">]</span></a> seguido
+de una identificación predecible y única para cada interfaz. Para contruir este
+identificador <strong class="program">SystemD</strong> puede utilizar hasta cinco estrategias
+distintas:</p>
+<dl class="simple">
+<dt><em>onboard</em> (<strong>o</strong>)</dt><dd><p>para la que se utiliza un índice que asigna el <em>firmware</em> a los dispositivos
+integrados. Por ejemplo, <em>eno1</em>.</p>
+</dd>
+<dt><em>slot</em> (<strong>s</strong>)</dt><dd><p>para la que se utiliza un número asociado a la ranura <abbr title="Peripheral Component Interconnect">PCI</abbr> utilizada. Por
+ejemplo, <em>ens1</em>.</p>
+</dd>
+<dt><em>path</em> (<strong>p</strong>)</dt><dd><p>para la que se utiliza la localización física del conector. Por ejemplo,
+para las dos tarjetas antes detectadas los nombres serán <em>wlp1s0</em> y <em>enp2s0</em>,
+puesto la salida de <strong class="command">lspci</strong> nos las ubica en <kbd class="kbd docutils literal notranslate">01:00.0</kbd> y
+<kbd class="kbd docutils literal notranslate">02:00.0</kbd> respectivamente.</p>
+</dd>
+<dt><em>mac</em> (<strong>x</strong>)</dt><dd><p>para la que se utiliza la dirección <abbr title="Media Access Control">MAC</abbr> de la tarjeta. Por ejemplo,
+<em>enx8c47be459a06</em> para la interfaz <em>ethernet</em> de nuestro ejemplo (véase la
+salida de <code class="code docutils literal notranslate"><span class="pre">ip</span> <span class="pre">link</span> <span class="pre">show</span></code>)</p>
+</dd>
+<dt>nombre clásico</dt><dd><p>la cual no es en realidad una estrategia predecible: simplemente es el nombre
+clásico que asigna el <em>kernel</em> a la interfaz. Se nombrará así, si no ha
+habido forma de nombrarla mediante un nombre predecible.</p>
+</dd>
+</dl>
+<p>Por lo general, las tarjetas no pueden ser nombradas mediante todas las
+estrategias. Por ejemplo, la interfaz <em>eno1</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>udevadm<span class="w"> </span>test-builtin<span class="w"> </span>net_id<span class="w"> </span>/sys/class/net/eno1<span class="w"> </span><span class="m">2</span>&gt;/dev/null
+<span class="go">ID_NET_NAMING_SCHEME=v245</span>
+<span class="go">ID_NET_NAME_MAC=enx8c47be459a06</span>
+<span class="go">ID_NET_NAME_ONBOARD=eno1</span>
+<span class="go">ID_NET_LABEL_ONBOARD=Realtek RTL8111H</span>
+<span class="go">ID_NET_NAME_PATH=enp2s0</span>
+</pre></div>
+</div>
+<p>tiene disponibles nombres para tres estrategias (<em>mac</em>, <em>onboard</em> y <em>path</em>),
+mientras que <em>wlp1s0</em> para solamente dos (<em>mac</em> y <em>path</em>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>udevadm<span class="w"> </span>test-builtin<span class="w"> </span>net_id<span class="w"> </span>/sys/class/net/eno1<span class="w"> </span><span class="m">2</span>&gt;/dev/null
+<span class="go">ID_NET_NAMING_SCHEME=v245</span>
+<span class="go">ID_NET_NAME_MAC=wlx5cbaef5c9ebf</span>
+<span class="go">ID_OUI_FROM_DATABASE=CHONGQING FUGUI ELECTRONICS CO.,LTD.</span>
+<span class="go">ID_NET_NAME_PATH=wlp1s0</span>
+</pre></div>
+</div>
+<p>Bien, entonces, ¿qué estrategia se sigue si hay varias disponibles? La respuesta
+la tiene el archivo <code class="file docutils literal notranslate"><span class="pre">/lib/systemd/network/99-default.link</span></code>. Ahí se podrá
+observar cuál es la precedencia de cada estrategia y se verá que la de <em>onboard</em>
+es mayor que la de <em>path</em>. Por esa razón, la interfaz cableada se nombró como
+<em>eno1</em> y no como <em>enp2s0</em>.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Compruebe si en el mismo directorio hay algún otro archivo de
+extensión <kbd class="kbd docutils literal notranslate">.link</kbd> con menor número que afecte al nombrado. En <em>Debian</em>
+lo hay, aunque sólo afecta al nombrado de las interfaces <abbr title="Universal Serial Port">USB</abbr>.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Si por alguna razón se prefiere prescindir de las estrategias de
+nombrado predecible, basta con añadir el parámetro de arranque
+<code class="code docutils literal notranslate"><span class="pre">net.ifnames=0</span></code> editando <code class="file docutils literal notranslate"><span class="pre">/etc/default/grub</span></code><a class="footnote-reference brackets" href="#id8" id="id4" role="doc-noteref"><span class="fn-bracket">[</span>4<span class="fn-bracket">]</span></a>.</p>
+</div>
 </section>
-<section id="persistencia">
-<h2><span class="section-number">8.1.2. </span>Persistencia<a class="headerlink" href="#persistencia" title="Enlace permanente a este encabezado">¶</a></h2>
-</section>
-<section id="interfaces-dummy">
-<h2><span class="section-number">8.1.3. </span>Interfaces dummy<a class="headerlink" href="#interfaces-dummy" title="Enlace permanente a este encabezado">¶</a></h2>
+<section id="renombrado">
+<h2><span class="section-number">8.1.3. </span>Renombrado<a class="headerlink" href="#renombrado" title="Enlace permanente a este encabezado">¶</a></h2>
+<p>Es posible alterar los nombres asignados a una o varias interfaces creando
+archivos de extensión <kbd class="kbd docutils literal notranslate">.link</kbd> dentro del directorio
+<code class="file docutils literal notranslate"><span class="pre">/etc/systemd/network</span></code>. Sólo hay que tener presente que los archivos se
+leen por orden alfabético inverso y que se juntan a los que hay existen en
+<code class="file docutils literal notranslate"><span class="pre">/lib/systemd/network</span></code>. Así pues, si escribiéramos:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/systemd/network/98-default.link</span>
+<span class="k">[Match]</span>
+<span class="na">OriginalName</span><span class="o">=</span><span class="s">*</span>
+
+<span class="k">[Link]</span>
+<span class="na">NamePolicy</span><span class="o">=</span><span class="s">mac</span>
+</pre></div>
+</div>
+<p>y, con todas las interfaces <strong>desactivas</strong>, forzásemos el renombrado:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>systemctl<span class="w"> </span>restart<span class="w"> </span>systemd-udev-trigger
+</pre></div>
+</div>
+<p>las dos interfaces anteriores pasarían a formar el nombre a partir de su <abbr title="Media Access Control">MAC</abbr>.
+En cualquier caso, esto es más apropiado para dar un nombre concreto a una
+interfaz (que no coincida con un nombre clásico para evitar problemas):</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="c1"># /etc/systemd/network/70-cableada.link</span>
+<span class="k">[Match]</span>
+<span class="na">Path</span><span class="o">=</span><span class="s">pci-0000:02:00.0</span>
+
+<span class="k">[Link]</span>
+<span class="na">Name</span><span class="o">=</span><span class="s">cable0</span>
+</pre></div>
+</div>
+<p>donde para referir la interfaz hemos preferido usar su <em>path</em> inmutable que
+puede consultarse cuál es exactamente con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>udevadm<span class="w"> </span>info<span class="w"> </span>/sys/class/net/eno1<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-i<span class="w"> </span>id_path
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>El archivo también sirve para redefinir características de la interfaz
+definibles con el programa <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/ethtool">ethtool</a></em>. Échele un ojo al manual de
+<em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/systemd.link">systemd.link</a></em>.</p>
+</div>
+<p class="rubric">Notas al pie</p>
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="id5" role="note">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
+<p>Para <em>linuces</em> sin <strong class="program">SystemD</strong> o con una versión anterior a la
+v147, pero que usan <strong class="program">udev</strong> (p.e. <em>Debian Jessie</em>) la solución para
+evitar la impredicibilidad era definir una regla de <strong class="program">udev</strong> que
+definiera el nombre a partir, por ejemplo, de su dirección <abbr title="Media Access Control">MAC</abbr>. En
+<em>Debian</em>, de hecho, cada vez que se detectaba una nueva interfaz se apuntaba
+automáticamente una nueva regla en
+<code class="file docutils literal notranslate"><span class="pre">/etc/udev/rules.d/70-persistent-net.rules</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># PCI device 0x10ec:0x8167 (r8169)</span>
+<span class="nv">SUBSYSTEM</span><span class="o">==</span><span class="s2">&quot;net&quot;</span>,<span class="w"> </span><span class="nv">ACTION</span><span class="o">==</span><span class="s2">&quot;add&quot;</span>,<span class="w"> </span><span class="nv">DRIVERS</span><span class="o">==</span><span class="s2">&quot;?*&quot;</span>,<span class="w"> </span>ATTR<span class="o">{</span>address<span class="o">}==</span><span class="s2">&quot;00:1a:4d:32:4f:04&quot;</span>,<span class="w"> </span>ATTR<span class="o">{</span>dev_id<span class="o">}==</span><span class="s2">&quot;0x0&quot;</span>,<span class="w"> </span>ATTR<span class="o">{</span>type<span class="o">}==</span><span class="s2">&quot;1&quot;</span>,<span class="w"> </span><span class="nv">KERNEL</span><span class="o">==</span><span class="s2">&quot;eth*&quot;</span>,<span class="w"> </span><span class="nv">NAME</span><span class="o">=</span><span class="s2">&quot;eth0&quot;</span>
+</pre></div>
+</div>
+<p>Por supuesto, el archivo se podía editar a voluntad. Sobre todo, si
+cambiábamos una interfaz de red (quizás por haberse estropeado) y deseábamos
+que la nueva asumiera su mismo papel. Esto pasa por que se llame exactamente
+como la antigua, circunstancia que jamás ocurría porque a la nueva interfaz
+se le asignaba un nombre que no estuviera ya ocupado. Por ejemplo, si el
+equipo tenía una interfaz (<em>eth0</em>), tal regla se apuntaba automática en el
+archivo. Al cambiar la tarjeta, el sistema apuntaba la nueva tarjeta, pero al
+estar ocupado el nombre <em>eth0</em> ya con una regla, creaba otra regla utilizando
+el siguiente disponible (<em>eth1</em>). Consecuentemente, la tarjeta no se llamaba
+igual a menos que editáramos el archivo para corregir la circunstancia.</p>
+</aside>
+<aside class="footnote brackets" id="id6" role="note">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id2">2</a><span class="fn-bracket">]</span></span>
+<p>Con nombres que por ahora nos resultarán extrañísimos y que el <em>kernel</em>
+habría nombrado como <em>eth0</em> y <em>wlan0</em>.</p>
+</aside>
+<aside class="footnote brackets" id="id7" role="note">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id3">3</a><span class="fn-bracket">]</span></span>
+<p>La relación completa está en la página de manual antes mencionada.</p>
+</aside>
+<aside class="footnote brackets" id="id8" role="note">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id4">4</a><span class="fn-bracket">]</span></span>
+<p>Y en el remototísimo caso de que estuviera instalado el programa
+<strong class="command">biosdevname</strong> también <code class="code docutils literal notranslate"><span class="pre">biosdevname=0</span></code>.</p>
+</aside>
+</aside>
 </section>
 </section>
 
@@ -73,9 +271,9 @@
     <h3><a href="../index.html">Tabla de contenido</a></h3>
     <ul>
 <li><a class="reference internal" href="#">8.1. Interfaces</a><ul>
-<li><a class="reference internal" href="#nombre">8.1.1. Nombre</a></li>
-<li><a class="reference internal" href="#persistencia">8.1.2. Persistencia</a></li>
-<li><a class="reference internal" href="#interfaces-dummy">8.1.3. Interfaces dummy</a></li>
+<li><a class="reference internal" href="#deteccion">8.1.1. Detección</a></li>
+<li><a class="reference internal" href="#nombre">8.1.2. Nombre</a></li>
+<li><a class="reference internal" href="#renombrado">8.1.3. Renombrado</a></li>
 </ul>
 </li>
 </ul>

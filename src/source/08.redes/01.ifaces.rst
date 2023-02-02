@@ -1,11 +1,220 @@
+.. _ifaces:
+
 Interfaces
 **********
+El *kernel* de *Linux* nombra las interfaces físicas de red con un nombre que
+identifica su tipo seguido de un ordinal que permite distinguirlas en caso de
+que haya varias de un mismo tipo. De este modo, las interfaces *ethernet* se
+nombran *eth0*, *eth1*, *eth2*, etc. o las interfaces inalámbricas *wlan0*,
+*wlan1*, etc. Por su parte, la `interfaz virtual de loopback
+<https://es.wikipedia.org/wiki/Loopback>` siempre recibe el nombre *lo*.
+
+El problema de esta nomenclatura es su impredecibilidad. Sus nombres se asignan
+al cargar su driver correspondiente después de haber sido detectadas y, si hay
+varias, no hay garantías de que la asignación de nombres se producza siempre en
+el mismo orden. Por ello, en un equipo con dos interfaces *ethernet^* podría ocurrir
+que una interfaz que en un arranque se detectó como *eth0* se detecte como
+*eth1* en un arranque posterior, lo cual puede tener consecuencias catastróficas
+si se usaron los nombres de las interfaces para definir reglas en el
+:ref:`cortafuegos <firewall>`. Es por esto que :ref:`SystemD <systemd>`, desde
+su versión **147** y en conjunción con :program:`udev`, definición un sistema
+predecible de nombres que :ref:`más adelante discutiremos <iface-names>`\ [#]_.
+
+.. _iface-detect:
+
+Detección
+=========
+Como ocurre con todo el *hardware* durante el proceso de arranque, las tarjetas
+se detectan automáticamente y podemos consultar en el registro o a través de
+alguna utilidad adecuada cómo se identificaron ante el núcleo. Por ejemplo, si
+las tarjetas son |PCI|, podremos usar :manpage:`lspci`::
+
+   # lspci | grep -i controler
+   [...]
+   01:00.0 Network controller: Qualcomm Atheros QCA6174 802.11ac Wireless Network Adapter (rev 32)
+   02:00.0 Ethernet controller: Realtek Semiconductor Co., Ltd.  RTL8111/8168/8411 PCI Express Gigabit Ethernet Controller (rev 15)
+   [...]
+
+Las tarjetas que estén soportadas (esto es aquellas para las que existe un
+controlador), recibirán un nombre y aparecen listadas dentro de la jerarquía de
+:file:`/sys`::
+
+   $ ls /sys/class/net
+   eno1 lo wlp1s0
+
+Como puede verse ahí aparecen las dos tarjetas físicas, *eno1* y *wlp1s0*\ [#]_,
+(y la interfaz de *loopback*), señal de que para ambas había un *driver*
+adecuado.
+
+También es posible consultar las interfaces con :ref:`ip <ip>`::
+
+   $ ip link show
+   1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT
+   group default qlen 1000
+       link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+   2: eno1: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc fq_codel state DOWN
+   mode DEFAULT group default qlen 1000
+       link/ether 8c:47:be:45:9a:06 brd ff:ff:ff:ff:ff:ff
+   3: wlp1s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP
+   mode DORMANT group default qlen 1000
+       link/ether 5c:ba:ef:5c:9e:bf brd ff:ff:ff:ff:ff:ff
+
+Esta orden devuelve más información. Por ejemplo, podemos saber que *eno1* no
+tiene conectado el cable, puesto que no aparece *LOWER_UP* en su descripción.
+
+.. _iface-names:
 
 Nombre
 ======
+¿Cómo nombran los *linuces* actuales que utilizan :program:`SystemD` las
+interfaces de red? La explicación superficial se encuentra en el artículo
+`Predictable Network Interface Names
+<https://systemd.io/PREDICTABLE_INTERFACE_NAMES/>`_, que conviene complementar
+al menos con la página de manual de :manpage:`systemd.net-naming-scheme`.
 
-Persistencia
-============
+Para construir el nombre se utilizan dos letras para identificar el tipo de
+interfaz física (*en* para *ethernet* o *wl* para interfaz *wifi*)\ [#]_ seguido
+de una identificación predecible y única para cada interfaz. Para contruir este
+identificador :program:`SystemD` puede utilizar hasta cinco estrategias
+distintas:
 
-Interfaces dummy
-================
+*onboard* (**o**)
+   para la que se utiliza un índice que asigna el *firmware* a los dispositivos
+   integrados. Por ejemplo, *eno1*.
+
+*slot* (**s**)
+   para la que se utiliza un número asociado a la ranura |PCI| utilizada. Por
+   ejemplo, *ens1*.
+
+*path* (**p**)
+   para la que se utiliza la localización física del conector. Por ejemplo,
+   para las dos tarjetas antes detectadas los nombres serán *wlp1s0* y *enp2s0*,
+   puesto la salida de :command:`lspci` nos las ubica en :kbd:`01:00.0` y
+   :kbd:`02:00.0` respectivamente.
+
+*mac* (**x**)
+   para la que se utiliza la dirección |MAC| de la tarjeta. Por ejemplo,
+   *enx8c47be459a06* para la interfaz *ethernet* de nuestro ejemplo (véase la
+   salida de :code:`ip link show`)
+
+nombre clásico
+   la cual no es en realidad una estrategia predecible: simplemente es el nombre
+   clásico que asigna el *kernel* a la interfaz. Se nombrará así, si no ha
+   habido forma de nombrarla mediante un nombre predecible.
+
+Por lo general, las tarjetas no pueden ser nombradas mediante todas las
+estrategias. Por ejemplo, la interfaz *eno1*::
+
+   $ udevadm test-builtin net_id /sys/class/net/eno1 2>/dev/null
+   ID_NET_NAMING_SCHEME=v245
+   ID_NET_NAME_MAC=enx8c47be459a06
+   ID_NET_NAME_ONBOARD=eno1
+   ID_NET_LABEL_ONBOARD=Realtek RTL8111H
+   ID_NET_NAME_PATH=enp2s0
+
+tiene disponibles nombres para tres estrategias (*mac*, *onboard* y *path*),
+mientras que *wlp1s0* para solamente dos (*mac* y *path*)::
+
+   $ udevadm test-builtin net_id /sys/class/net/eno1 2>/dev/null
+   ID_NET_NAMING_SCHEME=v245
+   ID_NET_NAME_MAC=wlx5cbaef5c9ebf
+   ID_OUI_FROM_DATABASE=CHONGQING FUGUI ELECTRONICS CO.,LTD.
+   ID_NET_NAME_PATH=wlp1s0
+
+Bien, entonces, ¿qué estrategia se sigue si hay varias disponibles? La respuesta
+la tiene el archivo :file:`/lib/systemd/network/99-default.link`. Ahí se podrá
+observar cuál es la precedencia de cada estrategia y se verá que la de *onboard*
+es mayor que la de *path*. Por esa razón, la interfaz cableada se nombró como
+*eno1* y no como *enp2s0*.
+
+.. note:: Compruebe si en el mismo directorio hay algún otro archivo de
+   extensión :kbd:`.link` con menor número que afecte al nombrado. En *Debian*
+   lo hay, aunque sólo afecta al nombrado de las interfaces |USB|.
+
+.. note:: Si por alguna razón se prefiere prescindir de las estrategias de
+   nombrado predecible, basta con añadir el parámetro de arranque
+   :code:`net.ifnames=0` editando :file:`/etc/default/grub`\ [#]_.
+
+Renombrado
+==========
+Es posible alterar los nombres asignados a una o varias interfaces creando
+archivos de extensión :kbd:`.link` dentro del directorio
+:file:`/etc/systemd/network`. Sólo hay que tener presente que los archivos se
+leen por orden alfabético inverso y que se juntan a los que hay existen en
+:file:`/lib/systemd/network`. Así pues, si escribiéramos:
+
+.. code-block:: ini
+
+   # /etc/systemd/network/98-default.link
+   [Match]
+   OriginalName=*
+
+   [Link]
+   NamePolicy=mac
+
+y, con todas las interfaces **desactivas**, forzásemos el renombrado::
+
+   # systemctl restart systemd-udev-trigger
+
+las dos interfaces anteriores pasarían a formar el nombre a partir de su |MAC|.
+En cualquier caso, esto es más apropiado para dar un nombre concreto a una
+interfaz (que no coincida con un nombre clásico para evitar problemas):
+
+.. code-block:: ini
+
+   # /etc/systemd/network/70-cableada.link
+   [Match]
+   Path=pci-0000:02:00.0
+
+   [Link]
+   Name=cable0
+
+donde para referir la interfaz hemos preferido usar su *path* inmutable que
+puede consultarse cuál es exactamente con::
+
+   $ udevadm info /sys/class/net/eno1 | grep -i id_path
+
+.. note:: El archivo también sirve para redefinir características de la interfaz
+   definibles con el programa :manpage:`ethtool`. Échele un ojo al manual de
+   :manpage:`systemd.link`.
+
+.. Interfaces dummy
+.. alias
+
+.. rubric:: Notas al pie
+
+.. [#] Para *linuces* sin :program:`SystemD` o con una versión anterior a la
+   v147, pero que usan :program:`udev` (p.e. *Debian Jessie*) la solución para
+   evitar la impredicibilidad era definir una regla de :program:`udev` que
+   definiera el nombre a partir, por ejemplo, de su dirección |MAC|. En
+   *Debian*, de hecho, cada vez que se detectaba una nueva interfaz se apuntaba
+   automáticamente una nueva regla en
+   :file:`/etc/udev/rules.d/70-persistent-net.rules`:
+
+   .. code-block:: bash
+
+       # PCI device 0x10ec:0x8167 (r8169)
+       SUBSYSTEM=="net", ACTION=="add", DRIVERS=="?*", ATTR{address}=="00:1a:4d:32:4f:04", ATTR{dev_id}=="0x0", ATTR{type}=="1", KERNEL=="eth*", NAME="eth0"
+
+   Por supuesto, el archivo se podía editar a voluntad. Sobre todo, si
+   cambiábamos una interfaz de red (quizás por haberse estropeado) y deseábamos
+   que la nueva asumiera su mismo papel. Esto pasa por que se llame exactamente
+   como la antigua, circunstancia que jamás ocurría porque a la nueva interfaz
+   se le asignaba un nombre que no estuviera ya ocupado. Por ejemplo, si el
+   equipo tenía una interfaz (*eth0*), tal regla se apuntaba automática en el
+   archivo. Al cambiar la tarjeta, el sistema apuntaba la nueva tarjeta, pero al
+   estar ocupado el nombre *eth0* ya con una regla, creaba otra regla utilizando
+   el siguiente disponible (*eth1*). Consecuentemente, la tarjeta no se llamaba
+   igual a menos que editáramos el archivo para corregir la circunstancia.
+
+.. [#] Con nombres que por ahora nos resultarán extrañísimos y que el *kernel*
+   habría nombrado como *eth0* y *wlan0*.
+
+.. [#] La relación completa está en la página de manual antes mencionada.
+
+.. [#] Y en el remototísimo caso de que estuviera instalado el programa
+   :command:`biosdevname` también :code:`biosdevname=0`.
+
+.. |PCI| replace:: :abbr:`PCI (Peripheral Component Interconnect)`
+.. |MAC| replace:: :abbr:`MAC (Media Access Control)`
+.. |USB| replace:: :abbr:`USB (Universal Serial Port)`
