@@ -58,7 +58,17 @@ También es posible obtener las interfaces a través del comando :ref:`ip <ip>`:
 
 Configuración
 =============
-INTRODUCCIÓN A LOS TRES MÉTODOS...
+Para la configuración básica de la interfaz de red cableada presentaremos (muy
+brevemente por ahora) tres alternativas:
+
+* :ref:`ifupdown <ifupdown>`, que es el método tradicional para la configuración
+  de interfaces de red en *Debian* y sigue siendo el oficial\ [#]_
+* La :ref:`configuración directa <net-univ>` que sirve para manipular en caliente y
+  circunstancialmente las interfaces. Es interesante conocerla, aunque no sirva
+  como método permanente de configuración.
+* :ref:`systemd-networkd <systemd-networkd>` que es la solución que facilita
+  :ref:`SystemD <systemd>` y puede utilizarse en aquellas distribuciones que lo
+  usan como proceso *init*.
 
 
 .. _ifupdown:
@@ -323,23 +333,124 @@ systemd-networkd
 ----------------
 :ref:`SystemD <systemd>` (también) permite la gestión de interfaces de red
 mediante el servicio :manpage:`systemd-networkd`, al que habría que sumar
-:manpage:`systemd-resolved` para la definición de los servidores |DNS|. El
-método es común a cualquier distribución que use este *init*, aunque como en el
-caso de *Debian*, el servicio puede estar desactivado porque se use un método
+:manpage:`systemd-resolved` si queremos también un |DNS| caché. El método es
+común a cualquier distribución que use este *init*, aunque como en el caso de
+*Debian*, el servicio puede estar desactivado porque se use un método
 alternativo\ [#]_.
 
 .. warning:: Evite que :ref:`ifupdown <ifupdown>` active las mismas interfaces
    que piense gestionar con :program:`systemd-networkd`, para lo cual puede,
    simplemente , evitar que arranquen automáticamente comentando las líneas que
    contienen sus respectivas directivas :kbd:`auto` o :kbd:`allow-hotplug`.
+   También se puede desinstalar el paquete *ifupdown* y prescindir por completo
+   de su configuración.
 
-.. https://medium.com/100-days-of-linux/working-with-systemd-networkd-e461cfe80e6d
+La filosofía de este método es crear archivos de extensión :kbd:`.network`
+dentro del directorio :file:`/etc/systemd/network` cada uno de los cuales
+configurará la red de una interfaz distinta.
+
+.. seealso:: En ese mismo directorio también puede haber archivos de extensión
+   :file:`.link` que permiten configurar las características de una interfaz
+   (nombre, velocidad, autonegociación, etc). Hay explicaciones adicionales en
+   el :ref:`epígrafe dedicado a las interfaces de red <ifaces>`.
+
+Los archivos se estructuran en una sección :kbd:`[Match]` que permite definir a
+cuál interfaz afecta la configuración y una o varias sección que definen tal
+configuración.
+
+Lo primero que debemos hacer es habilitar el servicio::
+
+   # systemctl enable systemd-networkd
+   # systemctl start systemd-networkd
+
+y también el de resolución de nombres::
+
+   # systemctl enable systemd-resolved 
+   # systemctl start systemd-resolved 
+   # ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+
+.. note:: La edición de :file:`/etc/systemd/resolved.conf` permite definir unos
+   servidores |DNS| genéricos que se usarán en caso de que no se definan
+   servidores particulares para las interfaces de red.
+
+Configuración dinámica
+''''''''''''''''''''''
+Basta con crear un archivo :file:`/etc/systemd/network/10-eth0.network`:
+
+.. code-block:: ini
+
+   [Match]
+   Name=eth0
+
+   [Network]
+   # yes, para ipv4 e ipv6
+   DHCP=ipv4
+
+.. note:: La expresión de la interfaz a la que afecta la configuración puede ser
+   mucho más rica. Por ejemplo, podríamos haber escrito:
+
+   .. code-block:: ini
+
+      [Match]
+      Name=eth*
+
+   que provocaría que todas las interfaces *ethernet* (supuesto que se llamen
+   así) estén configuradas por |DHCP|. También podríamos haber utilizado alguna
+   otra característica de la interfaz en vez del nombre, lo cual permitiría
+   cambiar el nombre de la interfaz, sin necesidad de redefinir este archivo:
+
+   .. code-block:: ini
+
+      [Match]
+      Path=pci-0000:03:00.0
+
+   Véase :ref:`interfaces <ifaces>` para más información.
+
+Una vez creado o modificado el archivo, deberemos recargar la configuración::
+
+   # networkctl reload
+
+No es necesario especificar interfaz alguna, porque se recargarán las
+configuraciones de todas las interfaces que hayan sufrido algún cambio. Si se
+quiere activar o desactivar una interfaz individual, puede hacerse::
+
+   # networkctl down eth0
+   # networkctl up eth0
+
+.. warning:: Pero si no ha recargado antes, se aplicará la configuración antigua.
+
+Para comprobar podemos consultar la configuración de la interfaz y de sus
+servidores |DNS|::
+
+   $ networkctl status eth0
+   $ resolvectl status eth0
+
+Configuración estática
+''''''''''''''''''''''
+Similar a la anterior, aunque habrá que ofrecer más información de
+configuración:
+
+.. code-block:: ini
+
+   [Match]
+   Name=eth0
+
+   [Network]
+   Address=192.168.255.10/24
+   Gateway=192.168.255.1
+   DNS=1.1.1.1 1.0.0.1
+   DNSOverTLS=opportunistic
+
+.. note:: La dos últimas líneas sobre |DNS| no son necesarias si llegamos a
+   definir una configuración global en :file:`/etc/systemd/resolved.conf`.
+   Añadir esta configuración en la interfaz, provocará que se use tal
+   configuración para el tráfico propio de ella.  La segunda línea permite hacer
+   consultas cifradas, si el servidor |DNS| las admite.
 
 .. _otros-conf-red:
 
 Otros métodos
 -------------
-
 Es posible realizar la configuración de red a través de aplicaciones gráficas,
 que ahorran la manipulación manual de ficheros. Las más habituales son:
 
@@ -349,15 +460,13 @@ que ahorran la manipulación manual de ficheros. Las más habituales son:
 * `wicd <http://wicd.sourceforge.net/>`_, apto para cualquier entorno gráfico
   y que dispone incluso de interfaz para la terminal no gráfica.
 
-Ambas aplicaciones son compatibles con tener configurada alguna interfaz a
-través del fichero :file:`/etc/network/interfaces`.
-
 .. _ej-redmin:
 
 .. include:: /99.ejercicios/082-redes.rst
 
 .. rubric:: Notas al pie
 
+.. [#] A fecha de redacción, la estable es *Bullseye*.
 .. [#] En realidad en el contenido de todo el directorio :file:`/etc/network`.
 .. [#] Si se instala el paquete *resolvconf*, si pueden incluirse.
 .. [#] Por ejemplo, *Ubuntu* usa netplan_, aunque sólo
