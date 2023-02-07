@@ -150,7 +150,7 @@ algunas distribuciones importantes son:
     manual.
   + Slackware_, que nació de SLS_.
   + RedHat_, que es la versión empresarial desarrollada por la empresa del
-    mismo nombre.  Tiene, más que derivadas, algunas variantes: Fedora_,
+    mismo nombre. Tiene, más que derivadas, algunas variantes: Fedora_,
     CentOS_, etc. En el :ref:`epígrafe introductorio sobre Linux del
     manual <linux>` hay información al respecto.
   + SuSE_, cuyas primeras versiones se publicaron como versión alemana de
@@ -195,10 +195,10 @@ En puridad, *Linux* sólo necesita una partición para el sistema raíz
 (habitualmente formateada en *ext4*, aunque no necesariamente). Ahora, es común
 que se creen otras particiones:
 
-* Partición para la *memoria de intercambio* cuyo tamaño suele ser el doble de la
-  memoria |RAM| hasta un máximo de 2GiB, con la salvedad de que, si se desea
-  hiberbar o suspender la ejecución, el tamaño debe ser al menos el de la
-  memoria |RAM|.
+* Partición para la *memoria de intercambio* para cuyo tamaño podemos usar la
+  fórmula expresada por :eq:`ram`. También es común que se prescinda de tal
+  partición y se use un archivo (con idénticas necesidades de tamaño), ya que a
+  partir de la versión *2.6* no hay diferencias de rendimiento.
 
 * Partición para datos de usuario montada sobre :file:`/home`.
 

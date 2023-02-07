@@ -4,7 +4,8 @@ Ejercicios sobre gestión de software
 #. Actualizar el sistema:
 
    a. Sin más.
-   #. Eliminando también los paquetes que se vuelven innecesarios.
+   #. Eliminando también en una sola orden los paquetes que se vuelven
+      innecesarios
 
 #. Instalar las herramientas para soportar |NTFS|.
 

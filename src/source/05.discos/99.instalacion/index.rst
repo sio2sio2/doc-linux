@@ -47,18 +47,18 @@ particionado |GPT| el arranque tanto con |BIOS| como con |UEFI|\ [#]_:
 .. table::
    :class: serv-part
 
-   ==================== ========== =========== ===============
-    Punto de montaje     Nombre     Tamaño      Tamaño previo
-   ==================== ========== =========== ===============
+   ==================== ========== ============ ===============
+    Punto de montaje     Nombre     Tamaño       Tamaño previo
+   ==================== ========== ============ ===============
     /                    RAIZ       5 GiB       1792 MiB
     /var/log             LOG        1 GiB       64 MiB
     /home                HOME       Variable    768 MiB
     /srv                 SRV        Variable    768 MiB
     /var/lib/mysql       MYSQL      Variable    768 MiB
-    swap                 SWAP       2 GiB       32 MiB
+    swap\ [#]_           SWAP       2 GiB\ [#]_       32 MiB
     /boot/efi            EFI        100 MiB     100 MIB
     \-                   BIOSBOOT   1 MiB       1 MiB
-   ==================== ========== =========== ===============
+   ==================== ========== ============ ===============
     
 La columna de *tamaño previo* indica el tamaño que le daremos a la partición en
 la máquina virtual y la de *tamaño* el que tendrá en el disco real. En este
@@ -601,7 +601,35 @@ problema.
    |ESP|, pero no está de más que la creemos por si en el futuro acabamos
    migrando el servidor a un *hardware* con arranque |UEFI|.
 
-.. [#] En nuestro caso, la segunda revisión de *Buster*, esto es,)la **10.2**.
+.. [#] Desde la versión *2.6* del núcleo, para memoria de intercambio, es tan
+   eficiente usar un archivo como una partición separada. `Este artículo de
+   Linuxize <https://linuxize.com/post/create-a-linux-swap-file/>`_ explica cómo
+   utilizar un archivo.
+
+.. [#] El tamaño apropiado de la partición de *swap* depende de la cantidad de
+   memoria disponible y de si se desea hibernar el equipo (cosa poco probable en un
+   servidor). Como regla general podemos establecer que la cantidad de *swap*
+   necesaria (**s**), **sin hibernación**, es del doble de la memoria
+   |RAM| cuando está es poca y del orden de su raíz cuadrada cuando es mucha
+   (por encima de **4** GiB), con lo que matemáticamente podríamos escribir esta
+   regla:
+
+   .. math::
+      :label: ram
+
+      s(m) = \left\{ \begin{array}{rcr}
+                        2m &  si & m \leq 1 \\
+                     \\ 2  &  si & 1 < m < 4 \\
+                     \\ \sqrt{m} &  si  & m \geq 4
+                     \end{array}
+             \right.
+
+   **Con hibernación** necesitaremos añadir un tamaño adicional igual al tamaño
+   de la |RAM| (p.e. será :math:`2 + m` cuando :math:`1<m<4` ).  `Esta guía
+   sobre memoria swap <https://help.ubuntu.com/community/SwapFaq>`_ de la página
+   de *Ubuntu* es de muy recomendable lectura. 
+
+.. [#] En nuestro caso, la segunda revisión de *Buster*, esto es, la **10.2**.
 
 .. [#] El administrador, sin embargo, es mejor que *hable inglés*, ya que de
    esta forma los errores se expresarán en inglés y será más fácil encontrar una
@@ -627,5 +655,6 @@ problema.
 .. |GRUB| replace:: :abbr:`GRUB (GRand Unified Bootloader)`
 .. |USB| replace:: :abbr:`USB (Universal Serial Bus)`
 .. |FAT| replace:: :abbr:`FAT (File Allocation Table)`
+.. |RAM| replace:: :abbr:`RAM (Random Access Memory)`
 
 .. _slitaz: http://www.slitaz.org
