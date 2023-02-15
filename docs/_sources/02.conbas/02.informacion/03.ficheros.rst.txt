@@ -100,12 +100,17 @@ conocer `cómo referirse a ellos <rutas>`_.
      `cp`_ más adelante)::
 
       $ ln vacio mismo.vacio
-      $ ls *vacio -l
+      $ ls vacio -l
       -rw-rw-r-- 2 profesor profesor 0 oct 14 10:02 mismo.vacio
       -rw-rw-r-- 2 profesor profesor 0 oct 14 10:02 vacio
 
-     Ahora hay dos nombres refiriéndose al mismo espacio. Por tanto, aparece un
-     *2*.
+     Ahora hay dos nombres refiriéndose al mismo espacio, por lo que aparece un
+     *2*. De hecho, si comprobamos qué :ref:`inodo <sf-fis>` refieren ambos
+     nombres, veremos que el mismo::
+
+      $ ls -1i vacio mismo.vacio
+      669 mismo.vacio
+      669 vacio
 
      En el caso de los directorios, el concepto es el mismo (referencias al
      propio directorio), aunque no está asociado al concepto de enlaces duros.
@@ -152,7 +157,13 @@ conocer `cómo referirse a ellos <rutas>`_.
 
      * Para *archivos*, representa el número de enlaces (duros) al propio
        archivo.
-     * Para *directorios*, el número de subdirectorios que contiene más 2.
+     * Para *directorios*, **2** más el número de subdirectorios que contiene.
+
+     .. warning:: En lo referente a directorios, el sistema de archivos |BTRFS|
+        no considera dentro de las cuentas para el número las referencias de "."
+        o "..". Como para directorios no se pueden hacer enlaces duros, este
+        campo siempre valdrá **1**.  Véase `Hard link count reported by \"ls -l\"
+        is wrong <https://www.spinics.net/lists/linux-btrfs/msg98964.html>`_.
 
    * Los dos siguientes campos son el **usuario propietario** y el **grupo
      propietario**, cuya explicación diferiremos hasta explicar los `permisos
@@ -226,10 +237,13 @@ conocer `cómo referirse a ellos <rutas>`_.
    * La fecha de *cambio* que indica el último momento en que se cambiaron los
      atributos de un archivo (propietarios, permisos, etc.).
 
-   * La fecha de *creación* que indica el momento en que se creó el archivo. En
-     este caso, el sistema de archivos es capaz de almacenarlo, pero los
-     sistemas unix no hacen uso de esta fecha, de modo que siempre la veremos
-     vacía.
+   * La fecha de *creación* que indica el momento en que se creó el archivo.
+     Algunos sistemas de archivos como *ext4* son capaces de almacenarla, pero hasta
+     versiones recientes de las `coreutils
+     <https://www.gnu.org/software/coreutils/coreutils>`_ no existía |API| para
+     poder obtenerla. Estoo cambió a partir de 2018 `como expone Stéphane
+     Chazelas en una respuesta de unix.stackexchange.com
+     <https://unix.stackexchange.com/a/119699>`_\ [#]_.
 
    Una opción interesante de :command:`stat` es ``-c`` que permite indicar el
    formato de salida del resultado de la consulta. Para expresar este formato cada
@@ -286,7 +300,7 @@ conocer `cómo referirse a ellos <rutas>`_.
 
    Si se usa la opción :kbd:`-i`, devuelve el :ref:`tipo MIME <mimetypes>`::
 
-      $ file primera_carlista.mp4
+      $ file -i primera_carlista.mp4
       primera_carlista.mp4: video/mp4; charset=binary
 
 .. _which:
@@ -1018,7 +1032,7 @@ Creando contenidos
    No pueden hacerse enlaces duros de directorios. Obsérvese, además, que ningún
    nombre es *más importante que otro*: el archivo se borrará definitivamente,
    mientras exista alguna referencia a él. Dicho de otro modo, no hay ningún
-   nombre (referencia)  *original* al que estén subordinados el resto de nombres.
+   nombre (referencia) *original* al que estén subordinados el resto de nombres.
 
 .. _install:
 .. index:: install
@@ -1174,12 +1188,17 @@ preferir :program:`nano`, un clónico mejorado del antiguo editor
 
 .. rubric:: Notas al pie
 
-.. [#] En realidad,  ``-p`` no preserva algunas propiedades como los atributos
-       extendidos. Usar ``-a`` implica, más bien, :kbd:`--preserve=all`.
+.. [#] El texto se escribió originariamente antes de esta fecha, razón por la
+   cual no aparece fecha de creación en la salida de :ref:`stat <stat>`.
 
 .. [#] :command:`which` no busca todos los programas que hay en nuestro árbol de
        directorios, ya que estos pueden encontrarse en cualquier lugar
        arbitrario. Véase la variable :ref:`PATH <PATH>`, para saber más al
        respecto.
 
+.. [#] En realidad,  ``-p`` no preserva algunas propiedades como los atributos
+       extendidos. Usar ``-a`` implica, más bien, :kbd:`--preserve=all`.
+
 .. |BSD| replace:: :abbr:`BSD (Berkeley Software Distribution)`
+.. |BTRFS| replace:: :abbr:`BTRFS (B-Tree Filesystem)`
+.. |API| replace:: :abbr:`API (Application Programming Interface)`

@@ -50,13 +50,11 @@ Antes de cifrar cualquier directorio es necesario crear las estructuras
 necesarias::
 
    # fscrypt setup
-   # fscrypt setup /
    # fscrypt setup /home
 
-La primera orden crea la configuración :file:`/etc/fscrypt.conf`, la segunda es
-necesaria si se quiere usar la contraseña del propio usuario como clave para el
-cifrado; y la tercera se requiere para poder usar otro tipo de claves para el
-cifrado.
+La primera orden crea la configuración :file:`/etc/fscrypt.conf` y en
+:file:`/.fscrypt`, y la segunda se requiere para poder usar otro tipo de claves
+para el cifrado.
 
 .. rubric:: Operativa
 
@@ -65,20 +63,27 @@ Para cifrar un directorio basta con que el usuario haga::
    $ mkdir ~/privado
    $ fscrypt encrypt ~/privado --source=pam_passphrase
 
-que usará como clave su propia contraseña de usuario. Además, de preparar el
-directorio para que se almacenen los datos cifrados, lo *desbloquea*, lo que
-significa que podremos escribir y leer dentro de él de forma transparente,
-aunque lo datos se guarden cifrados::
+que usará como clave su propia contraseña de usuario.
+
+.. note:: Sin embargo, al detectar la orden que nuestro directorio personal se
+   encuentra en un sistema de archivos diferente al raíz, nos da la posibilidad
+   de crear una clave extra que podremos usar para desbloquear el sistema en
+   caso de que formateemos la partición raíz.
+
+Además, de preparar el directorio para que se almacenen cifrados los datos, lo
+*desbloquea*, lo que significa que podremos escribir y leer dentro de él de
+forma transparente, aunque lo datos se guarden cifrados::
 
    $ fscrypt status ~/privado
    "/home/usuario/privado/" is encrypted with fscrypt.
 
-   Policy:   822664193b8152b4
+   Policy:  7892f8f9c076a98feac6ba4b22956021 
    Unlocked: Yes
 
-   Protected with 1 protector:
+   Protected with 2 protector:
    PROTECTOR         LINKED   DESCRIPTION
-   1095888ae485002d  Yes (/)  login protector for usuario
+   c53864a71dd271b8  Yes (/)  login protector for usuario
+   89fa83d5083aaf35  No       custom protector "Recovery passphrase for privado"
 
 La ventaja de usar la contraseña de usuario es doble:
 
@@ -90,18 +95,19 @@ La ventaja de usar la contraseña de usuario es doble:
 También puede usarse una clave distinta a la de usuario::
 
    $ mkdir ~/secreto
-   $ fscrypt encrypt ~/secreto --source=custom_passphrase
+   $ fscrypt encrypt ~/secreto --source=custom_passphrase --name="miclave"
    $ fscrypt status ~/secreto
-   "/home/usuario/secreto/" is encrypted with fscrypt.
+   "secreto/" is encrypted with fscrypt.
 
-   Policy:   2aca13a317cf9195
+   Policy:   6d6a13b4f0372393bf145dd5b82a41ea
+   Options:  padding:32 contents:AES_256_XTS filenames:AES_256_CTS policy_version:2
    Unlocked: Yes
 
    Protected with 1 protector:
    PROTECTOR         LINKED  DESCRIPTION
-   9572560fc543c9b5  No      custom protector "1234"
+   ce8e40654e96553d  No      custom protector "miclave"
    
-En este caso se ha usado una frase personalizada de nombre "1234". En futuros
+En este caso se ha usado una frase personalizada de nombre "miclave". En futuros
 reinicios, el directorio estará bloqueado y habrá que desbloquearlo
 explícitamente proporcionando la contraseña::
 
@@ -110,7 +116,19 @@ explícitamente proporcionando la contraseña::
 Por otro lado, si se quiere cambiar la contraseña, habrá que ejecutar lo
 siguiente::
 
-   $ fscrypt metadata change-passphrase --protector=/home:9572560fc543c9b5
+   $ fscrypt metadata change-passphrase --protector=/home:ce8e40654e96553d
+
+.. note:: Es posible añadir claves de desbloqueo extras a un directorio ya
+   cifrado (p.e. a :file:`~/privado`)::
+
+      $ fscrypt metadata create protector /home --name="protector extra" --source=custom_passphrase
+      Create new protector on "/home" [Y/n] y
+      Enter custom passphrase for protector "protector extra":
+      Confirm passphrase:
+      Protector 1097fd3459807989 created on filesystem "/home".
+      $ fscrypt metadata add-protector-to-policy --protector=/home:1097fd3459807989 --policy=/home:7892f8f9c076a98feac6ba4b22956021
+
+   donde para *policy* hemos indicado la asociada a :file:`~/privado`.
 
 .. rubric:: Cifrado del propio directorio de usuario
 
