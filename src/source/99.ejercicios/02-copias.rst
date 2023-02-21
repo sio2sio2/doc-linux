@@ -12,7 +12,7 @@ a. Lleve a cabo las siguienes tareas:
       :file:`sigo.en.blanco`. Use rutas relativas tanto para el origen como para
       el destino.
 
-   #. Hacer un enlace duro en el directorio temporal conservando el nombre.
+   #. Del archivo original hacer un enlace duro en el directorio temporal conservando el nombre.
       ¿Es posible en el sistema en que está trabajando? ¿Por qué?
 
    #. Crear la siguiente estructura de directorios:
