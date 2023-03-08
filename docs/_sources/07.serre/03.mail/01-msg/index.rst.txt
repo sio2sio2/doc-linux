@@ -1,3 +1,5 @@
+.. _mensaje-correo:
+
 El mensaje de correo
 ********************
 El contenido del epígrafe describe cuál es la estructura de los mensajes de
@@ -196,11 +198,11 @@ y la línea en blanco separadora el cuerpo del mensaje se verá así::
    IMAGEN CODIFICADA EN BASE64
 
 Es decir cada parte del mensaje (la primera es el cuerpo del texto) se marca con
-el indentificador aparecido en el **Content-Type** de la cabecera y, además se
+el identificador aparecido en el **Content-Type** de la cabecera y, además se
 incluyen unas cuantos campos que definen cuál es el tipo particular de esa
 parte. Acabados estos campos, se usa una línea en blanco para separar esta
 *cabecera de parte* de los datos de dicha parte y a continuación se incluyen los
-datos. La estrcutura se repite tantas veces como adjuntos haya.
+datos. La estructura se repite tantas veces como adjuntos haya.
 
 .. _smtp-trans:
 

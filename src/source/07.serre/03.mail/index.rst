@@ -30,20 +30,21 @@ Cuando se escribe en la barra de direcciones del navegador esto, se pide la
 conexión con la máquina *www.google.es*. Por ese motivo, en las conexiones
 |HTTP| puede prescindirse de los nombres y usar directamente la dirección |IP|.
 En cambio, cuando un cliente de correo envía un mensaje a la cuenta
-:code:`paco@hotmail.com``, no se especifica cuál es el servidor de correo en el
+:code:`paco@hotmail.com`, no se especifica cuál es el servidor de correo en el
 que hay que dejar el mensaje, sólo el dominio. Eso exige que exista un registro
 *MX* para la zona |DNS| que define el dominio  que identifique cuál es la
 máquina que se encarga del servicio de correo.
 
 .. seealso:: Tenga presente :ref:`las lecciones sobre DNS <dns>`, porque antes
-   de comenzar la instalación hay que configurar el |DNS| a fin de definir para
-   la red cuál será el servidor de correo.
+   de comenzar la instalación hay que configurar el |DNS| a fin de definir
+   cuál será el servidor de correo para el dominio.
 
 .. warning:: Los contenidos son bastente prolijos y no pretenden ser una guía
    paso a paso de como configurar por completo un servidor de correo. Presentan
    distintos conceptos y proponen configuraciones, algunas redundantes y otras
    que no tienen por qué llevarse a cabo. Para seguir una instalación ordenada
-   recurra a :ref:`nuestra chuleta <smtp-chuleta>`.
+   recurra al :ref:`índice sobre el servicio incluido para el módulo de
+   Servicios en Red de SMR <ser-correo>`. 
 
 .. toctree::
    :glob:

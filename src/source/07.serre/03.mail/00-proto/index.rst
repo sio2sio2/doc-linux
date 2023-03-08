@@ -20,8 +20,23 @@ servidor o de un servidor distinto. Al ser cuenta de *hotmail*, se comunica con
 el servidor correspondiente con una conexión |SMTP| sin autenticar y le
 transmite el mensaje. De este modo, el mensaje llega al servidor destino y acaba
 el papel del protocolo |SMTP| en la comunicación. En algún momento, *paco*,
-sentado frente a su equipo personal, deseará leer sus mensajes y para ello se
-conectará al servidor usando protocolos como |POP3| o |IMAP|.
+sentado frente a su equipo personal, deseará leer sus mensajes y para ello con
+un agente de correo (|MUA|), como `Outlook
+<https://es.wikipedia.org/wiki/Microsoft_Outlook>`_, se conectará al servidor
+usando protocolos como |POP3| o |IMAP|.
+
+.. note:: El esquema anterior era el habitual hasta la irrupción de los
+   *webmail*, esto es, de los clientes de correo electrónico basados en interfaz
+   web, que existen desde antiguo, pero que vinieron a imponerse a los |MUA|
+   tradicionales a partir de la irrupción de `GMail
+   <https://es.wikipedia.org/wiki/Gmail>`_. En un esquema con *webmail* el
+   cliente final (:kbd:`paco@hotmail.com`) se conecta a un servidor web usando
+   su navegador habitual y es el servidor web el que debe acceder a las buzones
+   de usuario. El cómo lo haga puede variar y no ser mediante un protocolo
+   estándar, ya que muy comúnmente el propietario del servicio de correo y del
+   servidor web son la misma compañía, pero es posible utilizar |IMAP| como
+   hacen los |MUA| de usuario final. Este es el caso del webmail :ref:`Roundcube
+   <roundcube>`.
 
 .. _agentes-correo:
 
@@ -97,7 +112,7 @@ Los puertos característicos del servicio son los siguientes:
       |MTA|.
 
    **587/TCP**
-      COmo el anterior, puerto destinado a la comunicación autenticada entre
+      Como el anterior, puerto destinado a la comunicación autenticada entre
       |MSA| y |MTA|, pero usando |SMTP| seguro con negociación previa.
 
 .. rubric:: Notas al pie
