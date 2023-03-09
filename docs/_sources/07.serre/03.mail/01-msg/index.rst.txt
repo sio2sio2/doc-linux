@@ -6,13 +6,13 @@ El contenido del epígrafe describe cuál es la estructura de los mensajes de
 correo, ya que el conocimiento de ésta es necesario para la implementación de
 filtros en el servidor |SMTP|.
 
-Los mensajes de correo son siempre ficheros de texto plano constituidos siempre
+Los mensajes de correo son siempre archivos de texto plano constituidos siempre
 por caracteres |ASCII| puros (7 *bits*). Para permitir el uso de otros caracteres
 y de adjuntos binarios (fotos, etc.) se creó |MIME|\ [#]_.
 
 Estructura básica
 =================
-Entendemos por ella la de los mensajes que carecen de ficheros adjuntos. En este
+Entendemos por ella la de los mensajes que carecen de archivos adjuntos. En este
 caso, en el correo se distinguen dos partes:
 
 #. La **cabecera** (*header* en inglés), constituida por un conjunto de campos

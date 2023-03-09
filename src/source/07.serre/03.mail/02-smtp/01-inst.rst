@@ -39,7 +39,7 @@ para este segundo dominio::
 
 Para resolver esto, podemos optar por la solución que deseemos. Posiblemente la
 más rápida y sencilla sea instalar un servidor |DNS| en la primera de las
-máquinas que resuelve ambas dominios. Por otra parte, el fichero de definición
+máquinas que resuelve ambas dominios. Por otra parte, el archivo de definición
 de zona tendrá que tener al menos los siguientes registros (aparte del registro
 *SOA*)::
 
@@ -140,7 +140,7 @@ que nos planteará la siguientes preguntas:
    .. image:: files/postfix2-nombre.png
 
    En este campo introducimos el nombre del dominio que gestionamos, que pasará
-   a constituir el contenido del fichero :file:`/etc/mailname`.
+   a constituir el contenido del archivo :file:`/etc/mailname`.
 
 #. Usuario receptor de los mensajes de administración:
 
@@ -155,13 +155,13 @@ que nos planteará la siguientes preguntas:
       postmaster:    root
       root:    usuario
 
-   En realidad, como su nombre indica, este fichero es un fichero de *alias* y
+   En realidad, como su nombre indica, este archivo es un archivo de *alias* y
    podemos modificarlo o añadir más entradas posteriormente::
 
       # echo 'mailadmin:    root' >> /etc/aliases
       # newaliases       # Obligatorio regenerar aliases.db después de su modificación
 
-   .. seealso:: Se ofrece algo más de información sobre este fichero :ref:`algo
+   .. seealso:: Se ofrece algo más de información sobre este archivo :ref:`algo
       más adelante <postfix-aliases>`.
 
 #. Dominios del servidor:
@@ -209,7 +209,7 @@ que nos planteará la siguientes preguntas:
 
 La configuración principal de :command:`postfix` se guarda en
 :file:`/etc/postfix/main.cf`, por lo que este proceso equivale a añadir las
-siguientes líneas a tal fichero\ [#]_:
+siguientes líneas a tal archivo\ [#]_:
 
 .. _postfix-conf-bas-main.cf:
 
@@ -233,7 +233,7 @@ siguientes líneas a tal fichero\ [#]_:
    :command:`dpkg-recofigure` se encarga de ello.
 
 Conviene modificar el nombre de la máquina expresado en la configuración (la
-línea resaltada) a *smtp.mail1.org*, de modo que podemos editar el fichero o
+línea resaltada) a *smtp.mail1.org*, de modo que podemos editar el archivo o
 bien::
 
    # postconf -e 'myhostname = smtp.mail1.org'
@@ -272,7 +272,7 @@ smtpd_tls_security_level_.
 
 Otro aspecto importantísimo del cifrado es preparar las clave pública y privado
 para llevar a cabo el cifrado. Si se echa un vistazo a la configuración de
-:program:`postfix`, se comprobará que el fichero ya trae definidas unas claves
+:program:`postfix`, se comprobará que el archivo ya trae definidas unas claves
 pública y privada::
 
    $ egrep '(cert|key)_file' /etc/postfix/main.cf 
@@ -331,18 +331,18 @@ llevarse a cabo del siguiente modo::
 
    # apt-get install sasl2-bin
 
-y configurarlo a través del fichero :file:`/etc/default/saslauthd`, lo cual
+y configurarlo a través del archivo :file:`/etc/default/saslauthd`, lo cual
 exige modificar dos líneas::
 
    START=yes
 
-y una al final del fichero, ya que :program:`postfix` en *debian* se ejecuta
+y una al final del archivo, ya que :program:`postfix` en *debian* se ejecuta
 enjaulado::
 
    OPTIONS="-c -m /var/spool/postfix/var/run/saslauthd"
 
 Hay, además, que configurar :program:`postfix` para que lo use, por lo que
-habrá que crear el fichero :file:`/etc/postfix/sasl/smtpd.conf`::
+habrá que crear el archivo :file:`/etc/postfix/sasl/smtpd.conf`::
 
    $ cat > /etc/postfix/sasl/smtpd.conf
    pwcheck_method: saslauthd
@@ -479,6 +479,29 @@ requiere primero saber cómo transmitir nuestra identidad al servidor\ [#]_:
    QUIT
    221 2.0.0 Bye
 
+.. note:: Hemos usado como mecanismo de autenticación ``PLAIN``. Si también
+   fuera válido ``LOGIN`` (la :ref:`autenticación SASL con dovecot
+   <postfix-dovecot-sasl>` la configuramos para que también lo sea), podríamos
+   haberlo comprobado del modo siguiente:
+
+   .. code-block:: console
+      :emphasize-lines: 2,4,7,9,11
+
+      $ printf "usuario" | base64
+      dXN1YXJpbw==
+      $ printf "contraseña" | base64
+      Y29udHJhc2XDsWE=
+      $ openssl s_client -connect localhost:smtp -starttls smtp -quiet
+      [...]
+      AUTH LOGIN
+      334 VXNlcm5hbWU6
+      dXN1YXJpbw==
+      334 UGFzc3dvcmQ6
+      Y29udHJhc2XDsWE=
+      235 2.7.0 Authentication successful
+      QUIT
+      221 2.0.0 Bye
+
 El último paso de la comprobación sería enviar un mensaje a través de este
 servidor al otro después de haberlo configurado también. La forma más
 sencilla es usar el ejecutable :command:`sendmail` y comprobar que el mensaje se
@@ -502,7 +525,7 @@ podríamos instalar :ref:`msmtp <msmtp>`, que es un pequeño |MSA|::
 
    # apt-get install msmtp
 
-y crear para el usuario emisor del mensaje el fichero :file:`~/.msmtprc`\
+y crear para el usuario emisor del mensaje el archivo :file:`~/.msmtprc`\
 [#]_:
 
 .. code-block:: apache
@@ -594,25 +617,23 @@ Nuestra estrategia en este caso, es aplicar el valor de tal directiva a los
 puertos **465** y **587** que son los que destinamos a la conexión de los |MSA|
 y, por tanto, requerirán autenticación. La otra directiva es, en realidad, un
 nombre inventado que aplicaremos a la configuración del puerto **25** editando
-el fichero :file:`/etc/postfix/master.cf`::
+el archivo :file:`/etc/postfix/master.cf`::
 
-   smtp      inet  n       -       y       -       -       smtpd
+   smtp        inet  n       -       y       -       -       smtpd
       -o smtpd_sasl_auth_enable=no
       -o smtpd_recipient_restrictions=$port25_recipient_restrictions
-   urd       inet  n       -       y       -       -       smtpd
+   submissions inet  n       -       y       -       -       smtpd
       -o smtpd_tls_wrappermode=yes
-   submission inet n       -       y       -       -       smtpd
+   submission  inet n       -       y       -       -       smtpd
    
 .. note:: En el :file:`master.cf` original sólo la línea del servicio |SMTP|
    está habilitada y sin añadir configuración lo que quiere decir que se tomará
    aquella escrita en :file:`main.cf`.
 
-.. note:: *urd*, y no |SMTP|\ s, es el servicio asociado al puerto **465** según
-   el fichero :file:`/etc/services`. Esto se debe a que |SMTP|\ s se abandonó en
-   el estándar en favor del uso de *STARTTLS*, así que tal puerto se asoció
-   posteriormente a `otro servicio distinto
-   <http://ftp.ipsyn.net/pub/mirrors/cisco/ftpeng.cisco.com/ipmulticast/ssm/>`_.
-
+.. note:: *submissions* es el servicio asociado al puerto **465/TCP** según
+   el archivo :file:`/etc/services`; y *submission* el asociado al **587/TCP**\
+   [#]_.
+  
 Como vemos, en el puerto **25**, deshabilitamos la autenticación, ya que no es
 nuestro propósito que lo usen los |MSA|, y usamos como restricciones las que
 definimos en :file:`main.cf` anteriormente. En el puerto **465** lo que hacemos
@@ -664,9 +685,9 @@ Cada cuenta prueba :program:`postfix` en uno de los puertos de escucha:
 
 Configuración
 =============
-Ya se ha dicho que el principal fichero de configuración de :program:`postfix`
+Ya se ha dicho que el principal archivo de configuración de :program:`postfix`
 es :file:`/etc/postfix/main.cf`, de modo que consultando o editando este
-fichero, puede revisarse o modificarse la configuración. No obstante, se dispone
+archivo, puede revisarse o modificarse la configuración. No obstante, se dispone
 de la utilidad :command:`postconf`, que permite realizar ambas acciones:
 
 #. Consultar la configuración::
@@ -674,8 +695,8 @@ de la utilidad :command:`postconf`, que permite realizar ambas acciones:
       $ postconf -n
 
    La opción ``-n`` provoca que sólo se muestren las directivas incluidas en el
-   fichero :file:`/etc/postfix/main.cf`. Si se prescinde de ella, se mostrarán
-   todas, tambíen aquellas que no se relacionan en el fichero y conservan, por
+   archivo :file:`/etc/postfix/main.cf`. Si se prescinde de ella, se mostrarán
+   todas, tambíen aquellas que no se relacionan en el archivo y conservan, por
    tanto, su valor predeterminado.
 
    Si se quiere consultar un valor concreto, puede indicarse como argumento la
@@ -704,7 +725,7 @@ de la utilidad :command:`postconf`, que permite realizar ambas acciones:
 
    .. note:: Pueden indicarse varias directivas en sendos parámetros.
 
-#. Comentar una directiva presente en el fichero::
+#. Comentar una directiva presente en el archivo::
 
       # postfix -# home_mailbox
 
@@ -856,11 +877,11 @@ Fase de **entrega**
    *UNIX* hay algunos programas básicos que usan el servicio de correo para
    informar al usuario (p.e. :command:`apt-get` o :command:`cron`)
 .. [#] Aunque se deja sin configurar en primera instancia el servidor, el
-   *script* llega a crear el fichero :file:`/etc/aliases`, lo que provoca que, 
+   *script* llega a crear el archivo :file:`/etc/aliases`, lo que provoca que, 
    auunque se responda a la pregunta durante la próxima configuración, éste no
    se toque y, en consecuencia, nunca se llegue a escribir en él qué usuario
    recibirá los correos de *root*. La manera más sencilla de evitarlo, que es la
-   que se propone es borrar primero el fichero. También puede optarse por
+   que se propone es borrar primero el archivo. También puede optarse por
    realizar la configuración y, después, añadir a mano la línea::
 
       root: nombre_usuario
@@ -904,14 +925,21 @@ Fase de **entrega**
       QUIT
       221 2.0.0 Bye
 
-.. [#] El fichero puede o no incluir la contraseña. Si la incluye, no la pedirá
-   al enviar el correo, pero será necesario cambiar los permisos del fichero
+.. [#] El archivo puede o no incluir la contraseña. Si la incluye, no la pedirá
+   al enviar el correo, pero será necesario cambiar los permisos del archivo
    para que sólo pueda ser leído por el usuario::
 
       $ chmod 600 ~/.msmtprc
       
 .. [#] La opción ``-a`` podemos ahorrárnoslas, puesto que la cuenta *vm25* la
    hemos definido como la predeterminada.
+
+.. [#] Durante algunas versiones de *Debian* (y hasta *Buster*) el servicio por
+   el puerto **465/TCP** se asociaba al nombre *urd*. Esto se debe a que |SMTP|\
+   s se abandonó en el estándar en favor del uso de *STARTTLS*, así que tal
+   puerto se asoció posteriormente a `otro servicio distinto
+   <http://ftp.ipsyn.net/pub/mirrors/cisco/ftpeng.cisco.com/ipmulticast/ssm/>`_.
+
 .. [#] La directiva de ejemplo limita el tamaño máximo de mensaje de correo a
    aproximadamente *20MB*. Este valor, por defecto, es 10MB.
 
