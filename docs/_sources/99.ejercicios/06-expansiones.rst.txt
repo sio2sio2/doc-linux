@@ -55,10 +55,17 @@ Ejercicios sobre expansiones
 #. Comprobar cuáles son las páginas de manual en español de la primera sección
    que empiezan por la letra «*m*».
 
+   .. note:: No intente resolver este  ejercicio (ni los que hay a continuación)
+      directamente con la orden :ref:`man <man>` (p.e. :code:`man -s1 -Les -w
+      --wildcard --names-only 'm*'`), porque además de que :command:`man` no
+      restringe su búsqueda al idioma (siempre busca también en las de inglés
+      americano), la intención es que con :ref:`ls <ls>` utilice comodines en las
+      rutas para obtener los archivos de esas páginas.
+
 #. Lo mismo, pero en cualquier sección.
 
 #. Lo mismo, pero en cualquier sección y lengua.
 
 #. ¿Cuántos kernel de linux distintos hay instalados en el sistema?
     
-   .. note:: Pruebe a buscarlos; no use herramientas como :program:`dpkg`.
+   .. note:: Pruebe a buscarlos en el sistema de archivos; no use el gestor de paquetes.

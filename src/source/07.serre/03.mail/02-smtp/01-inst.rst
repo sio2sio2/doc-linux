@@ -422,7 +422,7 @@ puertos **25**, **465** y **587**, según se describió :ref:`al tratar el proto
 `Dovecot SASL`_
 ---------------
 La alternativa al método anterior es usar :program:`dovecot`. En puridad basta
-con instalar el paquete *dovecot-core*, aunque si pretendemos proporcionar
+con instalar el paquete :deb:`dovecot-core`, aunque si pretendemos proporcionar
 también un servidor |IMAP| es mejor, directamente::
 
    # apt-get install dovecot-imapd
@@ -871,11 +871,12 @@ Fase de **entrega**
 .. rubric:: Notas al pie
 
 .. [#] Véanse los :ref:`preliminares de la configuración DNS <pre-dns>`.
-.. [#] En *debian* el servidor de correo predeterminado (asociado al paquete
-   *default-mta*) es :command:`exim4` y hasta *wheezy* o *jessie* se instalaba
-   con la instalación mínima. Este hecho no es raro, porque en los sistemas
+.. [#] En *Debian* el servidor de correo predeterminado (asociado al paquete
+   *default-mta*) fue :command:`exim4` y hasta *Wheezy* o *Jessie* se instalaba
+   con la instalación mínima. En las versiones modernas parece haber
+   desaparecido el paquete. Este hecho no es raro, porque en los sistemas
    *UNIX* hay algunos programas básicos que usan el servicio de correo para
-   informar al usuario (p.e. :command:`apt-get` o :command:`cron`)
+   informar al usuario (p.e. :command:`apt-get` o :command:`cron`).
 .. [#] Aunque se deja sin configurar en primera instancia el servidor, el
    *script* llega a crear el archivo :file:`/etc/aliases`, lo que provoca que, 
    auunque se responda a la pregunta durante la próxima configuración, éste no

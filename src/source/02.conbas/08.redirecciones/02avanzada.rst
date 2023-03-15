@@ -6,9 +6,9 @@ Redirección avanzada
    pretende hacer *scripts*. Para el uso interactivo de la *shell* basta con los
    conceptos explicados bajo el epígrafe anterior.
 
-Ya se ha expuesto que la *shell* tiene abiertos tres ficheros a los que asigna
+Ya se ha expuesto que la *shell* tiene abiertos tres archivos a los que asigna
 los descriptores *0*, *1* y *2*. Ahora bien, pueden usarse otros descriptores y
-asociarse a estos descriptores ya existentes o a ficheros.
+asociarse a estos descriptores ya existentes o a archivos.
 
 Pero Antes de ello introduzcamos un par de herramientas más:
 
@@ -60,7 +60,7 @@ Pero Antes de ello introduzcamos un par de herramientas más:
    Esta orden permite, además, dar valor a varias variables a la vez y está muy
    relacionada con la :ref:`variable IFS <sh-ifs>`, que codifica los
    caracteres que para :command:`read` representan un separador de campos. Su
-   valor predeterminado es "\\t \\n". Por este motivo\ [#]_::
+   valor predeterminado es "\\t \\n". Por este motivo::
 
       $ read x y <<<"1 2"
       $ echo "x=$x -- y=$y"
@@ -130,19 +130,19 @@ Pero Antes de ello introduzcamos un par de herramientas más:
 
 Puesto estos mimbres veamos qué otras cosas podemos hacer.
 
-Una posibilidad es usar un nuevo descriptor conectado a un fichero (si el
-fichero no existe se creará)::
+Una posibilidad es usar un nuevo descriptor conectado a un archivo (si el
+archivo no existe se creará)::
 
-   $ exec 3<>/tmp/fichero.txt
+   $ exec 3<>/tmp/archivo.txt
 
 De este modo, este descriptor servirá tanto para entrada como para salida.
 Puede, si se desea, sólo conectarlo para entrada o sólo para salida. El caso, es
 que ahora, cualquier cosa que se envíe a este descriptor, acabará en el
-fichero::
+archivo::
 
    $ echo "Hola" >&3
    $ echo "Adiós" > &3
-   $ cat /tmp/fichero.txt
+   $ cat /tmp/archivo.txt
    Hola
    Adiós
 
@@ -151,15 +151,15 @@ si intentamos leer del descriptor::
 
    $ cat <&3
 
-No obtendremos nada, pues nos encontramos al final del fichero. Cuando deseamos
+No obtendremos nada, pues nos encontramos al final del archivo. Cuando deseamos
 cerrar el descriptor basta con hacer lo siguiente::
 
    $ exec 3>&-
 
-y dejará de haber conexión entre el descriptor y el fichero.
+y dejará de haber conexión entre el descriptor y el archivo.
 
 Un uso que se hace a veces dentro de los *scripts* es asociar la salida estándar
-a un fichero, de manera que no haya que hacer la redirección al fichero en cada
+a un archivo, de manera que no haya que hacer la redirección al archivo en cada
 comando. Analicemos el siguiente trozo de código.
 
 .. code-block:: bash
@@ -177,21 +177,21 @@ comando. Analicemos el siguiente trozo de código.
 
 La primera línea logra dos cosas: que el descriptor **3** conecte su salida a donde
 la conecta el descriptor **1** (la pantalla) y después que este último se conecte al
-fichero :file:`/tmp/salida.txt`. La consecuencia es que a partir de este momento
-todas las órdenes usarán como salida estándar el fichero. La línea **7**
+archivo :file:`/tmp/salida.txt`. La consecuencia es que a partir de este momento
+todas las órdenes usarán como salida estándar el archivo. La línea **7**
 restituye la situación inicial, ya que hace que el descriptor 1 conecte su
 salida a la del descriptor **3**, o sea, la pantalla y, después, cierra el
 conector 3. Por tanto, a partir de ese momento, las órdenes volverán a mostrar
 su salida estándar por pantalla.
 
 Menos común, pero también posible es que queramos asociar la entrada estándar a
-un fichero:
+un archivo:
 
 .. code-block:: bash
 
    exec 3<&0 </tmp/entrada.txt
 
-   read -r primera  # Esto lee la primera línea del fichero.
+   read -r primera  # Esto lee la primera línea del archivo.
    echo "Primera línea: $primera"
    read -r segunda  # Y esto, la segunda.
    echo "Segunda líneaa: $segunda"
@@ -214,25 +214,14 @@ un fichero:
          2
          3
 
-      no funcionarán como esperamos, y ni veremos que ``MIVAR`` pase a valer 1.
-      La razón es que cuando se hace una tubería el segundo comando se ejecuta
-      en una subshell y, consecuentemente, estamos cambiando el valor de la
-      variable dentro de la subshell::
+       no funcionarán como esperamos, por lo que no veremos que ``MIVAR`` pase a
+       valer 1.  La razón es que cuando se hace una tubería el segundo comando
+       se ejecuta en una subshell y, consecuentemente, estamos cambiando el
+       valor de la variable dentro de la subshell::
 
-         $ echo -e "1\n2\n3" | { read MIVAR ; echo $MIVAR; }
-         1
+         $ echo -e "1\n2\n3" | { read MIVAR ; echo "Valor: $MIVAR"; }
+         Valor: 1
+         $ echo "Valor: $MIVAR"  # No devuelve valor
+         Valor: 
 
-      Sin embargo, al salir de la subshell la asignación se pierde.
-
-.. [#] Hay una razón fundada por la que estos ejemplos usan la redirección no
-   estándar de :program:`bash`, en vez de una tubería::
-
-      $ echo "1 2" | read x y
-
-   y es que la tubería provoca que ambas ordenes se ejecuten en sendas
-   *subshells* independientes. La consecuencia de esto es que :kbd:`x` e
-   :kbd:`y` no existen en la *shell* principal, así que tras ejecutar la orden
-   nos encontraremos con que no hemos logrado nada::
-
-      $ echo $x  # No devuelve valor alguno.
-
+       Sin embargo, al salir de la subshell la asignación se pierde.

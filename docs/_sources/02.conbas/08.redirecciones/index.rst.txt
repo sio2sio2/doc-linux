@@ -3,7 +3,7 @@
 Redirección de E/S
 ==================
 
-En la *shell* hay tres ficheros abiertos de modo predeterminado:
+En la *shell* hay tres archivos abiertos de modo predeterminado:
 
 #. La entrada estándar (*stdin*), que es el teclado.
 #. La salida estándar (*stdout*), que es la pantalla.
@@ -11,13 +11,13 @@ En la *shell* hay tres ficheros abiertos de modo predeterminado:
 
 Por ejemplo, cuando usamos :ref:`cat <cat>` de forma normal::
 
-   $ cat fichero
-   [... El contenido del fichero ...]
+   $ cat archivo
+   [... El contenido del archivo ...]
 
-este lee el fichero y devuelve su contenido por la salida estándar, porque es
+este lee el archivo y devuelve su contenido por la salida estándar, porque es
 su salida natural. Consecuentemente, vemos aparecer el contenido por la
 pantalla. Si, en cambio, no le damos ningún  argumento, esto es,
-no le decimos de qué fichero queremos que lea, :command:`cat` pasa a esperar
+no le decimos de qué archivo queremos que lea, :command:`cat` pasa a esperar
 recibir el contenido por la entrada estándar; y al ser esta el teclado, queda
 esperando a que escribamos algo por teclado::
 

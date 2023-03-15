@@ -3,7 +3,7 @@
 Redirección básica
 ==================
 
-Para este caso trataremos sólo los tres ficheros antes indicados:
+Para este caso trataremos sólo los tres archivos antes indicados:
 
 ================== ==================== ===================
 Nombre             Dipositivo           Descriptor asociado
@@ -16,13 +16,13 @@ Salida de errores  :file:`/dev/stderr`   2
 y no haremos redirecciones permanentes.    
 
 La tercera columna, intitulada *Descriptor asociado*, hace referencia al
-descriptor de fichero, o sea, al número entero, con el que es posible hacer
-referencia al fichero en cuestión.
+descriptor de archivo, o sea, al número entero, con el que es posible hacer
+referencia al archivo en cuestión.
 
 Salida
 ------
 La redirección de salida consiste en redirigir la salida estándar o la salida
-de errores hacia otro fichero que puede ser la otra salida o un fichero
+de errores hacia otro archivo que puede ser la otra salida o un archivo
 regular.
 
 Consideremos la siguiente orden::
@@ -31,29 +31,29 @@ Consideremos la siguiente orden::
 
 Sabemos ya que el comando leerá de teclado (la entrada estándar) y escribirá en
 la pantalla (la salida estándar). Si queremos redirigir la salida hacia un
-fichero regular, basta con lo siguiente::
+archivo regular, basta con lo siguiente::
 
    $ cat > contenedor_de_tonterias
    Esto que escribo, ya no aparece por la pantalla,
    puesto que se redirige la salida estándar
-   hacia un fichero llamado 'contenedor_de_tonterias'.
+   hacia un archivo llamado 'contenedor_de_tonterias'.
 
 
-Tal fichero puede o no existir: si no existe, se creará; si existe, se
+Tal archivo puede o no existir: si no existe, se creará; si existe, se
 sustituirá su anterior contenido por lo que escribamos ahora. Es posible también
-redirigir al fichero añadiendo en vez de sustituyendo::
+redirigir al archivo añadiendo en vez de sustituyendo::
 
    $ cat >> contenedor_de_tonterías
    Añadimos un par de líneas adicionales
    a las que escribimos antes
 
-El resultado es que el fichero contendrá 5 líneas: ls tres anteriores y estas
+El resultado es que el archivo contendrá 5 líneas: ls tres anteriores y estas
 dos nuevas, en vez de contener sólo estas dos últimas, lo cual habría ocurrido
 si hubiéramos usado una redirección simple.
 
 Hay ocasiones en que redirigimos la salida no porque deseemos guardar
 resultados, sino porque deseamos no verlos. En este caso, es sumamente útil
-el fichero especial :file:`/dev/null`, que se traga todo lo que le echemos sin
+el archivo especial :file:`/dev/null`, que se traga todo lo que le echemos sin
 dejar rastro::
 
    $ ls /usr/bin/ > /dev/null
@@ -80,7 +80,7 @@ mensaje de error deberíamos haber hecho::
 
    $ sadhgaskjhsa 2> /dev/null
 
-También es posible redirigir una fichero de salida hacia el otro. Por ejemplo,
+También es posible redirigir una archivo de salida hacia el otro. Por ejemplo,
 esto redirige la salida de errores hacia la salida estándar::
 
    $ sadhgaskjhsa 2>&1
@@ -91,7 +91,7 @@ en la salida de errores no en la estándar. De hecho::
 
    $ sadhgaskjhsa >contenedor_del_error 2>&1
 
-Escribe el mensaje de error en el fichero. En realidad, se redirigen tanto la
+Escribe el mensaje de error en el archivo. En realidad, se redirigen tanto la
 salida estándar como la de errores\ [#]_. No obstante, para esto último, es más
 sencillo redirigir ambas salidas a la vez, para lo cual hay un símbolo propio::
 
@@ -107,15 +107,15 @@ Por su parte, redirigir la entrada consiste en alimentar con una fuente
 alternativa a un programa que espera recibir datos desde la entrada estándar,
 que en un principio es el teclado. El caso más sencillo es::
 
-   $ cat < fichero
-   [ ...Se muestra el contenido del fichero... ]
+   $ cat < archivo
+   [ ...Se muestra el contenido del archivo... ]
 
 Como :command:`cat` no tiene argumentos espera recibir datos a través de la
 entrada estándar; pero, como con secuencia de la redirección, esta pasa de ser el
-teclado a ser el fichero. Consecuentemente, lo que muestra :command:`cat` es el
-contenido del fichero. En realidad, esto es equivalente a::
+teclado a ser el archivo. Consecuentemente, lo que muestra :command:`cat` es el
+contenido del archivo. En realidad, esto es equivalente a::
 
-   $ cat 0< fichero
+   $ cat 0< archivo
 
 Ya que **0** es el descriptor que representa la entrada estándar. Esta es la base de la redirección de entrada.
 
@@ -200,16 +200,16 @@ parte final de un documento. En concreto::
 
 muestra las dos últimas líneas. Pero resulta que sólo queremos la penúltima, o
 lo que es lo mismo, la primera línea de la salida producida por :command:`tail`.
-Pero resulta que :ref:`head <head>` permite extraer los comienzos de fichero, de
+Pero resulta que :ref:`head <head>` permite extraer los comienzos de archivo, de
 modo que si aplicamos un :kbd:`head -n1` a esa salida conseguiremos nuestro
 objetivo. Por supuesto es posible hacer::
 
-   $ tail -n2 /etc/group > /tmp/fichero.intermedio
-   $ head -n1 < /tmp/fichero.intermedio
+   $ tail -n2 /etc/group > /tmp/archivo.intermedio
+   $ head -n1 < /tmp/archivo.intermedio
    libvirt-qemu:x:116:libvirt-qemu
-   $ rm -f /tmp/fichero.intermedio
+   $ rm -f /tmp/archivo.intermedio
 
-Pero nos obliga a crear un absurdo fichero intermedio que hay que borrar al
+Pero nos obliga a crear un absurdo archivo intermedio que hay que borrar al
 terminar. La solución fetén a nuestro problema son las tuberías (``|``) que
 permite redirigir la salida estándar de un programa hacia la entrada estándar
 del siguiente::
@@ -236,7 +236,7 @@ En lo relativo a redirecciones son muy útiles dos órdenes que las usan:
 .. index:: tee
 
 :command:`tee`
-   Desdobla su entrada hacia dos salidas: la estándar y el fichero que se
+   Desdobla su entrada hacia dos salidas: la estándar y el archivo que se
    indique::
 
       $ ls / | tee /tmp/listado.txt
@@ -251,7 +251,7 @@ En lo relativo a redirecciones son muy útiles dos órdenes que las usan:
    Este comando, simplemente, cuenta los *bytes* que recibe por la entrada
    estándar y los redirige hacia la salida estándar. Es bastante útil cuando el
    flujo de datos es grande y no sabemos muy bien cuándo acabará. Por ejemplo,
-   supongamos que tenemos en el fichero :file:`disco.img.xz` la imagen cruda
+   supongamos que tenemos en el archivo :file:`disco.img.xz` la imagen cruda
    comprimida de un disco y queremos volcarla sobre el disco físico
    :file:`/dev/sdb`. La solución es trivial::
 
@@ -280,9 +280,9 @@ En lo relativo a redirecciones son muy útiles dos órdenes que las usan:
       $ xzcat disco.img.xz | pv -ps 250G > /dev/sdb
 
    No obstante, para este caso particular, :command:`pv` permite también indicar
-   en sus argumentos un fichero del que leer, en vez de usar la entrada
+   en sus argumentos un archivo del que leer, en vez de usar la entrada
    estándar. En este caso, :command:`pv` si es capaz de saber cuántos *bytes*
-   leerá, puesto que toma el dato del tamaño del fichero, y esto hace que sea
+   leerá, puesto que toma el dato del tamaño del archivo, y esto hace que sea
    innecesario pasar con ``-s`` la cantidad. Así pues, lo anterior, habría sido
    más inteligente haberlo hecho del siguiente modo::
 
@@ -305,13 +305,13 @@ de una orden (la "A") sea la entrada de la siguiente ("B")::
 exige que la :program:`ordenA` sea capaz de escribir su resultado en la salida
 estándar y la :program:`ordenB` sea capaz de leer de la entrada estándar. Sin
 embargo, puede ocurrir que la sintaxis de la :program:`ordenA` sólo nos permita
-escribir su resultado en un fichero, no en la salida estándar, o que la sintaxis
-de la :program:`ordenB` sólo nos permita leer de un fichero y no de la entrada
+escribir su resultado en un archivo, no en la salida estándar, o que la sintaxis
+de la :program:`ordenB` sólo nos permita leer de un archivo y no de la entrada
 estándar. En esas condiciones nos es imposible utilizar la tubería y tendremos
 que:
 
-- Utilizar el fichero intermedio, que es la estrategia más grosera. Por ejemplo,
-  si la :program:`ordenB` sólo puede leer de un fichero que se le pasa como
+- Utilizar el archivo intermedio, que es la estrategia más grosera. Por ejemplo,
+  si la :program:`ordenB` sólo puede leer de un archivo que se le pasa como
   argumento::
 
       $ ordenA > /tmp/entrada.txt
@@ -330,20 +330,20 @@ que:
 .. index:: mkfifo
 
 **Tuberias con nombre**
-   Las :dfn:`tuberías con nombre` consisten en crear un fichero especial que
+   Las :dfn:`tuberías con nombre` consisten en crear un archivo especial que
    representa una tubería con la orden :manpage:`mkfifo` y hacer que los dos
    programas involucrados lean y escriban en él, como si se tratara de un
-   fichero regular. La ventaja es que la transferencia de datos se lleva a cabo
-   del mismo que cuando se usan tuberías anónimas nrmales y por tanto, ambos
-   procesos se sincronizan la producción y el consumo, por lo que no se
-   almacenan datos en disco. De estemodo si es la :program:`ordenB` la que tiene
-   que leer de fichero, podemos hacer::
+   archivo regular. La ventaja es que la transferencia de datos se lleva a cabo
+   del mismo modo que cuando se usan tuberías anónimas normales y por tanto, ambos
+   procesos sincronizan la producción y el consumo, por lo que no se
+   almacenan datos en disco. De este modo, si es la :program:`ordenB` la que tiene
+   que leer de archivo, podemos hacer::
 
       $ mkfifo /tmp/tuberia
       $ ordenA > /tmp/tuberia & ordenB /tmp/tuberia
       $ rmdir /tmp/tuberia
 
-   y si es la :program:`ordenA` la que solo puede escribir en un fichero::
+   y si es la :program:`ordenA` la que solo puede escribir en un archivo::
 
       $ mkfifo /tmp/tuberia
       $ ordenA /tmp/tuberia & ordenB </tmp/tuberia
@@ -352,7 +352,7 @@ que:
 
 **Process substitution** (extensión de :program:`bash`, incompatible con *POSIX*)
    El primer caso de limitación es que :program:`ordenB` sólo sea capaz de leer de
-   fichero, esto es, la sintaxis posible es :kbd:`ordenB fichero-entrada`. Si es
+   archivo, esto es, la sintaxis posible es :kbd:`ordenB archivo-entrada`. Si es
    así, la forma imposible::
 
       $ ordenA | ordenB
@@ -362,15 +362,15 @@ que:
       $ ordenB <(ordenA)
 
    mientras que el segundo caso de limitación, que consiste en que
-   :program:`ordenA` sólo es capaz de escribir su resultado en un fichero, esto
-   es, que la sintaxis posibles es :kbd:`ordenA fichero-salida`, como no puede
+   :program:`ordenA` sólo es capaz de escribir su resultado en un archivo, esto
+   es, que la sintaxis posibles es :kbd:`ordenA archivo-salida`, como no puede
    resolverse::
 
       $ ordenA | ordenB
 
    se resuelve::
 
-      $ ordenA >($ordenB)
+      $ ordenA >(ordenB)
 
    .. note:: Con *POSIX* puede subsanarse la carencia, aunque utilizando :ref:`técnicas
       de redirección <ioredirect>` algo avanzada. Así la expresión::
@@ -403,7 +403,7 @@ que:
 
    Para que no quede expresado de forma tan general este apartado supongamos que
    queremos en una misma orden guardar el contenido del directorio raíz y a la
-   vez contar cuántos ficheros contiene. La solución es la siguiente::
+   vez contar cuántos archivos contiene. La solución es la siguiente::
 
       $ ls / | tee >(wc -l) >/tmp/listado.txt
 
@@ -418,7 +418,7 @@ que:
    salida del descriptor 1, que en el momento de la redirección sigue
    siendo aún la pantalla.
 
-.. [#] EN principio, podemos usar una tubería para emular un *Here String*::
+.. [#] En principio, podemos usar una tubería para emular un *Here String*::
 
       $ echo "Hola, don Pepito" | cat
       Hola, don Pepito

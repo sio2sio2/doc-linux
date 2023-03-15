@@ -405,7 +405,7 @@ Para abandonar la shell tenemos tres posibilidades:
 :command:`logout`
    Permite cerrar la sesión *de login*\ [#]_ abierta con :program:`bash`.
 
-Si lo que se pretende es apagar el sistema, existen varias alternativas:
+Si lo que se pretende es apagar el sistema\ [#]_, existen varias alternativas:
 
 .. _poweroff:
 .. index:: poweroff
@@ -504,6 +504,16 @@ Si lo que se pretende es apagar el sistema, existen varias alternativas:
       $ (logout)
       -bash: logout: no es un shell de entrada: use `exit'`
 
-.. [#] Hasta su versión 7, cuando *debian* usaba :ref:`System V <sysv>` como
-   sistema de inicio y no :ref:`systemd <systemd>`, :program:`halt` también
+.. [#] Las órdenes que se presentan a continuación eran, antes de la versión
+   **8** de *Debian* (*Jessie*) en que se adoptó :ref:`systemd <systemd>`,
+   programas independientes. Ahora son, en realidad, :ref:`enlaces simbólicos
+   <symlink>` a :ref:`systemctl <systemctl>` y equivalen a :code:`systemctl
+   poweroff`, :code:`systemctl reboot`, etc. Desde entonces puede, además,
+   ejecutarlas un usuario sin privilegios (en contra de lo que se da a entender
+   en el texto al usar la almohadilla), aunque usando su forma abreviada (sin
+   escribir explícitamente :kbd:`systemctl`)  no se encontrarán en el :ref:`PATH
+   <PATH>` y habrá que escribir la ruta explícitamente
+   (:code:`/usr/sbin/poweroff`, etc.)
+
+.. [#] :program:`halt` antes de que se usara :ref:`systemd <systemd>` también
    apagaba la máquina.

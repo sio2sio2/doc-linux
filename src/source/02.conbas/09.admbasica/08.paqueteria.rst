@@ -669,11 +669,74 @@ Y en otras qué paquetes dependen de él::
    $ apt rdepends pv
    pv
    Reverse Depends:
-     btrbk
-     xvidenc
-     h264enc
-     divxenc
-     vzctl
+     Depende: bfh-container-server
+     Depende: xvidenc
+     Recomienda: h264enc
+     Depende: divxenc
+     Depende: sanoid
+     Depende: progress-linux-container-server
+     Recomienda: open-infrastructure-compute-tools
+     Recomienda: mariadb-server
+     Depende: hashcheck
+     Sugiere: charliecloud-builders
+
+En este último caso, se devolverán todos los paquetes que requieran instalar
+aquel por el que se pregunta, estén o no instalados en el sistema. Lo habitual es que,
+cuando hagamos la pregunta, nos interese conocer sólo los paquetes realmente
+instalados, porque nuestra intención es conocer qué paquete es el responsable de
+que tengamos algo instalado. Por ejemplo::
+
+   $ apt list policykit-1
+   Listando... Hecho
+   policykit-1/testing,now 122-3 amd64 [instalado, automático]
+
+En mi sistema de escritorio se encuentra instalado el paquete :deb:`policykit-1`
+que no instalé explícitamente, puesto que aparece como automático. Como nunca
+pedí instalar sugerencias al utilizar :program:`apt`, no necesito la
+informacióon sobre sugerencias (ni reemplazos, etc. que tampoco me aportan
+mucho), sino estrictamente las dependencias y recomendaciones. En este caso,
+averiguar qué paquete provocó la instalación de éste se logra así::
+
+   $ apt rdepends --installed --no-suggests --no-breaks --no-replaces policykit-1
+   policykit-1
+   Reverse Depends:
+     Depende: rtkit
+
+Ya lo tenemos: es :deb:`rtkit`, pero::
+
+   $ apt list rtkit
+   Listando... Hecho
+   rtkit/testing,now 0.13-5 amd64 [instalado, automático]
+
+éste paquete también se instaló automáticamente. Podríamos repetir la operación
+indagando sobre él, pero en vez de eso podemos añadir la opción :kbd:`--recurse`
+que hará todo el trabajo por nosotros::
+
+   $ apt rdepends --installed --no-suggests --no-breaks --no-replaces --recurse policykit-1
+   policykit-1
+   Reverse Depends:
+     Depende: rtkit
+   rtkit
+   Reverse Depends:
+     Recomienda: pulseaudio
+   pulseaudio
+   Reverse Depends:
+     Recomienda: pavucontrol
+   pavucontrol
+   Reverse Depends:
+
+:deb:`rtkit` se instaló porque fue una recomendación de :deb:`pulseaudio` y éste
+quizás porque es a su vez una recomendación de :deb:`pavucontrol`::
+
+   $ apt list pulseaudio pavucontrol
+   Listando... Hecho
+   pavucontrol/testing,now 5.0-2 amd64 [instalado]
+   pulseaudio/testing,now 16.1+dfsg1-2+b1 amd64 [instalado]
+
+En realidad, no fue así, sino que ambos se instalaron a mano (aunque podría
+haber ocurrido que el único instalado explicitamente fuera *pavucontrol*\ [#]_).
+Por tanto, mientras *pavucontrol* (y *pulseaudio*) se encuentre en el sistema,
+*policykit-1* no podrá desinstalarse.
 
 .. note:: Existen también :kbd:`apt-cache depends` y :kbd:`apt-cache rdepends`.
 
@@ -1283,6 +1346,16 @@ o borradas::
 
 .. [#] Acuérdese de proteger el patrón para no correr el riesgo de que lo
    interpretre el propio :program:` bash`.
+
+.. [#] *pulseaudio* es un servidor de sonido que puede utilizarse en la salida
+   de numerosos programas (aunque no es estrictamente necesario).
+   *pavucontrol*, por su parte, es el mezclador para este servidor. Obviamente,
+   es absurdo instalar el mezclador, si no se tiene instalado el servidor,
+   razón por la cual ess una recomendación. Sin embargo, el servidor funciona
+   perfectamente sin el mezclador. Esa es la razón por la que ambos paquetes
+   están instalados manualmente: muy probablemente se instaló primero
+   manualmente *pulseaudio* que funcionó perfectamente y, sólo tiempo después,
+   quizás para tener mayor control sobre él, se quiso usar el mezclador.
 
 .. [#] Es el caso de la rama *experimental*.
 
