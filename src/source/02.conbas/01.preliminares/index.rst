@@ -174,15 +174,22 @@ quisiéramos indicar otro bastaría con incluirlo como argumento::
 
    $ ls /
 
-Esto muestra el contenido del directorio :file:`/`. Ahora bien, los comandos admiten también argumentos que comienzan por el carácter ``-``, que llamaremos opciones. Por ejemplo::
+Esto muestra el contenido del directorio :file:`/`. Ahora bien, los comandos
+admiten también argumentos que comienzan por el carácter ``-``, que llamaremos
+opciones. Por ejemplo::
 
    $ ls -a /
 
-La opción ``-a`` altera el comportamiento de :command:`ls`, de modo que se mostrarán todos los ficheros, incluidos los ocultos, que antes no se mostraban\ [#]_. Esta opción es lo que se llama una opción *corta* porque consta de una sola letra. En estos casos, a la letra sólo hay que anteponerle un único guión. Por supuesto, es posible añadir varias opciones a la vez::
+La opción ``-a`` altera el comportamiento de :command:`ls`, de modo que se
+mostrarán todos los ficheros, incluidos los ocultos, que antes no se mostraban\
+[#]_. Esta opción es lo que se llama una opción *corta* porque consta de una
+sola letra. En estos casos, a la letra sólo hay que anteponerle un único guión.
+Por supuesto, es posible añadir varias opciones a la vez::
 
    $ ls -a -l /
 
-Ahora hemos incluido la opción ``-l``. Una particularidad es que podemos alterar el orden de los argumentos y la orden seguirá siendo válida::
+Ahora hemos incluido la opción ``-l``. Una particularidad es que podemos alterar
+el orden de los argumentos y la orden seguirá siendo válida::
 
    $ ls -l -a /
 
@@ -194,15 +201,23 @@ Además en el caso de las opciones cortas, es posible fusionarlas::
 
    $ ls -al /
 
-También existen las opciones *largas*, que no son una letra, sino una palabra. Por ejemplo, ``-a`` tiene su equivalente largo en ``--all``::
+También existen las opciones *largas*, que no son una letra, sino una palabra.
+Por ejemplo, ``-a`` tiene su equivalente largo en ``--all``::
 
    $ ls --all
 
-Las opciones *largas* se notan anteponiendo dos guiones y no pueden fusionarse de ningún modo. Algunas opciones (sean *cortas* o *largas*) exigen a su vez un argumento que complete su significado. Por ejemplo, la opción ``-w`` de :command:`ls` nos permite indicar el ancho que queremos que ocupe la respuesta del comando. Pero, claro, hay que añadir cuál exactamente. Si quisiéramos un ancho de 80 caracteres::
+Las opciones *largas* se notan anteponiendo dos guiones y no pueden fusionarse
+de ningún modo. Algunas opciones (sean *cortas* o *largas*) exigen a su vez un
+argumento que complete su significado. Por ejemplo, la opción ``-w`` de
+:command:`ls` nos permite indicar el ancho que queremos que ocupe la respuesta
+del comando. Pero, claro, hay que añadir cuál exactamente. Si quisiéramos un
+ancho de 80 caracteres::
 
    $ ls -w 80 /
 
-En este caso, el *80* siempre tiene que posponerse a la opción ``-w`` con lo que no podremos fusionar con otra opción corta por la derecha, pero sí por la izquierda. Esto sigue siendo válido::
+En este caso, el *80* siempre tiene que posponerse a la opción ``-w`` con lo que
+no podremos fusionar con otra opción corta por la derecha, pero sí por la
+izquierda. Esto sigue siendo válido::
 
    $ ls -lw 80 /
 
@@ -210,7 +225,8 @@ Lo que si puede hacerse es fusionar la opción con su argumento::
 
    $ ls -lw80 /
 
-Para las opciones *largas* el argumento debe ir separado por un espacio o un signo igual::
+Para las opciones *largas* el argumento debe ir separado por un espacio o un
+signo igual::
 
    $ ls -l --width 80
 
@@ -218,8 +234,10 @@ o bien::
 
    $ ls -l --width=80
 
-.. warning::
-   Las reglas expuestas bajo este epígrafe son las que prescribe el estándar POSIX y muchos programas las siguen. Sin embargo, no todos los comandos permiten pasar los argumentos de este modo. Una excepción entre los comandos básicos es, por ejemplo, :ref:`find <find>`.
+.. warning:: Las reglas expuestas bajo este epígrafe son las que prescribe el
+   estándar POSIX y muchos programas las siguen. Sin embargo, no todos los
+   comandos permiten pasar los argumentos de este modo. Una excepción entre los
+   comandos básicos es, por ejemplo, :ref:`find <find>`.
 
 .. _man:
 
@@ -350,15 +368,15 @@ más recomendable es fiarnos de la siguiente orden interna:
 -------------------
 Es una de las preguntas básicas que hay que resolver cuando se han encontrado
 algún artículo en *Internet* que explica cómo hacer algo que necesitamos hacer y
-no sabemos muy bien hasta qué punto esas instrucciones será compatibles con
-nuestro sistema. Por lo general, si hemos sido nosotros quienes lo hemos
-instalado, pero puede no ser el caso. Tal información suele estar accesible
-también en la información del login de texto :ref:`tal como puede apreciarse en la
-primera captura <ingreso-inicial>`. Lo que no suele fallar en las principales
-distribuciones modernas, que siguen el `estandar LSB
+no sabemos muy bien hasta qué punto esas instrucciones serán compatibles con
+nuestro sistema. Por lo general lo sabremos, si hemos sido nosotros quienes lo
+hemos instalado, pero puede no ser el caso. La información suele proporcionarse
+en la información del login de texto :ref:`tal como puede
+apreciarse en la primera captura <ingreso-inicial>`. Lo que no suele fallar en
+las principales distribuciones modernas, que siguen el `estandar LSB
 <https://es.wikipedia.org/wiki/Linux_Standard_Base>`_, es la consulta del
-archivo :file:`/etc/os-release` con la orden :ref:`cat <cat>` que introduciremos
-más adelante::
+archivo :file:`/etc/os-release` con la orden :ref:`cat <cat>` que
+introduciremos más adelante::
 
    $ cat /etc/os-release
    PRETTY_NAME="Debian GNU/Linux 11 (bullseye)"
@@ -385,7 +403,6 @@ aunque la información del archivo se presenta mejor si se usa la orden específ
 
 ¿Cómo salgo de aquí?
 --------------------
-
 Para abandonar la shell tenemos tres posibilidades:
 
 **Ctrl+D**
@@ -508,12 +525,14 @@ Si lo que se pretende es apagar el sistema\ [#]_, existen varias alternativas:
    **8** de *Debian* (*Jessie*) en que se adoptó :ref:`systemd <systemd>`,
    programas independientes. Ahora son, en realidad, :ref:`enlaces simbólicos
    <symlink>` a :ref:`systemctl <systemctl>` y equivalen a :code:`systemctl
-   poweroff`, :code:`systemctl reboot`, etc. Desde entonces puede, además,
-   ejecutarlas un usuario sin privilegios (en contra de lo que se da a entender
-   en el texto al usar la almohadilla), aunque usando su forma abreviada (sin
-   escribir explícitamente :kbd:`systemctl`)  no se encontrarán en el :ref:`PATH
-   <PATH>` y habrá que escribir la ruta explícitamente
-   (:code:`/usr/sbin/poweroff`, etc.)
+   poweroff`, :code:`systemctl reboot`, etc. Al menos desde *Bookworm* si, se
+   tiene instalado :deb:`policykit-1`, las puede ejecutar un usuario sin
+   privilegios (en contra de lo que se da a entender en el texto al usar la
+   almohadilla). Eso sí, usando su forma abreviada (sin escribir explícitamente
+   :kbd:`systemctl`), no se encontrarán en el :ref:`PATH <PATH>` del usaurio y
+   habrá que escribir la ruta explícitamente (:code:`/usr/sbin/poweroff`, etc.).
+   Además, existe un inhibidor (:manpage:`systemd-inhibit`) que permite evitar
+   que el apagado o reinicio de la máquina mientras se ejecute algún programa.
 
 .. [#] :program:`halt` antes de que se usara :ref:`systemd <systemd>` también
    apagaba la máquina.
