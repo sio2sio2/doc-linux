@@ -1,6 +1,5 @@
 Ejercicios sobre SystemD
 ========================
-
 #. ¿Qué debemos hacer para que, aunque ese instalado el servidor gráfico,
    la máquina arranque sin él. Justifique convenientemente la respuesta.
 
@@ -11,7 +10,7 @@ Ejercicios sobre SystemD
    qué ha fallado? Considere dos posibilidades
 
    a. Que el servicio no ha arrancado porque falló su arranque.
-   b. QUe no siquiera se intentó el arranque.
+   b. Que ni siquiera se intentó el arranque.
 
 #. Supongamos que modificamos la configuración de arranque del servicio
    *rsyslog*. Haga que el demonio aplique dicha configuración.
@@ -26,7 +25,7 @@ Ejercicios sobre SystemD
 
 #. Impida que un servicio pueda arrancar, incluso de forma manual.
 
-#. Consuelte el *nivel de ejecucion* predeterminado.
+#. Consulte el *nivel de ejecucion* predeterminado.
 
 #. Demuestre que *rsyslog* arranca automáticamente en el nivel de ejecución
    anterior.
@@ -39,6 +38,6 @@ Ejercicios sobre SystemD
 #. Compruebe si ha fallado el arranque de algún servicio durante el proceso de
    arranque del sistema.
 
-#. ¿Cómo se puede saber si un determinado servicio arranca en un determinado
-   nivel de ejecución? Se sobreentiende que sin llegar a arrancar la máquina en
-   ese nivel de ejecución.
+#. ¿Cómo se puede saber si cierto servicio arranca en un determinado nivel de
+   ejecución? Se sobreentiende que sin llegar a arrancar la máquina en ese
+   nivel de ejecución.

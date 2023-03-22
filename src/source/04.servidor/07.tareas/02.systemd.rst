@@ -1,87 +1,378 @@
+.. _systemd-timer:
+
 Planificación con SystemD
 =========================
+Para la planificación de tareas :ref:`SystemD <systemd>` provee un tipo de
+unidades denominadas *timer* (:manpage:`systemd.timer`). La gestión de estas
+unidades posibilita tal planificación, de modo que centraremos el estudio en
+ellas. Antes de empezar a verlos es muy útil consultar cuáles son las unidades
+de tiempo activas en nuestro sistema:
 
-.. todo:: Por escribir. Revisar:
+.. code-block:: console
 
-   * `Reemplazando cron con systemd timer
-     <https://www.atareao.es/tutorial/trabajando-con-systemd/cron-con-systemd-timer/>`_.
-   * `Wiki de Archlinx <https://wiki.archlinux.org/index.php/Systemd/Timers_(Espa%C3%B1ol)>`_.
-   * `Timers en systemd
-     <https://blog.adrianistan.eu/2017/07/25/timers-systemd-reemplazo-cron/>`_
+   $ systemctl list-timers
+   NEXT                         LEFT        LAST                        PASSED        UNIT                         ACTIVATES                     
+   Mon 2023-03-20 23:18:42 CET  7h left     Sun 2023-03-19 09:49:22 CET 1 day 6h ago  apt-daily.timer              apt-daily.service
+   Mon 2023-03-20 23:49:22 CET  7h left     Sun 2023-03-19 17:14:01 CET 22h ago       man-db.timer                 man-db.service
+   Tue 2023-03-21 00:00:00 CET  8h left     -                           -             dpkg-db-backup.timer         dpkg-db-backup.service
+   Tue 2023-03-21 00:00:00 CET  8h left     Mon 2023-03-20 07:21:04 CET 8h ago        logrotate.timer              logrotate.service
+   Tue 2023-03-21 06:41:23 CET  14h left    Mon 2023-03-20 07:41:02 CET 8h ago        apt-daily-upgrade.timer      apt-daily-upgrade.service
+   Tue 2023-03-21 15:49:49 CET  23h left    Mon 2023-03-20 15:49:49 CET 9min ago      systemd-tmpfiles-clean.timer systemd-tmpfiles-clean.service
+   Sun 2023-03-26 03:10:32 CEST 5 days left Sun 2023-03-19 07:24:22 CET 1 day 8h ago  e2scrub_all.timer            e2scrub_all.service
+   Mon 2023-03-27 00:10:44 CEST 6 days left Mon 2023-03-20 12:38:27 CET 3h 21min ago  fstrim.timer                 fstrim.service
 
-.. system-run no es persistente:
-   https://unix.stackexchange.com/a/559717
+   8 timers listed.
+   Pass --all to see loaded but inactive timers, too
 
-Como en el caso de otras tantas tareas habituales en los sistema *UNIX*,
-:ref:`systemd <systemd>` también provee un reemplazo tanto para :ref:`at <at>`
-como para :ref:`cron <cron>`.
+Añadiendo la opción :kbd:`--user` obtendríamos las creadas y gestionadas por el propio usuario.
 
-.. _systemd-run:
-.. index:: systemd-run
+Timers
+------
+Las unidades *timer* son las encargadas de definir la programación de tareas mediante dos estrategias distintas:
+
+* Un tiempo determinado por el calendario (p.e. los martes a las dos de la
+  mañana) a semejanza de los trabajos ejecutados mediante :ref:`cron <cron>`.
+* Un tiempo definido a partir de un momento inicial variable asociado a un
+  evento como el arranque del sistema (p.e. un minuto después del arranque).
+
+Para la programación de tareas necesitamos tres elementos:
+
+* Un ejecutable encargado de realizar la propia tarea.
+* Un servicio sin sección :kbd:`[Install]` que refiere tal ejecutable.
+* Una unidad *timer* que comparte nombre con el servicio anterior y que define
+  cuándo ejecutarlo.
+
+.. _ejemplo-timer:
+
+Antes de generalizar, ilustraremos su uso con siguiente problema:
+
+   mpv_ es un excelente reproductor multimedia derivado del veterano MPlayer_
+   que al pulsar ":kbd:`Q`" permite abandonar la reproducción recordando su
+   estado (momento exacto, tamaño de la ventana, etc.), de suerte que al volver
+   a reproducir el vídeo lo recupera. Para ello, almacena en el directorio
+   :file:`${XDG_CONFIG_HOME}/.mpv/watch_later` del usuario archivos con los
+   estados de las reproducciones que se pidio recordar. El archivo
+   correspondiente a un vídeo se borra cuando la reproducción de este acaba o
+   bien cuando se abandona la reproducción sin pedir que se recuerde (pulsando
+   :kbd:`q`). El problema surge cuando un vídeo cuyo estado se pidió recordar,
+   simplemente se borra y se olvida, puesto que el archivo de su estado quedará
+   perennemente almacenado hasta que no se borre a mano.
+
+Para resolver este problema nos planteamos ejecutar al abrir la sesión de
+usuario la tarea de borrar los archivos de estado con más de un mes de
+antiguedad.
+
+Como ejecutable, podemos usar este:
+
+   .. literalinclude:: files/mpvcleaner.sh
+      :language: sh
+
+Para el cual creamos la unidad de servicio :file:`mpvcleaner.service`:
+
+.. code-block:: ini
+
+   [Unit]
+   Description=Borra los estados de mpv con más de un mes de antigüedad
+
+   [Service]
+   ExecStart=/bin/sh /usr/local/bin/mpvcleaner.sh
+   Type=oneshot
+
+que es de tipo *oneshot*, esto es, ejecuta nuestro *script* y espera a que
+acabe, lo cual es lógico, puesto que el tiempo de ejecución es mínimo.
+
+Y el *timer* :file:`mpvcleaner.timer`:
+
+.. literalinclude:: files/mpvcleaner.timer
+   :language: ini
+
+Ahora debemos colocar cada archivo en su lugar:
+
+* El ejecutable hemos decidido colocarlo en :file:`/usr/local/bin/` como se
+  desprende del texto de la unidad de servicio.
+* Por coherencia con la ubicación del ejecutable (un directorio común en vez de
+  :file:`~/bin/`), colocaremos las unidades en :file:`/etc/systemd/user/`.
+
+  .. code-block:: console
+
+     # mv mpvcleaner.{timer,service} /etc/systemd/user
+
+Y listo, ya puede el usuario habilitarlo:
+
+.. code-block:: console
+
+   $ systemctl --user daemon-reload
+   $ systemctl --user enable mpvcleaner.service
+   $ systemctl --user enable mpvcleaner.timer
+   $ systemctl --user start mpvcleaner.timer
+
+Visto el ejemplo, profundicemos más en la propia unidad *timer* que es realmente
+lo único nuevo a lo ya visto para :program:`systemd`. Para ello copiemos la
+de nuestro ejemplo y discutamos sobre ella:
+
+.. literalinclude:: files/mpvcleaner.timer
+   :language: ini
+
+Por lo general se utilizar tres secciones:
+
+:kbd:`[Unit]`
+   en que basta con declarar la descripción.
+
+:kbd:`[Install]`
+   en que normalmente siempre indicaremos lo mismo: las unidades habilitadas se
+   activarán con *timers.target*.
+
+:kbd:`[Timer]`
+   que es la que realmente tiene más chicha, porque es en la que definimos cuál
+   es el servicio asociado y cuándo y con qué frecuencia debe ejecutarse.
+
+   El servicio asociado se define con la variable 
+   
+   :kbd:`Unit=` (p.e. :code:`Unit = foobar.service`)
+      pero si no se expresa, se sobrentiende que será el servicio que comparte
+      nombre con el *timer*, de ahí que en nuestro ejemplo no se haya incluido.
+
+   Otra variable importante es
+
+   :kbd:`AccuracySec=`
+      que indica la precisión en la periodicidad y que, por defecto, está fijada
+      a 1 minuto, por lo que debe definirse cuando la periodicidad es inferior a
+      este intervalo de tiempo.
+
+   El cuándo y la frecuencia se expresan con distintas variables, la expresión
+   de cuyos valores se encuentra recogida en la página de
+   :manpage:`systemd.time`:
+
+   :kbd:`OnCalendar=`
+      es la única variable que permite definir un tiempo y frecuencia referido a
+      las fechas del calendario a la manera en que puede hacerse con :ref:`cron
+      <cron>`. Su formato se divide en tres partes y es:
+
+      .. code-block:: none
+
+         día_semana año-mes-dia hora:minuto:segundo
+
+      en que las comas expresan varias unidades (varios días, varios meses, etc.),
+      los dos puntos seguidos (:kbd:`..`) expresan rangos, la barra
+      (:kbd:`/`) expresa periodicidad; y el  asterisco, cualquier valor. Por
+      ejemplo:
+
+      + Una fecha concreta:
+
+        .. code-block:: ini
+
+           [Time]
+           OnCalendar=Tue 2023-03-21 10:40:32
+
+        Obsérvese que podríamos habernos ahorrado la expresión del día de las
+        semana, puesto que el 21 de marzo de 2023 sólo puede ser martes.
+
+      + Dos días concretos:
+
+        .. code-block:: ini
+
+           [Time]
+           OnCalendar=* 2023-03-21,23 10:40:32
+
+        Como la primera parte no se fija en absoluto y cada una de las tres
+        tiene una sintaxis diferente, podemos eliminarla, al no existir
+        confusión:
+
+        .. code-block:: ini
+
+           [Time]
+           OnCalendar=2023-03-21,23 10:40:32
+
+      + Un rango de días:
+
+        .. code-block:: ini
+
+           [Time]
+           OnCalendar=2023-03-21..30 10:40:32
+
+      + Cada veinte segundos (en el minuto, 0, 20 y 40):
+
+        .. code-block:: ini
+
+           [Time]
+           OnCalendar=*-*-* *:*:0/20
+
+        o bien:
+
+        .. code-block:: ini
+
+           [Time]
+           OnCalendar=*:*:0/20
+
+      * Cada veinte minutos:
+
+        .. code-block:: ini
+
+           [Time]
+           OnCalendar=*:0/20:*
+
+        aunque podemos ahorrarnos la expresión de los segundos:
+
+        .. code-block:: ini
+
+           [Time]
+           OnCalendar=*:0/20
+
+      * Semanalmente, todos los domingos:
+
+        .. code-block:: ini
+
+           [Time]
+           OnCalendar=Sun *-*-* 00:00:00
+
+   :kbd:`OnBootSec=`
+      el servicio se activa una vez transcurrido el tiempo especificado después
+      del arranque del sistema. Por ejemplo:
+
+      .. code-block:: ini
+
+         [Time]
+         OnBootSec=5m
+
+      lanzaría el servicio 5 minutos después de haber arrancado el sistema.
+      Los espacios de tiempo pueden expresarse en *us* (microsegundos), *ms*
+      (milisegundos). *s* (segundos), *m* (minutos), *h* (horas), *d* (días),
+      *M* (meses), *y* (años). Por ejemplo:
+
+      .. code-block:: none
+
+         50s
+         1m 30s
+         12h 12s
+         1M 1d
+
+   :kbd:`OnActiveSec=`
+      el servicio se activa una vez transcurrido el tiempo especificado después
+      de activarse la unidad de tiempo.
+
+   :kbd:`OnStartupSec=`
+      el servicio se activa una vez transcurrido el tiempo especificado después
+      de haberse activado el gestor de servicios. Cuando se trata de un servicio
+      de sistema, su gestor se activa poco después del arranque con lo que no
+      hay excesiva diferencia con :kbd:`OnBootSec=`. Sin embargo, si se trata de
+      un servicio de usuario, el gestor se activa al ingresar tras el arranque por
+      primera vez el usuario. Por tanto:
+
+      .. code-block:: ini
+
+         # Esta tiempo la activa el usuario bartolito.
+
+         [Time]
+         OnStartupSec=15s
+
+      El servicio se activará quince segundos después de acceder *bartolito* al
+      sistema y, si nunca llega a ingresar, el servicio no se activará nunca.
+
+
+   :kbd:`OnUnitActiveSec=`
+      El servicio se activa una vez transcurrido el tiempo especificado después de
+      haberse activado previamente el propio servicio. Esto significa que el
+      servicio se ejecutará con una periodicidad definida por dicho tiempo. Pero
+      ¿cómo se activó el servicio por primera vez? Obviamente, porque alguna de
+      las variables anteriores produjo tal activación. Por ejemplo:
+
+      .. code-block:: ini
+
+         [Time]
+         OnBootSec=5m
+         OnUnitActiveSec=30s
+         AccuracySec=1s
+
+      En este caso el servicio se activará cinco minutos después de haber
+      arrancado el sistema y, a partir de ese momento, se activará cada treinta
+      segundos.
+     
+      .. note:: Como esa periodicidad es menor al minuto, debemos añadir
+         :kbd:`AccuracySec=`.
+
+      Por supuesto, la activación pudo producirse con :kbd:`OnCalendar=`, por lo
+      que :kbd:`OnUnitActiveSec=` en este caso sería un modo alternativo a
+      expresar la periodicidad mediante la sintaxis propia de
+      :kbd:`OnCalendar=`.
+
+   :kbd:`OnUnitInactiveSec=`
+      Semejante a la anterior, pero el tiempo se cuenta no desde que se activa
+      el servicio, sino desde que se completa.
+
+   Además de todas las variables indicadas anteriormente, tiene interés:
+
+   :kbd:`Persistent=`
+      que sólo afecta si se utiliza :kbd:`OnCalendar=`. Por defecto es falsa
+      (:kbd:`false`), pero cuando verdadera (:kbd:`true`), el servicio se activa
+      al activarse el *timer*, si debió activarse mientras el
+      *timer* se encontraba inactivo. Por ejemplo:
+
+      .. code-block:: ini
+
+         [Timer]
+         OnCalendar=00:00:00
+         Persistent=True
+
+      El servicio se activa todos los días a medianoche. Pero ¿qué ocurre si una
+      noche a esa hora el sistema está apagado? Sin :kbd:`Persistent=` esa
+      activación, simplemente, se perderá. En cambio, al encontrarse definida a
+      verdadero, el servicio se activará tras el arranque del sistema en cuanto
+      se active la unidad de tiempo. Es, por tanto, el equivalente a
+      :ref:`anacron <anacron>`.
+
+.. _systemd-tareas-diferidas:
 
 Tareas diferidas
 ----------------
-Puede llevarse a cabo haciendo uso de la orden :command:`systemd-run`::
+Lo visto hasta ahora nos resuelve cómo utilizar :program:`SystemD` para
+sustituir al tradicional :ref:`cron <cron>`. Ahora bien, ¿hay algún modo de
+ejecutar puntualmente una tarea en diferido a la manera de :ref:`at <at>`. La
+respuesta es, con matices, sí, y se halla en la ejecución de :ref:`servicios
+efímeros con systemd-run <systemd-run>`.
 
-   $ systemd-run --user <cuándo> <qué>
+Básicamente consiste en usar :command:`systemd-run` como ya se ha visto, pero
+añadiendo antes del argumento posicional que comienza a definir la tarea
+las opciones propias de una unidad *timer* que son básicamente
+:kbd:`--on-calendar`, :kbd:`--on-boot`, :kbd:`--on-active`, :kbd:`--on-startup`,
+:kbd:`--on-unit-active` y :kbd:`--on-unit-deactive`, cuyo significado no es
+necesario repetir porque sus nombres son calcos de las variables que pueden
+incluirse en una sección :kbd:`[Timer]` de una unidad de tiempo. Obviamente, la
+unidad efímera se activa al ejecutar la orden :command:`systemd-run`, por lo que
+en este caso :kbd:`--on-active` indicará el espacio de tiempo que se difiere la
+ejecución de la orden. Por ejemplo::
 
-dónde:
+   $ systemd-run --user --on-active="1m 20s" --timer-property="AccuracySec=1s" touch /tmp/LO.HARE.MAS.TARDE
 
-``--user``
-   Establece que se usará el gestor de servicios del usuario y no el gestor de
-   servicios del sistema. Esto nos permite usarlo con un usuario distinto de
-   *root*.
+creará el archivo indicado un minuto y veinte segundos después de haberse
+ejecutado la orden. Obsérvese, además, que como la precisión en la periodicidad
+es de un minuto por defecto, es necesario rebajarla usando :kbd:`AccuracySec=`.
+Tal variable no tiene opción propia, así que puede introducirse a través de
+:kbd:`--timer-property`.
 
-**cuándo**
-   Establece cuándo se debe ejecutar la tarea. Tenemos dos formas de
-   establecerla:
+.. note:: Por supuesto, como en el caso de las unidades de tiempo persistentes, 
+   es posible añadir :kbd:`--on-unit-active` para lograr periodicidad::
 
-   - Como intervalo de tiempo tras un disparador que puede ser:
+      $ systemd-run --user --on-active=30s --on-unit-active=20s --timer-property=AccuracySec=1s touch /tmp/LO.HARE.MAS.TARDE
 
-     ``--on-boot=``
-      Un tiempo después de haberse producido el arranque.
+Ahora bien, ¿cuál es el problema que impide que :command:`systemd-run` sea un
+sustituto completo para :ref:`at <at>`? Básicamente el que se expresa en `esta
+petición registrada en el GitHub del proyecto
+<https://github.com/systemd/systemd/issues/13485>`_: que las unidades efímeras
+no sobreviven a un apagado del sistema. Como consecuencia, si apagamos (o
+reiniciamos) el equipo, tales unidades se perderán y las tareas diferidas jamás
+se ejecutarán\ [#]_.
 
-     ``-on-active=``
-      Un tiempo después de lanzarse la propia orden.
 
-     ``--on-startup=``
-      Un tiempo después de lanzarse el gestor de servicios.
+.. rubric:: Notas al pie
 
-     ``--on-unit-active=``
-      Un tiempo después de que se active la unidad a la que se asocia la orden.
+.. [#] Las unidades efímeras de usuario se guardan en
+   :file:`/run/user/UID/systemd/transient/` y las de sistema en
+   :file:`/run/systemd/transient/`, lo que provoca su borrado. Ciertamente,
+   podría evitarse copiándolas a :file:`${XDG_CONFIG_HOME}/systemd/user` o
+   :file:`/etc/systemd/system` respectivamente, pero esto sólo funcionaría con
+   tareas fijadas por el calendario y, además, una vez ejecutadas los archivos
+   de unidad quedarían en esos directorios perennemente hasta que las borráramos
+   a mano.
 
-     ``--on-unit-deactive=``
-      Un tiempo después de que se deactive la unidad a la que se asocia la
-      orden.
-
-     Estos tiempos pueden expresarse en *ms* (milisegundos). *s* (segundos), *m*
-     (minutos), *h* (horas), *d* (días), *M* (meses), *y* (años). Por ejemplo::
-
-      50s
-      1m 30s
-      12h 12s
-      1M 1d
-
-   - Como tiempo concreto, que requiere la opción ``--on-calendar=``. El tiempo
-     se expresa de la forma "2019-01-31 21:44:00 CET", aunque se puede eliminar
-     algún término. Por ejemplo, "22:00:00" significa las próximas 10 de la
-     noche.
-
-**qué**
-   Puede expresarse de dos maneras:
-
-   * ``--unit=nombre.service``, que ejecuta el servicio con el nombre dado.
-   * Escribir directamente la orden deseada con sus argumentos.
-
-Ejemplo:
-
-#. Dentro de **dos** minutos, crea un fichero en el directorio temporal::
-
-      $ systemd-run --user --on-active=2m touch /tmp/LO.HE.HECHO
-
-#. Crea el fichero un día concreto::
-
-      $ systemd-run --user --on-calendar='2019-02-22 11:12:23' touch /tmp/LO.HE.HECHO
-
-Planificación periódica de tareas
----------------------------------
+.. _mpv: https://mpv.io
+.. _MPlayer: https://mplayerhq.hu
