@@ -49,7 +49,6 @@ requiere saber cómo configurar :ref:`sudo <sudo>`, sino simplemente:
 
 Seguridad
 =========
-
 Permisos
 --------
 Se tratara el :ref:`sistema de permisos POSIX <ugo>` para el cual existe la
@@ -59,20 +58,44 @@ relación de ejercicios:
 
 Monitorización
 ==============
-De modo superficial, debe referirse el :ref:`sistema tradicional de
-monitorización <rsyslog>` para dejar claro:
+De modo superficial, debe referirse del :ref:`sistema tradicional de
+monitorización <rsyslog>` lo siguiente:
 
-+ Que los eventos se registran.
++ Que los eventos se registran dentro de de :file:`/var/log`.
 + Que hay distintos tipos de eventos.
 + Que tienen distinta importancia (nivel).
-+ Que dentro de :file:`/var/log` hay un servicio que ofrece el sistema operativo
-  para que se apunten los eventos dependiendo de su naturaleza.
++ Que hay un servicio que ofrece el sistema operativo
+  para que los eventos se apunten dependiendo de su naturaleza dentro de:
 
   * :file:`auth.log` para los mensajes de autenticación.
-  * :file:`syslog` para todos los mensajes excepto los anteriores.
+  * :file:`syslog` para todos los mensajes, excepto los anteriores.
 
-+ Que hay servicios que registran al margen del servicio anterior, pero suelen
-  apuntar también los eventos en archivos propios dentro de :file:`/var/log`.
++ Que hay servicios que registran eventos al margen del servicio anterior, pero
+  suelen apuntar también los eventos en archivos propios dentro de
+  :file:`/var/log`.
+
+El problema de este sistema es que al nivel al que se da el módulo no se conocen
+las expresiones regulares y, por tanto, es difícil encontrar información dentro
+de los registros. Esto lo facilita :ref:`journalctl <journalctl>`, ya que
+permite:
+
++ Mostrar sólo los mensajes de algún servicio particular añadiendo :kbd:`-u`::
+
+   # journalctl -u ssh
+
++ Establecer límites temporales con :kbd:`--since` y :kbd:`--until`. Por
+  ejemplo, los mensajes de los últimos 10 minutos::
+
+   # journalctl --since "-10m"
+
++ Mostrar los últimos registros (p.e. los 30 últimos)::
+
+   # journalctl -n30
+
++ Dejar el visor de registros pendiente de las últimas entradas (tal como hace
+  :code:`tail -f`)::
+
+   # journalctl -f
 
 Gestión de procesos
 ===================
