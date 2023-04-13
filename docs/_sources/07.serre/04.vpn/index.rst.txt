@@ -101,7 +101,7 @@ desear el uso de una |VPN|:
    a. Preservar el anonimato gracias a acceder a internet a través de una |IP|
       distinta a la proporcionada por el |ISP|, lo cual supone que el dueño del
       servidor |VPN| se comprometa a no facilitar la |IP| real del cliente a
-      terceros.
+      terceros\ [#]_.
    
       .. note:: Hay `algunos muy críticos
          <https://gist.github.com/joepie91/5a9909939e6ce7d09e29>`_ con estos
@@ -118,7 +118,7 @@ desear el uso de una |VPN|:
         evitar el acceso a ciertas páginas o que el cliente se sitúe en una red
         en la que se restringen algunos tipos de tráfico al exterior (muy
         comúnmente que sólo se permita tráfico |HTTP| y |HTTP|\ s). En este último
-        caso, el establecimiento del túnel no es trivial e implicar idear
+        caso, el establecimiento del túnel no es trivial e implica idear
         mecanismos que permitan hacer pasar al tráfico |VPN| por tráfico web.
         Los trataremos en el estudio práctico de :ref:`OpenVPN <openvpn>` y
         :ref:`Wireguard <wireguard>`.
@@ -267,6 +267,21 @@ aunque limitado a una transferencia de 10GB al mes.
 .. [#] En `este repositorio de Github
    <https://github.com/noiseprotocol/noise_spec/wiki/Noise-properties-and-protocol-comparisons>`_
    hay comparaciones con otros protocolos seguros.
+
+.. [#] En principio, muchas |VPN| comerciales se publicitan como servicio
+   *no-log*, esto es, servicios que no registran en absoluto la actividad de sus
+   usuarios y, por consiguiente, jamás podrán ceder información sobre sus
+   clientes a terceros, porque no tienen nada que ceder. Sin embargo, esto
+   podría ir en contradicción con la obligación legal de conservar registros si
+   la |VPN| tiene sede en un país que obligue a conservarlos. La recomendación a
+   este respecto es evitar cualquier |VPN| cuya sede se encuentre en uno de los
+   países que forma la `Alianza de los Cinco Ojos
+   <https://en.wikipedia.org/wiki/Five_Eyes>`_, que ha ido ampliándose de los
+   cinco originales a los `catorce actuales
+   <https://en.wikipedia.org/wiki/Five_Eyes#Fourteen_Eyes>`_, más `cuatro que
+   nunca han pertenecido formalmente, pero que han colaborado habitualmente con
+   ella <https://en.wikipedia.org/wiki/Five_Eyes#Six_Eyes_(proposed)>`_.
+
 
 .. [#] Con una notable diferencia: alcanzar la |IP| del servidor tendrá que
   seguir haciéndose por la puerta de enlace real. De lo contrario, no funcionará
