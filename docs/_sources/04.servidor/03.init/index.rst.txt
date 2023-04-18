@@ -48,6 +48,8 @@ SysV
    *wheezy*), de modo que este apartado es meramente informativo y, de hecho, no
    se entrará en absoluto en detalle\ [#]_.
 
+.. _runlevel:
+
 En el sistema de arranque basado en *SystemV* existe un fichero
 :file:`/etc/inittab` que controla la configuración para el ejecutable
 :command:`init`. Este fichero, entre otros aspectos, indica en qué *nivel de
