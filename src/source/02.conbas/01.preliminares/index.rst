@@ -529,7 +529,7 @@ Si lo que se pretende es apagar el sistema\ [#]_, existen varias alternativas:
    tiene instalado :deb:`policykit-1`, las puede ejecutar un usuario sin
    privilegios (en contra de lo que se da a entender en el texto al usar la
    almohadilla). Eso sí, usando su forma abreviada (sin escribir explícitamente
-   :kbd:`systemctl`), no se encontrarán en el :ref:`PATH <PATH>` del usaurio y
+   :kbd:`systemctl`), no se encontrarán en el :ref:`PATH <PATH>` del usuario y
    habrá que escribir la ruta explícitamente (:code:`/usr/sbin/poweroff`, etc.).
    Además, existe un inhibidor (:manpage:`systemd-inhibit`) que permite evitar
    que el apagado o reinicio de la máquina mientras se ejecute algún programa.

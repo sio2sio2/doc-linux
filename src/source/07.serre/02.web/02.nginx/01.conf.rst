@@ -5,44 +5,72 @@ Principios de configuración
 
 Instalación
 -----------
-Podríamos decir que basta con hacer::
+Para versiones recientes de *Debian* (sobre todo a partir de *Bookworm*) basta
+con::
 
-	 # apt-get install nginx-light
+	 # apt install nginx
 
-pero en el caso de :program:`nginx` y *debian* sería una simplicación
-intolerable. La razón es la siguiente:
+pero la regla es, en realidad, una simplificación que merece una explicación:
 
-:program:`nginx` hasta su versión *1.9.11* tenía módulos que se añadían
-monolíticamente al ejecutable, es decir, que no se podían cargar dinámicamente
-a través de la configuración, sino que en la compilación se añadían al núcleo
-del programa. Por esa razón, los empaquetadores de *debian* crearon tres
-sabores dependiendo de cuáles fueran los módulos que se habían incluido en la
-compilación:
+:program:`nginx` hasta su versión *1.9.11* tenía un sistema de módulos que
+obligaba a añadirlos monolíticamente al ejecutable, es decir, que no se podían
+cargar dinámicamente a través de la configuración, sino que en la compilación se
+añadían al núcleo del programa. Por esa razón, los empaquetadores de *Debian*
+crearon tres sabores dependiendo de cuáles fueran los módulos que se habían
+incluido en la compilación:
 
-* :program:`nginx-light`.
-* :program:`nginx-full`, o simplemente, :program:`nginx`.
-* :program:`nginx-extras`.
+:deb:`nginx-light`,
+   que incluía el menor número de módulos.
+
+:deb:`nginx-full`,
+   que incluía un mayor número de módulos, además de
+   algunos módulos de terceros. :deb:`nginx` a secas, era simplemente un
+   metapaquete que forzaba la instalación de esta versión *completa*.
+
+:deb:`nginx-extras`,
+   que incluía más módulos aún, tanto propios como de
+   terceros.
 
 De este modo, dependiendo de si necesitábamos más o menos módulos para la
-configuración del servidor, instalábamos uno u otro.
+configuración del servidor, instalábamos uno u otro. Desgraciadamente, si
+requeríamos un módulo no incluído en estos tres sabores, debíamos compilar toda
+la aplicación\ [#]_.
 
-Sin embargo, las versiones modernas incluyen módulos dinámicos y posibilitan que
-un mismo ejecutable pueda ejecutar más o menos módulos para lo cual sólo
-necesitan cargarlos. A partir de *stretch* (que incluye la versión *1.10.3*), la
-distribución trae ejecutables con posibilidad de carga dinámica de módulos y,
-aunque se siguen distribuyendo los tres sabores, cualquier de ellos es apto para
-ejecutar cualquier módulo empaquetado\ [#]_. En *stretch* y posteriores, la
-única diferencia entre estos sabores son los paquetes *debian* adicionales
-(módulos de :program:`nginx`) que se instalan automáticamente y algún módulo
-*estándar* que trae algún ejecutable y otro no\ [#]_.
+Al añadir :program:`nginx` la posibilidad de cargar módulos de forma dinámica,
+*Stretch* (que incluyó la versión *1.10.3*), produjo ejecutables con la
+posibilidad de cargar dinámicamente módulos. Sin embargo, se mantuvieron los
+tres sabores enumerados, cada uno de cuyos ejecutables contenía un número
+distinto de módulos compilados estáticamente\ [#]_. La única diferencia respecto
+a la versiones anteriores es que *Debian* incluyó paquetes con módulos
+adicionales que podían instalarse y cargarse dinámicamente con cualquiera de los
+tres sabores\ [#]_. Además, cada sabor podía tener como dependencia paquetes de
+módulos cargados dinámicamente para forzar su instalación y su carga.
 
-.. warning:: Así pues, la diferencia realmente relevante entre los tres sabores
-   son los módulos estáticamente compilados con el ejecutable, ya que los
-   dinámicos pueden instalarse manualmente a través de su paquete
-   correspondiente si el sabor que usamos no lo instala automáticamente. 
+*Bullseye* mantuvo esta situación con dos diferencias:
 
-En estos apuntes optaremos por instalar la versión ligera, ya que para casi todo
-su contenido basta con ella.
+* La primera fue añadir un nuevo sabor:
+
+  :deb:`nginx-core`
+     que era un sabor casi equivalente a :deb:`nginx-full`, pero sin incluir
+     módulos de terceros.
+
+* La segunda, que :deb:`nginx` dejó de ser un metapaquete que instalaba
+  forzosamente :deb:`nginx-full` y pasó a ser uno que instalaba cualquiera de los
+  cuatro.
+
+Y, finalmente, apareció *Bookworm*, que unificó los ejecutables en uno solo. A
+partir de esta versión, el paquete :deb:`nginx` es el que contiene el ejecutable
+del servidor con un número mínimo de módulos compilados estáticamente, y los
+cuatro sabores ya mencionados dependen de él y añaden dependencias a paquetes de
+módulos que se cargan dinámicamente. En consecuencia, la diferencia entre los
+distintos sabores son las dependencias que, en cualquier caso, pueden instalarse
+a mano.
+
+.. note:: En estos apuntes optaremos por instalar el paquete base :deb:`nginx`,
+   ya que para desarrollar casi todo su contenido basta con él.
+
+.. warning:: Si trabaja con una versión anterior a *Bookworn* es posible que le
+   salga más a cuenta instalar :deb:`nginx-light`.
 
 Ficheros de configuración
 -------------------------
@@ -345,14 +373,17 @@ La configuración, además, admite algunos añadidos interesantes:
 
 .. rubric:: Notas al pie
 
-.. [#] A partir de *stretch* cada módulo cargable dinámicamente se encuentra
-   en un paquete diferente. Por ejemplo, *libnginx-mod-http-dav-ext* contiene el
-   módulo `ngx_http_dav_module
-   <http://nginx.org/en/docs/http/ngx_http_dav_module.html>`_, que da suporte a
-   :program:`nginx` para las extensiones de *WebDav*, ya comentadas.
+.. [#] Estos son los inconvenientes de que los módulos debieran compilarse
+   estáticamente.
 
-.. [#] Por ejemplo, `ngx_http_referer` no está incluido en el ejecutable de
+.. [#] Por ejemplo, `ngx_http_referer` no estaba incluido en el ejecutable de
    *nginx-light*, pero sí en los de *nginx-full* y *nginx-extra*.
+
+.. [#] Por ejemplo, :deb:`libnginx-mod-http-dav-ext` contiene el módulo
+   `ngx_http_dav_module
+   <http://nginx.org/en/docs/http/ngx_http_dav_module.html>`_, que da suporte a
+   :program:`nginx` para las extensiones de *WebDav*, :ref:`ya comentadas
+   <metodos-webdav>`.
 
 .. [#] :program:`nginx` puede actuar como *proxy* de correo o *proxy* para
    conexiones TCP crudas. Para estos casos, no sirve escribir dentro de este
