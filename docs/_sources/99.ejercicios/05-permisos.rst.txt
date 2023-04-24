@@ -23,20 +23,15 @@ Ejercicios sobre permisos
 #. Hacer que de forma predeterminada cada vez que creo un archivo sólo yo pueda
    leerlo.
 
-#. Supongamos que creo el siguiente script en mi directorio personal:
+#. Supongamos que hacemos lo siguiente como administradores:
 
-   .. code-block:: bash
+   .. code-block:: console
 
-      #!/bin/sh
+      # ls -l /bin/rm
+      -rwxr-xr-x 1 root root 72752 sep 20  2022 /bin/rm
+      # chmod u+s /bin/rm
 
-      rm /home/usuario -rf
-
-   Lo guardo con el nombre de :file:`limpiar.sh` en mi directorio personal y le
-   doy los siguientes permisos::
-
-      $ chmod 4755 limpiar.sh
-
-   ¿Qué implicaciones tiene lo que he hecho?
+   ¿Qué he hecho y que implicaciones prácticas tiene?
 
 #. Supongamos que creamos un directorio :file:`/srv/ftp` al que queremos
    que todos los usuarios por |FTP| puedan subir ficheros, pero no queremos que

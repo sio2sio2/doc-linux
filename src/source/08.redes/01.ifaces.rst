@@ -12,18 +12,18 @@ nombran *eth0*, *eth1*, *eth2*, etc. o las interfaces inalámbricas *wlan0*,
 El problema de esta nomenclatura es su impredecibilidad. Sus nombres se asignan
 al cargar su driver correspondiente después de haber sido detectadas y, si hay
 varias, no hay garantías de que la asignación de nombres se producza siempre en
-el mismo orden. Por ello, en un equipo con dos interfaces *ethernet^* podría ocurrir
+el mismo orden. Por ello, en un equipo con dos interfaces *ethernet* podría ocurrir
 que una interfaz que en un arranque se detectó como *eth0* se detecte como
 *eth1* en un arranque posterior, lo cual puede tener consecuencias catastróficas
 si se usaron los nombres de las interfaces para definir reglas en el
 :ref:`cortafuegos <firewall>`. Es por esto que :ref:`SystemD <systemd>`, desde
-su versión **147** y en conjunción con :program:`udev`, definición un sistema
+su versión **147** y en conjunción con :program:`udev`, establece un sistema
 predecible de nombres que :ref:`más adelante discutiremos <iface-names>`\ [#]_.
 
 .. note:: Este epígrafe se limita a discutir sobre las interfaces **físicas**.
    Algunos tipos de interfaces virtuales se irán introduciendo bajo epígrafes
-   posteriores y otros ya aparecido en algunas partes del manual (p.e. :ref:`VPN
-   <vpn>`).
+   posteriores y otros ya han aparecido en algunas partes del manual (p.e.
+   :ref:`VPN <vpn>`).
 
 .. _iface-detect:
 
@@ -40,15 +40,15 @@ las tarjetas son |PCI|, podremos usar :manpage:`lspci`::
    02:00.0 Ethernet controller: Realtek Semiconductor Co., Ltd.  RTL8111/8168/8411 PCI Express Gigabit Ethernet Controller (rev 15)
    [...]
 
-Las tarjetas que estén soportadas (esto es aquellas para las que existe un
+Las tarjetas que estén soportadas (esto es, aquellas para las que existe un
 controlador), recibirán un nombre y aparecen listadas dentro de la jerarquía de
 :file:`/sys`::
 
    $ ls /sys/class/net
    eno1 lo wlp1s0
 
-Como puede verse ahí aparecen las dos tarjetas físicas, *eno1* y *wlp1s0*\ [#]_,
-(y la interfaz de *loopback*), señal de que para ambas había un *driver*
+Como puede verse ahí aparecen las dos tarjetas físicas, *eno1* y *wlp1s0*\ [#]_
+(además de la interfaz de *loopback*), señal de que para ambas había un *driver*
 adecuado.
 
 También es posible consultar las interfaces con :ref:`ip <ip>`::
@@ -167,8 +167,9 @@ y, con todas las interfaces **desactivas**, forzásemos el renombrado::
    # systemctl restart systemd-udev-trigger
 
 las dos interfaces anteriores pasarían a formar el nombre a partir de su |MAC|.
-En cualquier caso, esto es más apropiado para dar un nombre concreto a una
-interfaz (que no coincida con un nombre clásico para evitar problemas):
+En cualquier caso, sería más apropiado para dar un nombre concreto a una
+interfaz (que no coincida con un nombre clásico para evitar problemas) o
+siguiente:
 
 .. code-block:: ini
 
@@ -184,13 +185,24 @@ puede consultarse cuál es exactamente con::
 
    $ udevadm info /sys/class/net/eno1 | grep -i id_path
 
+Una alternativa sería mantener el nombre predecible y añadir como nombre
+alternativo el que gustemos\ [#]_:
+
+.. code-block:: ini
+
+   # /etc/systemd/network/70-cableada.link
+   [Match]
+   Path=pci-0000:02:00.0
+
+   [Link]
+   AlternativeName=cable0
+
 .. note:: El archivo también sirve para redefinir características de la interfaz
    definibles con el programa :manpage:`ethtool`. Échele un ojo al manual de
    :manpage:`systemd.link`.
 
 .. Interfaces dummy
    alias
-   alternatename
 
 .. rubric:: Notas al pie
 
@@ -226,6 +238,12 @@ puede consultarse cuál es exactamente con::
 
 .. [#] Y en el remototísimo caso de que estuviera instalado el programa
    :command:`biosdevname` también :code:`biosdevname=0`.
+
+.. [#] El nombre alternativo será tan válido como el principal, si usamos las
+   herramientas incluidas en :deb:`iproute2`. Téngase presente, sin embargo, que
+   sí usa :ref:`ifupdown <ifupdown>` para configurar la interfaz la herramienta
+   sólo atenderá al nombre que se haya incluido en
+   :file:`/etc/network/interfaces`.
 
 .. |PCI| replace:: :abbr:`PCI (Peripheral Component Interconnect)`
 .. |MAC| replace:: :abbr:`MAC (Media Access Control)`
