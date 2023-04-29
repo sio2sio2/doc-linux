@@ -185,21 +185,38 @@ puede consultarse cuál es exactamente con::
 
    $ udevadm info /sys/class/net/eno1 | grep -i id_path
 
+.. note:: El archivo también sirve para redefinir características de la interfaz
+   definibles con el programa :manpage:`ethtool`. Échele un ojo al manual de
+   :manpage:`systemd.link`.
+
 Una alternativa sería mantener el nombre predecible y añadir como nombre
 alternativo el que gustemos\ [#]_:
 
 .. code-block:: ini
 
-   # /etc/systemd/network/70-cableada.link
+   # /etc/systemd/network/99-network.link.d/cableada.conf
    [Match]
    Path=pci-0000:02:00.0
 
    [Link]
    AlternativeName=cable0
 
-.. note:: El archivo también sirve para redefinir características de la interfaz
-   definibles con el programa :manpage:`ethtool`. Échele un ojo al manual de
-   :manpage:`systemd.link`.
+.. note:: Obsérvese que no se ha definido un nuevo archivo :kbd:`.link` dentro
+   de :file:`/etc/systemd/network`, sino que la configuración se ha incluido en
+   un subdirectorio que añade al nombre :file:`99-default.link` una "d". Esto
+   se debe a que deseamos añadir configuración al archivo general y no
+   anularlo. Es el mismo mecanimos que se usa al :ref:`editar servicios
+   <systemd-edicion>`.
+
+.. warning:: Tenga presente que el nombrado de interfaces se incluye también en
+   el arranque temprano incluido en el archivo :file:`initrd.img` de su sistema.
+   Podría darse que intente cambiar el nombre de una interfaz editando los
+   archivos como se ha indicado y no tenga efecto la configuración, porque la
+   interfaz ya se nombró en tal arranque temprano y dentro de :file:`initrd.img` no
+   se haya obrado ningún cambio\ [#]_. Si es así, puede probar a regenerar el
+   archivo::
+
+      # update-initramfs -u
 
 .. Interfaces dummy
    alias
@@ -244,6 +261,18 @@ alternativo el que gustemos\ [#]_:
    sí usa :ref:`ifupdown <ifupdown>` para configurar la interfaz la herramienta
    sólo atenderá al nombre que se haya incluido en
    :file:`/etc/network/interfaces`.
+
+.. [#] Puede listar el contenido de la imagen con::
+
+      $ lsinitramfs /boot/initrd.img-$(uname -r)
+
+   Para comprobar qué contiene cada archivo, deberá, sin embargo, desempaquetar
+   por completo el archivo::
+
+      $ file /boot/initrd.img-$(uname -r)  # Para saber con qué esta comprimido.
+      $ mkdir /tmp/KK
+      $ cd /tmp/KK
+      $ zstdcat /boot/initrd.img-$(uname -r) | cpio -idv  # O "zcat", si se comprimió con gzip.
 
 .. |PCI| replace:: :abbr:`PCI (Peripheral Component Interconnect)`
 .. |MAC| replace:: :abbr:`MAC (Media Access Control)`
