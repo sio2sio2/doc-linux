@@ -149,9 +149,52 @@ Renombrado
 ==========
 Es posible alterar los nombres asignados a una o varias interfaces creando
 archivos de extensión :kbd:`.link` dentro del directorio
-:file:`/etc/systemd/network`. Sólo hay que tener presente que los archivos se
-leen por orden alfabético inverso y que se juntan a los que hay existen en
-:file:`/lib/systemd/network`. Así pues, si escribiéramos:
+:file:`/etc/systemd/network`. Para ello hay que tener presente que:
+
+.. _systemd-politica-conf:
+
+#. Para los archivos hay, en principio, dos ubicaciones posibles\ [#]_:
+   :file:`/lib/systemd/network` y la citada :file:`/etc/systemd/network`. La
+   primera debe reservarse para las configuraciones predefinidas en los
+   empaquetados de *Debian*, por lo que nos limitaremos a escribir sólo en la
+   segunda de las ubicaciones.
+#. Los archivos, con independencia de cuál sea su ubicación, se ordenan
+   alfabéticamente según su nombre y se asignará sólo la configuración del primer
+   archivo aplicable.
+#. En caso de que los nombres de las dos ubicaciones coincidan tiene prevalencia
+   el incluido en :file:`/etc/systemd/network` y el menos prioritario no tendrá
+   efecto alguno. Como consecuencia, si el prevalente es un archivo vacío
+   o un enlace simbólico a :file:`/dev/null`, no habrá configuración relacionada
+   con estos archivos\ [#]_.
+#. Para añadir configuración a un archivo podemos crear un subdirectorio que
+   al mismo nombre añada :file:`.d` (p.e.
+   :file:`/etc/systemd/network/99-network.link.d/` para
+   :file:`/lib/systemd/network/99-network.link`) y dentro de él crear archivos
+   con extensión :file:`.conf`\ [#]_. En caso de haber varios archivos se
+   mezclan en orden alfabético. Tal estrategia ya la hemos visto al :ref:`editar
+   servicios <systemd-edicion>`.
+#. Los archivos, en `formato ini
+   <https://es.wikipedia.org/wiki/INI_(extensi%C3%B3n_de_archivo)>`_, se
+   componen, fundamentalmente, de dos secciones:
+
+   * :kbd:`[Match]`, que incluye directivas para determinar si el archivo es
+     aplicable a una interfaz. Para que sea aplicable deben satisfacerse
+     **todas** las directivas.
+   * :kbd:`[Link]`, que incluye las directivas de configuración
+
+   .. note:: Además del nombre, los archivos :file:`.link`, permiten definir
+      otras características de la interfaz para las cuales se ha usado
+      tradicionalmente :manpage:`ethtool` (p.e la  velocidad de transmisión).
+      También permite redefinir la dirección |MAC|. Échele un ojo al manual de
+      :manpage:`systemd.link`.
+
+#. Para asegurarnos de cuál es el archivo que se ha aplicado a una interfaz,
+   podemos ejecutar la orden::
+
+      $ udevadm info --query=property --value --property=ID_NET_LINK_FILE /sys/class/net/eno1
+      /usr/lib/systemd/network/99-default.link
+
+Por tanto, si escribiéramos:
 
 .. code-block:: ini
 
@@ -167,9 +210,8 @@ y, con todas las interfaces **desactivas**, forzásemos el renombrado::
    # systemctl restart systemd-udev-trigger
 
 las dos interfaces anteriores pasarían a formar el nombre a partir de su |MAC|.
-En cualquier caso, sería más apropiado para dar un nombre concreto a una
-interfaz (que no coincida con un nombre clásico para evitar problemas) o
-siguiente:
+Podemos, por supuesto, dar un nombre concreto a una interfaz (a ser posible que
+no coincida con un nombre clásico para evitar problemas):
 
 .. code-block:: ini
 
@@ -180,33 +222,31 @@ siguiente:
    [Link]
    Name=cable0
 
-donde para referir la interfaz hemos preferido usar su *path* inmutable que
-puede consultarse cuál es exactamente con::
+donde para referir la interfaz hemos preferido usar su *path* inmutable, el cual
+puede consultarse cuál es con::
 
-   $ udevadm info /sys/class/net/eno1 | grep -i id_path
-
-.. note:: El archivo también sirve para redefinir características de la interfaz
-   definibles con el programa :manpage:`ethtool`. Échele un ojo al manual de
-   :manpage:`systemd.link`.
+   $ udevadm info --query=property --value --property=ID_PATH /sys/class/net/eno1
+   pci-0000:02:00.0
 
 Una alternativa sería mantener el nombre predecible y añadir como nombre
-alternativo el que gustemos\ [#]_:
+alternativo el que gustemos\ [#]_, para lo cual podríamos hacer::
 
-.. code-block:: ini
-
-   # /etc/systemd/network/99-network.link.d/cableada.conf
+   # ln -s /lib/systemd/network/99-default.link /etc/systemd/network/98-cableada.link
+   # mkdir /etc/systemd/network/98-cableada.link.d
+   # cat > /etc/systemd/network/98-cableada.link.d/alternativo.conf
    [Match]
    Path=pci-0000:02:00.0
 
    [Link]
    AlternativeName=cable0
 
-.. note:: Obsérvese que no se ha definido un nuevo archivo :kbd:`.link` dentro
-   de :file:`/etc/systemd/network`, sino que la configuración se ha incluido en
-   un subdirectorio que añade al nombre :file:`99-default.link` una "d". Esto
-   se debe a que deseamos añadir configuración al archivo general y no
-   anularlo. Es el mismo mecanimos que se usa al :ref:`editar servicios
-   <systemd-edicion>`.
+.. note:: Nótese que la configuración de :file:`98-cableada.link` sólo afectará
+   a la interfaz de cable y no a la inalámbrica, porque el archivo resultante
+   de aplicar tal configuración y la incluida en el subdirectorio
+   correspondiente contiene dos condiciones en :kbd:`[Match]`: la general que
+   cumple cualquier interfaz y la de :kbd:`Path=` que sólo cumple ella.
+
+.. _initrd.img-ifaces:
 
 .. warning:: Tenga presente que el nombrado de interfaces se incluye también en
    el arranque temprano incluido en el archivo :file:`initrd.img` de su sistema.
@@ -225,7 +265,7 @@ alternativo el que gustemos\ [#]_:
 
 .. [#] Para *linuces* sin :program:`SystemD` o con una versión anterior a la
    v147, pero que usan :program:`udev` (p.e. *Debian Jessie*) la solución para
-   evitar la impredicibilidad era definir una regla de :program:`udev` que
+   evitar la impredicibilidad era añadir una regla de :program:`udev` que
    definiera el nombre a partir, por ejemplo, de su dirección |MAC|. En
    *Debian*, de hecho, cada vez que se detectaba una nueva interfaz se apuntaba
    automáticamente una nueva regla en
@@ -236,17 +276,18 @@ alternativo el que gustemos\ [#]_:
        # PCI device 0x10ec:0x8167 (r8169)
        SUBSYSTEM=="net", ACTION=="add", DRIVERS=="?*", ATTR{address}=="00:1a:4d:32:4f:04", ATTR{dev_id}=="0x0", ATTR{type}=="1", KERNEL=="eth*", NAME="eth0"
 
-   Por supuesto, el archivo se podía editar a voluntad. Sobre todo, si
+   Por supuesto, el archivo se podía editar a voluntad, sobre todo, si
    cambiábamos una interfaz de red (quizás por haberse estropeado) y deseábamos
-   que la nueva asumiera su mismo papel. Esto supone que la nueva tome el nombre
-   de la antigua, circunstancia que jamás ocurría porque a la nueva interfaz se
-   le asignaba un nombre que no estuviera ya ocupado en el archivo. Así, si el
-   equipo tenía una interfaz (*eth0*), tal regla se apuntaba automática en el
-   archivo. Al cambiar la tarjeta, el sistema apuntaba la nueva tarjeta, pero al
-   estar ocupado el nombre *eth0* ya con una regla, creaba otra regla utilizando
-   el siguiente disponible (*eth1*). Consecuentemente, la tarjeta no se llamaba
-   igual a menos que editáramos el archivo para corregir la circunstancia:
-   borrar la antigua regla y que la nueva refiriera el nombre *eth0*.
+   que la nueva asumiera su mismo papel. De este modo, la nueva tomaba el nombre
+   de la antigua, cosa que jamás habría ocurrido si hubieras dejado la adición
+   automática, puesto que este automatismo asignaba a la interfaz un nombre que
+   no estuviera ya registrado. Así, si el equipo tenía una interfaz (*eth0*),
+   tal regla se apuntaba automática en el archivo. Al cambiar la tarjeta, el
+   sistema apuntaba la nueva tarjeta, pero al estar ocupado el nombre *eth0* ya
+   con una regla, creaba otra regla utilizando el siguiente disponible (*eth1*).
+   Consecuentemente, la tarjeta no se llamaba igual a menos que editáramos el
+   archivo para corregir la circunstancia: borrar la antigua regla y que la
+   nueva refiriera el nombre *eth0*.
 
 .. [#] Con nombres que por ahora nos resultarán extrañísimos y que el *kernel*
    habría nombrado como *eth0* y *wlan0*.
@@ -255,6 +296,20 @@ alternativo el que gustemos\ [#]_:
 
 .. [#] Y en el remototísimo caso de que estuviera instalado el programa
    :command:`biosdevname` también :code:`biosdevname=0`.
+
+.. [#] En realidad, hay otras dos ubicaciones posibles (véase
+   :manpage:`systemd.link`), una de las cuales es volátil; pero lo más probable
+   es que nos baste con manejar las dos citadas.
+
+.. [#] Por tanto, hay un segundo método para deshabilitar los nombres
+   predecibles de las interfaces alternativo al de modificar
+   :file:`/etc/default/grub`: crear :file:`/etc/systemd/network/99-default.link`
+   como enlace simbólico a :file:`/dev/null`, ya que esto provocará que la
+   configuración predeterminada en :file:`/lib/systemd/network/99-default.link`
+   quede sin efecto. Si esto no funciona, es probable que la causa sea la que se
+   recoge en la :ref:`advertencia que se incluye más adelante <initrd.img-ifaces>`.
+
+.. [#] Esta posibilidad sólo existe a partir de *Bookworm*.
 
 .. [#] El nombre alternativo será tan válido como el principal, si usamos las
    herramientas incluidas en :deb:`iproute2`. Téngase presente, sin embargo, que
