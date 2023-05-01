@@ -32,9 +32,14 @@ desarrollaron las principales distribuciones |BSD| existentes en la actualidad:
 <https://es.wikipedia.org/wiki/NetBSD>`_ o `OpenBSD
 <https://es.wikipedia.org/wiki/OpenBSD>`_.
 
-No obstante, el problema de licencias con AT&T, provocó que durante un periodo
-de dos años hasta que el pleito quedó resuelto en 1992 no se desarrollaran
-versiones libres de |BSD|, lo que propició en 1991 la aparición de *Linux*.
+No obstante, el `problema de licencias con AT&T
+<https://www.oreilly.com/library/view/open-sources/1565925823/ch04.html#kirkmck-11-fm2xml>`_,
+provocó que durante el periodo de dos años en que se desarrolló pleito (de 1992
+a 1994) no se desarrollaran versiones libres de |BSD|, lo que favoreció el
+interés por *Linux*, que había `nacido en julio de 1991
+<https://www.cs.cmu.edu/~awb/linux.history.html>`_ y se había `liberado en
+octubre de ese mismo año
+<https://groups.google.com/g/comp.os.minix/c/4995SivOl9o>`_.
 
 Por cortesía de wikipedia\ [#]_, este es la historia esquemática de los
 distintos unices:
@@ -189,12 +194,12 @@ característica las referidas distribuciones se agrupan así:
    =============================================== ========================
    Con liberación de versiones                      De liberación continua
    =============================================== ========================
-   Slackware_                                       Debian_ (testing, sid)
-   Debian_ (estable)                                Gentoo_
+   Slackware_                                       Gentoo_
+   Debian_ (estable)                                Debian_ (testing, sid)
    Ubuntu_                                          Archlinux_
    Mint_                                            Manjaro_
    `Kali Linux`_                                    `CentOS Stream`_
-   |RHEL|
+   |RHEL|                                           SliTaz_
    Fedora_
    CentOS_ (ahora `Rocky Linux`_, `Alma Linux`_)
    Suse_/OpenSuse_
@@ -216,6 +221,7 @@ característica las referidas distribuciones se agrupan así:
 .. _Linux from Scratch: https://www.linuxfromscratch.org
 .. _Rocky Linux: https://rockylinux.org
 .. _Alma Linux: https://almalinux.org
+.. _SliTaz: https://www.slitaz.org
 
 .. rubric:: Distribución de referencia
 
