@@ -183,25 +183,28 @@ En contraprestación
 - Requiere que podamos albergar los ficheros en algún espacio web propio y
   acomodar la reproducción en una página web (que puede ser tan simple como
   la proporcionada).
-- Como grabamos audio y vídeo por separado (aunque simultáneamente) hacer que
-  estén sincronizados quizás requiera una edición mínima del vídeo.
+- Como grabamos audio y vídeo por separado (aunque simultáneamente), hacer que
+  estén sincronizados quizás requiera una edición mínima.
 
 Partiendo de haber generado ya el vídeo :kbd:`tutorial.cast` y el
 audio :kbd:`tutorial.webm`, necesitamos una :download:`página html como ésta
-<files/tutorial.html>` en la que inscrustarlo:
+<files/tutorialv3.html>`\ [#]_ en la que inscrustarlo:
 
-.. literalinclude:: files/tutorial.html
+.. literalinclude:: files/tutorialv3.html
    :language: html
 
 .. warning:: La página debe estar alojada en un servidor. Si intenta usarla
-   cargándola como un fichero local en el navegador, le será imposible cargar el
+   como un archivo local, le será imposible cargar el
    vídeo y el audio. Ahora bien, dado que el vídeo nunca suele ser
    excesivamente pesado, ya que el formato no es propiamente vídeo, se puede
    incrustar como `dataURI <https://es.wikipedia.org/wiki/Esquema_de_URI_de_datos>`_:
 
-   .. code-block:: html
+   .. code-block:: js
 
-      <asciinema-player src="data:text/plain;base64, CAST.EN.BASE64" title="Reproducción..."></asciinema-player>
+      const cast64 = 'CAST.EN.BASE64';
+      const player = AsciinemaPlayer.create('data:text/plain;base64, ' + cast64, document.getElementById("video"), {
+         // opciones...
+      });
 
    donde :kbd:`CAST.EN.BASE64` es la salida de la orden::
 
@@ -210,9 +213,26 @@ audio :kbd:`tutorial.webm`, necesitamos una :download:`página html como ésta
    Desgraciadamente, el audio es normalmente excesivamente largo como para
    incrustarlo análogamente en el propio |HTML|.
 
-.. note:: El elemento :kbd:`<asciinema-player>` puede incluir el atributo :kbd:`speed`
+.. note:: Una opción que puede añadirse a :kbd:`Asciinema.create` es :kbd:`speed`
    para modificar la velocidad de reproducción. No obstante, si también se ha
-   grabado audio, álterar la velocidad es un problema.
+   grabado audio, alterar la velocidad resultará un problema.
+
+.. note:: Hay dos formas sencillas de controlar las dimensiones del vídeo:
+   
+   #. La expuesta en el ejemplo que consiste en evitar que el video se ajuste a
+      su elemento contenedor (:kbd:`fit: false`) y establecer el tamaño de la
+      fuente (:kbd:`small`, :kbd:`medium`, :kbd:`large` o una dimensión en
+      píxeles como :kbd:`12px`). Como el propio vídeo contiene la información de
+      filas y columnas  que hay, :program:`asciinema` calculará las dimensiones.
+
+   #. No usar lo anterior y definir las dimensiones del elemento contenedor
+      mediante |CSS|. Por ejemplo:
+
+      .. code-block:: html
+
+         <div id="video" style="width: 600px, margin:auto;"></video>
+
+
 
 .. rubric:: Notas al pie
 
@@ -235,6 +255,10 @@ audio :kbd:`tutorial.webm`, necesitamos una :download:`página html como ésta
    la página oficial de ffmpeg
    <https://trac.ffmpeg.org/wiki/Capture/Desktop>`_.
 
+.. [#] El código es válido para la versión **3** de :program:`asciinema`. Para
+   la versión **2.6.1**, use :download:`este otro <files/tutorialv2.html>`.
+
+
 .. _asciinema: https://asciinema.org
 .. _timeupdate: https://developer.mozilla.org/es/docs/Web/API/HTMLMediaElement/timeupdate_event
 .. _asciinema-player: https://github.com/asciinema/asciinema-player
@@ -247,3 +271,4 @@ audio :kbd:`tutorial.webm`, necesitamos una :download:`página html como ésta
 .. |JSON| replace:: :abbr:`JSON (JavaScript Object Notation)`
 .. |URL| replace:: :abbr:`URL (Uniform Resource Locator)`
 .. |HTML| replace:: :abbr:`HTML (HyperText Markup Language)`
+.. |CSS| replace:: :abbr:`CSS (Cascading Style Sheet)`
