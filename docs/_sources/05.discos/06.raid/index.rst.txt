@@ -205,6 +205,25 @@ Antes de pasar a describir los más comunes, es preciso fijar la siguiente
       con mejor rendimiento de escritura frente el |RAID|\ 6, a la que
       denomina |RAID| Z2.
 
+Podemos añadir una tabla que resuma las principales características de estos
+|RAID| simples:
+
+.. table:: 
+   :class: raid
+
+   ======== ======== ============= =========== =============
+    Tipo     Mínimo   Redundancia   Capacidad   Rendimiento
+   ======== ======== ============= =========== =============
+    RAID 0     2          0             n          r+w+
+    RAID 1     2         n-1            1          r+
+    RAID 5     3          1            n-1         r+w-
+    RAID 6     4          2            n-2         r+w-\ -
+   ======== ======== ============= =========== =============
+
+donde debemos entender que el *mínimo*, la *redundancia* y la *capacidad* se
+expresan en número de discos; y el *rendimiento* expresa con los signos "+" o
+"-", si hay mejora o empeoramiento en la lectura (*r*) o la escritura (*w*).
+
 Hay, además, sistemas |RAID|\ s que se constituyen **anidando** dos o más
 niveles de |RAID|. Los más utilizados son:
 
@@ -284,13 +303,16 @@ consideraciones a tener en cuenta:
    .. _hot-spare:
 
 #. Para minimizar el tiempo de sustitución de un disco defectuoso, algunos
-   sistemas incorporan un **dispositivo de reserva** (*hot spare*) que se
+   sistemas incorporan un :dfn:`dispositivo de reserva` (*hot spare*) que se
    encuentra conectado pero inactivo, por lo que no forma parte efectiva del
    |RAID|. Al surgir un fallo en algún disco, éste se inhabilita y
    automáticamente el disco de reserva ocupa su lugar en el |RAID|, por lo que
    comienza inmediatamente el *proceso de recuperación*. La labor del
    administrador consistirá en añadir al sistema un nuevo disco de reserva para
-   la próxima vez que se produzca una rotura.
+   la próxima vez que se produzca una rotura. Cuando un sistema |RAID| utiliza
+   uno o varios discos de reserva, suele añadir una "E" a su nombre. Por
+   ejemplo, un |RAID| **5E**, es un |RAID| 5 con al menos un disco de
+   reserva.
 
 #. Tenga presente que, si el sistema sólo tenía un grado de redundancia (p.e. un
    |RAID| 5 o un |RAID| 1 de dos discos), durante el proceso de reconstrucción
@@ -448,7 +470,7 @@ Estudiaremos ambas posibilidades.
 Pruebas de rendimiento
 ======================
 .. todo:: Proponer pruebas de lectura y escritura con alguna de las
-   herramientas sogeridas en `este artículo de Linuxhint
+   herramientas sugeridas en `este artículo de Linuxhint
    <https://linuxhint.com/benchmark_hard_disks_linux/>`_.
 
 .. rubric:: Notas al pie
