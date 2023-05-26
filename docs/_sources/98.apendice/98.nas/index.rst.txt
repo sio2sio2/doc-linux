@@ -275,7 +275,7 @@ archivos <omv-compartible>`, :ref:`establecer su política de permisos
 
 .. rubric:: Notas al pie
 
-.. [#] La v3 basada en *Jessie*, la v4 en *Stretch*, y la v5 en *Buster*. En
+.. [#] La v3 basada en Jessie_, la v4 en Stretch_, y la v5 en Buster_. En
    realidad, más que basarse en *Debian*, son *Debian* con el añadido de la
    interfaz *web* propia para la administración del |NAS|.
 

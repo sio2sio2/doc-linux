@@ -2,7 +2,7 @@
 
 IPtables
 ********
-Desde *Woody* a *Stretch* la herramienta de usuario para la definición del
+Desde Woody_ a Stretch_ la herramienta de usuario para la definición del
 cortafuegos ha venido siendo la suite de programas de :program:`iptables`:
 
 * :program:`iptables` e :program:`ip6tables` para la inspección en capa de red y
@@ -18,7 +18,7 @@ de programa el sufijo :kbd:`-legacy`. Así, :program:`iptables-legacy` es el
 apunta a :program:`iptables-nft`.
 
 .. warning:: Para seguir las lecciones sobre :program:`ipfilter` deberá usar
-   *Stretch* o, si usa *Buster*, utilizar las versiones *legacy* o asegurarse de
+   Stretch_ o, si usa Buster_, utilizar las versiones *legacy* o asegurarse de
    apuntar con :program:`update-alternatives` a las versiones *legacy*.
 
 .. rubric:: Contenidos

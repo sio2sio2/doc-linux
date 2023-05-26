@@ -262,8 +262,3 @@ sus distribuciones derivadas.
 .. |CD| replace:: :abbr:`CD (Compact Disk)`
 .. |DVD| replace:: :abbr:`DVD (Digital Versatile Disc)`
 .. |PC| replace:: :abbr:`PC (Personal Computer)`
-
-.. _Jessie: https://www.debian.org/News/2015/20150426
-.. _Stretch: https://www.debian.org/News/2017/20170617
-.. _Buster: https://www.debian.org/News/2019/20190706
-.. _Bullseye: https://www.debian.org/News/2021/20210814

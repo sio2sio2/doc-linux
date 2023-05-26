@@ -76,7 +76,7 @@ particionado podemos establecer lo siguiente:
   datos que se almacenen en ellos. Podríamos crear tres volúmenes lógicos
   independendientes, pero podemos aprovechar el concepto de
   :ref:`aprovisionamiento fino <lvm-aprovisionamiento>` para que ocupen el
-  mismo espacio y compitan por él. Como, sin embargo, el instalador de *Buster*
+  mismo espacio y compitan por él. Como, sin embargo, el instalador de Buster_
   no lo soporta, completaremos su creación durante la postinstalación.
 
 Para guardar el esquema de particiones sugerido basta un disco virtual de 3GiB.
@@ -629,7 +629,7 @@ problema.
    sobre memoria swap <https://help.ubuntu.com/community/SwapFaq>`_ de la página
    de *Ubuntu* es de muy recomendable lectura. 
 
-.. [#] En nuestro caso, la segunda revisión de *Buster*, esto es, la **10.2**.
+.. [#] En nuestro caso, la segunda revisión de Buster_, esto es, la **10.2**.
 
 .. [#] El administrador, sin embargo, es mejor que *hable inglés*, ya que de
    esta forma los errores se expresarán en inglés y será más fácil encontrar una

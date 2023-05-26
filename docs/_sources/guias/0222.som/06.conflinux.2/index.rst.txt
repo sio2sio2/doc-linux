@@ -72,8 +72,8 @@ correspondiente es ésta:
 .. rubric:: Notas al pie
 
 .. [#] En *Ubuntu*, por ejemplo, las ramas son siempre los nombres de las
-   versiones (de hecho se puede hacer en *Debian*, utilizando el nombre *buster*
-   en vez de *stable* si es que *Buster* es en ese momento la distribución
+   versiones (de hecho se puede hacer en *Debian*, utilizando el nombre Buster_
+   en vez de *stable* si es que Buster_ es en ese momento la distribución
    estable) y los componentes son *main*, *universe*, *multiverse* y
    *restricted*.
 

@@ -935,7 +935,7 @@ Fase de **entrega**
 .. [#] La opción ``-a`` podemos ahorrárnoslas, puesto que la cuenta *vm25* la
    hemos definido como la predeterminada.
 
-.. [#] Durante algunas versiones de *Debian* (y hasta *Buster*) el servicio por
+.. [#] Durante algunas versiones de *Debian* (y hasta Buster_) el servicio por
    el puerto **465/TCP** se asociaba al nombre *urd*. Esto se debe a que |SMTP|\
    s se abandonó en el estándar en favor del uso de *STARTTLS*, así que tal
    puerto se asoció posteriormente a `otro servicio distinto

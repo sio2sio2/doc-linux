@@ -37,7 +37,7 @@ particularmente interesante, además, la lectura de este completo `artículo sob
 el estado de Wireguard en junio de 2019
 <https://restoreprivacy.com/wireguard/>`_.
 
-.. note:: En caso de que utilicemos *Buster*\ [#]_, no dispondremos aún del
+.. note:: En caso de que utilicemos Buster_\ [#]_, no dispondremos aún del
    *software* en el repositorio, así que tendremos que echar mano de la rama
    *backports*::
 

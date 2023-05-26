@@ -233,7 +233,7 @@ el transporte indicado en la configuración, que es *smtp*.
 
 .. rubric:: Notas al pie
 
-.. [#] Tal es así, que hasta *jessie*, se instalaba un |MTA| (:program:`exim4`)
+.. [#] Tal es así, que hasta Jessie_, se instalaba un |MTA| (:program:`exim4`)
    en la instalación mínima.
 
 .. [#] Por ejemplo, algo tan básico cómo advertir de que hay un disco corrupto

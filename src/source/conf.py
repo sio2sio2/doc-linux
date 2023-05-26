@@ -373,6 +373,12 @@ rst_epilog = """
 .. |RAID| replace:: :abbr:`RAID (Redundant Array of Inexpensive Disks)`
 .. |SAI| replace:: :abbr:`SAI (Sistema de alimentación ininterrumpida)`
 .. |SSOO| replace:: :abbr:`SSOO (Sistemas Operativos)`
+
+.. _Woody: https://www.debian.org/News/2002/20020719
+.. _Jessie: https://www.debian.org/News/2015/20150426
+.. _Stretch: https://www.debian.org/News/2017/20170617
+.. _Buster: https://www.debian.org/News/2019/20190706
+.. _Bullseye: https://www.debian.org/News/2021/20210814
 """
 
 manpages_url = "https://manpages.debian.org/{path}"

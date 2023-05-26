@@ -30,7 +30,7 @@ llamada :program:`nftables` que promete mejor rendimiento, mayor claridad de
 sintaxis y evitar la duplicidad de código. Durante bastantes años\ [#]_, esta
 nueva herramienta ha convivido a la sombra de :program:`xtables`, pero las
 distribuciones modernas han optado ya por adoptarla como herramienta oficial
-(*Debian* desde *Buster*) por lo que su estudio es, más que aconsejable,
+(*Debian* desde Buster_) por lo que su estudio es, más que aconsejable,
 obligatorio
 
 El conocimiento de la suite de programas de :program:`iptables`, no obstante, no
