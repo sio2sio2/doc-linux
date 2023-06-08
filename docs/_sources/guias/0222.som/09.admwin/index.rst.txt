@@ -109,7 +109,7 @@ través de directivas de seguridad.
 
 Precedencia
 -----------
-La precedencia de las reglas viene dado por lo siguiente:
+La precedencia de las reglas viene dada por lo siguiente:
 
 #. Tiene precedencia cualquier *regla explícita* sobre cualquier *regla heredada*.
 #. Dentro de cada grupo anterior, las *reglas de denegación* tienen precedencia
@@ -351,7 +351,6 @@ directamente ejecutando :program:`services.msc`.
 
 Gestión de recursos
 ===================
-
 Discos
 ------
 Puede llevarse a cabo a través de la "Administración de equipos" o directamente
