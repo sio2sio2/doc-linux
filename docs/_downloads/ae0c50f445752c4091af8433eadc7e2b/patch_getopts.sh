@@ -1,18 +1,4 @@
 #
-# Parche para que una opción no sea considerada
-# argumento de la opción precedente, cuando esta
-# precisa un argumento.
-#
-patch_dash() {
-   [ "$opt" = ":" -o "$opt" = "?" ] && return 0
-   if echo $OPTARG | grep -q '^-'; then
-      OPTARG=$opt
-      opt=":"
-   fi
-}
-
-
-#
 # Parche para soportar opciones largas.
 #
 patch_lo() {
@@ -44,30 +30,5 @@ patch_lo() {
    elif [ -n "$OPTARG" ]; then  # No requiere argumento, pero se ha añadido uno.
       # Se elimina el argumento
       OPTARG=""
-   fi
-}
-
-
-#
-# Parche para soportar opciones con argumento opcional.
-#
-patch_optarg() {
-   local OPTS="$1" _OPT="$2"
-   eval local o=\$$_OPT
-
-   # La opción estaba a final de línea.
-   [ "$o" = ":" ] && oo="${OPTARG#-}" || oo="$o"
-
-   echo "$OPTS" | grep -qE '\b'"$oo"'\b' || return 0
-   # Si falló por no haber más argumentos,
-   # corregimos para que el argumento sea nulo
-   if [ "$o" = ":" ]; then
-      eval $_OPT='$OPTARG'
-      OPTARG=
-   # Si el argumento es la siguiente opción,
-   # retrocedemos en la lectura y hacemos nulo el argumento.
-   elif [ -z "${OPTARG%%-*}" ]; then
-      OPTIND=$((OPTIND-1))
-      OPTARG=
    fi
 }

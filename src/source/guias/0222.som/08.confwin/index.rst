@@ -41,7 +41,7 @@ Puntos de restauración
 sistema de archivos, para lo cual tendríamos que crear copias de seguridad) a
 través del programa :program:`SystemPropertiesProtection.exe`, accesible desde
 las "Propiedades>Protección del sistema" de "Este Equipo" o la sección
-"Seguridad y matenimiento" del "Panel de Control". La creación de estos puntos
+"Seguridad y mantenimiento" del "Panel de Control". La creación de estos puntos
 exige primero habilitar la posibilidad reservando una cantidad de espacio en
 disco para ello.
 
