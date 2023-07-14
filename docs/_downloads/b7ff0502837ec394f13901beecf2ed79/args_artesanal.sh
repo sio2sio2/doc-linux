@@ -16,11 +16,7 @@ Opciones:
 trap '[ $? -eq 2 ] && help' EXIT
 
 { ### Análisis de las opciones.
-   requiere_arg() {
-      local opts="hp:f:v"  # ":" significa que la opción requiere argumento propio
-
-      expr "$opts" : ".*${1#?}:" > /dev/null
-   }
+   opts="hp:f:v"  # Como en getopts, ":" significa que requiere argumento propio
 
    post=0  # Cantidad de argumentos pospuestos no asociados a ninguna opción
    while [ $# -gt $post ]; do
@@ -28,15 +24,15 @@ trap '[ $? -eq 2 ] && help' EXIT
          -h|--help)  # Ayuda
             help
             exit 0 ;;
-         -f|--file)  # Opción con argumento obligatorio.
+         -f|--file)
             [ -z "$2" ] && echo "$1 requiere argumento" >&2 && exit 2
             ARCHIVO="$2"
             shift 2 ;;
-         -p|--password)  # Opción con argumento opcional.
+         -p|--password)
             [ -z "$2" ] && echo "$1 requiere argumento" >&2 && exit 2
             PASSWORD="$2"
             shift 2 ;;
-         -v|--verbose)  # Opción sin argumento
+         -v|--verbose)
             VERBOSE=1
             shift ;;
          --)  # Final de las opciones
@@ -53,8 +49,9 @@ trap '[ $? -eq 2 ] && help' EXIT
          -??*)  #2 Fusión de opciones cortas
             rarg="${1#-?}" 
             arg="${1%$rarg}"
-            requiere_arg "$arg" || rarg="-$rarg" 
             shift
+            # Si "arg" no necesita argumento, rarg no es su argumento, sino otra opción
+            expr "$opts" : ".*${arg#-}:" > /dev/null || rarg="-$rarg" 
             set -- "$arg" "$rarg" "$@" ;;
          *)  #3 Argumentos no asociados a opciones no puestos al final
             arg=$1

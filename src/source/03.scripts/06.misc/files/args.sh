@@ -60,25 +60,16 @@ while getopts ":hvf:p:-:" opt; do
    case $opt in
       h|help)
          help
-         exit 0
-         ;;
+         exit 0 ;;
+      v|verbose) VERBOSE=1 ;;
+      f|file) FICHERO=$OPTARG ;;
+      p|password) PASSWORD=$OPTARG ;;
       \?)
          echo "-$OPTARG: Opción inválida."
-         exit 2
-         ;;
+         exit 2 ;;
       :)
          echo "-$OPTARG requiere un argumento"
-         exit 2
-         ;;
-      f|file)
-         FICHERO=$OPTARG
-         ;;
-      p|password)
-         PASSWORD=$OPTARG
-         ;;
-      v|verbose)
-         VERBOSE=1
-         ;;
+         exit 2 ;;
    esac
 done
 shift $((OPTIND-1))
