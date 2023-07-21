@@ -85,8 +85,8 @@ transparente, para lo cual se requiere:
    :manpage:`capabilities(7)`) ``CAP_NET_ADMIN``. Esto puede lograrse:
 
    - Ejecutando la aplicación como *root*.
-   - Concediéndole tal capacidad al ejecutable (p.e. `vea cómo hacerlo
-     <https://wiki.archlinux.org/index.php/Capabilities>`_).
+   - Concediéndole tal capacidad al ejecutable (p.e. :ref:`vea cómo hacerlo
+     <capabilities-prof>`).
 
    Cómo se configure la aplicación para que pueda actuar transparentemente es
    particular de cada una: el siguiente epígrafe estará dedicado a la
@@ -167,6 +167,7 @@ modo transparente, es necesario que el servidor final nos muestre cuál es la
       listen 80;  # Puerto y dirección de escucha pueden cambiar según el caso.
        
       location / {
+         default_type text/plain;
          return 200 "Saludos desde '$hostname'. Te conectas desde $remote_addr:$remote_port.\n";
       }
    }
@@ -318,12 +319,12 @@ cualquier *backend* de este modo:
 para que se envíen los paquetes utilizando la |IP| del cliente como origen.
 
 .. note:: Si los servidores finales están en la misma máquina recuerde hacer
-  referencia a ellos usando una |IP| local no habitual como la *127.1.1.1*
-  sugerida en la solución general.
+   referencia a ellos usando una |IP| local no habitual como la *127.1.1.1*
+   sugerida en la solución general.
 
-.. note:: En el caso del servidor web, como se conserva la |IP| del cliente,
-  no es necesario alterar la cabecera `X-Forwarded-For`, pero sí la referente
-  al protocolo, que cambia de |HTTP|\ s a |HTTP|:
+.. note:: En el caso del servidor web, como se conserva la |IP| del cliente, no
+   es necesario alterar la cabecera `X-Forwarded-For`, pero sí la referente al
+   protocolo, que cambia de |HTTP|\ s a |HTTP|. Por tanto:
 
   .. code-block:: bash
      :emphasize-lines: 3, 4
@@ -347,6 +348,18 @@ Y los cambios, según optemos por una estrategia u otra:
         #group haproxy
 
 **Usando capabilities**
+   * Habrá que conferir las *capabilities* adecuadas al ejecutable:
+
+     .. code-block:: console
+
+        # setcap 'cap_net_admin,cap_net_bind_service=ep' /usr/sbin/haproxy
+
+     La primera ya hemos dicho que permite crear el *socket* transparente,
+     mientras que la segunda escuchar en puerto privilegiado.
+
+     .. warning:: Cada vez que se sustituya el ejecutable con una actualización,
+        se perderán estas capacidades y habrá que volver a definirlas.
+
    * Comentar en la sesión *global* las dos líneas anteriores y también otra
      referente a una jaula que ya es imposible e innecesaria:
 
@@ -361,13 +374,12 @@ Y los cambios, según optemos por una estrategia u otra:
      sin privilegios no tiene permisos para sobrescribirlos::
 
       # invoke-rc.d haproxy stop
-      # rm -f /run/haproxy.pid /run/haproxy/*
+      # rm -f /run/haproxy.pid /run/haproxy/* /run/haproxy-master.sock
       # ls -ld /run/haproxy
       drwxrwsr-x 2 haproxy haproxy 80 Jul 17 21:59 /run/haproxy/
-      # echo 'PIDFILE="/run/haproxy/haproxy.pid"' >> /etc/default/haproxy
-
-     .. note:: La última orden cambia la ubicación del archivo que almacena el
-        |PID| simplemente por pulcritud
+      # cat >> /etc/default/haproxy
+      PIDFILE="/run/haproxy/haproxy.pid"
+      EXTRAOPTS="-S /run/haproxy/haproxy-master.sock"
 
    * Forzar a :ref:`systemd <systemd>` para que ejecute el servicio como el
      usuario *haproxy*, lo cual implica :ref:`manipular su configuración de

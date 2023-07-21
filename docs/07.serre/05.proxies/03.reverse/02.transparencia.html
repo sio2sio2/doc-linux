@@ -153,7 +153,7 @@ crear un <em>socket</em> transparente  exige a la aplicación la capacidad (véa
 <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/capabilities(7)">capabilities(7)</a></em>) <code class="docutils literal notranslate"><span class="pre">CAP_NET_ADMIN</span></code>. Esto puede lograrse:</p>
 <ul class="simple">
 <li><p>Ejecutando la aplicación como <em>root</em>.</p></li>
-<li><p>Concediéndole tal capacidad al ejecutable (p.e. <a class="reference external" href="https://wiki.archlinux.org/index.php/Capabilities">vea cómo hacerlo</a>).</p></li>
+<li><p>Concediéndole tal capacidad al ejecutable (p.e. <a class="reference internal" href="../../../02.conbas/09.admbasica/10.priv/02.capabilities.html#capabilities-prof"><span class="std std-ref">vea cómo hacerlo</span></a>).</p></li>
 </ul>
 <p>Cómo se configure la aplicación para que pueda actuar transparentemente es
 particular de cada una: el siguiente epígrafe estará dedicado a la
@@ -236,6 +236,7 @@ modo transparente, es necesario que el servidor final nos muestre cuál es la
 <span class="w">   </span><span class="kn">listen</span><span class="w"> </span><span class="mi">80</span><span class="p">;</span><span class="w">  </span><span class="c1"># Puerto y dirección de escucha pueden cambiar según el caso.</span>
 
 <span class="w">   </span><span class="kn">location</span><span class="w"> </span><span class="s">/</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="kn">default_type</span><span class="w"> </span><span class="s">text/plain</span><span class="p">;</span>
 <span class="w">      </span><span class="kn">return</span><span class="w"> </span><span class="mi">200</span><span class="w"> </span><span class="s">&quot;Saludos</span><span class="w"> </span><span class="s">desde</span><span class="w"> </span><span class="s">&#39;</span><span class="nv">$hostname&#39;.</span><span class="w"> </span><span class="s">Te</span><span class="w"> </span><span class="s">conectas</span><span class="w"> </span><span class="s">desde</span><span class="w"> </span><span class="nv">$remote_addr:$remote_port.\n&quot;</span><span class="p">;</span>
 <span class="w">   </span><span class="p">}</span>
 <span class="p">}</span>
@@ -377,9 +378,11 @@ sugerida en la solución general.</p>
 </div>
 <div class="admonition note">
 <p class="admonition-title">Nota</p>
-<p>En el caso del servidor web, como se conserva la <abbr title="Internet Protocol">IP</abbr> del cliente,
-no es necesario alterar la cabecera <cite>X-Forwarded-For</cite>, pero sí la referente
-al protocolo, que cambia de <abbr title="HyperText Transfer Protocol">HTTP</abbr>s a <abbr title="HyperText Transfer Protocol">HTTP</abbr>:</p>
+<dl class="simple">
+<dt>En el caso del servidor web, como se conserva la <abbr title="Internet Protocol">IP</abbr> del cliente, no</dt><dd><p>es necesario alterar la cabecera <cite>X-Forwarded-For</cite>, pero sí la referente al
+protocolo, que cambia de <abbr title="HyperText Transfer Protocol">HTTP</abbr>s a <abbr title="HyperText Transfer Protocol">HTTP</abbr>. Por tanto:</p>
+</dd>
+</dl>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>backend<span class="w"> </span>http
 <span class="w">   </span>mode<span class="w"> </span>http
 <span class="hll"><span class="w">   </span><span class="c1">#option forwardfor</span>
@@ -402,6 +405,18 @@ que <strong class="program">haproxy</strong> degrade sus permisos una vez arranc
 </ul>
 </dd>
 <dt><strong>Usando capabilities</strong></dt><dd><ul>
+<li><p>Habrá que conferir las <em>capabilities</em> adecuadas al ejecutable:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>setcap<span class="w"> </span><span class="s1">&#39;cap_net_admin,cap_net_bind_service=ep&#39;</span><span class="w"> </span>/usr/sbin/haproxy
+</pre></div>
+</div>
+<p>La primera ya hemos dicho que permite crear el <em>socket</em> transparente,
+mientras que la segunda escuchar en puerto privilegiado.</p>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Cada vez que se sustituya el ejecutable con una actualización,
+se perderán estas capacidades y habrá que volver a definirlas.</p>
+</div>
+</li>
 <li><p>Comentar en la sesión <em>global</em> las dos líneas anteriores y también otra
 referente a una jaula que ya es imposible e innecesaria:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1">#chroot /var/lib/haproxy</span>
@@ -414,16 +429,13 @@ referente a una jaula que ya es imposible e innecesaria:</p>
 archivos que genera la ejecución porque pertenecen a <em>root</em> y el usuario
 sin privilegios no tiene permisos para sobrescribirlos:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>invoke-rc.d<span class="w"> </span>haproxy<span class="w"> </span>stop
-<span class="gp"># </span>rm<span class="w"> </span>-f<span class="w"> </span>/run/haproxy.pid<span class="w"> </span>/run/haproxy/*
+<span class="gp"># </span>rm<span class="w"> </span>-f<span class="w"> </span>/run/haproxy.pid<span class="w"> </span>/run/haproxy/*<span class="w"> </span>/run/haproxy-master.sock
 <span class="gp"># </span>ls<span class="w"> </span>-ld<span class="w"> </span>/run/haproxy
 <span class="go">drwxrwsr-x 2 haproxy haproxy 80 Jul 17 21:59 /run/haproxy/</span>
-<span class="gp"># </span><span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;PIDFILE=&quot;/run/haproxy/haproxy.pid&quot;&#39;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/default/haproxy
+<span class="gp"># </span>cat<span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/default/haproxy
+<span class="go">PIDFILE=&quot;/run/haproxy/haproxy.pid&quot;</span>
+<span class="go">EXTRAOPTS=&quot;-S /run/haproxy/haproxy-master.sock&quot;</span>
 </pre></div>
-</div>
-<div class="admonition note">
-<p class="admonition-title">Nota</p>
-<p>La última orden cambia la ubicación del archivo que almacena el
-<abbr title="Process IDentifier">PID</abbr> simplemente por pulcritud</p>
 </div>
 </li>
 <li><p>Forzar a <a class="reference internal" href="../../../04.servidor/03.init/index.html#systemd"><span class="std std-ref">systemd</span></a> para que ejecute el servicio como el
