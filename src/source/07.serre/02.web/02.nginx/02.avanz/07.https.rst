@@ -243,30 +243,34 @@ modo bastante sencillo.
    la que albergue el servidor. Para instalar las herramientas accesorias
    es necesario hacer::
 
-      # apt install unzip debhelper
+      # apt install devscripts unzip
 
    que, como verá, instala bastantes paquetes.
 
 Aunque el propio *script* proporciona un método de instalación, es más
-conveniente que procuremos crear un paquete de *Debian*, Para ello, existe
-`otro repositorio <https://github.com/mdbraber/acme.sh-debian>`_ que nos
-permite generar el paquete que deseamos. Basta con descargar el repositorio
-(por ejemplo el :kbd:`zip`) y::
+conveniente por pulcritud que procuremos crear un paquete de *Debian*, Para
+ello, existe `otro repositorio <https://github.com/octopuce/acme.sh-debian>`_
+que nos permite generar el paquete que deseamos. El problema, a su vez, de este
+repositorio es que a fecha de redacción de este texto, utiliza :ref:`cron
+<cron>` en vez de los :ref:`Timers de SystemD <systemd-timer>`, por lo que en
+vez de directamente éste, utilizaremos `el fork del autor de este manual
+<https://github.com/sio2sio2/acme.sh-debian>`_. Basta con descargar el
+repositorio (por ejemplo el :kbd:`zip`) y::
 
    # unzip acme.sh-debian-master.zip
    # cd acme.sh-debian-master
 
-El *script* genera el paquete a partir de una copia del repositorio oficial que
-puede estar desfasada, así que antes de generarlo es conveniente editar :file:`debian/rules`:
+Antes de proceder a la generación del paquete es conveniente comprobar en :file:`debian/rules`
+el valor de la variable ``BRANCH``:
 
 .. code-block:: bash
 
-   GITHUBUSER = acmesh-official
-   BRANCH = master
+   BRANCH = 3.0.6
 
-y, hecha la modificación, ya se puede generar el paquete::
+y modificarla al valor de la última versión de :command:`acme.sh` que veamos en
+el repositorio oficial. Una vez hecho eso, basta con::
 
-   # make debian
+   # debuild
 
 que generará en el directorio padre el paquete listo para ser instalado.
 
@@ -275,35 +279,19 @@ que generará en el directorio padre el paquete listo para ser instalado.
 Como hemos generado el paquete la instalación es sumamente sencilla::
 
    # cd ..
-   # apt install ./acme.sh_0.1-2_amd64.deb
+   # apt install ./acme-sh_3.0.6-2~sio2sio2_all.deb
 
-.. warning:: El paquete, no obstante, tiene **un par de defectos** que es imprescindible
-   corregir:
-
-   * Para las renovaciones automáticas de certificados, el *script* original
-     añade una línea al :ref:`cron <cron>` de *root* para que comprueba diariamente
-     si es preciso renovar alguno::
-
-      11 0 * * * "/usr/lib/acme.sh"/acme.sh --cron --home /usr/lib/acme.sh > /dev/null
-
-     donde **11** es un minuto aleatorio. Esto tal vez funcione, si se usa
-     directamente el *script* sin demasiada personalización. Sin embargo, el
-     paquete guarda la configuración en :file:`/etc/acme.sh` y es dentro de ese
-     directorio donde se encuentran los certificados, por lo que la renovación
-     automática fallará. La solución es alterar esa línea para que se carguen las
-     variables de ambiente::
-
-      11 0 * * * . /etc/acme.sh/acme.sh.env ; "/usr/lib/acme.sh"/acme.sh --cron > /dev/null
-
-   * No incluye ningún script de desinstalación :file:`prerm`, por lo que ni se
-     elimina el trabajo de :ref:`cron <cron>` ni la línea que se creó en
-     :file:`/root/.bashrc` por lo que habrá que hacer ambas acciones a mano.
+El paquete instala el *software*, de manera que los certificados generados se
+almacenarán dentro del directorio :file:`/etc/acme.sh/` gracias a un alias
+incluido en :file:`/root/.bashrc` y crea la tarea periódica necesaria para que
+la renovación de los certificados se haga automáticamente.
 
 Si su intención es generar inmediatamente el certificado sin salir de la sesión
-de administrador, entonces deberá cargar a mano el archivo que define las
-variables de ambiente::
+de administrador, entonces deberá cargar el *alias* con::
 
-   # . /etc/acme.sh/acme.sh.env
+   # . ~/.bashrc
+   # command -v acme.sh
+   alias acme.sh='acme.sh --home /etc/acme.sh'
 
 .. rubric:: Generación del certificado
 
@@ -317,7 +305,7 @@ Proponemos lo más sencillo\ [#]_ (y que en muchos casos nos será suficiente):
   permite indicar con qué |CA| se pretende trabajar. Sin embargo, es más cómodo
   cambiar la predefinición::
 
-      # acme.sh acme.sh --set-default-ca  --server letsencrypt
+      # acme.sh --set-default-ca  --server letsencrypt
 
   .. note:: Puede consultar `todas las |CA|\ s disponibles en la documentación
      oficial <https://github.com/acmesh-official/acme.sh/wiki/Server>`_.
