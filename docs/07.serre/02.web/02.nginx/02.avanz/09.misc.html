@@ -323,7 +323,7 @@ mantenimiento no tendrá efecto. Para ello necesitamos el módulo <a class="refe
 <span class="p">}</span>
 </pre></div>
 </div>
-<p>que identifica a los clientes que se conectan desde direcciones locales<a class="footnote-reference brackets" href="#id3" id="id2" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a>:
+<p>que identifica a los clientes que se conectan desde direcciones locales<a class="footnote-reference brackets" href="#id5" id="id2" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a>:
 hecho lo cual, podemos modificar <code class="file docutils literal notranslate"><span class="pre">mantenimiento.conf</span></code> para que, cuando la
 <abbr title="Internet Protocol">IP</abbr> del cliente sea una de ellas, no tenga efecto el estado de mantemiento:</p>
 <blockquote>
@@ -366,12 +366,184 @@ hecho lo cual, podemos modificar <code class="file docutils literal notranslate"
 por lo que deberá comprobar si con su sabor de <strong class="program">nginx</strong> tiene
 instalado el paquete <a class="reference external" href="https://packages.debian.org/stable/libnginx-mod-http-geoip">libnginx-mod-http-geoip</a>.</p>
 </div>
+</section>
+<section id="registros-con-systemd">
+<span id="nginx-systemd"></span><h2><span class="section-number">7.2.2.2.10.6. </span>Registros con systemd<a class="headerlink" href="#registros-con-systemd" title="Enlace permanente a este encabezado">¶</a></h2>
+<p><strong class="program">nginx</strong> escribe directamente sus registros en el fichero que indiquemos
+en las directivas <a class="reference internal" href="../01.conf.html#nginx-logs"><span class="std std-ref">access_log y error_log</span></a>. Ahora bien,
+también da la posibilidad de pasárselos al gestor de registros
+(<strong class="program">systemd</strong> en las versiones modernas de <em>debian</em>) y que éste se
+encargue. Para ello podemos crear el siguiente fichero:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>/etc/nginx/conf.d/logging.conf
+<span class="go">log_format  journald  &#39;$host[$remote_addr] - $request - $status $body_bytes_sent &quot;$http_user_agent&quot;&#39;;</span>
+<span class="go">access_log  syslog:server=unix:/dev/log,facility=local7,severity=info,nohostname journald;</span>
+<span class="go">error_log   syslog:server=unix:/dev/log,facility=local7,severity=error,nohostname;</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Además, habra qué comentar las directivas correspondientes
+presentes en <code class="file docutils literal notranslate"><span class="pre">/etc/nginx/nginx.conf</span></code>, porque de lo contrario seguirán
+escribiéndose registros en los ficheros ahí definidos:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="c1">##</span>
+<span class="c1"># Logging settings</span>
+<span class="c1">##</span>
+
+<span class="c1">#access_log /var/log/nginx/access.log;</span>
+<span class="c1">#error_log /var/log/nginx/access.log;</span>
+</pre></div>
+</div>
+</div>
+<p>De este modo, los registros de acceso y error aparecerían al ejecutar:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>journalctl<span class="w"> </span>-u<span class="w"> </span>nginx
+</pre></div>
+</div>
+<p>Para los de acceso se ha redefinido el formato, a fin de que aparezca el nombre
+del dominio al que se accede (por si manejamos varios dominios virtuales) y no
+la hora y fecha, ya que de esto último se encarga el propio gestor.
+Desgraciadamente para los de error no es posible.</p>
+<p>Si además queremos que los registros en su formato tradicional no se apunten
+en <code class="file docutils literal notranslate"><span class="pre">/var/log/syslog</span></code>, sino en otro fichero, entonces debemos crear el
+fichero <code class="file docutils literal notranslate"><span class="pre">/etc/rsyslog.d/nginx.conf</span></code> con el siguiente contenido:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>cat<span class="w"> </span>&gt;<span class="w"> </span>/etc/rsyslog.d/nginx.conf
+<span class="go">local7.=info    /var/log/nginx/access.log</span>
+<span class="go">local7.err      /var/log/nginx/error.log</span>
+<span class="go">local7.*        &amp;</span>
+<span class="gp"># </span>invoke-rc.d<span class="w"> </span>rsyslog<span class="w"> </span>restart
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Como las líneas contienen el nombre del dominio, los registros de
+acceso es posible separarlos en distintos archivos dependiendo tal nombre.
+Véase <a class="reference external" href="http://www.rsyslog.com/doc/v8-stable/configuration/filters.html">cómo escribir las reglas para rsyslog</a></p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Como hemos colocado los registros dentro de <code class="file docutils literal notranslate"><span class="pre">/var/log/nginx</span></code> que
+es donde <em>debian</em> espera encontrar los logs de <strong class="program">nginx</strong>, no tenemos
+que preocuparnos de las rotaciones, ya que existe
+<code class="file docutils literal notranslate"><span class="pre">/etc/logrotate.d/nginx</span></code> que se encarga de ello.</p>
+</div>
+</section>
+<section id="cache-de-paquetes">
+<span id="nginx-debcache"></span><h2><span class="section-number">7.2.2.2.10.7. </span>Caché de paquetes<a class="headerlink" href="#cache-de-paquetes" title="Enlace permanente a este encabezado">¶</a></h2>
+<p>Cuando se requiere actualizar muchos ordenadores de la red local, la descarga de
+paquetes puedo suponer un gran tráfico de red. Una solución para evitarlo crear
+un repositorio completo, pero por lo general sólo se instalan una ínfima parte
+de los paquetes de la distribución con que descargamos y sincronizamos muchos
+paquetes que no son totalmente inútiles.</p>
+<p>Una solución alternativa es crear un <em>proxy</em><a class="footnote-reference brackets" href="#id6" id="id3" role="doc-noteref"><span class="fn-bracket">[</span>2<span class="fn-bracket">]</span></a> caché para almacenar los
+paquetes de descargados; asi sólo la primera instación requerirá descargarlos de
+internet y las siguientes se limitarán a obtenerlos del <em>proxy</em>.
+<strong class="program">nginx</strong> nos permite hacerlo como por otro lado nos lo permitiría
+<a class="reference internal" href="../../../05.proxies/02.web.html#squid"><span class="std std-ref">squid</span></a>).</p>
+<p>La idea es modificar el fichero <code class="file docutils literal notranslate"><span class="pre">sources.list</span></code> de manera que las líneas
+que se escriben así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">deb http://ftp.fr.debian.org/debian/ stretch  main</span>
+</pre></div>
+</div>
+<p>pasen a estar escritas así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">deb http://debian-cache.example.net/ftp.fr.debian.org/debian/ stretch  main</span>
+</pre></div>
+</div>
+<p>es decir, la línea es igual pero insertando el nombre de nuestro <em>proxy</em> al
+nombre de la máquina del reposito de <em>debian</em>. De este modo, el gestor de
+paquetes contactará con nuestro <strong class="program">nginx</strong> y éste será capaz de conocer
+cuál es el repositorio y la ruta al recurso, simplemente transformando el primer
+directorio en el nombre del repositorio.</p>
+<p>Para ello lo primero es crear un directorio de almacenamiento para las
+descargas:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mkdir<span class="w"> </span>-p<span class="w"> </span>/var/cache/nginx
+<span class="gp"># </span>chown<span class="w"> </span>www-data<span class="w"> </span>/var/cache/nginx
+</pre></div>
+</div>
+<p>Y ahora definir cómo es esta caché en <code class="file docutils literal notranslate"><span class="pre">/etc/nginx/conf.d/cache.conf</span></code>:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">proxy_cache_path</span><span class="w"> </span><span class="s">/var/cache/nginx/debcache</span>
+<span class="w">                 </span><span class="s">levels=1:2</span>
+<span class="w">                 </span><span class="s">keys_zone=debcache:8m</span>
+<span class="w">                 </span><span class="s">max_size=500m</span>
+<span class="w">                 </span><span class="s">inactive=14d</span>
+<span class="w">                 </span><span class="s">use_temp_path=off</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>cuyo contenido supone que:</p>
+<ul class="simple">
+<li><p>Almacenaremos todos los datos en <code class="file docutils literal notranslate"><span class="pre">/var/cache/nginx/debcache</span></code>.</p></li>
+<li><p>La caché la podremos referir luego como <em>debcache</em>.</p></li>
+<li><p>Dispondrá de un tamaño máximo de 500 MB. Si se supera este tamaño, para
+respetar este límite, se empezarán a eliminar contenidos empezando por
+aquellos cuyo tiempo de acceso es más antiguo.</p></li>
+<li><p>Los contenidos permanecerán 14 días almacenados. Superado este tiempo, se
+eliminarán.</p></li>
+</ul>
+<p>Por último debemos crear el dominio virtual (que hemos llamado
+<em>debian-cache.example.net</em>) con <a class="reference download internal" download="" href="../../../../_downloads/695f4f6e58814bc5706987003c50aa46/site-cache"><code class="xref download docutils literal notranslate"><span class="pre">esta</span> <span class="pre">configuracion</span></code></a>:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">server</span><span class="w"> </span><span class="p">{</span>
+<span class="w">   </span><span class="kn">listen</span><span class="w">  </span><span class="mi">80</span><span class="p">;</span>
+<span class="w">   </span><span class="kn">server_name</span><span class="w">   </span><span class="s">debian-cache.example.net</span><span class="p">;</span>
+<span class="w">   </span><span class="kn">server_tokens</span><span class="w"> </span><span class="no">off</span><span class="p">;</span>
+<span class="w">   </span>
+<span class="w">   </span><span class="kn">location</span><span class="w"> </span><span class="p">~</span><span class="w"> </span><span class="sr">^/(?P&lt;servidor&gt;[^/]+).*$</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="kn">rewrite</span><span class="w">  </span><span class="s">^/[^/]+(.*)</span>$<span class="w"> </span><span class="nv">$1</span><span class="w"> </span><span class="s">break</span><span class="p">;</span>
+
+<span class="w">      </span><span class="kn">proxy_pass</span><span class="w">  </span><span class="s">http://</span><span class="nv">$servidor</span><span class="p">;</span>
+<span class="w">      </span><span class="kn">resolver</span><span class="w"> </span><span class="mi">8</span><span class="s">.8.8.8</span><span class="p">;</span><span class="w">  </span><span class="c1"># U otro servidor DNS más apropiado.</span>
+<span class="w">      </span><span class="kn">proxy_http_version</span><span class="w"> </span><span class="mi">1</span><span class="s">.1</span><span class="p">;</span>
+<span class="w">      </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Host</span><span class="w">      </span><span class="nv">$servidor</span><span class="p">;</span>
+<span class="w">      </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">X-Real-IP</span><span class="w"> </span><span class="nv">$remote_addr</span><span class="p">;</span>
+
+<span class="w">      </span><span class="kn">proxy_cache</span><span class="w"> </span><span class="s">debcache</span><span class="p">;</span>
+<span class="w">      </span><span class="kn">proxy_cache_valid</span><span class="w"> </span><span class="s">8h</span><span class="p">;</span>
+<span class="w">      </span><span class="kn">proxy_cache_valid</span><span class="w"> </span><span class="mi">404</span><span class="w"> </span><span class="mi">10m</span><span class="p">;</span>
+<span class="w">      </span><span class="kn">proxy_cache_use_stale</span><span class="w"> </span><span class="s">error</span><span class="w"> </span><span class="s">timeout</span><span class="w"> </span><span class="s">updating</span><span class="w"> </span><span class="s">http_500</span><span class="w"> </span><span class="s">http_502</span><span class="w"> </span><span class="s">http_503</span><span class="w"> </span><span class="s">http_504</span><span class="p">;</span>
+<span class="w">      </span><span class="kn">proxy_cache_lock</span><span class="w"> </span><span class="no">on</span><span class="p">;</span>
+
+<span class="w">      </span><span class="kn">location</span><span class="w"> </span><span class="p">~</span><span class="w"> </span><span class="sr">\.deb$</span><span class="w"> </span><span class="p">{</span>
+<span class="w">         </span><span class="kn">rewrite</span><span class="w">  </span><span class="s">^/[^/]+(.*)</span>$<span class="w"> </span><span class="nv">$1</span><span class="w"> </span><span class="s">break</span><span class="p">;</span>
+<span class="w">         </span><span class="kn">proxy_pass</span><span class="w">  </span><span class="s">http://</span><span class="nv">$servidor</span><span class="p">;</span>
+
+<span class="w">         </span><span class="kn">proxy_cache_valid</span><span class="w"> </span><span class="s">14d</span><span class="p">;</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">   </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Actúa como <em>proxy</em> entre el repositorio de <em>debian</em> y el cliente usando la
+caché. Ahora bien, almacenar durante mucho tiempo la lista de paquetes no
+es muy recomendable, porque si un paquete se actualiza en el repositorio, pero
+nuestra lista no, el cliente intentará obtener una versión antigua del paquete y
+se encontrará con un error <strong>404</strong>. Por ello configuramos del siguiente modo:</p>
+<ul class="simple">
+<li><p>Los ficheros cacheados que no son paquetes <em>debian</em> se considerarán inválidos
+después de 8 horas, o sea, una jornada de trabajo. Si se detectan muchos
+errores <strong>404</strong> como consecuencia de la desincronización con el repositorio,
+se puede disminuir este tiempo a costa de que sean necesarias más
+actualizaciones remotas de las listas de paquetes el mismo día.</p></li>
+<li><p>Los paquetes, en cambio, se consideran válidos durante 14 días. A diferencia
+del caso anterior que un paquete cacheado se vuelva obsoleto, no supone un
+error, ya que el cliente descargará el nuevo paquete. La única desventaja es
+que cachearemos la versión antigua y la nueva y ocuparemos espacio de disco
+innecesariamente.</p></li>
+</ul>
+</section>
+<section id="testeo-del-rendimiento">
+<h2><span class="section-number">7.2.2.2.10.8. </span>Testeo del rendimiento<a class="headerlink" href="#testeo-del-rendimiento" title="Enlace permanente a este encabezado">¶</a></h2>
+<div class="admonition-todo admonition" id="id4">
+<p class="admonition-title">Por hacer</p>
+<p>Mostrar el uso de apachebench (p.e. tal como explica <a class="reference external" href="https://easyengine.io/tutorials/benchmark/apachebench/">aquí</a>)</p>
+</div>
 <p class="rubric">Notas al pie</p>
 <aside class="footnote-list brackets">
-<aside class="footnote brackets" id="id3" role="note">
+<aside class="footnote brackets" id="id5" role="note">
 <span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id2">1</a><span class="fn-bracket">]</span></span>
 <p>Podríamos, claro está, incluir también alguna dirección publica propia
 desde la que nos solemos conectar al servidor para administrarlo.</p>
+</aside>
+<aside class="footnote brackets" id="id6" role="note">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id3">2</a><span class="fn-bracket">]</span></span>
+<p>Aunque es mucho mas sencillo, si no necesitamos instalar <strong class="program">nginx</strong> por
+otra razón, usar <a class="reference external" href="https://www.tecmint.com/apt-cache-server-in-ubuntu/">apt-cacher-ng</a>.</p>
 </aside>
 </aside>
 </section>
@@ -397,6 +569,9 @@ desde la que nos solemos conectar al servidor para administrarlo.</p>
 </ul>
 </li>
 <li><a class="reference internal" href="#pagina-de-mantenimiento">7.2.2.2.10.5. Página de mantenimiento</a></li>
+<li><a class="reference internal" href="#registros-con-systemd">7.2.2.2.10.6. Registros con systemd</a></li>
+<li><a class="reference internal" href="#cache-de-paquetes">7.2.2.2.10.7. Caché de paquetes</a></li>
+<li><a class="reference internal" href="#testeo-del-rendimiento">7.2.2.2.10.8. Testeo del rendimiento</a></li>
 </ul>
 </li>
 </ul>

@@ -288,10 +288,161 @@ hecho lo cual, podemos modificar :file:`mantenimiento.conf` para que, cuando la
    por lo que deberá comprobar si con su sabor de :program:`nginx` tiene
    instalado el paquete :deb:`libnginx-mod-http-geoip`.
 
+.. _nginx-systemd:
+
+Registros con systemd
+=====================
+:program:`nginx` escribe directamente sus registros en el fichero que indiquemos
+en las directivas :ref:`access_log y error_log <nginx-logs>`. Ahora bien,
+también da la posibilidad de pasárselos al gestor de registros
+(:program:`systemd` en las versiones modernas de *debian*) y que éste se
+encargue. Para ello podemos crear el siguiente fichero::
+
+   # /etc/nginx/conf.d/logging.conf
+   log_format  journald  '$host[$remote_addr] - $request - $status $body_bytes_sent "$http_user_agent"';
+   access_log  syslog:server=unix:/dev/log,facility=local7,severity=info,nohostname journald;
+   error_log   syslog:server=unix:/dev/log,facility=local7,severity=error,nohostname; 
+
+.. warning:: Además, habra qué comentar las directivas correspondientes
+   presentes en :file:`/etc/nginx/nginx.conf`, porque de lo contrario seguirán
+   escribiéndose registros en los ficheros ahí definidos:
+
+   .. code-block:: nginx
+
+      ##
+      # Logging settings
+      ##
+
+      #access_log /var/log/nginx/access.log;
+      #error_log /var/log/nginx/access.log;
+
+De este modo, los registros de acceso y error aparecerían al ejecutar:
+
+.. code-block:: console
+
+   # journalctl -u nginx
+
+Para los de acceso se ha redefinido el formato, a fin de que aparezca el nombre
+del dominio al que se accede (por si manejamos varios dominios virtuales) y no
+la hora y fecha, ya que de esto último se encarga el propio gestor.
+Desgraciadamente para los de error no es posible.
+
+Si además queremos que los registros en su formato tradicional no se apunten
+en :file:`/var/log/syslog`, sino en otro fichero, entonces debemos crear el
+fichero :file:`/etc/rsyslog.d/nginx.conf` con el siguiente contenido:
+
+.. code-block:: console
+
+  # cat > /etc/rsyslog.d/nginx.conf
+  local7.=info    /var/log/nginx/access.log
+  local7.err      /var/log/nginx/error.log
+  local7.*        &
+  # invoke-rc.d rsyslog restart
+
+.. note:: Como las líneas contienen el nombre del dominio, los registros de
+   acceso es posible separarlos en distintos archivos dependiendo tal nombre.
+   Véase `cómo escribir las reglas para rsyslog
+   <http://www.rsyslog.com/doc/v8-stable/configuration/filters.html>`_
+
+.. note:: Como hemos colocado los registros dentro de :file:`/var/log/nginx` que
+   es donde *debian* espera encontrar los logs de :program:`nginx`, no tenemos
+   que preocuparnos de las rotaciones, ya que existe
+   :file:`/etc/logrotate.d/nginx` que se encarga de ello.
+
+.. _nginx-debcache:
+
+Caché de paquetes
+=================
+Cuando se requiere actualizar muchos ordenadores de la red local, la descarga de
+paquetes puedo suponer un gran tráfico de red. Una solución para evitarlo crear
+un repositorio completo, pero por lo general sólo se instalan una ínfima parte
+de los paquetes de la distribución con que descargamos y sincronizamos muchos
+paquetes que no son totalmente inútiles.
+
+Una solución alternativa es crear un *proxy*\ [#]_ caché para almacenar los
+paquetes de descargados; asi sólo la primera instación requerirá descargarlos de
+internet y las siguientes se limitarán a obtenerlos del *proxy*.
+:program:`nginx` nos permite hacerlo como por otro lado nos lo permitiría
+:ref:`squid <squid>`).
+
+La idea es modificar el fichero :file:`sources.list` de manera que las líneas
+que se escriben así::
+
+   deb http://ftp.fr.debian.org/debian/ stretch  main
+
+pasen a estar escritas así::
+
+   deb http://debian-cache.example.net/ftp.fr.debian.org/debian/ stretch  main
+
+es decir, la línea es igual pero insertando el nombre de nuestro *proxy* al
+nombre de la máquina del reposito de *debian*. De este modo, el gestor de
+paquetes contactará con nuestro :program:`nginx` y éste será capaz de conocer
+cuál es el repositorio y la ruta al recurso, simplemente transformando el primer
+directorio en el nombre del repositorio.
+
+Para ello lo primero es crear un directorio de almacenamiento para las
+descargas::
+
+   # mkdir -p /var/cache/nginx
+   # chown www-data /var/cache/nginx
+
+Y ahora definir cómo es esta caché en :file:`/etc/nginx/conf.d/cache.conf`:
+
+.. literalinclude:: files/cached.conf
+   :language: nginx
+
+cuyo contenido supone que:
+
+* Almacenaremos todos los datos en :file:`/var/cache/nginx/debcache`.
+* La caché la podremos referir luego como *debcache*.
+* Dispondrá de un tamaño máximo de 500 MB. Si se supera este tamaño, para
+  respetar este límite, se empezarán a eliminar contenidos empezando por
+  aquellos cuyo tiempo de acceso es más antiguo.
+* Los contenidos permanecerán 14 días almacenados. Superado este tiempo, se
+  eliminarán.
+
+Por último debemos crear el dominio virtual (que hemos llamado
+*debian-cache.example.net*) con :download:`esta configuracion
+<files/site-cache>`:
+
+.. literalinclude:: files/site-cache
+   :language: nginx
+
+Actúa como *proxy* entre el repositorio de *debian* y el cliente usando la
+caché. Ahora bien, almacenar durante mucho tiempo la lista de paquetes no
+es muy recomendable, porque si un paquete se actualiza en el repositorio, pero
+nuestra lista no, el cliente intentará obtener una versión antigua del paquete y
+se encontrará con un error **404**. Por ello configuramos del siguiente modo:
+
+* Los ficheros cacheados que no son paquetes *debian* se considerarán inválidos
+  después de 8 horas, o sea, una jornada de trabajo. Si se detectan muchos
+  errores **404** como consecuencia de la desincronización con el repositorio,
+  se puede disminuir este tiempo a costa de que sean necesarias más
+  actualizaciones remotas de las listas de paquetes el mismo día.
+* Los paquetes, en cambio, se consideran válidos durante 14 días. A diferencia
+  del caso anterior que un paquete cacheado se vuelva obsoleto, no supone un
+  error, ya que el cliente descargará el nuevo paquete. La única desventaja es
+  que cachearemos la versión antigua y la nueva y ocuparemos espacio de disco
+  innecesariamente.
+
+.. https://www.linuxito.com/gnu-linux/nivel-alto/943-crear-una-cache-de-paquetes-de-debian-con-nginx
+   http://tdt.rocks/repo_cache_ft_nginx.html
+   https://raymii.org/s/tutorials/NGINX_proxy_folder_to_different_root.html
+
+Testeo del rendimiento
+======================
+
+.. todo:: Mostrar el uso de apachebench (p.e. tal como explica `aquí
+   <https://easyengine.io/tutorials/benchmark/apachebench/>`_)
+
 .. rubric:: Notas al pie
 
 .. [#] Podríamos, claro está, incluir también alguna dirección publica propia
    desde la que nos solemos conectar al servidor para administrarlo.
+
+.. [#] Aunque es mucho mas sencillo, si no necesitamos instalar :program:`nginx` por
+   otra razón, usar `apt-cacher-ng
+   <https://www.tecmint.com/apt-cache-server-in-ubuntu/>`_.
 
 
 .. |HTML| replace:: :abbr:`HTML (HyperText Markup Language)`
