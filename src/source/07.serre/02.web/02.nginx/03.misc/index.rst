@@ -7,9 +7,9 @@ ajusta a un mismo esquema que podemos resumir en los siguientes pasos:
 
 0. **Preparación del servidor web**
 
-   Debemos tener instalado y en funcionamiento nuestro servidor
-   :program:`nginx`, |PHP| y un |SGBD| (my\ |SQL|, y habernos asegurado
-   previamente de que es :ref:`capaz de ejecutar código PHP <nginx-php>`.
+   Debemos tener instalado y en funcionamiento :program:`nginx`, |PHP| y un
+   |SGBD| (my\ |SQL|, en nuestro caso) y habernos asegurado previamente de que
+   es :ref:`capaz de ejecutar código PHP <nginx-php>`.
 
 #. **Instalación de la aplicación**
 

@@ -58,8 +58,8 @@ comprobar si el *referer* es válido:
 
 Compresión
 ==========
-Es muy reomendable, para ahorrar ancho de banda configurar el servidor para que
-comprima aquellos ficheros cuyp ratio de compresión es alto. La configuración
+Es muy recomendable, para ahorrar ancho de banda configurar el servidor para que
+comprima aquellos ficheros cuyo ratio de compresión es alto. La configuración
 predeterminada sólo comprime los documentos |HTML|, así que creamos un fichero
 de :download:`configuración adicional <files/gzip.conf>` como
 :file:`/etc/nginx/conf.d/gzip.conf`:
@@ -121,18 +121,17 @@ intérprete tengan los valores adecuados.
 
 Cliente original
 ----------------
-Un *proxy* intermedio que no que no actúe de forma transparente, hará creer al
-servidor web que todas las peticiones las recibe de él. En consecuencia,
-cualquier decisión que queramos tomar en función de quién sea quien nos haga la
-petición (p.e. si la petición es de un cliente local o uno remoto), será
-imposible.
+Un *proxy* intermedio que no actúe de forma transparente, hará creer al servidor
+web que todas las peticiones las recibe de él. En consecuencia, cualquier
+decisión que queramos tomar en función de quién sea quien nos haga la petición
+(p.e. si la petición es de un cliente local o uno remoto), será imposible.
 
 Para soslayar este inconveniente los *proxies* pueblan la cabecera
 :ref:`X-Forwarded-For <xforwardedfor>`, de manera que el servidor pueda
 recalcular la dirección que identifica al cliente original y definir la variable
-:kbd:`$remote_addr`, en vez de usar la |IP| de la conexióni (que será la del
+`$remote_addr`_, en vez de usar la |IP| de la conexión (que será la del
 *proxy*). Para que :program:`nginx` sea capaz de aprovechar la información de
-esta cabecera  puede crearse un fichero con contenido semejante a éste que
+esta cabecera puede crearse un fichero con contenido semejante a éste que
 aprovecha el módulo `ngx_http_realip_module
 <http://nginx.org/en/docs/http/ngx_http_realip_module.html>`_::
 
@@ -146,14 +145,19 @@ La directiva `real_ip_header
 <http://nginx.org/en/docs/http/ngx_http_realip_module.html#real_ip_header>`_
 permite indicar cuál es el nombre del campo a analizar, `set_real_ip_from
 <http://nginx.org/en/docs/http/ngx_http_realip_module.html#set_real_ip_from>`_
-las redes y máquinas en que consideramos que hay *proxies* que alteran la *ip*
-original y que queremos ignorar; y `real_ip_recursive
+las redes y direcciones en que consideramos que hay *proxies* que alteran la
+|IP| original; y `real_ip_recursive
 <http://nginx.org/en/docs/http/ngx_http_realip_module.html#real_ip_recursive>`_
-provoca a *off* que consideremos la *ip* del cliente la última contenida en
-``X-Forwarded-For`` (siempre que la ``$remote_addr`` coincida con alguna de
-las referidas en ``set_real_ip_from``); y a *on*, que la *ip* del cliente sea
-la última de ``X-Forwarded-For`` que tampoco coincida con las referidas en
-``set_real_ip_from``.
+puede tener dos valores que alteran de distinto modo la |IP| del cliente (o sea,
+`$remote_addr
+<https://nginx.org/en/docs/http/ngx_http_core_module.html#var_remote_addr>`_)
+cuando la detectada originalmente coincide con alguna de las recogidas en
+`set_real_ip_from`_:
+
+* *off* provoca que se tome incondicionalmente la última incluida en el campo
+  referido por `real_ip_header`_.
+* *on*, que se tome la última que no esté incluida en las referidas por
+  `set_real_ip_from`_.
 
 Para ilustrarlo supongamos este esquema:
 
@@ -165,16 +169,17 @@ que genera la siguiente cabecera ``X-Forwarded-For``:
 
    X-Forwarded-For: 80.35.60.114 123.12.21.34 10.35.2.3
 
-y un ``$remote_address`` original que vale *127.0.0.1*, ya que el *proxy* que
-recibe la comunicación en nuestro servidor (:program:`haproxy`) se comunica con
-:program:`nginx` a través de la interfaz de *loopback*.  En este caso, y con la
-configuración anterior en :file:`conf.d/realip.conf`:
+y una dirección |IP| para el cliente que vale *127.0.0.1* originalmente, ya que
+el *proxy* que recibe la comunicación en nuestro servidor (:program:`haproxy`)
+se comunica con :program:`nginx` a través de la interfaz de *loopback*. En este
+caso, debido a la configuración anterior en :file:`conf.d/realip.conf` y a que
+la |IP| original del cliente está incluida en `real_ip_recursive`_:
 
-* Si ``real_ip_recursive`` está deshabilitado, ``$remote_address`` acabará
-  valiendo *10.35.2.3*, o sea, la última *ip* de ``X-Forwarded-For``.
-* En caso contrario, ``$remote_address`` valdrá *123.12.21.34* ya que éste es el
-  último valor de ``X-Forwarded-For`` que no está incluido en las directivas
-  ``set_real_ip_from``.
+* Si `real_ip_recursive`_ está deshabilitado, `$remote_addr`_ valdrá
+  *10.35.2.3*, esto es, la última |IP| de ``X-Forwarded-For``.
+* Si está habilitado, `$remote_addr`_ valdrá *123.12.21.34*, ya que éste es
+  el último valor de ``X-Forwarded-For`` que no está incluido en las directivas
+  `set_real_ip_from`_.
 
 Protocolo original
 ------------------
