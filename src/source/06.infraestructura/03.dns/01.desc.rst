@@ -131,7 +131,7 @@ servicios *adicionales*:
 .. note:: Un servidor |DNS| no tiene por qué gestionar un único dominio. De
    hecho, lo habitual es que los dominios de segundo nivel contratados por
    particulares estén gestionados por el servidor |DNS|\ [#]_ del *agente
-   registrado* que haya usado como intermediario para la contratación.
+   registrador* que haya usado como intermediario para la contratación.
 
 .. _dns-resolucion:
 
@@ -145,7 +145,7 @@ Los servidores |DNS| son capaces de soportar dos tipos de consultas:
 
   + Si es el servidor que gestiona el dominio "iescastillodeluna.es", con la |IP|
     de la máquina.
-  + Si es el servidor |TLD| que gestiona "es" con la lista de servidores |DNS|
+  + Si es el servidor |TLD| que gestiona "es", con la lista de servidores |DNS|
     que gestionan "iescastillodeluna.es".
   + Si es alguno de los servidores raíz, con la lista de servidores |DNS| que
     gestionan "es".
@@ -341,6 +341,43 @@ El nombre del registro y su valor dependen de cuál sea el tipo y, por último,
        + |TTL| de todos los registros definidos dentro de la zona para los que
          expresamente no se haya definido uno.
 
+   Es interesante que el registro |SOA| indique la máquina que contiene el
+   registro y con él toda la definición de la zona de dominio. ¿Por qué?
+   Observemos que si preguntamos por quiénes son los servidores que gestionan el |TLD|
+   "es", obtendremos cuatro servidores::
+
+      $ host -tns es
+      es name server c.nic.es.
+      es name server g.nic.es.
+      es name server h.nic.es.
+      es name server a.nic.es.
+
+   Como ya se ha comentado debe existir redundancia. Sin embargo, sólo en uno de
+   esos servidores está realmente definida la zona (el llamado :ref:`servidor
+   maestro <dns-glosario>`). Los otros tres, lo que hacen es replicar las
+   definiciones que hay en el primero sincronizándose cada cierto tiempo\ [#]_
+   (los llamados :ref:`servidores esclavos <dns-glosario>`). Pues bien, ¿cuál de
+   esos tres es el maestro? La clave está en el registro |SOA|::
+
+      $ host -tsoa es
+      es has SOA record ns1.nic.es. hostmaster.nic.es. 2023102504 7200 7200 2592000 86400
+
+   Como puede verse, la máquina que contiene el registro es "ns1.nic.es", cuyo
+   nombre no concuerda con ninguno de los cuatro. Esto, sin embargo, se debe a
+   que el servidor maestro tiene dos nombres, "ns1" y una de las cuatro letras
+   ("a", "c", "g" o "h"), que obtuvimos antes. Para salir de dudas, lo único que
+   tenemos que hacer es resolver a la |IP|::
+
+      $ host ns1.nic..es
+      ns1.nic.es has address 194.69.254.1
+      $ host b.nic.es
+      b.nic.es has address 193.106.179.65
+      $ host a.nic.es
+      a.nic.es has address 194.69.254.1
+
+   ¡Hecho! Hemos acertado a la segunda: "a.nic.es" es el servidor maestro y los
+   otros tres son los esclavos.
+
 **A**
    Define cuál es la dirección |IP|\ v4 que corresponde a un nombre. Por
    ejemplo, el registro:
@@ -524,6 +561,8 @@ El nombre del registro y su valor dependen de cuál sea el tipo y, por último,
 --------
 .. seealso:: Consulte el :ref:`epígrafe dedicado a definirlo <dnssec>`.
 
+.. _dns-glosario:
+
 Glosario
 --------
 Para terminar referiremos algunas definiciones, gran parte de las cuáles ya están recogidas bajo los epígrafes anteriores:
@@ -564,6 +603,8 @@ Para terminar referiremos algunas definiciones, gran parte de las cuáles ya est
 .. [#] En el servidor :ref:`bind <bind>` que estudiaremos posteriormente, la resolución
    de los servidores raíz se encuentra en el archivo :file:`/usr/share/dns/root.hints`.
 .. [#] No parece funcionar correctamente en la versión *9.18*.
+.. [#] Información que, como vemos, también está definida en el propio registro
+   |SOA|.
 .. [#] No es que seamos muy listos, es que hemos hecho previamente la consulta::
 
       $ dig -tns iescastillodeluna.es +noall +answer
