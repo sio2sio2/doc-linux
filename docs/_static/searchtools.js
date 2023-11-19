@@ -57,7 +57,7 @@ const _removeChildren = (element) => {
 const _escapeRegExp = (string) =>
   string.replace(/[.*+\-?^${}()|[\]\\]/g, "\\$&"); // $& means the whole matched string
 
-const _displayItem = (item, searchTerms, highlightTerms) => {
+const _displayItem = (item, searchTerms) => {
   const docBuilder = DOCUMENTATION_OPTIONS.BUILDER;
   const docUrlRoot = DOCUMENTATION_OPTIONS.URL_ROOT;
   const docFileSuffix = DOCUMENTATION_OPTIONS.FILE_SUFFIX;
@@ -86,15 +86,9 @@ const _displayItem = (item, searchTerms, highlightTerms) => {
   linkEl.href = linkUrl + anchor;
   linkEl.dataset.score = score;
   linkEl.innerHTML = title;
-  const rehighlightListItem = () => {
-    if (SPHINX_HIGHLIGHT_ENABLED)  // set in sphinx_highlight.js
-      highlightTerms.forEach((term) => _highlightText(listItem, term, "highlighted"));
-  };
-  if (descr) {
+  if (descr)
     listItem.appendChild(document.createElement("span")).innerHTML =
       " (" + descr + ")";
-    rehighlightListItem();
-  }
   else if (showSearchSummary)
     fetch(requestUrl)
       .then((responseData) => responseData.text())
@@ -103,7 +97,6 @@ const _displayItem = (item, searchTerms, highlightTerms) => {
           listItem.appendChild(
             Search.makeSearchSummary(data, searchTerms)
           );
-        rehighlightListItem();
       });
   Search.output.appendChild(listItem);
 };
@@ -122,15 +115,14 @@ const _finishSearch = (resultCount) => {
 const _displayNextItem = (
   results,
   resultCount,
-  searchTerms,
-  highlightTerms,
+  searchTerms
 ) => {
   // results left, load the summary and display it
   // this is intended to be dynamic (don't sub resultsCount)
   if (results.length) {
-    _displayItem(results.pop(), searchTerms, highlightTerms);
+    _displayItem(results.pop(), searchTerms);
     setTimeout(
-      () => _displayNextItem(results, resultCount, searchTerms, highlightTerms),
+      () => _displayNextItem(results, resultCount, searchTerms),
       5
     );
   }
@@ -368,7 +360,7 @@ const Search = {
     // console.info("search results:", Search.lastresults);
 
     // print the results
-    _displayNextItem(results, results.length, searchTerms, highlightTerms);
+    _displayNextItem(results, results.length, searchTerms);
   },
 
   /**
@@ -434,14 +426,11 @@ const Search = {
         filenames[match[0]],
       ]);
     };
-    Object.keys(objects).forEach((prefix) => {
-      if (!(objects[prefix] instanceof Array)) {
-        objects[prefix] = Object.entries(objects[prefix]).map(([name, match]) => [...match, name]);
-      }
+    Object.keys(objects).forEach((prefix) =>
       objects[prefix].forEach((array) =>
         objectSearchCallback(prefix, array)
-      );
-    });
+      )
+    );
     return results;
   },
 
