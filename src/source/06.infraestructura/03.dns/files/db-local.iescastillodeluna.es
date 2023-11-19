@@ -18,5 +18,7 @@ smtp     IN    CNAME mail
 pop3     IN    CNAME mail
 imap     IN    CNAME mail
 www      IN    A     192.168.255.20
+; La máquina externo.iescastillodeluna.es está en otra red
+externo  IN    A     80.80.80.80
 ftp      IN    CNAME www
 *        IN    CNAME www
