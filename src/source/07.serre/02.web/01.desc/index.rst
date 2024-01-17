@@ -33,7 +33,10 @@ Hay básicamente tres versiones del protocolo:
   efectos de la descripciòn hecha aquí no presenta diferencias con respecto a la
   anterior.
 
-Por ejemplo, una conexión |HTTP| puede ser esta::
+Por ejemplo, una conexión |HTTP| puede ser esta:
+
+.. code-block:: console
+   :emphasize-lines: 1, 5-7
 
    $ telnet www.example.com 80
    Trying 80.80.80.80...
