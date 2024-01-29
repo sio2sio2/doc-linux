@@ -53,7 +53,8 @@ sus respectivos módulos, éstas contendrán:
 
 Atajos
 ======
-* :ref:`Tareas pendientes <todo>`
+.. * :ref:`Tareas pendientes <todo>`
+
 * :ref:`Índice de órdenes <genindex>`
 * :ref:`Búsqueda en el texto <search>`
 

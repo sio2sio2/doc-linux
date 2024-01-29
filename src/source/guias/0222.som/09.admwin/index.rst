@@ -132,10 +132,6 @@ Poniendo estas ideas en una tabla:
    |             | Permisión  |
    +-------------+------------+
 
-Ahora bien, ¿qué es lo que pasa si ninguna de las reglas es aplicable a la
-acción de un usuario y por tanto el sistema agota la lista de reglas |ACL| sin
-poder aplicar ninguna? En ese caso, la acción se considera denegada.
-
 .. seealso:: Para una explicación más exhaustiva, puede consultar `este
    artículo de ntfs.com <https://www.ntfs.com/ntfs-permissions-acl-use.htm>`_.
 
@@ -282,6 +278,43 @@ por quien tenga permisos para ello:
    `este desaparecido artículo
    <https://web.archive.org/web/20100105052819/http://www.cmschill.net/stringtheory/2009/05/02/bitwise-operators/>`_.
 
+Permisos efectivos
+------------------
+Para saber qué permisos efectivos tiene un usuario sobre un recurso, hay que
+agregar todas las reglas que le son aplicables, sabiendo que si hay
+contradicción entre dos reglas en la definición de un permiso, debemos tener en
+cuenta la precedencia antes señalada. Por ejemplo, supongamos que existen en un
+recurso las siguientes reglas para el usuario "Usuario" que pertenece al grupo
+"Usuarios":
+
+.. table:: Permisos efectivos
+   :class: aplreglas-aclwin
+
+   +----------+------+----------+-------------------------------------------------------+
+   |          |      |          | Permisos                                              |
+   | Entidad  | Tipo | Carácter +---+---+---+---+---+---+---+---+---+----+----+----+----+
+   |          |      |          | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 |
+   +==========+======+==========+===+===+===+===+===+===+===+===+===+====+====+====+====+
+   | Usuario  | Con. | Heredada |   | O | O |   |   | O |   |   |   | O  | O  |    |    |
+   +----------+------+----------+---+---+---+---+---+---+---+---+---+----+----+----+----+
+   | Usuarios | Den. | Heredada |   | X |   |   |   | X | X |   |   |    |    |    | X  |
+   +----------+------+----------+---+---+---+---+---+---+---+---+---+----+----+----+----+
+   | Usuario  | Con. | Propia   | O | O |   | O | O |   | O |   | O | O  |    | O  | O  |
+   +----------+------+----------+---+---+---+---+---+---+---+---+---+----+----+----+----+
+   | Usuarios | Con. | Propia   | O |   |   |   |   | O | O |   |   |    | O  |    |    |
+   +----------+------+----------+---+---+---+---+---+---+---+---+---+----+----+----+----+
+   | Usuarios | Den. | Propia   | X |   |   |   |   |   | X |   |   |    |    |    |    |
+   +----------+------+----------+---+---+---+---+---+---+---+---+---+----+----+----+----+
+   | Permisos efectivos         | X | O | O | O | O | O | X | X | O | O  | O  | O  | O  |
+   +----------+------+----------+---+---+---+---+---+---+---+---+---+----+----+----+----+
+
+Como se ve, es irrelevante que la |ACL| esté definida para "Usuario" o para el
+grupo "Usuarios": en cualquier caso, son aplicables a "Usuario". Deben aplicarse
+según la precedencia ya vista y sólo queda por comentar el caso en que haya
+algún permiso que no esté definido por ninguna regla aplicable (el **8** en el
+ejemplo). En ese caso, ante la ausencia de una definición expresa, el permiso se
+considera denegado. 
+
 Directivas de seguridad
 -----------------------
 Las :dfn:`directivas de seguridad` permiten configurar aspectos relacionados con
@@ -359,8 +392,59 @@ a través de :command:`diskmgmt.msc`.
 Impresoras
 ----------
 
-Compartición de recursos
-------------------------
+Carpetas compartidas
+--------------------
+Para compartir carpetas con otros sistemas debemos hacer lo siguiente:
+
+**Servidor**
+   El sistema Windows que tiene la carpeta que queremos compartir actúa como
+   servidor. En el debemos localizar la carpeta, y eligiendo "Propiedades" en el
+   menú contextual que se abre al pinchar con el botón derecho, abrir la pestaña
+   "Compartir":
+
+   .. image:: files/compartir.png
+
+   Ahí escogemos "Uso compartido avanzado..." lo que nos abrirá una ventana así:
+
+   .. image:: files/usocompartido.png
+
+   en la que debemos marcar "Compartir esta carpeta" y darle un nombre de red a
+   la carpeta, que puede o no coincidir con el nombre que tiene en el sistema.
+   En el ejemplo, se ha elegido uno distinto, lo que significa que la carpeta
+   "Prueba" se verá al ser compartida a través de la red como
+   "NombreCompartido".
+
+   Hecho esto, se debe definir los permisos pulsando sobre "Permisos". Como se
+   ve en la siguiente captura:
+
+   .. image:: files/permisoscompartidos.png
+
+   estos permisos son más simplificados que los :ref:`permisos sobre el sistema de
+   archivos NTFS <winperm>` y sólo existen "Control total", "Lectura" y
+   "Escritura". En principio, "Todos" tiene únicamente permisos de lectura, pero
+   pueden añadirse más reglas ACL para cualquier usuario o grupo definido en el
+   sistema. Lo importante es tener presente que, cuando se accede desde un
+   cliente a la carpeta, se hará con la identidad de un usuario y los permisos
+   que éste tenga serán los más restrictivos entre los permisos |NTFS| definidos
+   sobre la carpeta y éstos permisos de compartición. Por tanto, aunque un
+   usuario tenga "Control total" sobre la carpeta, si estos permisos de
+   compartición no se han alterado y la única regla definida es la predefinida
+   para "Todos", el usuario sólo tendrá permisos de lectura si accede al recurso
+   compartido desde un cliente. Y, por la misma razón, si a un usuario
+   determinado le damos en los permisos de compartición "Control total", pero no
+   tiene permisos sobre la carpeta, el usuario no podrá acceder al recurso.
+
+   .. warning:: Tenga cuidado si un usuario tiene permisos por pertenecer al
+      grupo "Administradores" y haber una |ACL| en sus permisos |NTFS| referente
+      a este grupo: los permisos no parecen tener efecto al compartirse.
+
+**Cliente**
+   Para acceder desde un cliente basta con usar la dirección
+   ``\\\\IP.SERVIDOR\\NombreCompartido`` o
+   ``\\\\NOMBRE.DE.RED\\NombreCompartido``. Si el cliente es un *Windows*,
+   antes de acceder al recurso, deberá entrar en el "Administrador de
+   credenciales" para especificar con qué usuario y contraseña desea acceder al
+   recurso compartido.
 
 .. include:: /guias/0222.som/99.ejercicios/06.winII.rst
 
