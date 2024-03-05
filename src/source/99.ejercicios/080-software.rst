@@ -3,9 +3,14 @@ Ejercicios sobre gestión de software
 
 #. Actualizar el sistema:
 
-   a. Sin más.
-   #. Eliminando también en una sola orden los paquetes que se vuelven
-      innecesarios
+   a. Actualice la lista de paquetes.
+   #. Actualice en sí el sistema sin más.
+   #. Como alternativa a lo anterior, actualice a la vez que
+      elimina paquetes no necesarios.
+
+#. Hacer una actualización completa del sistema, de modo que se actualice
+   *software* aunque el proceso suponga sustituir un paquete por varios
+   distintos.
 
 #. Instalar las herramientas para soportar |NTFS|.
 
@@ -25,7 +30,5 @@ Ejercicios sobre gestión de software
    no tenemos entorno gráfico)
 
 #. Desinstalar el juego anterior.
-
-#. Hacer una actualización completa del sistema.
 
 .. |NTFS| replace:: :abbr:`NTFS (New-Technology FileSystem)`
