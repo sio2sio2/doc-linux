@@ -48,7 +48,7 @@ de zona tendrá que tener al menos los siguientes registros (aparte del registro
    ns    IN    A        192.168.255.1
    mail  IN    A        192.168.255.1
    smtp  IN    CNAME    mail
-   imap  IN    CNAME    imap
+   imap  IN    CNAME    mail
 
 Además, conviene que el dominio de los servidores que obtenemos con
 :command:`dnsdomain` o :command:`hostname` sea coherente\ [#]_::
