@@ -1,7 +1,7 @@
 #!/bin/sh
 
-MPVDIR=${XDG_CONFIG_HOME:-$HOME/.config}/mpv/
+STATEDIR=${XDG_STATE_HOME:-$HOME/.local/state}
 
-[ -d "$MPVDIR/watch_later" ] || exit 0
+[ -d "$STATEDIR/mpv/watch_later" ] || exit 0
 
-find "$MPVDIR/watch_later" -type f -mtime +30 -delete
+find "$STATEDIR/mpv/watch_later" -type f -mtime +30 -delete
