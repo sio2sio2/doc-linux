@@ -7,40 +7,45 @@
 
 Firma de documentos
 *******************
-Según :ref:`se presentó en un principio <firma-digital>`, puede firmarse
-cualquier archivo o flujo de datos y a resultas de ello se obtendrá un archivo
-independiente de firma que contiene el resumen cifrado junto a metainformación
-sobre el proceso. Es lo que se llama `firma independiente
-<https://en.wikipedia.org/wiki/Detached_signature>`_. Sobre ello no hay mucho
-más que añadir.
+Para firmar documentos existen dos vías basadas en :ref:`certificados digitales
+X.509 <cert-digital>`:
 
-Sin embargo, el formato |PDF| permite integrar en un objeto interno la firma
-dentro del propio documento, razón por la cual --junto a la de ser independiente
-su aspecto de la plataforma\ -- se utiliza para la formalización digital de
-contratos, solicitudes, promulgación de leyes, etc. que requieren validez legal.
+* Si el documento tiene formato |PDF|, este estándar permite integrar en un
+  objeto interno la firma dentro del propio documento, razón por la cual --junto
+  a la de ser independiente su aspecto de la plataforma\ -- se utiliza muy
+  comúnmente para la formalización digital de contratos, solicitudes,
+  promulgación de leyes, etc. que requieren validez legal.
 
-Este proceso de firma:
+  .. note:: Aunque opcionalmente pueden generarse marcas visibles en el documento
+     que denoten quién ha firmado y cuándo lo ha hecho, la verdadera firma digital
+     no deja huella visible en una impresión: se verifica utilizando una
+     herramienta de verificación sobre el archivo.
 
-+ utiliza :ref:`certificados digitales X.509 <cert-digital>`.
-+ calcula el :ref:`resumen <hash>` de todo el documento, exceptuando el contenido
-  de la propia firma\ [#]_.
-+ permite adjuntar sucesivamente distintas firmas. Tenga presente, no obstante,
-  que una de las firmas, no incluiría en su resumen los añadidos que suponen las
-  que se hayan hecho después. Consecuentemente, el orden en que se firme es
-  importante si los firmantes tienen distinta jerarquía: lo lógico, pues, es que
-  firme primero el que tenga menos jerarquía, después el supervisor del primer
-  firmante y así sucesivamente.
+  Al estar integrada la firma dentro del propio documento, el algoritmo debe:
 
+  + calcular el :ref:`resumen <hash>` de todo el documento, exceptuando el
+    contenido de la propia firma\ [#]_.
 
-.. note:: Aunque opcionalmente pueden generarse marcas visibles en el documento
-   que denoten quién ha firmado y cuándo lo ha hecho, la verdadera firma digital
-   no deja huella visible en una impresión: se verifica utilizando una
-   herramienta de verificación sobre el archivo.
+  + permitir adjuntar sucesivamente distintas firmas. Tenga presente, no obstante,
+    que una de las firmas, no incluiría en su resumen los añadidos que suponen las
+    que se hayan hecho después. Consecuentemente, el orden en que se firme es
+    importante si los firmantes tienen distinta jerarquía: lo lógico, pues, es que
+    firme primero el que tenga menos jerarquía, después el supervisor del primer
+    firmante y así sucesivamente.
 
-.. seealso:: Para conocer con mayor profundidad cómo se almacenan las firmas
-   dentro de un |PDF| puede leer `el extenso libro blanco sobre firmas
-   digitales <https://itextpdf.com/en/resources/books/digital-signatures-pdf>`_
-   de Bruno Lowagie.
+  .. seealso:: Para conocer con mayor profundidad cómo se almacenan las firmas
+     dentro de un |PDF| puede leer `el extenso libro blanco sobre firmas
+     digitales <https://itextpdf.com/en/resources/books/digital-signatures-pdf>`_
+     de Bruno Lowagie.
+
+* Sea cual sea el documento (o flujo de datos), puede generarse un archivo
+  independiente de firma que contiene el resumen cifrado junto a metainformación
+  sobre el proceso. Es lo que se llama `firma independiente
+  <https://en.wikipedia.org/wiki/Detached_signature>`_. De modo muy
+  rudimentario, esto fue lo que se hizo anteriormente :ref:`al presentar el concepto
+  de firma <firma-digital>`. Este método es el que se usa en la :ref:`firma de
+  correos electrónicos <email-seguro>`, pero también puede usarse para firmar
+  documentos.
 
 .. _firma-legal:
 
@@ -75,8 +80,8 @@ también es posible la `consulta de todos los prestadores europeos
 
 .. _pdfsig:
 
-Apéndice práctico
-=================
+Firma integrada
+===============
 Hay varias aplicaciones en Linux que permiten la firma y verificación de firmas
 de documentos |PDF|:
 
@@ -167,6 +172,151 @@ de confianza::
 
    $ pdfsig -nssdir ~/.pki/nssdb -add-signature -nick 'CADENA-EN-NSSDB-DEL-CERT' doc.pdf doc_firmado.pdf
 
+Firma independiente
+===================
+La otra estrategia para la firma digital es generar archivos independientes de
+firma. En este caso, el estándar más habitual es el referido en el :rfc:`2315` y
+que ya hemos citado al tratar el :ref:`formato PKCS #7 <cert-p7>`. 
+
+Aunque un usuario puede firmar y verificar de forma manual (acciones que
+veremos después), lo habitual es que los organismos que utilizan esta estrategia
+obren del siguiente modo:
+
++ La firma de un documento genera un documento modificado que es igual al
+  original, pero que además contiene de forma *visible* un código de
+  verificación y una |URL| donde se puede llevar a cabo la verificación de la
+  firma.
+
+  .. note:: Nótese que este documento está modificado y, por tanto, no será el
+     que verifique el archivo de firma.
+
++ El archivo original y el de firma se almacenan en un servidor al que se accede
+  a través del servicio de verificación,
+
+De esto modo, el usuario que desea comprobar la veracidad del documento debe
+ingresar en el servicio de verificación y usar el código de verificación. El
+servicio le proporcionará el archivo original y el de firma y, adicionalmente,
+podrá llevar a cabo la comprobación de la firma. comprobación que, en cualquier
+caso, podrá hacer el propio usuario con los dos archivos que se le proporcionan.
+
+.. seealso:: La Junta de Andalucía utiliza este mecanismo de firma electrónica para
+   sus documentos. :ref:`Más adelante lo trataremos <como-firma-junta>` y
+   se ilustrará cómo en particular se hace todo lo indicado más arriba.
+
+Esta segunda estrategia que utilizan los organismos tiene sus ventajas e
+inconvenientes frente a la de firma integrada:
+
+**Ventajas**
+   * En principio, con esta estrategia se puede firmar cualquier tipo de
+     documento, ya que el formato no tiene que haber considerado un modo de
+     incrustar en sus metadatos la firma. En la práctica, si se hace a través de
+     uno de estos servicios y no de forma manual, es probable que sólo se puedan
+     firmar archivos |PDF|, ya que el servicio debe manipular el archivo original para
+     incluir la información de verificación y, posiblemente, sólo se haya
+     preparado para alterar documentos |PDF|.
+   * Si se imprime el documento en papel, aún sabremos que se firmó y cómo
+     verificarlo, ya que podremos ver en la copia de papel el código de
+     verificación y la |URL| a la que acceder.
+
+**Desventajas**
+   * El propio documento no contiene la información de firma, sino que esta se
+     halla almacenada externamente.
+   * Cuando se utiliza un servicio, este almacenamiento externo es un servidor
+     ajeno, por lo que dependeremos de que el organismo conserve tal
+     información, ya que de lo contrario será imposible llevar a cabo la
+     verificación. En principio, podríamos soslayar este problema descargando el
+     archivo original y el de firma en cuanto hubiéramos firmado, en vez de
+     confiar en que tales archivos se conserven siempre en el servidor remoto.
+   * La verificación se hace con el archivo original, no con el modificado.
+     Alguien malintencionado podría haber hecho cambios adicionales en el
+     modificado, por lo que deberíamos cotejar visualmente que la única
+     diferencia entre el original y el modificado es la información adicional de
+     verificación.
+
+Firma
+-----
+Partamos de que tenemos un documento (no necesariamente un |PDF|) y un
+certificado personal (:file:`key.pem` y :file:`cert.pem`) con el que queremos
+firmar tal documento::
+
+   $ openssl smime -sign -in fichero.txt -inkey key.pem -outform DER -binary -signer cert.pem -out fichero.p7s
+
+Esto generará un archivo de firma (:file:`fichero.p7s` en formato |DER|) que
+contiene la firma en sí y también el propio certificado (lo que simplifica luego
+la verificación). A partir de ahora tendríamos que almacenar tanto el archivo
+(:file:`fichero.txt`) como la propia firma (:file:`fichero.p7s`).
+
+.. warning:: Al archivo de firma, además de la propia firma, sólo se añade el
+   certificado del firmante\ [#]_, aunque puedan existir otros certificados dentro de
+   :file:`cert.pem` que completen la cadena de confianza. Si se desea añadir
+   éstos también, deberán ponerse en archivo aparte y declararlo con la opción
+   :kbd:`-certfile`::
+
+      $ openssl smime -sign -in fichero.txt -inkey key.pem -outform DER -binary -signer cert.pem -certfile chain.pem -out fichero.p7s
+
+.. openssl pkcs7 -inform der -in firma.p7s -print_certs
+
+Verificación
+------------
+La verificación consiste en tomar el archivo de firma (:file:`fichero.p7s`), que
+suponemos que contiene el certificado firmante, y el archivo que se firmó
+(:file:`fichero.txt`)::
+
+   $ openssl smime -verify -inform DER -in fichero.p7s -content fichero.txt -purpose any -binary > /dev/null
+   Verification successful
+
+.. warning:: La verificación exige que la cadena de confianza esté completa. Si
+   :file:`fichero.p7s` no contiene el certificado del firmante, habrá que
+   referirlo a través de :kbd:`-certfile` y, si existen autoridades intermedias,
+   deberemos incluir sus certificados mediante :kbd:`-CAfile`.
+
+.. _como-firma-junta:
+
+Cómo firma la Junta de Andalucía
+--------------------------------
+En realidad, este procedimiento es común a las administraciones públicas (al
+menos las españolas). Por ejemplo, `la Comunidad de Madrid también lo practica
+<https://sede.comunidad.madrid/codigo-seguro-verificacion>`_.
+
+Tomemos un documento firmado por la administración. Por ejemplo, tomemos las
+`Instrucciones para regular aspectos relativos a la organización y el
+funcionamiento  del curso 2024/2025
+<https://www.juntadeandalucia.es/educacion/portals/web/inspeccion-educativa/normativa/-/normativas/detalle/resolucion-de-26-de-junio-de-2024-de-la-direccion-general-de-formacion-profesional-por-la-que-se-dictan-instrucciones>`_.
+De un simple vistazo, sabemos que están firmadas porque todas las páginas tienen
+este pie:
+
+.. image:: files/info-ver.png
+
+que es precisamente el contenido que se añade al original como consecuencia del
+proceso de firma. Trae información de quién lo firmó y cuándo, pero lo realmente
+sustancioso es que incluye una |URL| y un código de verificación (o un código
+|QR| con esa misma información). Al acceder a `esa URL
+<https://ws050.juntadeandalucia.es/verificarFirma/>`_, podremos escribir el
+código de verificación y obtendremos lo siguiente:
+
+.. image:: files/arc-ver.png
+
+Se nos indica que la firma es válida, lo cual podemos creer o no, quién y cuándo
+firmó (aunque eso eran datos que ya proporcionaba el pie añadido); y sobre todo
+el archivo original (que si lo descargamos podremos comprobar que es idéntico,
+pero no contiene el pie informativo) y un documento |XML| del que podemos
+extraer el archivo de firma ``.p7s``, ya que se encuentra contenido en uno de
+sus elementos::
+
+   $ cat <<EOF > firma.p7s
+   -----BEGIN PKCS7-----
+   $(xmlstarlet sel -B -t -v '//enids:FirmaConCertificado' firma.xml)
+   -----END PKCS7-----
+   EOF
+
+Con ambos archivos podemos hacer la comprobación::
+
+   $ openssl smime -verify -inform PEM -in firma.p7s -content original.pdf -purpose any -binary > /dev/null
+   Verification successful
+
+.. note:: En las órdenes :file:`firma.xml` es el |XML| descargado y
+   :file:`original.pdf` el |PDF| original también descargado.
+
 .. rubric:: Notas al pie
 
 .. [#] Obviamente, ya que de lo contrario el contenido de la firma dependería
@@ -191,6 +341,10 @@ de confianza::
    permite, pero a fecha de redacción (abril de 2022) las aplicaciones
    derivadas, no.
 
+.. [#] Y lo contiene porque no hemos incluido la opción :kbd:`-nocerts`. Si lo
+   hubiéramos hecho, el archivo contendría extrictamente la firma sin ningún
+   certificado.
+
 .. |PDF| replace:: :abbr:`PDF (Portable Dcument Format)`
 .. |NSS| replace:: :abbr:`NSS (Network Secure Services)`
 .. |CA| replace:: :abbr:`CA (Certification Authority)`
@@ -198,6 +352,10 @@ de confianza::
 .. |eIDAS| replace:: :abbr:`eIDAS (Electronic IDentification, Authentication and trust Services)`
 .. |MIME| replace:: :abbr:`MIME (Multipurpose Internet Mail Extensions)`
 .. |FNMT| replace:: :abbr:`FNMT (Fábrica Nacional de Moneda y Timebre)`
+.. |DER| replace:: :abbr:`DER (Distinguised Enconding Rules)`
+.. |URL| replace:: :abbr:`URL (Uniform Resource Locator)`
+.. |QR| replace:: :abbr:`QR (Quick Response)`
+.. |XML| replace:: :abbr:`XML (eXtensible Markup Language)`
 
 .. _LibreOffice: https://www.libreoffice.org
 .. _MuPDF: https://mupdf.com
