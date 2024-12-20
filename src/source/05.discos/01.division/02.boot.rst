@@ -48,7 +48,7 @@ a. Pueden existir aún equipos muy antiguos que disponen de |BIOS|.
    compatibilidad aumente\ [#]_.
 
 Como en todo estado de transición, es indispensable conocer ambas tecnologías,
-que es en lo que afanará este epígrafe.
+que es en lo que se afanará este epígrafe.
 
 Proceso de arranque
 *******************
@@ -152,20 +152,23 @@ Analicemos las particularidades de cada estándar.
 .. table:: Comparativa |UEFI|/|BIOS|
    :class: uefi-bios
 
-   +-----------------+---------------+--------------------------+
-   | Características | |BIOS|        | |UEFI|                   |
-   +=================+===============+==========================+
-   | Arquitectura    |   16bits      | 32 ó 64 bits             |
-   +-----------------+---------------+--------------------------+
-   | Compatibilidad  | No            | A extinguir              |
-   +-----------------+---------------+--------------------------+
-   | Arranque        | Dispositivos  | | Dispotivos             |
-   |                 |               | | Cargadores de arranque |
-   +-----------------+---------------+--------------------------+
-   | Seguridad       | Ninguna       | Secure boot              |
-   +-----------------+---------------+--------------------------+
-   | Gestor externo  | Necesario     | Opcional                 |
-   +-----------------+---------------+--------------------------+
+   +-----------------+----------------+--------------------------+
+   | Características | |BIOS|         | |UEFI|                   |
+   +=================+================+==========================+
+   | Arquitectura    |   16bits       | 32 ó 64 bits             |
+   +-----------------+----------------+--------------------------+
+   | Compatibilidad  | No             | A extinguir              |
+   +-----------------+----------------+--------------------------+
+   | Arranque        | Dispositivos   | | Dispositivos           |
+   |                 |                | | Cargadores de arranque |
+   +-----------------+----------------+--------------------------+
+   | Seguridad       | Ninguna        | Secure boot              |
+   +-----------------+----------------+--------------------------+
+   | Gestor externo  | Necesario      | Opcional                 |
+   +-----------------+----------------+--------------------------+
+   | Particionado    | Incomprensible | | DOS                    |
+   |                 |                | | GPT                    |
+   +-----------------+----------------+--------------------------+
 
 |BIOS|
 ======
@@ -219,8 +222,13 @@ posible reparar el arranque, pero nos tocará utilizar herramientas para ello.
 
 |UEFI|
 ======
-Al contrario del sistema anterior, |UEFI| es capaz de entender una tabla de
-particiones |GPT| y algunos sistemas de archivos (obligatoriamente |FAT| y, para
+Al contrario del sistema anterior, |UEFI| es capaz de entender las particiones
+del disco siempre que estas sean:
+
++ Particiones primarias |DOS|.
++ Particiones |GPT|.
+
+Reconoce, además, algunos sistemas de archivos (obligatoriamente |FAT| y, para
 dispositivos ópticos, CDFS), y dispone de un :ref:`gestor de arranque
 <boot-manager>` básico. No es preciso, pues, un gestor de arranque externo,
 aunque es muy común que se instale también. *Windows*, de hecho, necesita
@@ -230,21 +238,30 @@ instaláremos distintos sistemas *Linux* podríamos arrancarlos todos sin
 necesidad de |GRUB| (aunque lo habitual es que también se instale)
 
 El gestor de arranque integrado es capaz de almacenar en memoria |NVRAM|\ [#]_
-entradas ordenadas de arranque. Cada entrada recibe un nombre (p.e. "Debian") y
-refiere la ruta a un archivo contenida en la partición |GUID| de un determinado
-dispositivo. Cuáles sean la ruta, la partición y el dispositivo es lo de menos\ [#]_
-con tal de que el archivo sea un cargador de arranque. La única condición es que
-la partición esté formateada con un sistema de archivos inteligible por el
-*firmware*. Por tanto, para arrancar un sistema opèrativo basta con que haya una
-partición adecuada para albergar su cargador de arranque y que la referencia a
-este cargador se haya incluido como entrada. De este modo, las entradas en el
-gestor integrado no son referencias a un dispositivo, como pasa con |BIOS|, sino
-a un cargador concreto, por lo que podemos tener conviviendo en un único disco
-arranques de distintos sistemas operativos sin necesidad de ningún gestor
-externo. A pesar de esto, nos podemos encontrar en una secuencia de arranque
-|EFI| una o varias entradas que refieren dispositivos. Estas entradas en
-realidad lo que hacen es buscar un archivo (un cargador de arranque) en una ruta
-predefinida dentro de ese dispositivo. Desvaleremos más adelante cuál.
+entradas ordenadas de arranque, cada una de las cuales recibe un nombre
+identificativo (p.e. "Debian") y refiere la ruta a un cargador de arranque
+contenido en una partición especial llamada |ESP|. Dicha partición se
+caracteriza por estar formateada en un sistema de archivos inteligible por el
+*firmware* (habitualmente |FAT|\ 32) y tener un código identificativo de partición\ [#]_:
+
++ ``0xEF`` en particionados |DOS|.
++ ``C12A7328-F81F-11D2-BA4B-00A0C93EC93B`` en particionados |GPT|\ [#]_
+
+.. image:: files/part-gpt-uefi.png
+
+.. caution:: Aunque el firmware |EFI| permite el uso del particionado |DOS|,
+   esto no se ideó más que como una solución transitoria para soslayar el
+   problema de que en el momento del nacimiento del programa las herramientas no
+   hubieran aún añadido soporte para el nuevo sistema de particionado |GPT|. Por
+   tanto, lo recomendable es usar siempre este último particionado.
+
+Al referir las entradas de la secuencia de arranque, archivos incluidos en un
+sistema de archivos, podemos tener conviviendo en un único disco arranques de
+distintos sistemas operativos sin necesidad de ningún gestor externo. A pesar de
+esto, nos podemos encontrar en una secuencia de arranque |EFI| una o varias
+entradas que refieren dispositivos, y no cargadores concretos.  Estas entradas,
+en realidad, refieren también archivos (un cargador de arranque), pero en una
+ruta predefinida dentro de ese dispositivo. Desvelaremos más adelante cuál.
 
 .. image:: files/bootmanager-efi.png
 
@@ -253,38 +270,26 @@ dinámicamente una entrada por cada dispositivo extraíble detectado en la fase
 |POST| y que no estuviera presente ya en la secuencia. De este modo, es posible
 arrancar desde una memoria |USB| que se haya pinchado circunstancialmente.
 
-Aunque los cargadores de arranque podrían estar almacenados en distintas
-particiones de distintos dispositivos y en rutas arbitrarias, en la práctica
-esto se hace con ciertos criterios que acatan los instaladores de los sistemas
-operativos:
+.. _efi-archivos:
 
-+ En el particionado |GPT| de un disco se crea una partición formateada con
-  sistema de archivos |FAT|\ 32 y de tipo |ESP| (código simplificado *EF00*\
-  [#]_), Si disponemnos de varios discos, basta que esta partición esté en uno
-  de ellos:
+En la partición |ESP| los cargadores de arranque se organizan bajo la siguiente
+estructura de directorios:
 
-  .. image:: files/part-gpt-uefi.png
+.. code-block:: none
 
-  .. _EFI-archivos:
+  /
+  +-- EFI/
+       +-- debian/
+       +-- Windows Boot Manager/
+       +-- etc.
+       +-- Boot/
+            +-- bootx64.efi
 
-+ Dentro de esa partición se crea una estructura de directorios con este aspecto:
-
-
-  .. code-block:: none
-
-     /
-     +-- EFI/
-          +-- debian/
-          +-- Windows Boot Manager/
-          +-- etc.
-          +-- Boot/
-               +-- bootx64.efi
-
-  esto es, un directorio :file:`EFI` dentro del cual cada sistema operativo crea
-  un subdirectorio con los archivos oportunos para el arranque o para al menos
-  comenzar el arranque. Uno de esos archivos será el que deba cargar el
-  *firmware* |EFI|, por lo que su ruta será la que se añada como entrada en la
-  secuencia de arranque.
+esto es, un directorio :file:`EFI` dentro del cual cada sistema operativo crea
+un subdirectorio con los archivos oportunos para el arranque o para al menos
+comenzar el arranque. Uno de esos archivos será el que deba cargar el
+*firmware* |EFI|, por lo que su ruta será la que se añada como entrada en la
+secuencia de arranque.
 
 Como se deduce, todo está perfectamente estructurado y, por tanto, mientras
 exista espacio suficiente (habitualmente con **100** MiB hay más que de sobra)
@@ -420,20 +425,12 @@ arranque no requerirá estar firmado.
 .. [#] En la implementación |UEFI| que traen algunos *softwares* de
    virtualización (OVMF_), la |NVRAM| se emula almacenando en el directorio
    :file:`EFI` un fichero llamado :file:`NvVars`.
-.. [#] Esto quiere decir que si suponemos dos cargadores, uno podría estar
-   almacenado en la tercera partición del primer disco; y el segundo en la
-   segunda partición del segundo disco. En la práctica esto no es así y todos
-   se almacenan en la misma partición dentro de un determinado directorio. Lo
-   veremos a continuación.
-.. [#] En realidad, el código identificativo de esta partición es mucho más
-   largo (``C12A7328-F81F-11D2-BA4B-00A0C93EC93B``). ``EF00`` es el código
-   simplificado que usa la utilidad :ref:`gdisk <gdisk.i>`. Sin embargo,
-   la especificación |UEFI| ni siquiera exige que la partición este marcada
-   con este código, ya que las entradas que se almacenan en la |NVRAM| indican
-   cuál es la partición de disco donde se encuentra el fichero que constituye el
-   cargador de arranque. Lo único necesario. pues, es que el sistema de archivos
-   sea comprensible, esto es, que sea |FAT|\ 32.
-
+.. [#] El estándar prescribe que la partición que contiene los cargadores de
+   arranque esté marcada con los códigos que se refieren a continuación. En
+   cambio, muchos *firmware* son mas laxos y les basta con que la partición esté
+   formateada en |FAT|\ 32.
+.. [#] En la utilidad :ref:`gdisk <gdisk.i>` se muestra el código simplificado
+   ``EF00``.
 .. [#] Por ejemplo, esta orden añade una nueva entrada::
 
       # efibootmgr --create --disk /dev/sda --part 2 --loader /EFI/so/bootx64.efi \
