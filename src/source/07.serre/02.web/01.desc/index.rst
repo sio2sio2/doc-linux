@@ -13,7 +13,7 @@ La petición del cliente está constituida por:
   quiere obtenerse.
 * Opcionalmente, un **cuerpo** que permite enviar datos al servidor.
 
-La respuesta del servisdor consta de:
+La respuesta del servidor consta de:
 
 * Un **código**.
 * Una **cabecera** constituida por campos que informa al cliente sobre algunos
@@ -30,7 +30,7 @@ Hay básicamente tres versiones del protocolo:
   anterior.
 * La versión **2**, que es relativamente reciente y empieza a ser usada en clientes y
   servidores. Añade mejoras en el empaquetado y transporte de datos, pero a
-  efectos de la descripciòn hecha aquí no presenta diferencias con respecto a la
+  efectos de la descripción hecha aquí no presenta diferencias con respecto a la
   anterior.
 
 Por ejemplo, una conexión |HTTP| puede ser esta:
@@ -68,7 +68,7 @@ Por ejemplo, una conexión |HTTP| puede ser esta:
 Analicemos con  detenimiento:
 
 * Las tres primeras líneas son un aviso de la orden :command:`telnet` de que
-  hemos establecido conexión. Siemnpre son las mismas, así que nada tienen que
+  hemos establecido conexión. Siempre son las mismas, así que nada tienen que
   ver con el protocolo que analizamos.
 
 * Las dos siguientes lineas las hemos escrito nosotros y forman la petición::
