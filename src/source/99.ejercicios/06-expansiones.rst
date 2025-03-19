@@ -28,13 +28,13 @@ Ejercicios sobre expansiones
 #. Mostrar por pantalla los directorios hijos de :file:`/` que contengan la
    cadena «*bin*» en cualquier parte de su nombre.
 
-#. Mostrar los programas propios del administrador que contengan tres letras.
+#. Mostrar los programas propios del administrador que contengan tres caracteres.
 
    .. note:: En los modernos sistemas *Debian* :file:`/sbin` y :file:`/usr/sbin`
       contienen lo mismo.
 
 #. Mostrar los programas propios del administrador que contengan al menos tres
-   letras.
+   caracteres.
 
 #. Mostrar los programas propios del administrador que empiecen por «*a*» y
    acaben por cualquier vocal.
