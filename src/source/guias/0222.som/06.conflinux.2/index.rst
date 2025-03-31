@@ -32,7 +32,7 @@ gestión de software del manual <paqueteria>` y es conveniente tenerlos claros.
 
 Los contenidos apropiados para esta sección, aparte de lo anterior son:
 
-- Las `ramas y secciones de Debian <paquetes-deb>`_, aunque solamente si se usa
+- Las :ref:`ramas y secciones de Debian <paquetes-deb>`, aunque solamente si se usa
   como base la propia *Debian*. Si se usa otra derivada como *Ubuntu*, debería
   adaptarse el epígrafe\ [#]_.
 - Los :ref:`repositorios <deb-repo>`.
