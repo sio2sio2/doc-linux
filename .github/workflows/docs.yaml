@@ -1,0 +1,44 @@
+name: Construir y desplegar el manual
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Obtención de la documentación
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Instalación de dependencias.
+        run: |
+          pip install -r requirements.txt
+
+      - name: Construir documentación 
+        run: |
+          make html
+          touch docs/html/.nojekyll
+
+      - name: Desplegarla en GitHub Page
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/html
+
+      - name: Notificación
+        if: success()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: "${{ github.sha }}",
+              body: "¡Doc actualizada: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+            })
