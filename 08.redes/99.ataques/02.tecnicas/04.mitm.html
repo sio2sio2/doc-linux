@@ -1,0 +1,226 @@
+
+
+<!DOCTYPE html>
+
+<html lang="es" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>8.9.2.5. Ataques de modificación &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/classic.css?v=2bf1fcf8" />
+    <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+    
+    <script src="../../../_static/documentation_options.js?v=a621b78a"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/translations.js?v=f85f4cfb"></script>
+    
+    <link rel="index" title="Índice" href="../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../search.html" />
+    <link rel="next" title="8.9.3. Redes inalámbricas" href="../03.wifi/index.html" />
+    <link rel="prev" title="8.9.2.4. Ataques contra la autenticación" href="03.brute.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="../03.wifi/index.html" title="8.9.3. Redes inalámbricas"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="03.brute.html" title="8.9.2.4. Ataques contra la autenticación"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" ><span class="section-number">8. </span>Redes</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" ><span class="section-number">8.9. </span>Ataques</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="index.html" accesskey="U"><span class="section-number">8.9.2. </span>Técnicas</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">8.9.2.5. </span>Ataques de modificación</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="ataques-de-modificacion">
+<span id="mitm"></span><h1><span class="section-number">8.9.2.5. </span>Ataques de modificación<a class="headerlink" href="#ataques-de-modificacion" title="Link to this heading">¶</a></h1>
+<p>Para ilustrar los ataques de modificación analizaremos dos técnicas distintas.
+En ambos casos, daremos por hecho ya que el atacante ha logrado interceptar el
+tráfico (p.e. con un <a class="reference internal" href="02.arp.html#arp-spoofing"><span class="std std-ref">envenenamiento ARP</span></a>).</p>
+<section id="sslstrip">
+<span id="id1"></span><h2><span class="section-number">8.9.2.5.1. </span>SSLstrip<a class="headerlink" href="#sslstrip" title="Link to this heading">¶</a></h2>
+<section id="concepto">
+<h3><span class="section-number">8.9.2.5.1.1. </span>Concepto<a class="headerlink" href="#concepto" title="Link to this heading">¶</a></h3>
+<p><em>SSLstrip</em> es un ataque para capturar (y monitorizar en claro, claro está)
+conexiones <abbr title="HyperText Transfer Protocol">HTTP</abbr>s:</p>
+<img alt="../../../_images/sslstrip.png" src="../../../_images/sslstrip.png" />
+<p>En la imagen se presentan dos conexiones distintas entre cliente y superior. En
+la superior el tráfico está cifrado entre los dos extremos por lo que la
+máquina que intercepta el tráfico poco puede hacer, ya que será incapaz de
+descifrar el contenido envuelto por <abbr title="Secure Socket Layer">SSL</abbr>. A lo más podría interceptar la
+consulta <abbr title="Domain Name Server">DNS</abbr> previa y hacer una resolución espúrea para que el nombre del
+servidor se resolviera a la <abbr title="Internet Protocol">IP</abbr> de un servidor web que controlara el atacante.
+De este modo, podría ser este segundo servidor y no el legítimo el que
+contestara a la petición del cliente. El problema que presenta este ataque es
+que el servidor suplantador presentará un certificado digital inválido y los
+navegadores web son, desde hace varios años, muy claros al respecto. Por
+tanto, sería muy, muy probable que el usuario se diera cuenta de que está
+sufriendo un ataque.</p>
+<p><em>SSLstrip</em>, sin embargo, no consiste en esto, sino en lo descrito en la
+conexión inferior. Si el navegador es la primera vez que se conecta al
+servidor, es probable que intente una conexión no cifrada y que el servidor web
+legítimo le pida que repita la petición por <abbr title="HyperText Transfer Protocol">HTTP</abbr>s. Ahora bien, esa primera
+conexión no es cifrada y, por tanto, es susceptible de ser capturada y
+manipulada. El ataque <em>SSLstrip</em> consiste en atrapar esa primera petición
+vulnerable y actuar como proxy repitiendo la petición hacia el servidor
+legítimo.  Éste redigirá la petición hacia la conexión segura, el proxy la
+realizará y recibirá la respuesta. En consecuencia, los dos extremos del tunel
+<abbr title="Secure Socket Layer">SSL</abbr> son el servidor legítimo y el proxy atacante, y este último será capaz de
+descifrar la respuesta. La respuesta sin cifrar la remitirá al cliente y este
+la recibirá sin saber jamás que el servidor legítimo cifra las conexiones. De
+este modo, el cliente realizará siempre peticiones <abbr title="HyperText Transfer Protocol">HTTP</abbr> y el <em>proxy</em> atacante
+las cifrará y se comunicará con el servidor mediante <abbr title="HyperText Transfer Protocol">HTTP</abbr>s. En este caso,
+el usuario no tiene por qué sospechar que hay un ataque, puesto que jamás
+recibe ninguna alerta y sólo podría ponerse sobreaviso si considera sospechoso
+establecer una conexión insegura con un servidor con el que intercambia
+información sensible (p.e. datos bancarios si es la web de un banco).</p>
+<p>El único pero que se le puede poner al ataque es que necesita que el cliente
+realice una primera conexión insegura y eso no ocurrirá:</p>
+<ul class="simple">
+<li><p>si el navegador ya intentó la conexión no segura en el pasado y el servidor ya
+lo redirigió al sitio seguro, puesto que con toda seguridad el servidor envió
+un código <strong>301</strong>.</p></li>
+<li><p>si el cliente accede directamente al sitio seguro, por ejemplo, porque llega a
+él a través de un buscador como <cite>Google &lt;https://www.google.com&gt;</cite>, que le
+presentará el enlace seguro y no el inseguro.</p></li>
+</ul>
+<p>Cuando <a class="reference external" href="https://es.wikipedia.org/wiki/Moxie_Marlinspike">Moxie Marlinspike</a>
+presentó el ataque en 2009, no había forma de evitarlo. Servidores y
+navegadores reaccionaron introduciendo con el <span class="target" id="index-0"></span><a class="rfc reference external" href="https://datatracker.ietf.org/doc/html/rfc6797.html"><strong>RFC 6797</strong></a> las campos de
+cabecera <abbr title="HTTP Strict Transport Security">HSTS</abbr>, que son campos de cabecera <code class="docutils literal notranslate"><span class="pre">Strict-Transport-Security:</span></code> que
+en la respuesta informan al cliente de que debe comunicarse con él usando
+<abbr title="HyperText Transfer Protocol">HTTP</abbr>s y no <abbr title="HyperText Transfer Protocol">HTTP</abbr>. Como consecuencia, las respuestas del servidor siempre
+incluyen una cabecera semejante a esta:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Strict-Transport-Security: max-age=31536000; includeSubDomains
+</pre></div>
+</div>
+<p>que informa al navegador de que durante un año (31536000 segundos) debe acceder
+al dominio solicitado y a todos sus subdominios usando protocolo seguro. Por
+tanto, después de haber aceptado esta cabecera, el navegador convertirá
+cualquier enlace inseguro en seguro y jamás hasta que se cumpla el plazo
+establecido accederá al servidor por <abbr title="HyperText Transfer Protocol">HTTP</abbr>. Además, la aceptación de esta
+cabecera, provoca que el navegador rechace la conexión al servidor si el
+certificado no es fiable o inválido sin dar ocasión al usuario de aceptarlo de
+todos modos.</p>
+<p>Por lo general, los navegadores no atienden la cabecera cuando se realiza una
+petición <abbr title="HyperText Transfer Protocol">HTTP</abbr>, ya que la cabecera ha podido ser inyectada por un proxy
+malintencionado; o cuando, aunque sea <abbr title="HyperText Transfer Protocol">HTTP</abbr>s, el certificado sea inválido,
+ya que no se puede asegurar que sea el servidor legítimo.</p>
+<div class="admonition seealso">
+<p class="admonition-title">Ver también</p>
+<p>Para más información sobre esta cabecera consulte <a class="reference external" href="https://developer.mozilla.org/es/docs/Web/HTTP/Headers/Strict-Transport-Security">su descripción
+en el sitio para desarrolladores del proyecto Mozilla</a>.</p>
+</div>
+<p>Este proceder, no obstante, no resuelve el caso en que se accede por primera
+vez al sitio a través de un enlace no seguro. Para evitar la
+vulnerabilidad en este momento, se mantienen listas <abbr title="Strict Transport Security">STS</abbr> que los navegadores
+precargan. De este modo, la conexión a un sitio incluido en la lista siempre
+será segura, aunque se haga por primera vez y mediante enlace no seguro.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>En el navegador <a class="reference external" href="https://www.google.com/chrome/">Chrome</a>, puede consultar cuáles son las cabeceras <abbr title="HTTP Strict Transport Security">HSTS</abbr>
+que se utilizan utilizan a través del enlace <a class="reference external" href="chrome://net-internals#hsts">chrome://net-internals#hsts</a>.</p>
+</div>
+</section>
+<section id="implementacion">
+<span id="bettercap"></span><h3><span class="section-number">8.9.2.5.1.2. </span>Implementación<a class="headerlink" href="#implementacion" title="Link to this heading">¶</a></h3>
+</section>
+</section>
+<section id="mitmproxy">
+<h2><span class="section-number">8.9.2.5.2. </span>mitmproxy<a class="headerlink" href="#mitmproxy" title="Link to this heading">¶</a></h2>
+<span class="target" id="id2"></span></section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="../../../index.html">Tabla de contenido</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">8.9.2.5. Ataques de modificación</a><ul>
+<li><a class="reference internal" href="#sslstrip">8.9.2.5.1. SSLstrip</a><ul>
+<li><a class="reference internal" href="#concepto">8.9.2.5.1.1. Concepto</a></li>
+<li><a class="reference internal" href="#implementacion">8.9.2.5.1.2. Implementación</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#mitmproxy">8.9.2.5.2. mitmproxy</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Tema anterior</h4>
+    <p class="topless"><a href="03.brute.html"
+                          title="capítulo anterior"><span class="section-number">8.9.2.4. </span>Ataques contra la autenticación</a></p>
+  </div>
+  <div>
+    <h4>Próximo tema</h4>
+    <p class="topless"><a href="../03.wifi/index.html"
+                          title="próximo capítulo"><span class="section-number">8.9.3. </span>Redes inalámbricas</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../_sources/08.redes/99.ataques/02.tecnicas/04.mitm.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="../03.wifi/index.html" title="8.9.3. Redes inalámbricas"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="03.brute.html" title="8.9.2.4. Ataques contra la autenticación"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" ><span class="section-number">8. </span>Redes</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" ><span class="section-number">8.9. </span>Ataques</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="index.html" ><span class="section-number">8.9.2. </span>Técnicas</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">8.9.2.5. </span>Ataques de modificación</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright CC BY 4.0, 2016-2025, José Miguel Sánchez Alés.
+      Creado usando <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,220 @@
+.. _ajustes:
+
+Trabajar en la consola
+======================
+La tareas de un administrador se desarrollan principalmente en el árido y
+austero hábitat de la consola de texto\ [#]_. Por ello, es conveniente buscar
+estrategias para mejorar el entorno. Es conveniente aclarar que por consola de
+texto nos referimos a las terminales ajenas al entorno gráfico.
+
+Ajustes
+-------
+En una terminal una de las primeras facilidades que se echan de menos es el
+uso de ratón para copiar y pegar texto\ [#]_. Para habilitarlo basta con
+instalar el paquete *gpm*::
+
+   # apt-get install gpm
+
+Otro aspecto interesante es el de la resolución de la pantalla. Las
+distribuciones modernas suelen tener habilitado el *framebuffer*, pero
+dependiendo de la resolución que se escoja automáticamente, las letras
+tendrán o no un tamaño. En los monitores más modernos que soportan altas
+resoluciones, la letra es a veces ridícula y se lee con dificultad. Para
+subsanarlo hay que tocar la configuración de *grub* (el gestor de arranque).
+editando el fichero :file:`/etc/default/grub`. La resolución del menú de
+selección de sistema operativo se controla a través del parámetro::
+
+   GRUB_GFXMODE=800x600x32
+
+que permite indicar la resolución (*800x600*) y el color (32). Por supuesto,
+hay otras muchos valores posibles. El sistema heredará esta misma
+configuración, a menos que redefinamos la resolución mediante::
+
+   GRUB_GFXPAYLOAD_LINUX=keep
+
+Con el valor dado, la línea es absolutamente inútil, porque indicamos que se
+mantenga (*keep*) la resolución.
+
+En un sistema sin entorno gráfico, lo anterior basta para disponer de una
+terminal a nuestro gusto. Sin embargo, cuando también se instala un entorno
+gráfico, linux redefinirá la resolución\ [#]_ y podremos volver a encontrarnos
+que por culpa de la resolución las letras se ven demasiado pequeñas si salimos a
+la terminal de texto. En este caso, la solución es definir las letras en el
+fichero :file:`/etc/default/console-setup`. Por ejemplo::
+
+   CHARMAP="UTF-8"
+   CODESET="guess"  #"Lat15"
+   FONTFACE="Terminus"
+   FONTSIZE="16x32"
+
+En la página de manual de *console-setup* pueden verse los distintos valores
+para estas variables.
+
+Para comprobar la configuración sin necesidad de reiniciar, puede hacerse::
+
+   # setupcon -f
+
+.. note:: El tamaño original de la fuente era *8x16*. Si el nuevo valor, es
+   demasiado grande existe uno intermedio: *12x24*.
+
+.. note:: Puede automatizarse esto último utilizando el configurador de
+   *Debian*::
+
+      # dpkg-reconfigure console-setup
+
+Un último consejo de gran utilidad es hacer perfectamente reconocible el
+*prompt* del usuario sin privilegios del *prompt* del administrador para que
+no perdamos de vista si actuamos como uno u otro. Para ello, en todas las
+estribuciones el *prompt* acaba en un almohadilla ("*#*"), cuando es el del
+administrador, o en un dólar ("*$*"), cuando es el de un usuario normal.
+Con todo, podemos despistarnos, por lo que un truco muy
+eficaz es cambiar también su color de manera que el del administrador sea rojo
+y el de cualquier otro usuario verde. En las últimas distribuciones de *debian*,
+el prompt del usuario normal sí esta coloreado, pero no el del administrador.
+Podemos corregirlo creado este fichero:
+
+.. code-block:: bash
+
+   # cat > /etc/profile.d/prompt_color.sh
+   if [ "$BASH" ] && [[ "$TERM" =~ color$ ]]; then
+      [ `id -u` -eq 0 ] && COLOR="31" || COLOR="32"
+      PS1='${debian_chroot:+($debian_chroot)}\[\033[01;'$COLOR'm\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
+   fi
+
+.. _tmux:
+.. index:: tmux
+
+tmux
+----
+:command:`tmux` es un herramienta indispensable para el administrador de sistemas:
+
+* Permite partir la terminal tanto en vertical como en horizontal, de modo
+  que dispongamos en una misma pantalla de varias sesiones.
+
+* Permite crear sesiones en pestañas diferentes.
+
+* Conserva las sesiones, aunque salgamos de él. Esto es muy útil durante
+  sesioens remotas en las que se corte la comunicación, ya que al volver a
+  conectarnos veremos que todo está tal y cómo lo dejamos. Que se conserven
+  las sesiones significa que las sesiones siguen su curso, no que se congelen
+  en el estado en que se quedaron. Por ese motivo, si abandonamos
+  :command:`tmux` mientras se actualizaba el sistema, éste seguirá
+  actualizándose y, si tal actualización no requiería de nuestra
+  intervención, se completará.
+
+.. note:: Otro programa semejante y muy usado es :program:`screen`
+
+El programa debe instalarse y, para usarse basta con ejecutarlo::
+
+   $ tmux
+
+Ahora bien, si salimos de tmux desconectándonos de él, esto es, dejando que
+corra en segundo plano\ [#]_; al volver a ejecutar :program:`tmux` sin opciones,
+no abriremos la misma sesión de :program:`tmux`, sino una nueva, con lo que no
+tendremos acceso a todo lo que estuviéramos haciendo. Lo habitual, sin embargo,
+es volver a entrar en la misma sesión, así que podemos añadir un :ref:`alias
+<alias>`, para que al escribir :program:`tmux` a secas abramos una nueva sesión,
+si no existe una previa, o nos conectemos a la existente, si sí la hay\ [#]_::
+
+   alias tmux='tmux attach || tmux new-session'
+
+Para dar órdenes a :command:`tmux` es necesario pulsar antes :kbd:`Ctrl+b`. Esta
+combinación, no obstante, es un poco incómoda dado el lugar en que se encuentra
+la "*b*" en el teclado. Una opción es sustituirla por :kbd:`Ctrl+a`, ya que en
+:program:`screen` esta es combinación de teclas usada, y como :program:`tmux` es
+un programa posterior al que han llegado muchos usuarios procedentes de
+:program:`screen`, es muy común que se configure :program:`tmux` para que use su
+combinación de teclas. No obstante, :kbd:`Ctrl+a` en :command:`bash` permite
+retroceder al comienzo de la línea de comandos, con lo que de elegir tal
+combinación nos quedamos sin esta útil posibilidad. Otra opción es usar
+:kbd:`Ctrl+s`\ [#]_, que está en una posición similar y, por tanto, resulta
+cómoda. Mi fichero de configuración :file:`~/.tmux.conf` es :download:`éste
+<files/tmux.conf.txt>`:
+
+.. include:: files/tmux.conf.txt
+   :literal:
+
+Esta configuración genera una particularidad: al desconectarse de
+:command:`tmux`, si usamos :kbd:`<bind> + d` se manda una señal de finalización
+a la *shell* padre desde la que se ejecutó. Si no se quiere enviar esta señal,
+se puede teclear :kbd:`<bind> + Ctrl+d`\ [#]_.
+
+Otra configuración interesante es configurar :program:`bash`, de manera que al
+abrir una sesión, arranquemos (o nos conectemos) directamente a :command:`tmux`.
+Para ello podemos añadir un fichero :file:`~/.bashrc.d/99-tmux.sh`, según se
+sugiere :ref:`al tratar la orden interna source <bashrc.d>`, con el
+siguiente contenido:
+
+.. literalinclude:: files/99-tmux.sh
+   :language: bash
+
+Consola gráfica
+---------------
+Vale. Pero, y si accedo al servidor desde el escritorio de mi ordenador de
+sobremesa, ¿cómo me lo monto?
+
+Los entornos de escritorio más sofisticados suelen traer un emulador de terminal
+(como `gnome-terminal <https://help.gnome.org/users/gnome-terminal/stable/>`_
+para `gnome <https://www.gnome.org/>`_, `konsole <https://konsole.kde.org/>`_
+para `KDE <https://www.kde.org/>`_, o `lxterminal
+<https://github.com/lxde/lxterminal>`_ para `LXDE
+<https://wiki.lxde.org/en/Main_Page>`_), de modo que si usamos uno de ellos,
+podemos valernos de estos terminales.
+
+En cualquier caso, el emulador "*estándar*", por llamarlo de alguna manera es
+`xterm <https://invisible-island.net/xterm/>`_ y, aunque bastante más sencillo
+que el resto, son más que suficientes las posibilidades que nos brinda, ya que
+su falta de pestañas para abrir en una misma ventana varias sesiones, la podemos
+suplir con el uso de :ref:`tmux <tmux>`, También carece de menú que nos permita
+cambiar la tipografía y el tamaño de la letra, pero podemos configurarlo a
+través de fichero. Para ello podemos añadir a :file:`~/.Xresorces` la línea::
+
+   #include ".Xresources.d/xterm"
+
+y dentro de este directorio :file:`~/.Xresources.d` crear un fichero
+:file:`xterm` con un contenido parecido a este::
+
+   xterm*faceName: Terminus
+   xterm*faceSize: 18
+   xterm*background: Black
+   xterm*foreground: LightGrey
+   xterm*geometry: 100x30
+   xterm*jumpScroll: True
+   xterm*saveLines: 200
+   xterm*scrollBar: False
+   xterm*loginShell: True
+
+.. note:: `Terminus <http://terminus-font.sourceforge.net/>`_ es una fuente
+   monoespaciada con paquete propio en *Debian*. Hasta Stretch_ basta con tener
+   instalado el paquete *xfonts-terminus*. Sin embargo, a partir de Bullseye_
+   deberá instalar :deb:`fonts-terminus-otb`.
+
+.. rubric:: Notas al pie
+
+.. [#] Aunque siempre se puede hacer más llevadero el trance::
+
+   # apt-get install bsdgames
+
+.. [#] Lo habitual en linux para copiar es seleccionar el texto deseado con el
+   ratón y para copiar pulsar el botón central del ratón.
+
+.. [#] A menos que incluyamos como parámetro de arranque para el núcleo
+   ``nomodeset``, lo cual no es recomendable.
+
+.. [#] Esto se logra pulsando :kbd:`<bind> + d`, siendo *bind* la combinación de
+   teclas que se tenga definida para dar órdenes al programa. La combinación
+   predeterminada es :kbd:`Ctrl+b`.
+
+.. [#] No incluya este *alias* aún, espere a una configuración un poco más
+   sofisticada que se indica a continuación
+
+.. [#] :kbd:`Ctrl+s` permite congelar la terminal (y :kbd:`Ctrl+q` descongelarla),
+   pero como es algo a lo que no le encuentro demasiada utilidad, no me ha
+   importado perderlo.
+
+.. [#] La ventaja de configurarlo así y cargarlo al arrancar :command:`bash`,
+   tal como se propone a continuación, se explota fundamentalmente al conectarse
+   al servidor remotamente con :ref:`SSH <ssh>`: para abandonar la conedión
+   dejando abierta la sesión nos basta con pulsar :kbd:`<bind> + d`. En cambio,
+   si por alguna razón deseamos permanecer en el servidor pero fuera de tmux,
+   podemos pulsar :kbd:`<bind> + Ctrl+d`

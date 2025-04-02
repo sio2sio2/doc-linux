@@ -1,0 +1,326 @@
+.. _dns-spoofing:
+
+Envenenamiento |DNS|
+********************
+Concepto
+========
+EL :dfn:`envenenamiento DNS` consiste en resolver para la
+víctima nombres de dominio de forma fraudulenta, de manera que se asocia el
+nombre con una dirección |IP| distinta a la que determina la fuente autoritaria.
+
+Por ejemplo, la dirección |IP| asociada al nombre `www.facebook.com
+<http://www.facebook.com>`_ es::
+
+   # host -ta www.facebook.com
+   www.facebook.com is an alias for star-mini.c10r.facebook.com.
+   star-mini.c10r.facebook.com has address 31.13.83.36
+
+En este caso, el *envenenamiento* procuraría hacer que el cliente resolviera a
+otra |IP| distinta, muy comúnmente la |IP| de una máquina controlada por el
+atacante, con el fin de que la víctima acabe accediendo a esta máquina pensando
+que lo hace a la original. Por lo general, el *envenenamiento* |DNS| es sólo una
+pieza dentro de un ataque más complejo. En el ejemplo, la máquina controlada por
+el atacante podría disponer un servidor con una página semejante al stio web
+original, a fin de que de capturar el usuario y contraseña que se introduzcan.
+
+Método
+======
+Un envenenamiento |DNS| puede llevarse a cabo de dos formas:
+
+#. Mediante un ataque |mitm|, de manera que se le cambie a la víctima el servidor
+   |DNS| que resuelve las peticiones. Si controlamos alguna de las máquinas por
+   la que sale la petición de la víctima, es tan fácil como capturar las
+   peticiones |DNS|  y redirigirlas a nuestro servidor. Por ejemplo, esta regla
+   de :ref:`iptables <iptables>`::
+
+      # iptables -t nat -i eth1 -p udp --dport 53 -j REDIRECT
+
+   se apropiaría del tráfico |DNS| y lo redirigiría a la propia máquina. En
+   cambio, si no controlamos una máquina intermedia, podemos intentar un
+   :ref:`envenenamiento ARP <arp-spoofing>` para lograr que las peticiones se
+   desvíen y pasen por la máquina que controlamos.
+
+   .. seealso:: En la sección sobre :ref:`envenenamiento ARP <arp-spoofing>` hay
+      un ejemplo que incluye envenenamiento |DNS| mediante un ataque |mitm|.
+
+#. Aprovechando alguna vulnerabilidad de un servidor |DNS| para envenenar su
+   caché. Los servidores |DNS| suelen almacenar las peticiones que previamente
+   se le han hecho durante el tiempo que indique el |TTL| del registro |DNS|, a
+   fin de agilizar posteriores consultas. El envenamiento de su caché provocaría
+   que se almacenase en ella unaa entrada fraudulenta y que ésta se sirviese a
+   todos los clientes que con posterioridad requirieran la resolución del nombre
+   relacionado con la entrada.
+
+.. _dnssec:
+
+Contramedida: |DNSSEC|
+======================
+El mejor modo de combatir el envenenamiento |DNS| es usar |DNSSEC|, esto es, la
+extensiones de seguridad de |DNS|, que permiten certificar que la resolución de
+un nombre es legítima. Como, en principio, el protocolo carece por completo de
+seguridad, se ideó el siguiente mecanismo:
+
+* Se genera una :ref:`pareja de claves asimétricas <asimetrico>` llamada |KSK|,
+  cuya misión es generar certificados digitales para cada una de las zonas de
+  las que sea autoritario el servidor. Cada uno de estos certificados digitales
+  de zona se denomina |ZSK|\ [#]_. Las claves públicas tanto de la |KSK| como de
+  cada una de las |ZSK| se publican a través de sendos registros *DNSKEY*.
+
+* Para evitar la suplantación, en la zona de nivel superior se publican
+  registros |DS| para cada clave pública |ZSK|, cada uno de cuyos valores se
+  obtiene a partir de la clave pública y una :ref:`función hash <hash>`.
+
+* Con la clave privada |ZSK| se firman todos los registros de la zona y se
+  publica la firma a través de sendos registros *RRSIG*.
+
+* Un servidor |DNS| puede verificar la autenticidad del registro |DNS| haciendo
+  uso de esta firma. Además, facilita al cliente un bit |AD| para que sepa si
+  se llevó a cabo la verificación.
+
+.. warning:: Lamentablemente, no todos las zonas de internet tienen
+   habilitado |DNSSEC| ni todos los servidores |DNS| hacen las comprobaciones
+   pertinentes. Lo segundo tiene fácil solución, ya que podemos escoger uno que
+   sí las haga o instalar en nuestra propia red un servidor que se encargue de
+   ellas. Ahora bien, lo segundo imposibilita que se puedan verificar los
+   registro de la zona.
+
+Para ilustrar el mecanismo\ [#]_ podemos tomar el dominio `pir.org
+<http://pir.org>`_, que tiene habilitado |DNSSEC| y cuyas claves públicas son::
+
+   # dig +noall +answer +multi pir.org. DNSKEY
+   pir.org.                14247 IN DNSKEY 256 3 5 (
+                                   AwEAAbHw5xE/Ynv0V5dsKsCJjouddggMLG1YXU3nCfyL
+                                   1Invj6DqtmUhXEqGwWMHnU8wTPxubIpyvfd2aEhRAV9e
+                                   Q2H5LbVicg/pXjn4Vvfp+Qip8IAsz7pl2x9QJLIDU4/p
+                                   hRopCznWOtUvwB2JndXfP6TQjvQ795N2g+8b2NroHtvR
+                                   ) ; ZSK; alg = RSASHA1; key id = 38661
+   pir.org.                14247 IN DNSKEY 257 3 5 (
+                                   BQEAAAABwLVXPnxhBS3mbsmdELtev76BoF5GbQvuxymL
+                                   +SiXwmvER/UFs106REHZAmXdCLg2Fa4sD1CoUAam6SEP
+                                   kM+UzGEJHcq6BV99InGEb75Tx7BoNhVPkgS7UnSFPKrH
+                                   LxqmjrEU9aso010kjP6QatU8bVmz4zHlTeEM8ytk23HI
+                                   NdL2VDi1uFr5buXO/6KbGnR2xk41mMRTgKuF0pMoFIE4
+                                   PVPojDFMQR1eGd4KRLou7OUqyYHTVa3jJV6+jbSonein
+                                   Y1YHyFCRiwRYLT831rOctL62dSvLcYJCKC7S/L70P6gS
+                                   2ajMTvZaLdjGo5eb52QQRPKSG9Msov22DTkEPF6j0Q==
+                                   ) ; KSK; alg = RSASHA1; key id = 54135
+
+Para la clave pública |ZSK| los registros |DS| deberían ser\ [#]_::
+
+   # dig +noall +answer +multi pir.org. DNSKEY | /usr/sbin/dnssec-dsfromkey -f - pir.org.
+   pir.org. IN DS 54135 5 1 225F055ACB65C8B60AD18B3640062E8C23A5FD89
+   pir.org. IN DS 54135 5 2 6CDE2DE97F1D07B23134440F19682E7519ADDAE180E20B1B1EC52E7F58B2831D
+
+.. note:: Obsérvese cómo el registro |DS| refiere el identificador de la clave
+   con el que se relaciona (**54135**). A partir de cada clave se generan dos
+   registros |DS|, porque se usan dos algoritmos de *hash* distintos: el **1**,
+   que se corresponde con *SHA-1*; y el **2** con *SHA-256*.
+
+que son, efectivamente, los registros |DS| que publica la zona de nivel
+superior *org*::
+
+   # dig +noall +answer pir.org. DS
+   pir.org.                85769   IN      DS      54135 5 2 6CDE2DE97F1D07B23134440F19682E7519ADDAE180E20B1B1EC52E7F 58B2831D
+   pir.org.                85769   IN      DS      54135 5 1 225F055ACB65C8B60AD18B3640062E8C23A5FD8
+
+Ovbviamente, los registros de esta zona deberían estar firmados:
+
+.. code-block:: console
+   :emphasize-lines: 4
+
+   # dig @1.1.1.1 +noall +answer +comments www.pir.org
+   ;; Got answer:
+   ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 45818
+   ;; flags: qr rd ra ad; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
+
+   ;; OPT PSEUDOSECTION:
+   ; EDNS: version: 0, flags:; udp: 1452
+   ;; ANSWER SECTION:
+   www.pir.org.            300     IN      A       97.107.141.235
+
+Usando como servidor de consulta *1.1.1.1*, que sí realiza verificaciones
+|DNSSEC|, se obtiene que está habilitado el bit |AD|, lo que significa que se
+autenticó con la firma la consulta y que el resultado es seguro. El registro de
+firma, por su parte, puede obtenerse también::
+
+   # dig +noall +answer +multi www.pir.org RRSIG
+   www.pir.org.            236 IN RRSIG A 5 3 300 (
+                                   20190119084003 20190105084003 38661 pir.org.
+                                   PTZedwjjOn4vS9UV76EdGBZxkpIDMeq+GpaKluMQvJBW
+                                   tiO/LPNTWDRUFogS2hj9ZYzN8EqYc6jG3uH4C+55zULE
+                                   0e+PiUUakXPg7IKDyJQwn9Oep5lHX3LVrTL9ivF2fqO1
+                                   Pg0oApoy4znBrVS0jftkBg54+Z8ktRhAiPhU9tM= )
+
+o bien, indicando a :command:`dig` que facilite información |DNSSEC| al
+realizar la consulta del  registro::
+
+   # dig +noall +answer +multi +dnssec www.pir.org
+   www.pir.org.            300 IN A 97.107.141.235
+   www.pir.org.            300 IN RRSIG A 5 3 300 (
+                                   20190120084003 20190106084003 38661 pir.org.
+                                   o5n7myzeu07teGl1KpgsAsVuRgAll78xyhFFo1On5CUW
+                                   bNd5pHMQNxgYDUEz6k3Yjvgl/DvV+ayeQwrBXUQF+AQp
+                                   RRqalWA3bHD41yAg3JAGohoTxPVzEMJ2zLRCvevY0xiV
+                                   hdpQHq2jgLq/ps5XzqFYNqFMI6pYY+SKu8PRsy0= )
+
+
+Para comprobar qué ocurre cuando la verificación falla, podemos usar un registro
+mal configurado aposta (*dnssec-failed.org*)::
+
+   # dig @1.1.1.1 +noall +answer +comments dnssec-failed.org
+   ;; Got answer:
+   ;; ->>HEADER<<- opcode: QUERY, status: SERVFAIL, id: 5738
+   ;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 0, ADDITIONAL: 0
+
+No se obtiene respuesta, porque la petición falla con un *SERVFAIL*. En cambio,
+si usamos un servidor de consulta que no realiza comprobaciones::
+
+   # dig @194.179.1.100 +noall +answer +comments dnssec-failed.org
+   ;; Got answer:
+   ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 53392
+   ;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
+
+   ;; OPT PSEUDOSECTION:
+   ; EDNS: version: 0, flags:; udp: 1460
+   ;; ANSWER SECTION:
+   dnssec-failed.org.      7200    IN      A       69.252.80.75
+
+.. note:: Si se quiere obtener la información de registro, sin que el
+   servidor haga verificación alguna, aunque la soporte, se puede enviar
+   habilitado en la consulta el bit |CD|:
+
+   .. code-block:: console
+      :emphasize-lines: 3,4
+
+      # dig @1.1.1.1 +noall +answer +comments +cd dnssec-failed.org
+      ;; Got answer:
+      ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 37413
+      ;; flags: qr rd ra cd; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
+
+      ;; OPT PSEUDOSECTION:
+      ; EDNS: version: 0, flags:; udp: 1452
+      ;; ANSWER SECTION:
+      dnssec-failed.org.      7200    IN      A       69.252.80.75
+
+   Obsérvese cómo no se obtiene error, pero tampoco el bit |AD| que acredita que
+   se hizo verificación.
+
+Por otra parte, cuando no hay firma para verificar un registro no se obtendrá
+ningún fallo, pero no se habilitará el bit |AD|:
+
+.. code-block:: console
+   :emphasize-lines: 4
+
+   # dig @1.1.1.1 +noall +answer +comments www.google.com
+   ;; Got answer:
+   ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 39878
+   ;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
+
+   ;; OPT PSEUDOSECTION:
+   ; EDNS: version: 0, flags:; udp: 1460
+   ;; ANSWER SECTION:
+   www.google.com.         251     IN      A       216.58.201.132
+
+Ahora bien, ante esta respuesta ¿cómo sabemos si no se ha producido la
+verificación porque el servidor que utizamos no la soporte o, en cambio, porque
+la zona no tiene habilitado |DNSSEC|? Para ello podemos usar varios métodos:
+
+#. Comprobar si el servidor soporta |DNSSEC| consultado el dominio
+   *dnssec-failed.org* como se hizo más arriba:
+
+#. Comprobar si la zona tiene habilitado |DNSSEC| requiriendo el registro
+   *DNSKEY*::
+
+      # dig @1.1.1.1 +noall +answer google.com. DNSKEY
+
+   que no existe, frente a::
+
+      # dig @1.1.1.1 +noall +answer +multi pir.org. DNSKEY
+   
+   que sí vimos más arriba que devolvía respuesta.
+
+#. Comprobar si el registro tiene firma::
+
+      # dig @1.1.1.1 +noall +answer +dnssec www.google.com.
+      www.google.com.         233     IN      A       216.58.211.36
+
+   En este caso no existe, frente a::
+
+      # dig @1.1.1.1 +noall +answer +dnssec www.pir.org.
+      www.pir.org.            300 IN A 97.107.141.235
+      www.pir.org.            300 IN RRSIG A 5 3 300 (
+                                      20190120084003 20190106084003 38661 pir.org.
+                                      o5n7myzeu07teGl1KpgsAsVuRgAll78xyhFFo1On5CUW
+                                      bNd5pHMQNxgYDUEz6k3Yjvgl/DvV+ayeQwrBXUQF+AQp
+                                      RRqalWA3bHD41yAg3JAGohoTxPVzEMJ2zLRCvevY0xiV
+                                      hdpQHq2jgLq/ps5XzqFYNqFMI6pYY+SKu8PRsy0= )
+
+Por último, puede hacerse con :command:`dig` una especie de *trace* que
+muestre cuál es la cadena de verificaciones que permiten acreditar la resolución
+de un registro::
+
+   # dig @1.1.1.1 +sigchase +trusted-key=/usr/share/dns/root.key www.pir.org
+
+.. note:: El fichero :file:`/usr/share/dns/root.key` contiene los registros
+   *DNSKEY* de la zona "." y se instala con el paquete *dns-root-data*. En
+   cualquier caso, podrían obtenerse con la consulta::
+
+      # dig +noall +answer . DNSKEY > /tmp/root.key
+
+   aunque deberíamos creer ciegamente en el servidor al que hacemos la consulta,
+   claro está.
+
+.. note:: Con la orden anterior, la verificación se hace de abajo arriba, esto
+   es, coomenzamos verificando ``www.pir.org`` y acabamos cuando nos topamos con
+   las claves que definimos como seguras (las del fichero comentado). También
+   podemos hacer la verificación en sentido contrario añadiendo la opción
+   ``+topdown``.
+
+.. seealso:: `Explicación sobre el funcionamiento de DNSSEC
+   <https://www.cloudflare.com/dns/dnssec/how-dnssec-works/>`_, cortesía de
+   *Cloudflare*.
+
+Aplicación: sumideros |DNS|
+===========================
+Los sumideros |DNS| no son propiamente un ataque, sino que los configura el
+propio administrador del sistema para evitar que los clientes de su red accedan
+a determinados sitios, bien porque están dedicados a albergar publicidad, bien
+porque por políticas de empresa se quiere evitar su visita. Se basan en el
+*envenenamiento* |DNS| por ataque |mitm|.
+
+.. seealso:: En la sección de |DNS| puede consultar :ref:`cómo crear uno con
+   dnsmasq <dnsmasq-bloqueo>`. 
+
+.. rubric:: Notas al pie
+
+.. [#] El esquema, por tanto, es análogo al de una entidad certificadora
+   emitiendo certificados digitales de usuario o servidor.
+
+.. [#] Tenga presente que para el desarrollo de este apartado se usan tres
+   dominios, porque tienen unas características concretas:
+
+   ``google.com``
+      No firma los registros, por lo que no hay posibilidad de verificar la firma.
+
+   ``pir.org``
+      Presenta un registro firmado válido.
+
+   ``dnssec-failed.org``
+      Es un registro con una firma inválidad, hecho así aposta a efectos de
+      testeo.
+
+   Ahora bien, si su situación cambia (p.e. ``google.com`` empieza a fimar
+   registros), habrá que buscar otros con estas características para que las
+   pruebas sigan siendo válidas.
+
+.. [#] El ejecutable :command:`dnssec-dsfromkey` se encuentra en el paquete
+   :deb:`bind9-utils`.
+
+.. |mitm| replace:: *man-in-the-middle*
+.. |TTL| replace:: :abbr:`TTL (Time To Live)`
+.. |DNSSEC| replace:: :abbr:`DNSSEC (Domain Name System Security Extensions)`
+.. |DS| replace:: :abbr:`DS (Delegation signer)`
+.. |AD| replace:: :abbr:`AD (Authenticated Data)`
+.. |CD| replace:: :abbr:`CD (Checking Disabled)`
+.. |KSK| replace:: :abbr:`KSK (Key Signing Key)`
+.. |ZSK| replace:: :abbr:`ZSK (Zone Signing Key)`

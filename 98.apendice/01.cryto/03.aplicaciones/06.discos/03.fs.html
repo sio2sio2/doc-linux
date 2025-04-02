@@ -1,0 +1,283 @@
+
+
+<!DOCTYPE html>
+
+<html lang="es" data-content_root="../../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>9.1.3.6.3. Cifrado con el sistema de archivos &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/classic.css?v=2bf1fcf8" />
+    <link rel="stylesheet" href="../../../../_static/custom.css" type="text/css" />
+    
+    <script src="../../../../_static/documentation_options.js?v=a621b78a"></script>
+    <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/translations.js?v=f85f4cfb"></script>
+    
+    <link rel="index" title="Índice" href="../../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../../search.html" />
+    <link rel="next" title="9.1.3.6.4. Cifrado de directorio" href="04.app.html" />
+    <link rel="prev" title="9.1.3.6.2. Cifrado de bloques" href="02.luks.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="04.app.html" title="9.1.3.6.4. Cifrado de directorio"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="02.luks.html" title="9.1.3.6.2. Cifrado de bloques"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" ><span class="section-number">9. </span>Apéndices</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../index.html" ><span class="section-number">9.1. </span>Criptografía</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../../03.aplicaciones.html" ><span class="section-number">9.1.3. </span>Aplicaciones de la criptografía</a> &#187;</li>
+          <li class="nav-item nav-item-4"><a href="../06.discos.html" accesskey="U"><span class="section-number">9.1.3.6. </span>Cifrado de discos</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">9.1.3.6.3. </span>Cifrado con el sistema de archivos</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="cifrado-con-el-sistema-de-archivos">
+<span id="crypto-ext4"></span><h1><span class="section-number">9.1.3.6.3. </span>Cifrado con el sistema de archivos<a class="headerlink" href="#cifrado-con-el-sistema-de-archivos" title="Link to this heading">¶</a></h1>
+<p>Desde la versión <em>4.1</em> del <em>kernel</em> de Linux, <em>ext4</em> soporta el cifrado
+transparente, así que podemos utilizar las capacidades del propio sistema de
+archivos para cifrar de forma transparente uno o alguno de sus directorios.</p>
+<p>En consecuencia:</p>
+<ul class="simple">
+<li><p>Es el propio sistema de archivos el que se encarga del cifrado, lo que mejora
+el rendimiento respecto a la solución anterior.</p></li>
+<li><p>El sistema de archivos debe ser forzosamente <em>ext4</em>. Otros sistemas de
+archivos también pueden soportar cifrado, pero en ese caso, tendremos que
+estudiar cómo se cifra con ellos.</p></li>
+<li><p>Como el anterior, es un método apropiado para cifrar datos de usuario.</p></li>
+</ul>
+<p>Antes de empezar es necesario:</p>
+<ol class="arabic">
+<li><p>Comprobar que el tamaño de página que usa el sistema y el tamaño de bloque
+del sistema de archivos son iguales<a class="footnote-reference brackets" href="#id2" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>getconf<span class="w"> </span>PAGE_SIZE
+<span class="go">4096</span>
+<span class="gp"># </span>tune2fs<span class="w"> </span>-l<span class="w"> </span>/dev/sda5<span class="w"> </span><span class="p">|</span><span class="w"> </span>awk<span class="w"> </span><span class="s1">&#39;$0 ~ /^Block size:/ {print $NF}&#39;</span>
+<span class="go">4096</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Suponemos que el sistema de archivos en el que queremos cifrar algunos
+directorios es <code class="file docutils literal notranslate"><span class="pre">/home</span></code> y que éste se encuentra sobre la partición
+<code class="file docutils literal notranslate"><span class="pre">/dev/sda5</span></code></p>
+</div>
+</li>
+<li><p>Habilitar el cifrado para el sistema de archivos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>tune2fs<span class="w"> </span>-l<span class="w"> </span>/dev/sda5<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-q<span class="w"> </span>crypt<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Habilitado&quot;</span>
+<span class="gp"># </span>tune2fs<span class="w"> </span>-O<span class="w"> </span>encrypt<span class="w"> </span>/dev/sda5
+<span class="gp"># </span>tune2fs<span class="w"> </span>-l<span class="w"> </span>/dev/sda5<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-q<span class="w"> </span>crypt<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Habilitado&quot;</span>
+<span class="go">Habilitado</span>
+</pre></div>
+</div>
+</li>
+<li><p>Instalar el <em>software</em> adecuado:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>apt<span class="w"> </span>install<span class="w"> </span>fscrypt<span class="w"> </span>libpam-fscrypt
+</pre></div>
+</div>
+<p>En puridad sólo necesitamos el primer paquete, pero el segundo permite
+desbloquear de forma transparente los directorios cifrados al autenticarse el
+usuario en el sistema.</p>
+</li>
+</ol>
+<p class="rubric">Preparación</p>
+<p>Antes de cifrar cualquier directorio es necesario crear las estructuras
+necesarias:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>fscrypt<span class="w"> </span>setup
+<span class="gp"># </span>fscrypt<span class="w"> </span>setup<span class="w"> </span>/home
+</pre></div>
+</div>
+<p>La primera orden crea la configuración <code class="file docutils literal notranslate"><span class="pre">/etc/fscrypt.conf</span></code> y en
+<code class="file docutils literal notranslate"><span class="pre">/.fscrypt</span></code>, y la segunda se requiere para poder usar otro tipo de claves
+para el cifrado.</p>
+<p class="rubric">Operativa</p>
+<p>Para cifrar un directorio basta con que el usuario haga:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>mkdir<span class="w"> </span>~/privado
+<span class="gp">$ </span>fscrypt<span class="w"> </span>encrypt<span class="w"> </span>~/privado<span class="w"> </span>--source<span class="o">=</span>pam_passphrase
+</pre></div>
+</div>
+<p>que usará como clave su propia contraseña de usuario.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Sin embargo, al detectar la orden que nuestro directorio personal se
+encuentra en un sistema de archivos diferente al raíz, nos da la posibilidad
+de crear una clave extra que podremos usar para desbloquear el sistema en
+caso de que formateemos la partición raíz.</p>
+</div>
+<p>Además, de preparar el directorio para que se almacenen cifrados los datos, lo
+<em>desbloquea</em>, lo que significa que podremos escribir y leer dentro de él de
+forma transparente, aunque lo datos se guarden cifrados:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>fscrypt<span class="w"> </span>status<span class="w"> </span>~/privado
+<span class="go">&quot;/home/usuario/privado/&quot; is encrypted with fscrypt.</span>
+
+<span class="go">Policy:  7892f8f9c076a98feac6ba4b22956021</span>
+<span class="go">Unlocked: Yes</span>
+
+<span class="go">Protected with 2 protector:</span>
+<span class="go">PROTECTOR         LINKED   DESCRIPTION</span>
+<span class="go">c53864a71dd271b8  Yes (/)  login protector for usuario</span>
+<span class="go">89fa83d5083aaf35  No       custom protector &quot;Recovery passphrase for privado&quot;</span>
+</pre></div>
+</div>
+<p>La ventaja de usar la contraseña de usuario es doble:</p>
+<ul class="simple">
+<li><p>Al autenticarse en el sistema, todos los directorios cifrados con la
+contraseña de usuario, se desbloquearán automáticamente.</p></li>
+<li><p>Al modificar la contraseña de usuario, cambiará solidariamente la clave de
+cifrado de todos esos directorios.</p></li>
+</ul>
+<p>También puede usarse una clave distinta a la de usuario:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>mkdir<span class="w"> </span>~/secreto
+<span class="gp">$ </span>fscrypt<span class="w"> </span>encrypt<span class="w"> </span>~/secreto<span class="w"> </span>--source<span class="o">=</span>custom_passphrase<span class="w"> </span>--name<span class="o">=</span><span class="s2">&quot;miclave&quot;</span>
+<span class="gp">$ </span>fscrypt<span class="w"> </span>status<span class="w"> </span>~/secreto
+<span class="go">&quot;secreto/&quot; is encrypted with fscrypt.</span>
+
+<span class="go">Policy:   6d6a13b4f0372393bf145dd5b82a41ea</span>
+<span class="go">Options:  padding:32 contents:AES_256_XTS filenames:AES_256_CTS policy_version:2</span>
+<span class="go">Unlocked: Yes</span>
+
+<span class="go">Protected with 1 protector:</span>
+<span class="go">PROTECTOR         LINKED  DESCRIPTION</span>
+<span class="go">ce8e40654e96553d  No      custom protector &quot;miclave&quot;</span>
+</pre></div>
+</div>
+<p>En este caso se ha usado una frase personalizada de nombre «miclave». En futuros
+reinicios, el directorio estará bloqueado y habrá que desbloquearlo
+explícitamente proporcionando la contraseña:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>fscrypt<span class="w"> </span>unlock<span class="w"> </span>~/secreto
+</pre></div>
+</div>
+<p>Por otro lado, si se quiere cambiar la contraseña, habrá que ejecutar lo
+siguiente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>fscrypt<span class="w"> </span>metadata<span class="w"> </span>change-passphrase<span class="w"> </span>--protector<span class="o">=</span>/home:ce8e40654e96553d
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Es posible añadir claves de desbloqueo extras a un directorio ya
+cifrado (p.e. a <code class="file docutils literal notranslate"><span class="pre">~/privado</span></code>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>fscrypt<span class="w"> </span>metadata<span class="w"> </span>create<span class="w"> </span>protector<span class="w"> </span>/home<span class="w"> </span>--name<span class="o">=</span><span class="s2">&quot;protector extra&quot;</span><span class="w"> </span>--source<span class="o">=</span>custom_passphrase
+<span class="go">Create new protector on &quot;/home&quot; [Y/n] y</span>
+<span class="go">Enter custom passphrase for protector &quot;protector extra&quot;:</span>
+<span class="go">Confirm passphrase:</span>
+<span class="go">Protector 1097fd3459807989 created on filesystem &quot;/home&quot;.</span>
+<span class="gp">$ </span>fscrypt<span class="w"> </span>metadata<span class="w"> </span>add-protector-to-policy<span class="w"> </span>--protector<span class="o">=</span>/home:1097fd3459807989<span class="w"> </span>--policy<span class="o">=</span>/home:7892f8f9c076a98feac6ba4b22956021
+</pre></div>
+</div>
+<p>donde para <em>policy</em> hemos indicado la asociada a <code class="file docutils literal notranslate"><span class="pre">~/privado</span></code>.</p>
+</div>
+<p class="rubric">Cifrado del propio directorio de usuario</p>
+<p>Un caso muy socorrido es cifrar el directorio personal del usuario con la clave
+del propio usuario. Esta tarea debe llevarla a cabo el administrador y es
+conveniente que se lleve a cabo en el proceso de alta del usuario. En cualquier
+caso, puede obrarse del siguiente modo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mkdir<span class="w"> </span>/home/usuario.new
+<span class="gp"># </span>chown<span class="w"> </span>usuario:usuario<span class="w"> </span>/home/usuario.new
+<span class="gp"># </span>fscrypt<span class="w"> </span>encrypt<span class="w"> </span>/home/usuario.new<span class="w"> </span>--user<span class="o">=</span>usuario
+<span class="gp"># </span>cp<span class="w"> </span>-aT<span class="w"> </span>/home/usuario<span class="w"> </span>/home/usuario.new
+<span class="gp"># </span>rm<span class="w"> </span>-rf<span class="w"> </span>/home/usuario
+<span class="gp"># </span>mv<span class="w"> </span>/home/usuario.new<span class="w"> </span>/home/usuario
+</pre></div>
+</div>
+<p>El tercer paso exige que el administrador proporcione la contraseña del usuario,
+o sea, que la conozca. Esto en realidad no es problema, porque después de la
+operación, el usuario podrá modificar la contraseña. El quinto paso, en puridad,
+requeriría el uso de una herramienta como <strong class="program">shred</strong> para eliminar todo
+rastro de los archivos sin cifrar.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Lo lógico si se desea que los usuarios tengan cifrado su directorio
+es crear un <em>script</em> para que el alta incluya el cifrado de tal directorio.</p>
+</div>
+<p class="rubric">Notas al pie</p>
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="id2" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
+<p>Al crear el sistema de archivos, <span class="xref std std-ref">mkfs.ext4</span> escoge un
+tamaño de bloque. Normalmente el tamaño es <strong>4096</strong>, pero puede ser menor, si
+la partición es muy pequeña. En cualquier caso, puede forzarse el tamaño con
+la opción <kbd class="kbd docutils literal notranslate">-b</kbd>.</p>
+</aside>
+</aside>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h4>Tema anterior</h4>
+    <p class="topless"><a href="02.luks.html"
+                          title="capítulo anterior"><span class="section-number">9.1.3.6.2. </span>Cifrado de bloques</a></p>
+  </div>
+  <div>
+    <h4>Próximo tema</h4>
+    <p class="topless"><a href="04.app.html"
+                          title="próximo capítulo"><span class="section-number">9.1.3.6.4. </span>Cifrado de directorio</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../../_sources/98.apendice/01.cryto/03.aplicaciones/06.discos/03.fs.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="04.app.html" title="9.1.3.6.4. Cifrado de directorio"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="02.luks.html" title="9.1.3.6.2. Cifrado de bloques"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" ><span class="section-number">9. </span>Apéndices</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../index.html" ><span class="section-number">9.1. </span>Criptografía</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../../03.aplicaciones.html" ><span class="section-number">9.1.3. </span>Aplicaciones de la criptografía</a> &#187;</li>
+          <li class="nav-item nav-item-4"><a href="../06.discos.html" ><span class="section-number">9.1.3.6. </span>Cifrado de discos</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">9.1.3.6.3. </span>Cifrado con el sistema de archivos</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright CC BY 4.0, 2016-2025, José Miguel Sánchez Alés.
+      Creado usando <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    </div>
+  </body>
+</html>

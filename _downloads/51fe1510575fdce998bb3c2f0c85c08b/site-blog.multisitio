@@ -1,0 +1,54 @@
+map $uri $blogname {
+    default main;  # O como se quiera llamar al blog principal
+    ~^/(?!wp-)(?P<blogpath>[^/]+)/.*$       $blogpath;
+}
+
+server {
+   listen  80;
+   listen 443 ssl;
+
+   server_name blogs.example.net;
+
+   root /srv/www/blogs;
+   try_files $uri $uri/ /index.php$is_args$args;
+   index index.php;
+
+   include snippets/snakeoil.conf;
+
+   # Separamos los logs en ficheros aparte
+   # Pero los errores no admiten variables (https://trac.nginx.org/nginx/ticket/562)
+   access_log   /var/log/nginx/blogs.$blogname.access.log;
+   error_log    /var/log/nginx/blogs.error.log;
+
+   # Redirección al sitio seguro
+   if ($https != "on") {
+      return 301 https://$host$request_uri;
+   }
+
+   include snippets/robotsoff.conf;
+   include snippets/faviconoff.conf;
+
+   if (!-e $request_filename) {
+      rewrite ^/wp-admin/network(/.*) /wp-admin$1 last;
+      rewrite ^(?:/[^/]+)?(/.*) $1 last;
+   }
+
+   # Evita que se ejecute cualquier
+   # script php subido por el usuario.
+   location ^~ /wp-content/uploads/ {
+      expires max;
+      access_log off;
+      log_not_found off;
+   } 
+
+   location ~ \.php$ {
+      include snippets/fastcgi-php.conf;
+      fastcgi_pass php;
+   }
+
+   location ~* \.(?:js|css|jpe?g|gif|htc|ico|png|html|xml|otf|ttf|eot|woff2?|svg)$ {
+      expires max;
+      access_log off;
+      log_not_found off;
+   }
+}

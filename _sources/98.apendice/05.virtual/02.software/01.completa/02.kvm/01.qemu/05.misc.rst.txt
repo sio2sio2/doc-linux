@@ -1,0 +1,434 @@
+Otros aspectos
+==============
+Reservamos este epígrafe para aspectos variados que no requieren excesivo
+desarrollo, pero pueden resultar muy útiles.
+
+Procesadores
+------------
+Para especificar el número de procesadores puede usarse la opción :kbd:`-smp`::
+
+   $ qemu-system-vga -smp 2 -hda disco.qcw
+
+.. _qemu-efi:
+
+Firmware de la placa base
+-------------------------
+Por defecto, al virtualizar plataformas x86, :program:`QEmu` utiliza como
+firmware la |BIOS| de 16 *bits* proporcionada por el proyecto SeaBIOS_. Esto es
+suficiente en la mayoría de los casos (especialmente *Linux*), pero cuando el
+huésped debe correr on sistema operativo que lo exija (el caso de *Windows* 11)
+o quieren precisamente hacerse pruebas sobre el arranque, surge la necesidad
+de que el huésped arranque un firmware |EFI|.
+
+Para utilizar |EFI| basta con indicarle un archivo que contenga el *firmware*
+apropiado que habrá de descargarse o instalarse primero en el anfitrión. El
+usado habitualmente es OVMF_ para el que existe el paquete :deb:`ovmf` en
+*Debian*::
+
+   # apt install ovmf
+
+Con el paquete instalado, es tan fácil cambiar el *firmware* como añadir:
+
+:code:`-bios /usr/share/ovmf/OVMF.fd`
+
+donde la ruta es el lugar donde el paquete almacena el *firmware*.
+
+.. note:: Para emular la |NVRAM|, |OVMF| crear un archivo dentro de la partición
+   |ESP| denominado :file:`NvVars`.
+
+Es fundamental tener presente que al cargar este *firmware*, deja de tener
+efecto la secuencia de arranque establecida según lo expuesto en el
+:ref:`arranque básico <qemu-arranque-basico>`. Para manipular la secuencia es
+necesario pulsar :kbd:`F2` durante el arranque de la máquina virtual, lo cual
+permitirá entrar en un entorno desde el cuál puede escogerse qué sistema
+operativo arrancar o alterar permanentemente el orden.
+
+.. note:: La secuencia de arranque |EFI| también puede manipularse desde un
+   *Linux* huésped utilizando la orden efibootmgr_. Hay unos pocos ejemplos de
+   uso en :ref:`este epígrafe del manual <efi-entradas-grub>`.
+
+.. _qemu-vhost-net:
+
+Soporte para *vhost-net*
+------------------------
+La mejora en el rendimiento que supone *virtio-net* sólo será efectiva si puede
+comunicarse directamente con el núcleo del anfitrión a través de su módulo
+*vhost-net*. Para ello es necesario asegurarse de que el módulo se cargará
+durante el arranque del anfitrión\ [#]_::
+
+   # echo "vhost_net" >> /etc/modules
+
+Y asegurarnos, además, de que el dispositivo de caracteres que crea
+(:file:`/dev/vhost-net`) es accesible por el usuario que utiliza
+:program:`QEmu`, para lo cual podemos valernos un mecanismo ya utilizado para
+otros casos::
+
+   # cat >> /etc/udev/rules.d/55-qemuperm.rules
+   KERNEL=="vhost-net", ACTION=="add", GROUP="qemusers", MODE="0660"
+
+que concede permisos al grupo *qemusers*.
+
+Con estos mimbres ya podremos hacer uso del módulo. Recordemos que, usando el
+dispositivo *virtio-net*, utilizábamos una :ref:`interfaz macvtap0 para dejar la
+interfaz como adaptador puente <qemu-red-puente-macvtap>` así:
+
+:code:`-netdev tap,id=nic,fd=3`
+
+Pues bien, ahora la tendremos que utilizar así:
+
+:code:`-netdev tap,id=nic,fd=3,vhost=on,vhostfd=4`
+
+donde **4** es el descriptor de archivo usado a cuya entrada/salida
+redirigiremos :file:`/dev/vhost-net`. Por tanto, la orden quedaría ahora así::
+
+   $ qemu-system-vga -hda disco.qcw -device virtio-net,netdev=nic,mac=$(</sys/class/net/macvtap0/address) \
+      -netdev tap,id=nic,fd=3,vhost=on,vhostfd=4 3<>/dev/tap$(</sys/class/net/macvtap0/ifindex) 4<>/dev/vhost-net
+
+En el caso de una interfaz *TAP*, hay más diferencias. Propusimos:
+
+:code:`-netdev bridge,id=nic,br=br0`
+
+El problema es que *bridge* no admite :kbd:`vhost` ni :kbd:`vhostfd`, así que
+tenemos que echar mano de *tap*. La línea equivalente es:
+
+:code:`-netdev tap,id=nic,br=br0,helper=/usr/lib/qemu/qemu-bridge-helper`
+
+en que hay explícitamente que especificar el *helper*. Escrito así, sí podemos
+hacer el añadido:
+
+:code:`-netdev tap,id=nic,br=br0,helper=/usr/lib/qemu/qemu-bridge-helper,vhost=on,vhostfd=4`
+
+con lo que la orden completa quedaría así::
+
+   $ qemu-system-vga -hda disco.qcw -device virtio-net,netdev=nic \
+      -netdev tap,id=nic,br=br0,helper=/usr/lib/qemu/qemu-bridge-helper,vhost=on,vhostfd=4 4<>/dev/vhost-net
+
+.. _qemu-virtio-scsi:
+
+virtio-scsi
+-----------
+Es un *driver* bastante eficiente que emula completamente una controladora
+|SCSI|. Para utilizarlo con un este disco:
+
+:code:`-blockdev "driver=file,node-name=f1,filename=disco.qcw" -blockdev "driver=qcow2,node-name=hdd,file=f1"`
+
+podemos añadir lo siguiente:
+
+:code:`-device virtio-scsi,id=scsi0 -device scsi-hd,drive=hdd,bus=scsi0.0,channel=0,scsi-id=0,lun=0`
+
+donde podemos ir cambiando el valor de :kbd:`lun`, si añadimos más discos; o
+:kbd:`scsi-hd` por :kbd:`scsi-cd`, si de lo que se trata es de una unidad
+óptica. De este modo, una máquina con una disco y un dispositivo óptico
+podríamos arrancarla así::
+
+   $ qemu-system-vga -device virtio-scsi,id=scsi0 \
+      -blockdev "driver=file,node-name=f1,filename=disco.qcw" -blockdev "driver=qcow2,node-name=hdd,file=f1" \
+      -device scsi-hd,drive=hdd,bus=scsi0.0,channel=0,scsi-id=0,lun=0,bootindex=1 \
+      -blockdev "driver=file,node-name=cdrom,filename=gparted.iso" \
+      -device scsi-cd,drive=cdrom,bus=scsi0.0,channel=0,scsi-id=0,lun=1,bootindex=0
+
+Puede obtenerse mejoras en el rendimiento añadiendo 4 colas:
+
+:code:`-device virtio-scsi,id=scsi0,num_queues=4`
+
+y, tanto para este driver como para *virtio-blk*, hay mejora también si se
+define el objeto:
+
+:code:`-object iothread,id=iothread0`
+
+y se añade su uso a *virtio-scsi* (o *virtio-blk*):
+
+:code:`-device virtio-scsi,id=scsi0,iothread=iothread0`
+
+.. _qemu-usb:
+
+|USB|
+-----
+Para habilitar |USB| en el huésped es necesario arrancar la máquina con:
+
+:code:`-device qemu-xhci`\ [#]_
+
+Este epígrafe, no obstante, está dedicado a describir cómo hacer que un
+dispositivo |USB| conectado al anfitrión aparezca directamente en el huésped.
+Necesitaremos dos cosas:
+
+#. Si se usa :program:`QEmu` como usuario sin privilegios, permitir que éste
+   tenga permisos de escritura. Esto se hace de modo análogo a como :ref:`se permite
+   la escritura en dispositivos TAP de caracteres <qemu-red-puente-macvtap>`:
+   definiendo un grupo *qemusers* donde se encuentren los usuarios que
+   virtualicen y añadiendo una regla para la creación de dispositivos |USB|::
+
+      # cat >> /etc/udev/rules.d/55-qemuperm.rules
+      SUBSYSTEM=="usb", ACTION=="add", GROUP="qemusers", MODE="0660"
+
+#. Pasar al huésped el dispositivo |USB| que queremos tener disponible en él,
+   para lo cual tenemos que identificar en el anfitrión tal dispositivo::
+
+      $ lsusb
+      [...]
+      Bus 001 Device 007: ID abcd:1234 Unknown UDisk
+      [...]
+
+   Supongamos que el dispositivo es éste. Si queremos tener una salida más
+   prolija de sus características, podemos hacer::
+
+      $ lsusb -v -s 1:7
+      [...]
+          idVendor           0xabcd Unknown
+          idProduct          0x1234
+      [...]
+
+   donde :kbd:`1:7` son el número de bus y dispositivo que se han observado en
+   la salida sucinta primera. Consultado estos datos podemos pasar la gestión
+   del dispositivo |USB| al huésped añadiendo:
+
+   :code:`-device usb-host,hostbus=1,hostaddr=7`\ [#]_
+
+   Estos dos números (**1** y **7**) son cambiantes. Una alternativa es
+   identificar el dispositivo con su código de vendedor y producto que sí son
+   fijos y, por tanto, no exigirán que los consultemos cada vez que conectamos
+   el dispositivo al equipo:
+
+   :code:`-device usb-host,vendorid=0xabcd,productid=0x1234`
+
+   .. note:: El dispositivo |USB| no estará disponible en el anfitrión, mientras
+      esté siendo gestionado por el huésped.
+
+En definitiva, que si queremos que un huésped se haga cargo de la gestión de un
+dispositivo |USB| (con identificador de vendedor **0xabcd** e identicador de
+producto **0x1234**), deberemos arrancarlo así::
+
+   $ qemu-system-vga -hda disco.qcw -device qemu-xhci -device usb-host,vendorid=0xabcd,productid=0x1234
+
+.. _qemu-virtio-fs:
+
+Directorio compartido
+---------------------
+Un aspecto muy importante de la virtualización es tener algún mecanismo
+eficiente para compartir archivos entre el anfitrión y el huésped. Esto, en
+principio y siempre que el huésped tenga conectividad de red con el anfitrión,
+puede llevarse a cabo haciendo uso de un sistema de archivos en red como |NFS|
+o |CIFS|, pero no es eficiente. La mejor solución es utilizar `virtio-fs`_, que
+está pensado específicamente para este propósito.
+
+Para compartir un directorio del anfitrión debemos antes utilizar en él el
+demonio :program:`virtiofsd` como administrador::
+
+   # /usr/lib/qemu/virtiofsd --socket-path=/var/run/vm1.sock -o source=/var/lib/share --socket-group=qemusers
+
+donde estamos suponiendo, como llevamos haciendo esta ahora, que *qemusers* es
+un grupo al que pertenecen los usuarios que arrancan máquinas virtuales de
+:program:`QEmu`.
+
+Hecho lo cual, podemos arrancar el huésped, que usará el *socket* creado por la
+orden para comunicarse con el anfitrión::
+
+   $ qemu-system-vga -hda disco.qcw -chardev socket,id=char0,path=/var/run/vm1.sock \
+      -device vhost-user-fs-pci,chardev=char0,tag=anfitrion,queue-size=1024 \
+      -object memory-backend-file,id=mem,size=512M,mem-path=/dev/shm,share=on -numa node,memdev=mem
+
+"*anfitrion*" es una etiqueta que se utilizará cuando en el huésped queramos
+montar el directorio compartido::
+
+   # mount -t virtiofs anfitrion /mnt
+
+.. Carpetas compartidas (virtio-fs):
+   https://www.tauceti.blog/post/qemu-kvm-share-host-directory-with-vm-with-virtio/
+   https://github.com/virtio-win/kvm-guest-drivers-windows/wiki/VirtIO-FS:-Shared-file-system
+   https://virtio-fs.gitlab.io/howto-qemu.html
+   https://qemu.readthedocs.io/en/latest/tools/virtiofsd.html
+
+.. Para libvirt:
+
+   http://blog.vmsplice.net/2020/04/virtio-fs-has-landed-in-qemu-50.html
+   https://www.tauceti.blog/posts/qemu-kvm-share-host-directory-with-vm-with-virtio/
+
+.. _qemu-disco-compact:
+
+Compactación de discos
+----------------------
+La intención del epígrafe es lograr un disco en formato |QCOW|\ 2 con el menor
+tamaño posible, propósito que requiere tres tareas:
+
+#. Eliminar los archivos innecesarios.
+#. Rellenar con ceros los bloques del sistema de archivos que en algún momento se
+   hubieran escrito y se liberaran posteriormente.
+#. Comprimir la imagen.
+
+Para ello tomemos una imagen llamada :file:`disco.qcw` y obremos sobre ella. Las
+dos primeras tareas requieren acceso a su contenido, para lo cual lo mejor es
+:ref:`montar el disco <qemu-nbd>` en vez de arrancar el sistema huésped::
+
+   # modprobe nbd max_part=63
+   # qemu-nbd -c /dev/nbd0 disco.qcw
+   # partx -a /dev/nbd0
+
+Esto debería dejar disponibles las particiones de la imagen
+(:file:`/dev/nbd0p1`, :file:`/dev/nbd0p2`, etc.). El siguiente paso es ir
+montando uno a uno los sistemas de archivos para realizar sobre ellos las dos
+primeras acciones: borrar lo innecesario y rellenar con ceros. Lo primero es
+trivial y lo segundo depende de cuál sea el sistema de archivos:
+
+* Si es *ext4*, podemos usar :manpage:`zerofree` (incluido en el paquete del
+  mismo nombre)::
+
+   # zerofree -v /dev/nbd0p1
+
+* Si es |NTFS|, podemos usar :manpage:`ntfswipe` (incluido en el paquete
+  :deb:`ntfs-3g`)::
+
+   # ntfswipe -uvb0 /dev/nbd0p1
+
+Una vez que hayamos terminado con todos los sistemas de archivos, deberemos
+desmontar la imagen de disco::
+
+   # qemu-nbd -d /dev/nbd0
+
+Y, finalmente, hacer una :ref:`conversión de la imagen <qemu-discos-conv>` para
+comprimirla::
+
+   $ mv disco{,_z}.qcw
+   $ qemu-img convert -c -p -f qcow2 disco_z.qcw -O qcow2 disco.qcw
+   $ rm -f disco_z.qcw
+
+donde la opción :kbd:`-c` es la que obra la compresión.
+
+.. _qemu-disco-cifrado:
+
+Cifrado de discos
+-----------------
+El formato |QCOW|\ 2 ofrece la posibilidad de cifrar las propias imágenes de
+disco, de manera que su contenido esté bloqueado mientras no se conozca cuál es
+la contraseña usada para su cifrado.
+
+Para ello, lo primero es :ref:`crear una imagen <qemu-img-create>` de disco cifrada::
+
+   $ qemu-img create -f qcow2 --object "secret,id=pass,data=micontraseña" \
+      -o "encrypt.format=luks,encrypt.key-secret=pass" cifrado.qcw 4G
+
+Hecho esto, la imagen estará cifrada, por lo que cada vez que quiera usarse
+deberá proporcionarse la contraseña. Así, para :ref:`montar el disco
+<qemu-nbd>`::
+
+   # qemu-nbd -c /dev/nbd0 --object "secret,id=pass,data=micontraseña" \
+      --image-opts "driver=qcow2,encrypt.format=luks,encrypt.key-secret=pass,file.filename=cifrado.qcw"
+
+y para usarla en una máquina virtual::
+
+   $ qemu-system-vga -object "secret,id=pass,data=micontraseña" -blockdev "driver=file,node-name=disco,filename=cifrado.qcw" \
+      -blockdev "driver=qcow2,encrypt.format=luks,encrypt.key-secret=pass,node-name=hdd,file=disco" -device "virtio-blk,drive=hdd"
+
+.. Cifrar la imagen con LUKS: https://bugzilla.redhat.com/show_bug.cgi?id=1406803
+
+.. _qemu-tpm:
+
+Chip |TPM|
+----------
+Puede ser muy interesante disponer en el huésped de un *chip* |TPM|:
+
+#. Si el anfitrión es un *Linux* y dispone de *chip*, podemos utilizar el *chip*
+   también en el huésped añadiendo las siguientes opciones:
+
+   :code:`-device tpm-tis,tpmdev=tpm0 -tpmdev passthrough,id=tpm0`
+
+#. Si no dispone del *chip*, aún podemos emularlo del siguiente modo:
+
+   a. Instalamos en el anfitrión el *software* apropiado::
+
+         # apt install swtpm-tools
+   
+   b. Creamos un directorio donde almacenar los estados del |TPM|::
+
+         $  mkdir vmtpm0 
+
+   c. Lanzamos el *software* que crea un *socket* para la comunicación\ [#]_::
+
+         $ swtpm socket --tpmstate dir=vmtpm0 --ctrl type=unixio,path=vmtpm0/swtpm-sock
+
+   d. Una vez hechos estos preparativos, ya podremos arrancar máquinas virtuales
+      con un *chip* virtual |TPM| añadiendo lo siguiente:
+
+      :code:`-chardev socket,id=chrtpm,path=vmtpm0/swtpm-sock -tpmdev emulator,id=tpm0,chardev=chrtpm -device tpm-tis,tpmdev=tpm0`
+
+      donde el *socket* es el creado por :command:`swtpm`. Si todo ha ido bien,
+      el huésped debería disponer de un dispositivo :file:`/dev/tpm0`. Además,
+      al apagar la máquina, :command:`swtpm` también completará  su ejecución.
+
+Pausado
+-------
+Supongamos que de una máquina arrancada con::
+
+   $ qemu-system-vga -hda disco.qcw -device virtio-net,netdev=nic -netdev user,id=nic
+
+quiere pausarse su ejecución. Para ello, basta con acudir al monitor y ejecutar
+la orden:
+
+.. code-block:: none
+
+   (qemu) stop
+
+Si se quiere volver a poner en ejecución, basta con:
+
+.. code-block:: none
+
+   (qemu) cont
+
+Esto proceder, no obstante, sólo es válido mientras no se aborte la ejecución
+de la máquina. Si nuestra intención,  es pausar la máquina, abortar la ejecución
+y tiempo más adelante volver a arrancar la máquina con el estado justo que tenía
+cuando se pausó es necesario más:
+
+.. code-block:: none
+
+   (qemu) stop
+   (qemu) migrate "exec:xz -c > estado_disco.xz"
+   (qemu) quit
+
+Con esto habremos no solo parado la máquina, sino guardado su estado en el
+archivo :file:`estado_disco.xz`.  Si al reiniciar la máquina queremos recuperar el
+estado de ejecución, deberemos arrancar la máquina exactamente del mismo modo::
+
+   $ qemu-system-vga -hda disco.qcw -device virtio-net,netdev=nic -netdev user,id=nic \
+      -incoming "exec:xz -dc estado_disco.xz"
+
+pero añadiendo la opción :kbd:`-incoming`. Obviamente, la máquina se encontrará
+pausada, porque fue así como estaba cuando guardamos su estado, así que será
+necesario abrir el monitor y:
+
+.. code-block:: none
+
+   (qemu) cont
+
+.. rubric:: Notas al pie
+
+.. [#] Hasta que arranquemos no se cargará, así que si queremos hacer pruebas
+   sobre la marcha, habrá que cargarlo por esta vez a mano::
+
+      # modprobe vhost_net
+
+.. [#] De ahí que tuviéramos que incluir esto al querer emular el comportamiento
+   del puntero en una pantalla táctil (:kbd:`-device usb-tablet`) tal como
+   recomienda el manual cuando la salida es |VNC|.
+.. [#] Obviamente, el huésped debe tener habilitado el |USB|, de modo que
+   también deberá usarse :code:`-device qemu-xhci`.
+.. [#] :command:`swtpm` tiene una opción para correr en segundo plano (:kbd:`-d`),
+   pero :program:`QEmu` no funciona cuando se usa. ?:/
+
+.. |TPM| replace:: :abbr:`TPM (Trusted Platform Module)`
+.. |USB| replace:: :abbr:`USB (Universal Serial Bus)`
+.. |BIOS| replace:: :abbr:`BIOS (Basic I/O System)`
+.. |EFI| replace:: :abbr:`EFI (Extensible Firmware Interface)`
+.. |VNC| replace:: :abbr:`VNC (Virtual Network Computing)`
+.. |NVRAM| replace:: :abbr:`NVRAM (Non Volatile RAM)`
+.. |ESP| replace:: :abbr:`ESP (EFI System Partition)`
+.. |OVMF| replace:: :abbr:`OVMF (Open Virtual Machine Firmware)`
+.. |NFS| replace:: :abbr:`NFS (Network File System)`
+.. |CIFS| replace:: :abbr:`CIFS (Common Internet File System)`
+.. |NTFS| replace:: :abbr:`NTFS (New Technology File System)`
+.. |QCOW| replace:: :abbr:`QCOW (Qemu Copy-On-Write)`
+.. |SCSI| replace:: :abbr:`SCSI (Small Computer System Interface)`
+
+.. _SeaBIOS: https://www.seabios.org/SeaBIOS
+.. _OVMF: https://github.com/tianocore/tianocore.github.io/wiki/OVMF
+.. _efibootmgr: https://www.linuxbabe.com/command-line/how-to-use-linux-efibootmgr-examples
+.. _virtio-fs: https://virtio-fs.gitlab.io

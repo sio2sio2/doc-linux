@@ -1,0 +1,502 @@
+
+
+<!DOCTYPE html>
+
+<html lang="es" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>7.2.2.1. Principios de configuración &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/classic.css?v=2bf1fcf8" />
+    <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+    
+    <script src="../../../_static/documentation_options.js?v=a621b78a"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/translations.js?v=f85f4cfb"></script>
+    
+    <link rel="index" title="Índice" href="../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../search.html" />
+    <link rel="next" title="7.2.2.2. Configuración" href="02.avanz/index.html" />
+    <link rel="prev" title="7.2.2. nginx" href="index.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="02.avanz/index.html" title="7.2.2.2. Configuración"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="7.2.2. nginx"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" ><span class="section-number">7. </span>Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" ><span class="section-number">7.2. </span>Web</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="index.html" accesskey="U"><span class="section-number">7.2.2. </span>nginx</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">7.2.2.1. </span>Principios de configuración</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="principios-de-configuracion">
+<h1><span class="section-number">7.2.2.1. </span>Principios de configuración<a class="headerlink" href="#principios-de-configuracion" title="Link to this heading">¶</a></h1>
+<section id="instalacion">
+<span id="nginx-install"></span><h2><span class="section-number">7.2.2.1.1. </span>Instalación<a class="headerlink" href="#instalacion" title="Link to this heading">¶</a></h2>
+<p>Para versiones recientes de <em>Debian</em> (sobre todo a partir de <em>Bookworm</em>) basta
+con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>apt<span class="w"> </span>install<span class="w"> </span>nginx
+</pre></div>
+</div>
+<p>pero la regla es, en realidad, una simplificación que merece una explicación:</p>
+<p><strong class="program">nginx</strong> hasta su versión <em>1.9.11</em> tenía un sistema de módulos que
+obligaba a añadirlos monolíticamente al ejecutable, es decir, que no se podían
+cargar dinámicamente a través de la configuración, sino que en la compilación se
+añadían al núcleo del programa. Por esa razón, los empaquetadores de <em>Debian</em>
+crearon tres sabores dependiendo de cuáles fueran los módulos que se habían
+incluido en la compilación:</p>
+<dl class="simple">
+<dt><a class="extlink-deb reference external" href="https://packages.debian.org/stable/nginx-light">nginx-light</a>,</dt><dd><p>que incluía el menor número de módulos.</p>
+</dd>
+<dt><a class="extlink-deb reference external" href="https://packages.debian.org/stable/nginx-full">nginx-full</a>,</dt><dd><p>que incluía un mayor número de módulos, además de
+algunos módulos de terceros. <a class="extlink-deb reference external" href="https://packages.debian.org/stable/nginx">nginx</a> a secas, era simplemente un
+metapaquete que forzaba la instalación de esta versión <em>completa</em>.</p>
+</dd>
+<dt><a class="extlink-deb reference external" href="https://packages.debian.org/stable/nginx-extras">nginx-extras</a>,</dt><dd><p>que incluía más módulos aún, tanto propios como de
+terceros.</p>
+</dd>
+</dl>
+<p>De este modo, dependiendo de si necesitábamos más o menos módulos para la
+configuración del servidor, instalábamos uno u otro. Desgraciadamente, si
+requeríamos un módulo no incluído en estos tres sabores, debíamos compilar toda
+la aplicación<a class="footnote-reference brackets" href="#id7" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a>.</p>
+<p>Al añadir <strong class="program">nginx</strong> la posibilidad de cargar módulos de forma dinámica,
+<a class="reference external" href="https://www.debian.org/News/2017/20170617">Stretch</a> (que incluyó la versión <em>1.10.3</em>), produjo ejecutables con la
+posibilidad de cargar dinámicamente módulos. Sin embargo, se mantuvieron los
+tres sabores enumerados, cada uno de cuyos ejecutables contenía un número
+distinto de módulos compilados estáticamente<a class="footnote-reference brackets" href="#id8" id="id2" role="doc-noteref"><span class="fn-bracket">[</span>2<span class="fn-bracket">]</span></a>. La única diferencia respecto
+a la versiones anteriores es que <em>Debian</em> incluyó paquetes con módulos
+adicionales que podían instalarse y cargarse dinámicamente con cualquiera de los
+tres sabores<a class="footnote-reference brackets" href="#id9" id="id3" role="doc-noteref"><span class="fn-bracket">[</span>3<span class="fn-bracket">]</span></a>. Además, cada sabor podía añadir dependencias a paquetes de
+módulos dinámicos.</p>
+<p><a class="reference external" href="https://www.debian.org/News/2021/20210814">Bullseye</a> mantuvo esta situación con dos diferencias:</p>
+<ul>
+<li><p>La primera fue añadir un nuevo sabor:</p>
+<dl class="simple">
+<dt><a class="extlink-deb reference external" href="https://packages.debian.org/stable/nginx-core">nginx-core</a></dt><dd><p>que era un sabor casi equivalente a <a class="extlink-deb reference external" href="https://packages.debian.org/stable/nginx-full">nginx-full</a>, pero sin incluir
+estáticamente ningún módulo de terceros.</p>
+</dd>
+</dl>
+</li>
+<li><p>La segunda, que <a class="extlink-deb reference external" href="https://packages.debian.org/stable/nginx">nginx</a> dejó de ser un metapaquete que instalaba
+forzosamente <a class="extlink-deb reference external" href="https://packages.debian.org/stable/nginx-full">nginx-full</a> y pasó a ser uno que instalaba cualquiera de los
+cuatro.</p></li>
+</ul>
+<p>Y, finalmente, apareció <em>Bookworm</em>, que unificó los ejecutables en uno solo. A
+partir de esta versión, el paquete <a class="extlink-deb reference external" href="https://packages.debian.org/stable/nginx">nginx</a> es el que contiene el ejecutable
+del servidor (esto es, <code class="file docutils literal notranslate"><span class="pre">/usr/sbin/nginx</span></code>) con un número mínimo de módulos
+compilados estáticamente, y los cuatro sabores ya mencionados son metapaquetes
+que instalan éste y añaden dependencias a paquetes de módulos dinámicos, por lo
+que la única diferencia entre ellos es la cantidad de paquetes de módulos
+instalados automáticamente.</p>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Si trabaja con una versión anterior a <em>Bookworm</em> es posible que le
+salga más a cuenta instalar <a class="extlink-deb reference external" href="https://packages.debian.org/stable/nginx-light">nginx-light</a>, porque apenas hay aspectos
+recogidos en esta guía que no se puedan resolver con esta versión. Para
+<em>Bookworm</em> y posteriores instale <a class="extlink-deb reference external" href="https://packages.debian.org/stable/nginx">nginx</a> por la misma razón y añada
+módulos dinámicos según convenga.</p>
+</div>
+</section>
+<section id="ficheros-de-configuracion">
+<h2><span class="section-number">7.2.2.1.2. </span>Ficheros de configuración<a class="headerlink" href="#ficheros-de-configuracion" title="Link to this heading">¶</a></h2>
+<p>La configuración de <strong class="program">nginx</strong> está incluida toda dentro de
+<code class="file docutils literal notranslate"><span class="pre">/etc/nginx</span></code>. Los ficheros y directorios relevantes son los siguientes:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>/etc/nginx
+   +--- conf.d/
+   +--- modules-available/
+   +--- modules-enabled/
+   +--- nginx.conf
+   +--- sites-available/
+           +--- default
+   +--- sites-enabled/
+           +--- default -&gt; ../sites-available/default
+   +--- snippets/
+           +--- fastcgi-php.conf
+           +--- snakeoil.conf
+</pre></div>
+</div>
+<p>cuyo significado podemos desglosar así:</p>
+<dl>
+<dt><code class="file docutils literal notranslate"><span class="pre">nginx.conf</span></code></dt><dd><p>Es, en sí, el fichero de configuración. el resto de configuración existente
+en este directorio se aplica, bien porque este fichero la carga directamente,
+bien porque un fichero cargado por él, la carga a su vez.</p>
+</dd>
+<dt><code class="file docutils literal notranslate"><span class="pre">conf.d</span></code></dt><dd><p>Contiene ficheros con trozos de configuración que <code class="file docutils literal notranslate"><span class="pre">nginx.conf</span></code> siempre
+carga si su extensión es <code class="file docutils literal notranslate"><span class="pre">*.conf</span></code>.</p>
+</dd>
+<dt><code class="file docutils literal notranslate"><span class="pre">snippets</span></code></dt><dd><p>Es un directorio destinado a contener también ficheros con trozos de
+configuración, pero a diferencia de los contenidos en el directorio anterior,
+sólo se aplicarán si son expresamente citados dentro de otros ficheros de
+configuración. <em>Debian</em> trae dos configuraciones ya definidas que podemos
+aprovechar:</p>
+<ul class="simple">
+<li><p><code class="file docutils literal notranslate"><span class="pre">fastcgi-php.conf</span></code> para la configuración de <abbr title="PHP Hypertext Preprocesor">PHP</abbr>.</p></li>
+<li><p><code class="file docutils literal notranslate"><span class="pre">snakeoil.conf</span></code> que incluye las líneas necesarias para usar el
+certificado autofirmado del servidor.</p></li>
+</ul>
+<p>Para aplicar una configuración incluida en este directorio debe utilizar en
+la línea en que queramos que se aplique la directiva <code class="docutils literal notranslate"><span class="pre">include</span></code>:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">include</span><span class="w"> </span><span class="n">snippets/snakeoil.conf</span>;
+</pre></div>
+</div>
+</dd>
+<dt><code class="file docutils literal notranslate"><span class="pre">sites-available</span></code></dt><dd><p>Un mismo servidor web puede alojar distintos sitios <em>web</em> mediante el
+mecanismo de <a class="reference internal" href="02.avanz/01.vdomains.html#ngx-server"><span class="std std-ref">dominios virtuales</span></a>. Este directorio está
+destinado a albergar la definición de todos los <em>dominios virtuales</em>. Ya se
+verá más adelante esto con mayor profundidad.</p>
+</dd>
+<dt><code class="file docutils literal notranslate"><span class="pre">sites-enabled</span></code></dt><dd><p>Contiene los <em>dominios virtuales</em> habilitados. Los que no se encuentren aquí,
+no forman parte de la configuración y por tanto es como si no se hubieran
+definido. Para habilitar dominios basta, simplemente, con hacer enlaces
+simbólicos que apuntes a las definiciones incluidas en <code class="file docutils literal notranslate"><span class="pre">sites-available</span></code>.</p>
+</dd>
+<dt><code class="file docutils literal notranslate"><span class="pre">modules-available</span></code></dt><dd><p>Para cargar dinámicante un módulo la documentación de <strong class="program">nginx</strong>
+indica que debe incluirse en la configuración una línea así:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">load_module</span><span class="w"> </span><span class="s">modules/nonbre_del_modulo.so</span>
+</pre></div>
+</div>
+<p>Para simplificarlo, <em>Debian</em> incluye un fichero de configuración para cada
+módulo con su línea <code class="docutils literal notranslate"><span class="pre">load_module</span></code> correspondiente, con lo que cargar el
+fichero de configuración, implica cargar el módulo. Como <em>Debian</em> prefiere
+alojar para sus paquetes estos ficheros en
+<code class="file docutils literal notranslate"><span class="pre">/usr/share/nginx/modules-available/</span></code>, en este directorio sólo cabría
+crear ficheros de configuración para módulos que hubiéramos compilado
+nosotros mismos.</p>
+</dd>
+<dt><code class="file docutils literal notranslate"><span class="pre">modules-enabled</span></code></dt><dd><p>Son enlaces simbólicos a los módulos que realmente se cargan al arrancar
+<strong class="program">nginx</strong>. Cada vez que se instala en el sistema un paquete
+correspondiente a un módulo, <em>Debian</em> crea el enlace simbólico que apunta
+al fichero de configuración correspondiente en
+<code class="file docutils literal notranslate"><span class="pre">/usr/share/nginx/modules-available</span></code>. Por supuesto, si algún módulo no
+lo usamos, podemos aligerar <strong class="program">nginx</strong> eliminando el enlace (y
+reiniciando el servidor, claro).</p>
+</dd>
+</dl>
+<p>En la práctica:</p>
+<ul class="simple">
+<li><p><code class="file docutils literal notranslate"><span class="pre">nginx.conf</span></code> se modifica si se desea alterar alguna directiva citada en
+él.</p></li>
+<li><p>Se escribe algún fichero <code class="file docutils literal notranslate"><span class="pre">conf.d</span></code>, si se desea añadir configuración
+predeterminada a la labor <abbr title="HyperText Transfer Protocol">HTTP</abbr> de <strong class="program">nginx</strong><a class="footnote-reference brackets" href="#id10" id="id4" role="doc-noteref"><span class="fn-bracket">[</span>4<span class="fn-bracket">]</span></a>.</p></li>
+<li><p>Nuestra tarea se basa fundamentalmente en crear sitios cuya configuración se
+creará en un fichero dentro de <code class="file docutils literal notranslate"><span class="pre">sites-available</span></code> que luego se enlazará
+desde <code class="file docutils literal notranslate"><span class="pre">sites-enabled</span></code>.</p></li>
+<li><p>Si algún trozo de configuración es recurrente en varios sitios, o bien
+deseamos apartarla para tenerla mejor controlada y organizada, podemos crear
+un <em>snippet</em> para ella e incluir tal <em>snippet</em> con la directiva <code class="docutils literal notranslate"><span class="pre">include</span></code> en
+el fichero de configuración del sitio correspondiente.</p></li>
+</ul>
+</section>
+<section id="modulos-adicionales">
+<span id="nginx-install-modules"></span><h2><span class="section-number">7.2.2.1.3. </span>Módulos adicionales<a class="headerlink" href="#modulos-adicionales" title="Link to this heading">¶</a></h2>
+<p>Como hemos instalado <em>nginx-light</em> puede ocurrir que en algún momento
+necesitemos un módulo empaquetado que no instala automáticamente este sabor.
+Supongamos que tal módulo es <em>libnginx-mod-http-auth-pam</em>. En ese caso:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>apt-get<span class="w"> </span>install<span class="w"> </span>libnginx-mod-http-auth-pam
+</pre></div>
+</div>
+<p>El script de <em>postinstalación</em> se encarga de todo, así que nos podemos limitar
+a comprobar que en <code class="file docutils literal notranslate"><span class="pre">/etc/nginx/modules-enabled</span></code> se ha creado el enlace
+adecuado:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>ls<span class="w"> </span>-F<span class="w"> </span>/etc/nginx/modules-enabled/*pam*
+<span class="go">50-mod-http-auth-pam.conf@</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Por supuesto podemos deshabilitar módulos innecesarios eliminado los
+enlaces simbólicos correspondientes en ese directorio.</p>
+</div>
+</section>
+<section id="configuracion-basica">
+<span id="nginx-basico"></span><h2><span class="section-number">7.2.2.1.4. </span>Configuración básica<a class="headerlink" href="#configuracion-basica" title="Link to this heading">¶</a></h2>
+<p>Para ilustrar la configuración, tomemos una muy básica que sirve contenido
+estático y analicémosla. En principio, editemos
+<code class="file docutils literal notranslate"><span class="pre">/etc/nginx/sites-available/default</span></code> y dejémoslo con este contenido:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">server</span><span class="w"> </span><span class="p">{</span>
+<span class="w">   </span><span class="kn">listen</span><span class="w">  </span><span class="mi">80</span><span class="p">;</span>
+<span class="w">   </span><span class="kn">server_name</span><span class="w"> </span><span class="s">_</span><span class="p">;</span>
+
+<span class="w">   </span><span class="kn">root</span><span class="w"> </span><span class="s">/srv/www</span><span class="p">;</span>
+<span class="w">   </span><span class="kn">try_files</span><span class="w"> </span><span class="nv">$uri</span><span class="w"> </span><span class="nv">$uri/</span><span class="w"> </span><span class="p">=</span><span class="mi">404</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p id="nginx-try-files"><span id="nginx-root"></span><span id="nginx-listen"></span><span id="nginx-server"></span>Cada directiva <a class="reference external" href="http://nginx.org/en/docs/http/ngx_http_core_module.html#server">server</a> nos permite
+configurar un <em>dominio virtual</em> y es lo que hemos hecho. Por ahora:</p>
+<ul>
+<li><p>sólo nos preocuparemos de definir una que escucha por el puerto <strong>80</strong>
+(<a class="reference external" href="http://nginx.org/en/docs/http/ngx_http_core_module.html#listen">listen</a>)</p></li>
+<li><p>en el que no preocupa cuál sea el nombre (la cabecera <code class="docutils literal notranslate"><span class="pre">Host</span></code>, de ahí el
+valor de <a class="reference external" href="http://nginx.org/en/docs/http/ngx_http_core_module.html#server_name">server_name</a>)</p></li>
+<li><p>en que todos los ficheros compartidos a través del servidor se sitúan bajo
+<code class="file docutils literal notranslate"><span class="pre">/srv/www</span></code><a class="footnote-reference brackets" href="#id11" id="id5" role="doc-noteref"><span class="fn-bracket">[</span>5<span class="fn-bracket">]</span></a>, merced a la directiva <a class="reference external" href="http://nginx.org/en/docs/http/ngx_http_core_module.html#root">root</a></p></li>
+<li><p>la directiva <a class="reference external" href="http://nginx.org/en/docs/http/ngx_http_core_module.html#try_files">try_files</a> le
+indica al servidor qué recursos debe intentar devolver al realizarse una
+petición. En la configuración propuesta, primero se intenta devolver el propio
+recurso; si éste no es un fichero, debe comprobarse si es un directorio y en
+tal caso tratarlo como tal; y, si tampoco es un directorio, devolver un error
+<strong>404</strong>. Una alternativa podría haber sido:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">try_files</span><span class="w"> </span><span class="nv">$uri</span><span class="w"> </span><span class="nv">$uri/</span><span class="w"> </span><span class="s">/</span>
+</pre></div>
+</div>
+<p>en este caso, cuando el recurso no se encontró como fichero ni como
+directorio, no se genera un error, sino que se devuelve la página principal.
+Por tanto en esta configuración, jamás se devolverá al cliente un error de
+recurso inexistente.</p>
+</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Si miramos dónde se inserta este fichero dentro de <code class="file docutils literal notranslate"><span class="pre">nginx.conf</span></code>,
+comprobaremos que lo hace en un bloque <code class="docutils literal notranslate"><span class="pre">http</span></code>. O sea que un bloque
+<code class="docutils literal notranslate"><span class="pre">server</span></code> se inserta dentro de un bloque <code class="docutils literal notranslate"><span class="pre">http</span></code>. Esto es importante
+tenerlo en cuenta porque la configuración de <strong class="program">nginx</strong> se estructura
+en contextos: el global, el <code class="docutils literal notranslate"><span class="pre">http</span></code>, el <code class="docutils literal notranslate"><span class="pre">server</span></code>, etc.` que se anidan unos
+dentro de otros. Cuando consultemos la documentación oficial, podremos
+comprobar que para cada directiva se define en qué contextos es válida.</p>
+</div>
+<p>Para rematar la configuración, debemos probarla. Para ello, podemos escribir una
+página principal simple en <code class="file docutils literal notranslate"><span class="pre">/srv/www/index.html</span></code>:</p>
+<div class="highlight-html notranslate"><div class="highlight"><pre><span></span><span class="cp">&lt;!DOCTYPE html&gt;</span>
+<span class="p">&lt;</span><span class="nt">html</span> <span class="na">lang</span><span class="o">=</span><span class="s">&quot;es&quot;</span><span class="p">&gt;</span>
+   <span class="p">&lt;</span><span class="nt">title</span><span class="p">&gt;</span>Página principal<span class="p">&lt;/</span><span class="nt">title</span><span class="p">&gt;</span>
+   <span class="p">&lt;</span><span class="nt">meta</span> <span class="na">charset</span><span class="o">=</span><span class="s">&quot;utf-8&quot;</span><span class="p">&gt;</span>
+   <span class="p">&lt;</span><span class="nt">h1</span><span class="p">&gt;</span>Página principal<span class="p">&lt;/</span><span class="nt">h1</span><span class="p">&gt;</span>
+<span class="p">&lt;/</span><span class="nt">html</span><span class="p">&gt;</span>
+</pre></div>
+</div>
+<p>Y, por último, usar un navegador para acceder a la página usando, por ejemplo,
+la propia <em>IP</em> de la máquina en la que hayamos instalado el servidor.</p>
+<p>Sobre esta configuración básica podemos añadir algunas modificaciones:</p>
+<ul>
+<li><p>La directiva <code class="docutils literal notranslate"><span class="pre">listen</span></code> puede incluir explicitamente la interfaz en la que
+queremos que escuche. Por ejemplo:</p>
+<blockquote>
+<div><div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">listen</span><span class="w"> </span><span class="n">localhost</span><span class="p">:</span><span class="mi">80</span><span class="p">;</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>ya que cuando se indica únicamente el puerto se sobreentiende que escuchará en
+todas las disponibles.</p>
+</li>
+<li><p>Esta misma directiva puede usarse repetidamente para escuchar en múltiples
+puertos o múltiples interfaces, de modo que:</p>
+<blockquote>
+<div><div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">listen</span><span class="w">  </span><span class="mi">80</span><span class="p">;</span>
+<span class="k">listen</span><span class="w">  </span><span class="mi">8080</span><span class="p">;</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>hará que el servidor escuche tanto en el puerto <strong>80</strong> como en el <strong>8080</strong><a class="footnote-reference brackets" href="#id12" id="id6" role="doc-noteref"><span class="fn-bracket">[</span>6<span class="fn-bracket">]</span></a>.</p>
+</li>
+<li><p>Si en el navegador hemos usado esta dirección (cambiése la <em>ip</em> por la que
+toque):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">http://192.168.1.11</span>
+</pre></div>
+</div>
+<p id="nginx-index">para pedir la página, deberíamos ser conscientes de lo que ha ocurrido. No
+hemos incluido ruta alguna para especificar el recurso, así que
+<strong class="program">nginx</strong> no encuentra el «no recurso» (por llamarlo de alguna forma).
+Siguiendo la directiva <code class="docutils literal notranslate"><span class="pre">try_files</span></code> añade una barra y entonces prueba a pedir
+el directorio raíz e, inexplicablemente, se devuelve el recurso
+<code class="file docutils literal notranslate"><span class="pre">/index.html</span></code>. Obviamente el suceso tiene explicación. Cuando
+<strong class="program">nginx</strong> se encuentra con que se le pide un directorio, revisa una
+directiva llamada <a class="reference external" href="http://nginx.org/en/docs/http/ngx_http_index_module.html#index">index</a> para saber
+cuáles son los fichero que se consideran de índice y que se mostrarán. El
+valor predeterminado de esta directiva es:</p>
+<blockquote>
+<div><div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">index</span><span class="w"> </span><span class="s">index.html</span><span class="p">;</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>así que esa es la razón por la que se sirve la página simple que preparamos.
+La directiva, por supuesto, admite que le cambiemos el valor o incluso que
+pongamos varios para que  <strong class="program">nginx</strong> pruebe su existencia ordenadamente.
+Por ejemplo:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">index</span><span class="w"> </span><span class="s">index.html</span><span class="w"> </span><span class="s">index.htm</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>probaría si existen <code class="file docutils literal notranslate"><span class="pre">index.html</span></code> y, si no es así, prueba <code class="file docutils literal notranslate"><span class="pre">index.htm</span></code>.
+Ahora bien, ¿qué ocurre si no existen tales ficheros de índice? En ese caso,
+<strong class="program">nginx</strong> mostrará el contenido del directorio, pero sólo si se añade
+la directiva <a class="reference external" href="http://nginx.org/en/docs/http/ngx_http_autoindex_module.html#autoindex">autoindex</a>:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">autoindex</span><span class="w"> </span><span class="no">on</span><span class="p">;</span>
+<span class="k">autoindex_exact_size</span><span class="w"> </span><span class="no">off</span><span class="p">;</span><span class="w">  </span><span class="c1"># Muestra unidades k, m, M, etc. y no bytes siempre</span>
+</pre></div>
+</div>
+<p>que por defecto tiene valor <em>off</em>.</p>
+</li>
+</ul>
+<p>La configuración, además, admite algunos añadidos interesantes:</p>
+<ul id="nginx-logs">
+<li><p><strong class="program">nginx</strong> registra los accesos y los accesos fallidos dentro de los
+ficheros <code class="file docutils literal notranslate"><span class="pre">access.log</span></code> y <code class="file docutils literal notranslate"><span class="pre">error.log</span></code> del directorio
+<code class="file docutils literal notranslate"><span class="pre">/var/log/nginx</span></code>, ya que así de define dentro <code class="file docutils literal notranslate"><span class="pre">nginx.conf</span></code>
+mediante las directivas <a class="reference external" href="http://nginx.org/en/docs/http/ngx_http_log_module.html#access_log">access_log</a> y
+<a class="reference external" href="http://nginx.org/en/docs/http/ngx_http_log_module.html#error_log">error_log</a>. A este
+respecto es importante tener claras dos cosas:</p>
+<ul class="simple">
+<li><p>Es común definir distintos ficheros de registro para distintos dominios
+virtuales, así que podríamos incluir dentro del bloque <code class="docutils literal notranslate"><span class="pre">server</span></code> estas
+dos directivas con ficheros alternativos.</p></li>
+<li><p>Si en un mismo contexto se definen varios <code class="docutils literal notranslate"><span class="pre">access_log</span></code> (o <code class="docutils literal notranslate"><span class="pre">error_log</span></code>),
+se escribirán registros en los ficheros que definen todas las directivas.
+Sin embargo, cuando en un contexto inferior se define la directiva, ésta
+sobreescribe las definiciones que pudieran haberse hecho en un contexto
+superior.</p></li>
+<li><p>Estos ficheros se escriben directamente y no pasan por el gestor de
+registros (<strong class="program">systemd</strong> o <strong class="program">rsyslog</strong>, según el caso). Para
+propiciar que <strong class="program">nginx</strong> use el gestor, vea más adelante <a class="reference internal" href="02.avanz/09.misc.html#nginx-systemd"><span class="std std-ref">cómo</span></a>.</p></li>
+</ul>
+</li>
+<li><p><strong class="program">nginx</strong> tiene unas páginas predefinidas para informar al cliente
+de los errores (<strong>403</strong>, <strong>404</strong>, <strong>502</strong>, etc.). Podemos, no obtante, crear
+páginas personalizadas y hacer que <strong class="program">nginx</strong> las envíe al cliente en
+vez de las predefinidas:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">error_page</span><span class="w"> </span><span class="mi">404</span><span class="w">                      </span><span class="s">/errors/404.html</span><span class="p">;</span>
+<span class="k">error_page</span><span class="w"> </span><span class="mi">500</span><span class="w"> </span><span class="mi">502</span><span class="w"> </span><span class="mi">503</span><span class="w"> </span><span class="mi">504</span><span class="w">          </span><span class="s">/errors/50X.html</span><span class="p">;</span>
+</pre></div>
+</div>
+</li>
+</ul>
+<p class="rubric">Notas al pie</p>
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="id7" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
+<p>Este es el inconveniente de que los módulos se compilen
+estáticamente.</p>
+</aside>
+<aside class="footnote brackets" id="id8" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id2">2</a><span class="fn-bracket">]</span></span>
+<p>Por ejemplo, <cite>ngx_http_referer</cite> no estaba incluido en el ejecutable de
+<em>nginx-light</em>, pero sí en los de <em>nginx-full</em> y <em>nginx-extra</em>.</p>
+</aside>
+<aside class="footnote brackets" id="id9" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id3">3</a><span class="fn-bracket">]</span></span>
+<p>Por ejemplo, <a class="extlink-deb reference external" href="https://packages.debian.org/stable/libnginx-mod-http-dav-ext">libnginx-mod-http-dav-ext</a> contiene el módulo
+<a class="reference external" href="http://nginx.org/en/docs/http/ngx_http_dav_module.html">ngx_http_dav_module</a>, que da suporte a
+<strong class="program">nginx</strong> para las extensiones de <em>WebDav</em>, <a class="reference internal" href="../01.desc/01.comando.html#metodos-webdav"><span class="std std-ref">ya comentadas</span></a>.</p>
+</aside>
+<aside class="footnote brackets" id="id10" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id4">4</a><span class="fn-bracket">]</span></span>
+<p><strong class="program">nginx</strong> puede actuar como <em>proxy</em> de correo o <em>proxy</em> para
+conexiones TCP crudas. Para estos casos, no sirve escribir dentro de este
+fichero y se debe tocar directamente <code class="file docutils literal notranslate"><span class="pre">nginx.conf</span></code>.</p>
+</aside>
+<aside class="footnote brackets" id="id11" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id5">5</a><span class="fn-bracket">]</span></span>
+<p>Lo cierto es que <em>Debian</em> sigue pretendiendo que el contenido del
+servidor siga estando bajo <code class="file docutils literal notranslate"><span class="pre">/var/www</span></code>. Nosotros, en cambio, preferimos
+seguir las directrices del <a class="reference external" href="http://www.pathname.com/fhs/">FHS</a>, ya
+citado al comienzo de este material.</p>
+</aside>
+<aside class="footnote brackets" id="id12" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id6">6</a><span class="fn-bracket">]</span></span>
+<p>Ya veremos que esto es útil cuando queramos versiones seguras e inseguras
+del mismo sitio:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="k">listen</span><span class="w">  </span><span class="mi">80</span><span class="p">;</span>
+<span class="k">listen</span><span class="w">  </span><span class="mi">443</span><span class="w"> </span><span class="s">ssl</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>aunque esto requiere más configuración.</p>
+</aside>
+</aside>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="../../../index.html">Tabla de contenido</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">7.2.2.1. Principios de configuración</a><ul>
+<li><a class="reference internal" href="#instalacion">7.2.2.1.1. Instalación</a></li>
+<li><a class="reference internal" href="#ficheros-de-configuracion">7.2.2.1.2. Ficheros de configuración</a></li>
+<li><a class="reference internal" href="#modulos-adicionales">7.2.2.1.3. Módulos adicionales</a></li>
+<li><a class="reference internal" href="#configuracion-basica">7.2.2.1.4. Configuración básica</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Tema anterior</h4>
+    <p class="topless"><a href="index.html"
+                          title="capítulo anterior"><span class="section-number">7.2.2. </span>nginx</a></p>
+  </div>
+  <div>
+    <h4>Próximo tema</h4>
+    <p class="topless"><a href="02.avanz/index.html"
+                          title="próximo capítulo"><span class="section-number">7.2.2.2. </span>Configuración</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../_sources/07.serre/02.web/02.nginx/01.conf.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="02.avanz/index.html" title="7.2.2.2. Configuración"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="7.2.2. nginx"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" ><span class="section-number">7. </span>Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" ><span class="section-number">7.2. </span>Web</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="index.html" ><span class="section-number">7.2.2. </span>nginx</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">7.2.2.1. </span>Principios de configuración</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright CC BY 4.0, 2016-2025, José Miguel Sánchez Alés.
+      Creado usando <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,438 @@
+
+
+<!DOCTYPE html>
+
+<html lang="es" data-content_root="../../../../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>9.2.2.2.1.1.2. Contenedores no privilegiados &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../../../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../../../../_static/classic.css?v=2bf1fcf8" />
+    <link rel="stylesheet" href="../../../../../../_static/custom.css" type="text/css" />
+    
+    <script src="../../../../../../_static/documentation_options.js?v=a621b78a"></script>
+    <script src="../../../../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../../../_static/translations.js?v=f85f4cfb"></script>
+    
+    <link rel="index" title="Índice" href="../../../../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../../../../search.html" />
+    <link rel="next" title="9.2.2.2.1.2.1. Preliminares" href="../02.lxd.html" />
+    <link rel="prev" title="9.2.2.2.1.1.1. Contenedores privilegiados" href="01.priv.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="../02.lxd.html" title="9.2.2.2.1.2.1. Preliminares"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="01.priv.html" title="9.2.2.2.1.1.1. Contenedores privilegiados"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../../../index.html" ><span class="section-number">9. </span>Apéndices</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../../../index.html" ><span class="section-number">9.2. </span>Virtualización</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../../../../02.software.html" ><span class="section-number">9.2.2. </span>Software de virtualización</a> &#187;</li>
+          <li class="nav-item nav-item-4"><a href="../../02.lxc.html" accesskey="U"><span class="section-number">9.2.2.2.1. </span><abbr title="LinuX Containers">LXC</abbr></a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">9.2.2.2.1.1.2. </span>Contenedores no privilegiados</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="contenedores-no-privilegiados">
+<h1><span class="section-number">9.2.2.2.1.1.2. </span>Contenedores no privilegiados<a class="headerlink" href="#contenedores-no-privilegiados" title="Link to this heading">¶</a></h1>
+<p>El uso de <a class="reference internal" href="../../../../02.software.html#contenedor-no-privilegiado"><span class="std std-ref">contenedores no privilegiados</span></a>
+mejora la seguridad del contenedor al reducir las posibilidades de que una tarea
+del contenedor escape al anfitrión con permisos de administrador, puesto que el
+usuario <em>root</em> del contenedor no coincide con el del anfitrión. Esto se logra
+mediante el uso de espacios de nombres de usuario que permiten que el usuario
+<em>root</em> que actúa dentro de un contenedor (o sea, dentro el espacio de nombres
+de usuario asociado al contenedor) no sea el usuario <em>root</em> del anfitrión.</p>
+<p>Aunque no es indispensable, lo habitual es que el usuario del anfitrión que
+ejecuta un contenedor no privilegiado sea un usuario sin privilegios y no el
+administrador, por lo que reduciremos este epígrafe a este caso.</p>
+<section id="userns">
+<span id="id1"></span><h2><span class="section-number">9.2.2.2.1.1.2.1. </span>UserNS<a class="headerlink" href="#userns" title="Link to this heading">¶</a></h2>
+<p>Antes de meternos de lleno en los contenedores sin privilegios, es conveniente
+entender bien qué ocurre cuando usamos espacios de nombres de usuario.
+Probemos a ejecutar un <em>shell</em> en un espacio de nombres de usuario distinto:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>id<span class="w"> </span>-u
+<span class="go">1000</span>
+<span class="gp">$ </span>unshare<span class="w"> </span>---user
+<span class="gp">$ </span>id
+<span class="go">uid=65534(nobody) gid=65534(nogroup) grupos=65534(nogroup)</span>
+<span class="gp">$ </span><span class="nb">echo</span><span class="w"> </span><span class="nv">$$</span>
+<span class="go">1059</span>
+</pre></div>
+</div>
+<p>La orden <strong class="command">unshare</strong> permite ejecutar procesos en espacios de nombres
+distintos al del proceso padre, y en este caso hemos creado tan solo un espacio
+de nombres de usuario distinto para una sesión de <strong class="program">bash</strong> con proceso
+<strong>1059</strong>. Como no hay definido ningún mapeo de usuarios para él<a class="footnote-reference brackets" href="#id5" id="id2" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a>, mi usuario del
+anfitrión con <abbr title="User IDentifier">UID</abbr> <strong>1000</strong> se resuelve a <em>nobody</em>. De hecho, si abrimos otra
+terminal para abandonar temporalmente el nuevo espacio de nombres, podemos
+comprobar que efectivamente no hay definido mapeo alguno:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>cat<span class="w"> </span>/proc/1059/uid_map
+<span class="gp">$ </span>cat<span class="w"> </span>/proc/1059/gid_map
+</pre></div>
+</div>
+<p>Ambos archivos están vacíos, pero pueden escribirse una única vez para definir
+el mapeo. En principio, un usuario sin privilegios sólo puede mapear su propio
+<abbr title="User IDentifier">UID</abbr> a cualquier otro (típicamente el <strong>0</strong> del administrador, aunque no
+necesariamente), por lo que podríamos hacer (no lo hagamos todavía):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;0 1000 1&quot;</span><span class="w"> </span>&gt;<span class="w"> </span>/proc/1059/uid_map
+</pre></div>
+</div>
+<p>o bien:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;33 1000 1&quot;</span><span class="w"> </span>&gt;<span class="w"> </span>/proc/1059/uid_map
+</pre></div>
+</div>
+<p>En el primer caso, sería <em>root</em> en el nuevo espacio de nombres y en el segundo
+el usuario con <abbr title="User IDentifier">UID</abbr> <strong>33</strong> (que en <em>Debian</em> es <em>www-data</em>). La sintaxis de esa
+línea es «<kbd class="kbd docutils literal notranslate">uid_newns</kbd> <kbd class="kbd docutils literal notranslate">uid_oldns</kbd> <kbd class="kbd docutils literal notranslate">numero</kbd>», donde número es el número de
+<abbr title="User IDentifier">UID</abbr>s que se mapean. Por ejemplo, si hubiéramos intentado:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;33 1000 2&quot;</span><span class="w"> </span>&gt;<span class="w"> </span>/proc/1059/uid_map
+</pre></div>
+</div>
+<p>se habría mapeado el <abbr title="User IDentifier">UID</abbr> <strong>33</strong> a nuestro <abbr title="User IDentifier">UID</abbr> en el espacio de nombres
+principal y el <abbr title="User IDentifier">UID</abbr> <strong>34</strong> al siguiente (el <strong>1001</strong>). Pero esto no lo tenemos
+permitido, porque sólo podemos mapear nuestro propio <abbr title="User IDentifier">UID</abbr>, así que se
+habría producido un error en caso de intentarlo.</p>
+<p>En los contenedores, sin embargo, se recrea un sistema completo donde hay muchos
+usuarios y grupos y es necesario que el usuario pueda mapear rangos completos,
+no sólo su propio <abbr title="User IDentifier">UID</abbr>. Para soslayar esta limitación existe el concepto de
+rango de identificadores subordinados:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>cat<span class="w"> </span>/etc/subuid
+<span class="go">usuario:100000:65536</span>
+<span class="gp">$ </span>cat<span class="w"> </span>/etc/subuid
+<span class="go">usuario:100000:65536</span>
+</pre></div>
+</div>
+<p>Esto significa que el usuario tiene subordinados 65536 <abbr title="User IDentifier">UID</abbr>s (del 100000 al 165535)
+y también 65536 <abbr title="Group IDentifier">GID</abbr>s, de manera que cuando se ejecuten tareas dentro de un
+contenedor no privilegiado de mi usuario los distintos usuarios del contenedor
+podrán asociarse (mapearse) a identificadores de este rango (p.e. <strong>0</strong> será
+<strong>100000</strong>, <strong>1</strong> será <strong>100001</strong>, etc.).</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Es probable que esta definición ya exista en nuestro sistema. Si no
+existe, o quiere modificarse, puede usarse <a class="reference internal" href="../../../../../../02.conbas/05.seguridad/05a.usuarios.html#usermod"><span class="std std-ref">usermod</span></a> para
+ello:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>usermod<span class="w"> </span>--add-subuids<span class="w"> </span><span class="m">100000</span>-165535<span class="w"> </span>usuario
+<span class="gp"># </span>usermod<span class="w"> </span>--add-subgids<span class="w"> </span><span class="m">100000</span>-165535<span class="w"> </span>usuario
+</pre></div>
+</div>
+</div>
+<p>Gracias a ello y a tener instalado el paquete <a class="extlink-deb reference external" href="https://packages.debian.org/stable/uidmap">uidmap</a>, podremos hacer un
+mapeo que incluya más de un solo identificador para el nuevo espacio de nombres<a class="footnote-reference brackets" href="#id6" id="id3" role="doc-noteref"><span class="fn-bracket">[</span>2<span class="fn-bracket">]</span></a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>newuidmap<span class="w"> </span><span class="m">1059</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">100000</span><span class="w"> </span><span class="m">65536</span><span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="m">1000</span><span class="w"> </span><span class="m">1</span><span class="w">   </span><span class="c1"># pid uid_newns uid_oldns tam [más rangos]</span>
+<span class="gp">$ </span>newgidmap<span class="w"> </span><span class="m">1059</span><span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="m">100000</span><span class="w"> </span><span class="m">65536</span><span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="m">1000</span><span class="w"> </span><span class="m">1</span>
+<span class="gp">$ </span>cat<span class="w"> </span>/proc/1059/uid_map
+<span class="go">         1     100000      65536</span>
+<span class="go">         0       1000          1</span>
+</pre></div>
+</div>
+<p>O sea, hemos asociado el <strong>0</strong> con nuestro <abbr title="User IDentifier">UID</abbr> del anfitrión y del <strong>1</strong> en
+adelante con el rango de identificadores subordinados. Si volvemos ahora a la
+sesión abierta en el nuevo espacio de nombres:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>id<span class="w"> </span>-un
+<span class="go">root</span>
+</pre></div>
+</div>
+<p>Lo cual es lógico, porque si en el anfitrión soy el <strong>1000</strong>, en esta sesión se
+me identifica como administrador. De hecho, probemos a crear dos archivos en el
+directorio temporal:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>touch<span class="w"> </span>/tmp/yo
+<span class="gp">$ </span>touch<span class="w"> </span>/tmp/subordinado
+<span class="gp">$ </span>chown<span class="w"> </span><span class="m">1</span><span class="w"> </span>/tmp/subordinado
+<span class="gp">$ </span>stat<span class="w"> </span>-c%U<span class="w"> </span>/tmp/yo<span class="w"> </span>/tmp/subordinado
+<span class="go">root</span>
+<span class="go">daemon</span>
+</pre></div>
+</div>
+<p>que son identificados como propiedad de los usuarios <em>root</em> (<strong>0</strong>) y <em>daemon</em>
+(<strong>1</strong>) dentro del espacio de nombres. Fuera, sin embargo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>stat<span class="w"> </span>-c%u<span class="w"> </span>/tmp/yo<span class="w"> </span>/tmp/subordinado
+<span class="go">1000</span>
+<span class="go">100000</span>
+</pre></div>
+</div>
+<p>lo cual es consecuente con nuestro mapeo. Lo lógico es que el rango de
+identificadores subordinados se hagan con números altos para que no interfiera
+con los usuarios reales del anfitrión. Con estos mimbres, ya podemos meternos
+en harina.</p>
+</section>
+<section id="preliminares">
+<h2><span class="section-number">9.2.2.2.1.1.2.2. </span>Preliminares<a class="headerlink" href="#preliminares" title="Link to this heading">¶</a></h2>
+<p>Al utilizar <abbr title="LinuX Containers">LXC</abbr> como usuario sin privilegios los directorios predeterminados
+varían:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>root</p></th>
+<th class="head"><p>usuario</p></th>
+<th class="head"><p>Descripción</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="file docutils literal notranslate"><span class="pre">/etc/lxc</span></code></p></td>
+<td><p><code class="file docutils literal notranslate"><span class="pre">~/.config/lxc</span></code></p></td>
+<td><p>Configuración</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="file docutils literal notranslate"><span class="pre">/var/lib/lxc</span></code></p></td>
+<td><p><code class="file docutils literal notranslate"><span class="pre">~/.local/share/lxc</span></code></p></td>
+<td><p>Almacén de contenedores</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="file docutils literal notranslate"><span class="pre">/var/cache/lxc</span></code></p></td>
+<td><p><code class="file docutils literal notranslate"><span class="pre">~/.cache/lxc</span></code></p></td>
+<td><p>Almacén de plantillas</p></td>
+</tr>
+</tbody>
+</table>
+<p>Esto puede ser algo impertinente, puesto que podría convenirme que el almacen de
+plantillas estuviera sobre un sistema <abbr title="B-TRee File System">BTRFS</abbr> distinto al de mi directorio de
+usuario, que quizás esté sobre ext4. Por ahora no nos precuparemos de ello y nos
+daremos por satisfechos con lograr crear y usar este tipo de contenedores.</p>
+<p>Por supuesto, hemos de asegurarnos de que nuestro usuario tiene definidos ragos
+subordinados en <code class="file docutils literal notranslate"><span class="pre">/etc/subuid</span></code> y <code class="file docutils literal notranslate"><span class="pre">/etc/subgid</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>cat<span class="w"> </span>/etc/subuid
+<span class="go">usuario:100000:65536</span>
+<span class="gp">$ </span>cat<span class="w"> </span>/etc/subuid
+<span class="go">usuario:100000:65536</span>
+</pre></div>
+</div>
+<p>De la instalación de:manpage:<cite>uidmap</cite> no debemos preocuparnos porque es
+dependencia de <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/lxc">lxc</a></em>.</p>
+<p>Por último, para la red utilizaremos interfaces <abbr title="Virtual ETHernet">VETH</abbr> asociadas a una interfaz
+puente (<em>lxcbr0</em>), así que nos conviene no tener instalado el paquete
+<em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/dnsmasq">dnsmasq</a></em> y dejar que se encargue de la creación del puente
+<strong class="program">lxc-net</strong>. Como un usuario sin privilegios no puede crear
+interfaces <abbr title="Virtual ETHernet">VETH</abbr>, <abbr title="LinuX Containers">LXC</abbr> facilita un <em>script</em> llamado <strong class="command">lxc-user-nic</strong>
+con el bituid habilitado que se encarga de ello. Sin embargo, no crea
+indiscriminadamente interfaces, sino que tenemos explícitamente que dar permisos
+a los usuarios registrándolos en <code class="file docutils literal notranslate"><span class="pre">/etc/lxc/lxc-usernet</span></code>.  Podríamos
+dar permisos exclusivamente a <em>usuario</em> para crear hasta 10 interfaces <abbr title="Virtual ETHernet">VETH</abbr>
+asociadas a la interfaz <em>lxcbr0</em> con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;usuario veth lxcbr0 10&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/lxc/lxc-usernet
+</pre></div>
+</div>
+<p>pero en vez de eso, crearemos un grupo llamado <em>lxc</em> en que incluiremos a todos
+los usuarios que pensamos que crearán contenedores no privilegiados:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>addgroup<span class="w"> </span>--system<span class="w"> </span>lxc
+<span class="gp"># </span>adduser<span class="w"> </span>usuario<span class="w"> </span>lxc
+</pre></div>
+</div>
+<p>Y concederemos el permiso de esta manera:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;@lxc veth lxcbr0 10&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/lxc/lxc-usernet
+</pre></div>
+</div>
+</section>
+<section id="creacion">
+<h2><span class="section-number">9.2.2.2.1.1.2.3. </span>Creación<a class="headerlink" href="#creacion" title="Link to this heading">¶</a></h2>
+<p>Necesitamos un archivo de configuración para el usuario, así que:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>mkdir<span class="w"> </span>-p<span class="w"> </span>~/.config/lxc
+<span class="gp">$ </span>cat<span class="w"> </span>&gt;<span class="w"> </span>~/.config/lxc/default.conf
+<span class="gp"># </span>Red
+<span class="go">lxc.net.0.type = veth</span>
+<span class="go">lxc.net.0.link = lxcbr0</span>
+<span class="go">lxc.net.0.flags = up</span>
+<span class="go">lxc.net.0.hwaddr = de:ad:be:ef:xx:xx</span>
+
+<span class="gp"># </span>Mapeo<span class="w"> </span>del<span class="w"> </span>usuario
+<span class="go">lxc.idmap = u 0 100000 65536</span>
+<span class="go">lxc.idmap = g 0 100000 65536</span>
+</pre></div>
+</div>
+<p>La configuración de la red no necesita explicación ni debería dar problemas si
+incluímos el permiso pertinente en <code class="file docutils literal notranslate"><span class="pre">/etc/lxc/lxc-usernet</span></code>. El mapeo sí
+admite más comentarios:</p>
+<ul class="simple">
+<li><p>Es congruente con los rangos de identificadores subordinados definidos en
+<code class="file docutils literal notranslate"><span class="pre">/etc/subuid</span></code> y <code class="file docutils literal notranslate"><span class="pre">/etc/subgid</span></code>.</p></li>
+<li><p>Ambas líneas, una para usuarios y otra para grupos, implican que el
+identificador <strong>0</strong> en el huésped se asocie al <strong>100000</strong> en el anfitrión;
+el <strong>1</strong>, al <strong>100001</strong>, y así sucesivamente hasta el <strong>65535</strong>.</p></li>
+</ul>
+<p>Y, ¡listo!, ya podemos crear el contenedor:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>lxc-create<span class="w"> </span>-n<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-t<span class="w"> </span>download<span class="w"> </span>--<span class="w"> </span>-d<span class="w"> </span>alpine<span class="w"> </span>-r<span class="w"> </span><span class="m">3</span>.17<span class="w"> </span>-a<span class="w"> </span>amd64
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>No use <a class="reference internal" href="../../../../../../02.conbas/05.seguridad/05a.usuarios.html#newgrp"><span class="std std-ref">newgrp</span></a> para hacer que el usuario pertenezca
+sobre la marcha al grupo <em>lxc</em>.</p>
+</div>
+<p>Y una vez creado, su uso es ligeramente diferente. No debemos usar
+<strong class="command">lxc-start</strong> y <strong class="command">lxc-attach</strong>, sino <strong class="command">lxc-unpriv-start</strong> y
+<strong class="command">lxc-unpriv-attach</strong><a class="footnote-reference brackets" href="#id7" id="id4" role="doc-noteref"><span class="fn-bracket">[</span>3<span class="fn-bracket">]</span></a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>lxc-unpriv-start<span class="w"> </span>-n<span class="w"> </span><span class="nb">test</span>
+<span class="gp">$ </span>lxc-unpriv-attach<span class="w"> </span>-n<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--<span class="w"> </span>passwd
+<span class="gp">$ </span>lxc-unpriv-attach<span class="w"> </span>-n<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--<span class="w"> </span>/usr/sbin/adduser<span class="w"> </span>-s<span class="w"> </span>/bin/ash<span class="w"> </span>-g<span class="w"> </span><span class="s2">&quot;&quot;</span><span class="w"> </span>usuario
+<span class="gp">$ </span>lxc-console<span class="w"> </span>-n<span class="w"> </span><span class="nb">test</span>
+
+<span class="go">  [...]</span>
+
+<span class="gp">$ </span>lxc-stop<span class="w"> </span>-n<span class="w"> </span><span class="nb">test</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Por supuesto, podremos definir dos <a class="reference internal" href="../../../../../../02.conbas/07.avanzada/08.interpretaciones.html#alias"><span class="std std-ref">alias</span></a> para evitarnos
+el cambio de orden.</p>
+</div>
+<p>Si para albergar los contenedores hemos reservado un sistema de archivos en
+<code class="file docutils literal notranslate"><span class="pre">/var/lib/lxc</span></code> y queremos usarlo también con los contenedores no
+pivilegiados podemos seguir la siguiente estrategia:</p>
+<ol class="arabic">
+<li><p>Permitirmos la escritura sobre el directorio al grupo <em>lxc</em>, el cual sugerimos
+crear anteriormente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>chgrp<span class="w"> </span>lxc<span class="w"> </span>/var/lib/lxc
+<span class="gp"># </span>chmod<span class="w"> </span>g+w<span class="w"> </span>/var/lib/lxc
+</pre></div>
+</div>
+</li>
+<li><p>Modificamos ls ruta para el almacen de contenedores privilegiados:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;lxc.lxcpath = /var/lib/lxc/root&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/lxc/lxc.conf
+</pre></div>
+</div>
+</li>
+<li><p>Modificamos la ruta para el almacen de los contenedores no privilegiados del
+usuario «<em>usuario</em>»:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;lxc.lxcpath = /var/lib/lxc/</span><span class="nv">$USER</span><span class="s2">&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>~/.config/lxc/lxc.conf
+</pre></div>
+</div>
+</li>
+</ol>
+<p>De esta forma cada usuario almacenará sus contenedores en un subdirectorio de
+<code class="file docutils literal notranslate"><span class="pre">/var/lib/lxc</span></code>.</p>
+<p>Con el usuario administrador también se pueden hacer contenedores no
+privilegiados exactamente con la misma técnica: añadiendo la delegación de
+identificadores (en <code class="file docutils literal notranslate"><span class="pre">/etc/subuid</span></code> y <code class="file docutils literal notranslate"><span class="pre">/etc/subgid</span></code>) y añadiendo el
+mapeo correspondiente en la configuración (<kbd class="kbd docutils literal notranslate">lxc.idmap</kbd>). Ahora bien:</p>
+<ul class="simple">
+<li><p>Habrá problema al escribir en <code class="file docutils literal notranslate"><span class="pre">/var/cache/lxc</span></code>, porque parece intentar
+guardar las plantillas no con el administrador, sino con el identificador
+delegado. Obviamente, si se permiten todos los permisos en ese subdirectorio
+(<strong>777*</strong>) se acabará con el problema.</p></li>
+<li><p>Hay que usar <strong class="command">lxc-start</strong> y <strong class="command">lxc-attatch</strong>, no las versiones
+«<em>unpriv</em>».</p></li>
+<li><p>No hay limitaciones en la creación de la interfaz de red, así que no hay que
+añadir ningún permiso a <code class="file docutils literal notranslate"><span class="pre">/etc/lxc/lxc-usernet</span></code> ni tendremos por qué
+ceñirnos a usar interfaces <abbr title="Virtual ETHernet">VETH</abbr>.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>El cacheo de las plantillas, sin embargo, seguirá produciéndose en los
+directorios particulares <code class="file docutils literal notranslate"><span class="pre">~/.cache/lxc</span></code>.</p>
+</div>
+<p class="rubric">Notas al pie</p>
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="id5" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id2">1</a><span class="fn-bracket">]</span></span>
+<p>La versión de <strong class="command">unshare</strong> que trae <em>Bookworm</em> incorpora la
+opciones <kbd class="kbd docutils literal notranslate">-</kbd>-<kbd class="kbd docutils literal notranslate">map</kbd>-<kbd class="kbd docutils literal notranslate">users</kbd> y <kbd class="kbd docutils literal notranslate">-</kbd>-<kbd class="kbd docutils literal notranslate">map</kbd>-<kbd class="kbd docutils literal notranslate">groups</kbd> para facilitar el mapeo en
+el momento de crear el nuevo espacio.</p>
+</aside>
+<aside class="footnote brackets" id="id6" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id3">2</a><span class="fn-bracket">]</span></span>
+<p>En realidad, el contenido de <code class="file docutils literal notranslate"><span class="pre">/etc/subuid</span></code> y <code class="file docutils literal notranslate"><span class="pre">/etc/subgid</span></code> no
+altera la incapacidad del usuario para mapear identificadores que no son
+suyos, por lo que volcar directamente el mapeo en el
+<code class="file docutils literal notranslate"><span class="pre">uid_map</span></code>/<code class="file docutils literal notranslate"><span class="pre">gid_map</span></code> del proceso nos seguirá resultado imposible.
+Sin embargo, <strong class="command">newuidmap</strong> y <strong class="command">newgidmap</strong> tiene habilitado el
+<em>bituid</em></p>
+</aside>
+<aside class="footnote brackets" id="id7" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id4">3</a><span class="fn-bracket">]</span></span>
+<p>El <em>PATH</em> que se usa al ejecutar mediante <strong class="command">lxc-unpriv-attrach</strong>
+la orden en el contenedor es el del usuario, no el del administrador, de ahí
+que haya que habido que expresar la ruta completa de <a class="reference internal" href="../../../../../../02.conbas/05.seguridad/05a.usuarios.html#adduser"><span class="std std-ref">adduser</span></a>.</p>
+</aside>
+</aside>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="../../../../../../index.html">Tabla de contenido</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">9.2.2.2.1.1.2. Contenedores no privilegiados</a><ul>
+<li><a class="reference internal" href="#userns">9.2.2.2.1.1.2.1. UserNS</a></li>
+<li><a class="reference internal" href="#preliminares">9.2.2.2.1.1.2.2. Preliminares</a></li>
+<li><a class="reference internal" href="#creacion">9.2.2.2.1.1.2.3. Creación</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Tema anterior</h4>
+    <p class="topless"><a href="01.priv.html"
+                          title="capítulo anterior"><span class="section-number">9.2.2.2.1.1.1. </span>Contenedores privilegiados</a></p>
+  </div>
+  <div>
+    <h4>Próximo tema</h4>
+    <p class="topless"><a href="../02.lxd.html"
+                          title="próximo capítulo"><span class="section-number">9.2.2.2.1.2.1. </span>Preliminares</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../../../../_sources/98.apendice/05.virtual/02.software/03.contenedores/02.lxc/01.nativas/02.unpriv.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="../02.lxd.html" title="9.2.2.2.1.2.1. Preliminares"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="01.priv.html" title="9.2.2.2.1.1.1. Contenedores privilegiados"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../../../index.html" ><span class="section-number">9. </span>Apéndices</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../../../index.html" ><span class="section-number">9.2. </span>Virtualización</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../../../../02.software.html" ><span class="section-number">9.2.2. </span>Software de virtualización</a> &#187;</li>
+          <li class="nav-item nav-item-4"><a href="../../02.lxc.html" ><span class="section-number">9.2.2.2.1. </span><abbr title="LinuX Containers">LXC</abbr></a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">9.2.2.2.1.1.2. </span>Contenedores no privilegiados</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright CC BY 4.0, 2016-2025, José Miguel Sánchez Alés.
+      Creado usando <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    </div>
+  </body>
+</html>

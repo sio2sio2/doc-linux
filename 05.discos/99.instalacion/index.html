@@ -1,0 +1,789 @@
+
+
+<!DOCTYPE html>
+
+<html lang="es" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>5.10. Instalación del servidor &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+    
+    <script src="../../_static/documentation_options.js?v=a621b78a"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/translations.js?v=f85f4cfb"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <link rel="index" title="Índice" href="../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../search.html" />
+    <link rel="next" title="6. Servicios de infraestructura" href="../../06.infraestructura/index.html" />
+    <link rel="prev" title="5.9. Recuperación de datos" href="../09.recup/index.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="../../06.infraestructura/index.html" title="6. Servicios de infraestructura"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="../09.recup/index.html" title="5.9. Recuperación de datos"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U"><span class="section-number">5. </span>Dispositivos de almacenamiento</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">5.10. </span>Instalación del servidor</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="instalacion-del-servidor">
+<span id="inst-servidor"></span><h1><span class="section-number">5.10. </span>Instalación del servidor<a class="headerlink" href="#instalacion-del-servidor" title="Link to this heading">¶</a></h1>
+<p>Bajo este epígrage veremos cómo:</p>
+<ul class="simple">
+<li><p>Protoinstalar el servidor sobre el disco de una máquina virtual.</p></li>
+<li><p>Hacer un particionado adecuado.</p></li>
+<li><p>Exponer cómo transladar la protoinstalación a la máquina real.</p></li>
+</ul>
+<p>fruto de lo cual conseguiremos un sistema:</p>
+<ul class="simple">
+<li><p>Preparado para arrancar con <abbr title="Basic I/O System">BIOS</abbr> o <abbr title="Unified Extensible Firmware Interface">UEFI</abbr>.</p></li>
+<li><p>Instalado sobre un <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr>1 para mejorar la seguridad y disponibilidad de la
+información.</p></li>
+<li><p>Que usa <a class="reference internal" href="../01.division/04.virt.html#lvm-aprovisionamiento"><span class="std std-ref">aprovisionamiento fino</span></a> para los
+sistemas de archivos dedicados a los datos.</p></li>
+<li><p>Con posibilidad de crear instantáneas del sistema de archivos raíz para poder
+revertir cambios inconvenientes.</p></li>
+<li><p>Con una imagen virtual para poder llevar a cabo pruebas con ella, antes de
+transladarlas al servidor en producción.</p></li>
+</ul>
+<section id="preinstalacion">
+<h2><span class="section-number">5.10.1. </span>Preinstalación<a class="headerlink" href="#preinstalacion" title="Link to this heading">¶</a></h2>
+<p>Antes de lanzar el instalador debemos planificar cuáles son los sistemas de
+ficheros apropiados para nuestro servidor, y preparar las particiones, el <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr>
+y los volúmenes lógicos adecuados al plan.</p>
+<section id="sistemas-de-ficheros">
+<h3><span class="section-number">5.10.1.1. </span>Sistemas de ficheros<a class="headerlink" href="#sistemas-de-ficheros" title="Link to this heading">¶</a></h3>
+<p>Es obvio que cada servidor requerirá un esquema diferente más allá de separar
+<code class="file docutils literal notranslate"><span class="pre">/</span></code>, <code class="file docutils literal notranslate"><span class="pre">/home</span></code> y dedicar una partición para la memoria de intercambio<a class="footnote-reference brackets" href="#id10" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a>.  A estos tres, nos podría interesar añadir:</p>
+<ul class="simple">
+<li><p><code class="file docutils literal notranslate"><span class="pre">/var/log</span></code> para tener aparte los registros y que no llenen por completo
+la partición raíz, si se desmadran por algún motivo.</p></li>
+<li><p><code class="file docutils literal notranslate"><span class="pre">/srv</span></code> para almacenar los archivos relacionados con los servicios que
+podamos ofrecer (web, ftp, etc.)</p></li>
+<li><p><code class="file docutils literal notranslate"><span class="pre">/var/lib/mysql</span></code>, si nuestro servidor almacena bases de datos de MySQL.</p></li>
+<li><p>Cualesquier otras particiones que ayuden en nuestro propósito. Por ejemplo, si
+el servidor incluye <a class="reference internal" href="../05.copias/01.backups/10.backuppc.html#backuppc"><span class="std std-ref">BackupPC</span></a>, entonces conviene separar
+<code class="file docutils literal notranslate"><span class="pre">/var/lib/backuppc</span></code>.</p></li>
+</ul>
+<p>Por tanto, si añadimos dos particiones de arranque para asegurarnos en un
+particionado <abbr title="GUID Partition Table">GPT</abbr> el arranque tanto con <abbr title="Basic I/O System">BIOS</abbr> como con <abbr title="Unified Extensible Firmware Interface">UEFI</abbr><a class="footnote-reference brackets" href="#id11" id="id2" role="doc-noteref"><span class="fn-bracket">[</span>2<span class="fn-bracket">]</span></a>:</p>
+<table class="serv-part docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Punto de montaje</p></th>
+<th class="head"><p>Nombre</p></th>
+<th class="head"><p>Tamaño</p></th>
+<th class="head"><p>Tamaño previo</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>/</p></td>
+<td><p>RAIZ</p></td>
+<td><p>5 GiB</p></td>
+<td><p>1792 MiB</p></td>
+</tr>
+<tr class="row-odd"><td><p>/var/log</p></td>
+<td><p>LOG</p></td>
+<td><p>1 GiB</p></td>
+<td><p>64 MiB</p></td>
+</tr>
+<tr class="row-even"><td><p>/home</p></td>
+<td><p>HOME</p></td>
+<td><p>Variable</p></td>
+<td><p>768 MiB</p></td>
+</tr>
+<tr class="row-odd"><td><p>/srv</p></td>
+<td><p>SRV</p></td>
+<td><p>Variable</p></td>
+<td><p>768 MiB</p></td>
+</tr>
+<tr class="row-even"><td><p>/var/lib/mysql</p></td>
+<td><p>MYSQL</p></td>
+<td><p>Variable</p></td>
+<td><p>768 MiB</p></td>
+</tr>
+<tr class="row-odd"><td><p>swap<a class="footnote-reference brackets" href="#id12" id="id3" role="doc-noteref"><span class="fn-bracket">[</span>3<span class="fn-bracket">]</span></a></p></td>
+<td><p>SWAP</p></td>
+<td><p>2 GiB<a class="footnote-reference brackets" href="#id13" id="id4" role="doc-noteref"><span class="fn-bracket">[</span>4<span class="fn-bracket">]</span></a></p></td>
+<td><p>32 MiB</p></td>
+</tr>
+<tr class="row-even"><td><p>/boot/efi</p></td>
+<td><p>EFI</p></td>
+<td><p>100 MiB</p></td>
+<td><p>100 MIB</p></td>
+</tr>
+<tr class="row-odd"><td><p>-</p></td>
+<td><p>BIOSBOOT</p></td>
+<td><p>1 MiB</p></td>
+<td><p>1 MiB</p></td>
+</tr>
+</tbody>
+</table>
+<p>La columna de <em>tamaño previo</em> indica el tamaño que le daremos a la partición en
+la máquina virtual y la de <em>tamaño</em> el que tendrá en el disco real. En este
+particionado podemos establecer lo siguiente:</p>
+<ul class="simple">
+<li><p>Las dos últimas particiones son particiones de disco y quedan fuera de
+cualquier <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr> o grupo de volúmenes.</p></li>
+<li><p>El resto de sistemas de archivos son volúmenes lógicos de un grupo de
+volúmenes construido sobre un <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr> 1.</p></li>
+<li><p><kbd class="kbd docutils literal notranslate">/</kbd>, <kbd class="kbd docutils literal notranslate">/var/log</kbd> y <kbd class="kbd docutils literal notranslate">swap</kbd> son volúmenes cuyo tamaño final
+podemos establecer a priori a partir de cuál sea el uso que le demos al
+servidor. Por ejemplo, un servidor sin entorno gráfico difícilmente necesitará
+más de 5 GiB de espacio de almacenamiento.</p></li>
+<li><p>Los tres restastes sistemas, sin embargo, tendrán un tamaño variable según los
+datos que se almacenen en ellos. Podríamos crear tres volúmenes lógicos
+independendientes, pero podemos aprovechar el concepto de
+<a class="reference internal" href="../01.division/04.virt.html#lvm-aprovisionamiento"><span class="std std-ref">aprovisionamiento fino</span></a> para que ocupen el
+mismo espacio y compitan por él. Como, sin embargo, el instalador de <a class="reference external" href="https://www.debian.org/News/2019/20190706">Buster</a>
+no lo soporta, completaremos su creación durante la postinstalación.</p></li>
+</ul>
+<p>Para guardar el esquema de particiones sugerido basta un disco virtual de 3GiB.</p>
+<img alt="../../_images/particiones.png" src="../../_images/particiones.png" />
+</section>
+<section id="particionado">
+<h3><span class="section-number">5.10.1.2. </span>Particionado<a class="headerlink" href="#particionado" title="Link to this heading">¶</a></h3>
+<p>Lo llevaremos a cabo antes de hacer la instalación con el fin de tener absoluta
+libertad. Podríamos, para ello, crear un disco virtual y arrancar la máquina con
+un sistema <em>Live</em> como <em>Gparted</em>. En vez de eso, haremos las particiones de
+disco desde el sistema anfitrión para lo cual debemos crear el disco:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>qemu-img<span class="w"> </span>create<span class="w"> </span>-f<span class="w"> </span>qcow2<span class="w"> </span>servidor.qcw<span class="w"> </span>3G
+</pre></div>
+</div>
+<p>y hacerlo disponible en <code class="file docutils literal notranslate"><span class="pre">/dev/nbd0</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>modprobe<span class="w"> </span>nbd<span class="w"> </span><span class="nv">max_part</span><span class="o">=</span><span class="m">7</span>
+<span class="gp"># </span>qemu-nbd<span class="w"> </span>-c<span class="w"> </span>/dev/nbd0<span class="w"> </span>servidor.qcw
+</pre></div>
+</div>
+<p>Hecho lo cual, ya podemos particionar:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>sgdisk<span class="w"> </span>-a<span class="w"> </span><span class="m">8</span><span class="w"> </span>-n<span class="w"> </span><span class="s2">&quot;0:40:2047&quot;</span><span class="w"> </span>-t<span class="w"> </span><span class="s2">&quot;0:0xef02&quot;</span><span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;0:BOOTBIOS&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>-a<span class="w"> </span><span class="m">2048</span><span class="w"> </span>-n<span class="w"> </span><span class="s2">&quot;0:2048:+100M&quot;</span><span class="w"> </span>-t<span class="w"> </span><span class="s2">&quot;0:0xef00&quot;</span><span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;0:EFI&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">              </span>-N<span class="w"> </span><span class="m">0</span><span class="w"> </span>-t<span class="w"> </span><span class="s2">&quot;3:0xfd00&quot;</span><span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;3:RAID&quot;</span><span class="w"> </span>/dev/nbd0
+<span class="gp"># </span>partx<span class="w"> </span>-a<span class="w"> </span>/dev/nbd0
+</pre></div>
+</div>
+<p>Ahora debe crearse el <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr> sobre la tercera partición:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mdadm<span class="w"> </span>--create<span class="w"> </span>/dev/md0<span class="w"> </span>--metadata<span class="o">=</span><span class="m">1</span><span class="w"> </span>--homehost<span class="o">=</span>any<span class="w"> </span>--name<span class="o">=</span><span class="m">0</span><span class="w"> </span><span class="se">\</span>
+<span class="w">   </span>--verbose<span class="w"> </span>--level<span class="o">=</span><span class="m">1</span><span class="w"> </span>--raid-devices<span class="o">=</span><span class="m">1</span><span class="w"> </span>--force<span class="w"> </span>/dev/nbd0p3
+</pre></div>
+</div>
+<p>y sobre él crear un grupo de volúmenes y definir los volúmenes lógicos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>vgcreate<span class="w"> </span>VGraid<span class="w"> </span>/dev/md0
+<span class="gp"># </span>lvcreate<span class="w"> </span>-n<span class="w"> </span>raiz<span class="w"> </span>-L<span class="w"> </span>1792M<span class="w"> </span>VGraid
+<span class="gp"># </span>lvcreate<span class="w"> </span>-n<span class="w"> </span>log<span class="w"> </span>-L<span class="w"> </span>64M<span class="w"> </span>VGraid
+<span class="gp"># </span>lvcreate<span class="w"> </span>-n<span class="w"> </span>pool<span class="w"> </span>-L<span class="w"> </span>768M<span class="w"> </span>VGraid
+<span class="gp"># </span>lvcreate<span class="w"> </span>-n<span class="w"> </span>swap<span class="w"> </span>-C<span class="w"> </span>y<span class="w"> </span>-L<span class="w"> </span>64M<span class="w"> </span>VGraid
+</pre></div>
+</div>
+<p>De estos volúmenes, el nombrado <em>pool</em> será el volumen que posteriormente
+convirtamos en el <em>pool</em> de aprovisionamiento, y lo colocamos antes del
+dedicado a <em>swap</em> para que al situarse éste último al final pueda ampliarse
+luego su tamaño hasta los 2 GiB manteniendo la contiguidad del espacio. De
+hecho, forzamos la contiguidad a través de la opción <kbd class="kbd docutils literal notranslate">-C</kbd>.</p>
+<p>Además formateamos para asegurarnos de que el tamaño de bloque es de 4KiB:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#  </span>mkfs.ext4<span class="w"> </span>-L<span class="w"> </span>RAIZ<span class="w"> </span>-b4k<span class="w"> </span>/dev/VGraid/raiz
+<span class="gp">#  </span>mkfs.ext4<span class="w"> </span>-L<span class="w"> </span>LOG<span class="w"> </span>-b4k<span class="w"> </span>/dev/VGraid/log
+</pre></div>
+</div>
+<p>Una vez hecho esto, ya podemos comenzar la instalación en una máquina virtual,
+así que desconectamos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>vgchange<span class="w"> </span>-an<span class="w"> </span>VGraid
+<span class="go">0 logical volume(s) in volume group &quot;VGraid&quot; now activ</span>
+<span class="gp"># </span>mdadm<span class="w"> </span>--stop<span class="w"> </span>/dev/md0
+<span class="go">mdadm: stopped /dev/md0</span>
+<span class="gp"># </span>qemu-nbd<span class="w"> </span>-d<span class="w"> </span>/dev/nbd0
+<span class="go">/dev/nbd0 disconnected</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="instalacion">
+<h2><span class="section-number">5.10.2. </span>Instalación<a class="headerlink" href="#instalacion" title="Link to this heading">¶</a></h2>
+<p>Debemos hacernos con el disco de instalación de la última estable de debian<a class="footnote-reference brackets" href="#id14" id="id5" role="doc-noteref"><span class="fn-bracket">[</span>5<span class="fn-bracket">]</span></a>, colocar el disco duro que hemos preparado bajo el epígrafe anterior, y
+arrancar la máquina virtual. La instalación es bastante sencilla:</p>
+<ol class="arabic">
+<li><p>Elegimos la instalación con <em>ncurses</em> (¿para qué queremos la gráfica?):</p>
+<img alt="Menú inicial de instalación" src="../../_images/01-menu.png" />
+</li>
+<li><p>Escogemos la lengua<a class="footnote-reference brackets" href="#id15" id="id6" role="doc-noteref"><span class="fn-bracket">[</span>6<span class="fn-bracket">]</span></a>, el país y el teclado apropiados:</p>
+<img alt="Lengua del sistema" src="../../_images/02-lang.png" />
+<img alt="Elección del país" src="../../_images/03-pais.png" />
+<img alt="Mapa de teclado" src="../../_images/04-teclado.png" />
+</li>
+<li><p>Escogemos un nombre de servidor:</p>
+<img alt="Elección del nombre del servidor" src="../../_images/05-nombre.png" />
+</li>
+<li><p>Y el dominio al que pertenece:</p>
+<img alt="Elección del nombre de dominio" src="../../_images/06-dominio.png" />
+</li>
+<li><p>Las siguientes preguntas son referentes a los usuarios del sistema:</p>
+<img alt="Contraseña del administrador" src="../../_images/07-claveroot.png" />
+<img alt="Nombre real del usuario" src="../../_images/08-nombrerealusuario.png" />
+<img alt="Nombre del usuario" src="../../_images/09-nombreusuario.png" />
+<img alt="Contraseña del usuario" src="../../_images/10-claveusuario.png" />
+</li>
+<li><p>Seleccionamos la zona horaria:</p>
+<img alt="Contraseña del usuario" src="../../_images/11-zonahoraria.png" />
+</li>
+<li><p>Escogemos particionado manual</p>
+<img alt="Menú de particionado" src="../../_images/12-particiones.png" />
+<p>y llegamos a la parte más delicada de la instalación. La herramientas nos
+presentará el disco tal cómo lo dejamos preparado:</p>
+<img alt="Vista general de las particiones y volúmenes definidos" src="../../_images/13-particiones.png" />
+<p>así que nuestra labor se limita a asociar cada volumen con el punto de
+montaje apropiado. Por ejemplo, para el volumen dedicado a <code class="file docutils literal notranslate"><span class="pre">/</span></code>:</p>
+<img alt="Vista de las opciones de una partición" src="../../_images/14-particiones.png" />
+<p>Obsérvese que no se reformatea la partición, ya que lo hicimos antes de
+comenzar la instalación. Es importante no hacerlo, ya que de lo contrario en
+las particiones muy pequeñas, la herramienta escogerá como tamaño de bloque
+1KiB, cuando nuestra intención es que sea de 4KiB. Además, como no hemos
+podido crear aún los volúmenes de aprovisionamiento fino, dejamos <em>pool</em> sin
+asignar.</p>
+<p>Recuerde que hemos creado una partición <abbr title="EFI System Partition">ESP</abbr> y que esta suele montarse sobre
+<code class="file docutils literal notranslate"><span class="pre">/boot/efi</span></code>, así que no olvide definirlo también:</p>
+<img alt="Definición de la partición ESP" src="../../_images/15-particiones.png" />
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Esta prevención es necesaria porque estamos llevando a cabo la
+instalación en un sistema <abbr title="Basic I/O System">BIOS</abbr>. Si fuera <abbr title="Unified Extensible Firmware Interface">UEFI</abbr>, <em>Debian</em> habría tomado
+directamente la partición como la apropiada para este fin.</p>
+</div>
+</li>
+<li><p>Después de aceptar el particionado, pasara un tiempo mientras se instalan en
+disco los paquetes básicos, después de lo cual se pedirá si deseamos añadir
+más discos como fuente de paquetes. Nuestra intención es instalar paquetes de
+internet, así que contestaremos que no:</p>
+<img alt="CD como fuente de paquetes" src="../../_images/16-cd.png" />
+</li>
+<li><p>Y seleccionamos un repositorio de internet. Las réplicas en España,
+particularmente, nunca me han dado buen resultado:</p>
+<img alt="Elección del país del repositorio" src="../../_images/17-pais-replica.png" />
+<img alt="Elección del servidor de la réplica." src="../../_images/18-servidor-replica.png" />
+<p>Aún podremos definir si accedemos a través de un proxy, aunque lo habitual es
+que no sea así:</p>
+<img alt="../../_images/19-proxy.png" src="../../_images/19-proxy.png" />
+</li>
+<li><p><em>Debian</em> lleva a cabo una encuesta para conocer cuáles son los paquetes más
+usados y, en consecuencia, saber cuáles son más importantes para la
+comunidad. No está de más decir que sí, aunque podemos contestar que no:</p>
+<img alt="Participación en la encuesta sobre el uso de paquetes" src="../../_images/20-encuesta.png" />
+</li>
+<li><p>Seleccionamos los grupos de programas que queremos instalar. En este caso, lo
+más prudente es limitarse a escoger el servidor <abbr title="Security SHell">SSH</abbr> y las herramientas
+básicas; e instalar a mano el resto:</p>
+<img alt="Qué paquetes se instalarán automáticamente" src="../../_images/21-paquetes.png" />
+</li>
+<li><p>Y para finalizar el último paso nos pide indicar dónde se instalará <abbr title="GRand Unified Bootloader">GRUB</abbr>.
+Como sólo tenemos un disco (<code class="file docutils literal notranslate"><span class="pre">sda</span></code>), es en él donde debemos instalarlo:</p>
+<img alt="¿Se quiere instalar grub?" src="../../_images/22-grub.png" />
+<img alt="Lugar de instalación de grub" src="../../_images/23-discogrub.png" />
+</li>
+</ol>
+<p>Hecho todo lo cual, se completa la instalación y es posible arrancar el
+servidor.</p>
+</section>
+<section id="postinstalacion">
+<h2><span class="section-number">5.10.3. </span>Postinstalación<a class="headerlink" href="#postinstalacion" title="Link to this heading">¶</a></h2>
+<p>Tras la instalación hay tres tareas que podemos acometer:</p>
+<section id="personalizacion">
+<h3><span class="section-number">5.10.3.1. </span>Personalización<a class="headerlink" href="#personalizacion" title="Link to this heading">¶</a></h3>
+<p>Las operaciones de personalización son muy particulares y pueden incluir:</p>
+<ul class="simple">
+<li><p>Sustituir <strong class="program">vim-tiny</strong> por <strong class="program">vim</strong>.</p></li>
+<li><p>Realizar <a class="reference internal" href="../../02.conbas/99.misc/02.consola.html#ajustes"><span class="std std-ref">ajustes</span></a> (instalar y configurar <a class="reference internal" href="../../02.conbas/99.misc/02.consola.html#tmux"><span class="std std-ref">tmux</span></a>,
+etc.)</p></li>
+</ul>
+</section>
+<section id="aprovisionamiento-fino">
+<h3><span class="section-number">5.10.3.2. </span>Aprovisionamiento fino<a class="headerlink" href="#aprovisionamiento-fino" title="Link to this heading">¶</a></h3>
+<p>Como el instalador no soporta <a class="reference internal" href="../01.division/04.virt.html#lvm-aprovisionamiento"><span class="std std-ref">aprovisionamiento fino</span></a> es ahora cuando debemos llevarlo a cabo. Para ello
+hemos de arrancar el sistema, instalar la herramienta propiada y convertir el
+volumen lógico que reservamos para esta función en un <em>pool</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>apt<span class="w"> </span>install<span class="w"> </span>thin-provisioning-tools
+<span class="gp"># </span>lvconvert<span class="w"> </span>--thinpool<span class="w"> </span>/dev/VGraid/pool
+</pre></div>
+</div>
+<p>Hecho lo cual debemos crear los tres volúmenes faltantes:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lvcreate<span class="w"> </span>-T<span class="w"> </span>-n<span class="w"> </span>home<span class="w"> </span>-V<span class="w"> </span>768M<span class="w"> </span>VGraid/pool
+<span class="gp"># </span>lvcreate<span class="w"> </span>-T<span class="w"> </span>-n<span class="w"> </span>srv<span class="w"> </span>-V<span class="w"> </span>768M<span class="w"> </span>VGraid/pool
+<span class="gp"># </span>lvcreate<span class="w"> </span>-T<span class="w"> </span>-n<span class="w"> </span>mysql<span class="w"> </span>-V<span class="w"> </span>768M<span class="w"> </span>VGraid/pool
+<span class="gp"># </span>mkfs.ext4<span class="w"> </span>-L<span class="w"> </span>SRV<span class="w"> </span>-b4k<span class="w"> </span>/dev/VGraid/srv
+<span class="gp"># </span>mkfs.ext4<span class="w"> </span>-L<span class="w"> </span>HOME<span class="w"> </span>-b4k<span class="w"> </span>/dev/VGraid/home
+<span class="gp"># </span>mkfs.ext4<span class="w"> </span>-L<span class="w"> </span>MYSQL<span class="w"> </span>-b4k<span class="w"> </span>/dev/VGraid/mysql
+</pre></div>
+</div>
+<p>copiar los ficheros personal sobre el nuevo volumen:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mount<span class="w"> </span>/dev/VGraid/home<span class="w"> </span>/mnt
+<span class="gp"># </span>tar<span class="w"> </span>-C<span class="w"> </span>/home/<span class="w"> </span>-cf<span class="w"> </span>-<span class="w"> </span>.<span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>-C<span class="w"> </span>/mnt/<span class="w"> </span>-xvpf<span class="w"> </span>-
+<span class="gp"># </span>umount<span class="w"> </span>/mnt
+<span class="gp"># </span>rm<span class="w"> </span>/home/usuario<span class="w"> </span>-rf
+</pre></div>
+</div>
+<p>crear el punto de montaje <code class="file docutils literal notranslate"><span class="pre">/var/log/mysql</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mkdir<span class="w"> </span>/var/lib/mysql
+</pre></div>
+</div>
+<p>añadir los tres puntos de montaje a <code class="file docutils literal notranslate"><span class="pre">/etc/fstab</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>cat<span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/fstab
+<span class="go">/dev/mapper/VGraid-home /home   ext4    defaults        0       2</span>
+<span class="go">/dev/mapper/VGraid-srv  /srv    ext4    defaults        0       2</span>
+<span class="go">/dev/mapper/VGraid-mysql /var/lib/mysql ext4 defaults   0       2</span>
+</pre></div>
+</div>
+<p>y, por esta vez, montarlo a mano:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mount<span class="w"> </span>/home
+<span class="gp"># </span>mount<span class="w"> </span>/var/lib/mysql
+<span class="gp"># </span>mount<span class="w"> </span>/srv
+</pre></div>
+</div>
+</section>
+<section id="generacion-de-la-imagen-final">
+<h3><span class="section-number">5.10.3.3. </span>Generación de la imagen final<a class="headerlink" href="#generacion-de-la-imagen-final" title="Link to this heading">¶</a></h3>
+<p>Aunque la imagen ya está lista, si la queremos usar como plantilla de pruebas es
+conveniente que la limpiemos para menguar su volumen:</p>
+<ul class="simple">
+<li><p>Mucho tamaño se debe a espacio no ocupado, pero escrito por ficheros que se
+escribieron y borraron durante la instalación.</p></li>
+<li><p>Pueden vaciarse los registros de <code class="file docutils literal notranslate"><span class="pre">/var/log</span></code>.</p></li>
+<li><p>Pueden eliminarse los ficheros de <em>bytecode</em> de <em>Python</em>.</p></li>
+<li><p>Las lista de paquetes en los repositorios ocupan también espacio
+innecesriamente.</p></li>
+</ul>
+<p>Es posible hacer estas operaciones a mano montando el disco con
+<strong class="command">qemu-nbd</strong>, pero <a class="reference download internal" download="" href="../../_downloads/bae553b8e54e59517ec1c243249da104/mrproper"><code class="xref download docutils literal notranslate"><span class="pre">este</span> <span class="pre">script</span></code></a> creado para
+la ocasión, puede ahorrarnos el trabajo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mrproper<span class="w"> </span>disco.qcw
+</pre></div>
+</div>
+<p>El script generará en el mismo directorio un nuevo disco <code class="file docutils literal notranslate"><span class="pre">disco-light.qcw</span></code>
+con el mínimo tamaño posible.</p>
+</section>
+<section id="configurar-el-servidor">
+<h3><span class="section-number">5.10.3.4. </span>Configurar el servidor<a class="headerlink" href="#configurar-el-servidor" title="Link to this heading">¶</a></h3>
+<p>Con todo lo anterior ya tenemos un sistema base para trabajar. A partir de aquí
+tenemos dos posibilidades:</p>
+<ul class="simple">
+<li><p>Trasladarlo al servidor.</p></li>
+<li><p>Llevar a cabo las instalaciones y configuraciones de servicios sobre la imagen
+y, cuando esté a punto, trasladar el resultado a la máquina real. Obrar de
+este segundo modo, nos da la ventaja de disponer en el futuro de una plantilla
+que la configuración exacta de nuestro servidor y, en consecuencia, apta para
+hacer pruebas antes de pasar los cambios al servidor real. En caso, de optar
+por esto segundo, no está de manos pasarle <strong class="command">mrproper</strong> al acabar.</p></li>
+</ul>
+</section>
+</section>
+<section id="traslado-a-servidor-real">
+<h2><span class="section-number">5.10.4. </span>Traslado a servidor real<a class="headerlink" href="#traslado-a-servidor-real" title="Link to this heading">¶</a></h2>
+<p>Una vez que se tenga a punto la imagen, puede trasladarse al <em>hardware</em> real.
+Suponemos que en esta máquina real sí dispondremos de dos discos para el
+<abbr title="Redundant Array of Inexpensive Disks">RAID</abbr> 1.</p>
+<p>La idea es utilizar un sistema <em>linux</em> arrancado desde un dispositivo extraíble
+para volcar la imagen sobre los discos físicos del servidor real, para lo cual
+es mejor que el disco virtual no esté en formato <em>qcow2</em> sino que sea una imagen
+cruda. Por tanto, antes de nada:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>qemu-info<span class="w"> </span>convert<span class="w"> </span>-cpf<span class="w"> </span>qcow2<span class="w"> </span>disco.qcw<span class="w"> </span>-O<span class="w"> </span>raw<span class="w"> </span>disco.raw
+<span class="gp"># </span>xz<span class="w"> </span>-v9<span class="w"> </span>disco.raw
+</pre></div>
+</div>
+<p>De esta forma, tenemos una imagen comprimida <code class="file docutils literal notranslate"><span class="pre">disco.raw.xz</span></code>. Lo más cómodo
+es preparar un <abbr title="Universal Serial Bus">USB</abbr> que disponga de una distribución de arranque y una
+partición de datos en la que incluyamos la imagen comprimida. Como distribución
+vale cualquiera medianamente moderna, ya que sólo se necesita que sea capaz de
+descomprimir el formato <a class="reference internal" href="../../02.conbas/11.backup/01.compresion.html#xz"><span class="std std-ref">xz</span></a>. Incluso la mínima <a class="reference external" href="http://www.slitaz.org">SliTaZ</a> puede
+valernos.</p>
+<p>Sea como sea, arrancando con este pincho <abbr title="Universal Serial Bus">USB</abbr>, suponiendo que la partición en
+la que hemos copiado <code class="file docutils literal notranslate"><span class="pre">disco.raw.xz</span></code> se haya montado sobre <code class="file docutils literal notranslate"><span class="pre">/mnt</span></code>, y
+finalmente que los discos del servidor sean <code class="file docutils literal notranslate"><span class="pre">/sda</span></code> y <code class="file docutils literal notranslate"><span class="pre">/sdb</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>xzcat<span class="w"> </span>/mnt/disco.raw.xz<span class="w"> </span>&gt;<span class="w"> </span>/dev/sda
+</pre></div>
+</div>
+<p>La orden volcará el contenido del disco sobre el primer disco. Esto, sib
+embargo, no es suficiente, ya que al menos debemos corregir que la copia de la
+<abbr title="GUID Partition Table">GPT</abbr> no se encuentre al final del disco:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>sgdisk<span class="w"> </span>-e<span class="w"> </span>/devsda
+</pre></div>
+</div>
+<section id="constitucion-del-raid">
+<h3><span class="section-number">5.10.4.1. </span>Constitución del <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr><a class="headerlink" href="#constitucion-del-raid" title="Link to this heading">¶</a></h3>
+<p>Hay, sin embargo, otro detalle nada baladí. Tenemos un <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr> en precario que
+aún no usa el segundo disco y que, además, sólo aprovecha los primeros 3GiB de
+disco. Antes de nada, debemos agrandar la partición, pero si lo hacemos ahora es
+bastante probable que como consecuencia de la acción de copiar al final de disco
+la <abbr title="GUID Partition Table">GPT</abbr>, el sistema haya detectado el <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr> y el grupo de volúmenes al releer
+la tabla de particiones. Así que primero vamos a paralos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>vgchange<span class="w"> </span>-an<span class="w"> </span>VGraid
+<span class="gp"># </span>mdadm<span class="w"> </span>--stop<span class="w"> </span>/dev/md0
+</pre></div>
+</div>
+<p>Para, después, a las bravas tocar la tabla de particiones:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>sgdisk<span class="w"> </span>-d<span class="w"> </span><span class="m">3</span><span class="w"> </span>-N<span class="w"> </span><span class="m">3</span><span class="w"> </span>-t<span class="w"> </span><span class="s2">&quot;3:0xfd00&quot;</span><span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;3:RAID&quot;</span><span class="w"> </span>-p<span class="w"> </span>/dev/sda3
+</pre></div>
+</div>
+<p>esto, es borrarla y redefinir la última partición hasta el final.  Como sólo
+hemos tocado la propia <abbr title="GUID Partition Table">GPT</abbr> y el contenido de la partición, el <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr> seguirá
+intacto. Tocaría ahora agrandar el <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr>, pero sale más a cuenta sincronizar
+con el segundo disco y sólo después llevar a cabo la ampliación efectiva. Para
+ello, empezamos por copiar la tabla de particiones:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>sgdisk<span class="w"> </span>-R<span class="w"> </span>/dev/sdb<span class="w"> </span>/dev/sda
+<span class="gp"># </span>sgdisk<span class="w"> </span>-G<span class="w"> </span>/dev/sdb
+</pre></div>
+</div>
+<p>Y ahora, sí, añadir el segundo disco al <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mdadm<span class="w"> </span>--add<span class="w"> </span>/dev/md0<span class="w"> </span>/dev/sdb3
+<span class="gp"># </span>mdadm<span class="w"> </span>--grow<span class="w"> </span>/dev/md0<span class="w"> </span>--raid-device<span class="o">=</span><span class="m">2</span>
+</pre></div>
+</div>
+<p>Al hacerlo, comenzará el proceso de sincronización de los 3GiB, cuyo progreso
+podemos observar:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>watch<span class="w"> </span>cat<span class="w"> </span>/proc/mdstat
+</pre></div>
+</div>
+<p>Completada la sincronización (que no debe durar demasiado), podemos <em>colonizar</em> el
+resto de la partición:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mdadm<span class="w"> </span>--grow<span class="w"> </span>/dev/md0<span class="w"> </span>--assume-clean<span class="w"> </span>-z<span class="w"> </span>max
+<span class="gp"># </span>pvresize<span class="w"> </span>/dev/md0
+</pre></div>
+</div>
+<p>Y ya el grupo de volumen ocupará todo el disco y, en consecuencia, podremos
+aplicar los volúmenes lógicos al tamaño que deseemos, empezando eso sí, por el
+dedicado a <em>swap</em> cuyo espacio debe ser contiguo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lvextend<span class="w"> </span>-L<span class="w"> </span>2G<span class="w"> </span>/dev/VGraid/swap
+<span class="gp"># </span>mkswap<span class="w"> </span>-L<span class="w"> </span>SWAP<span class="w"> </span>-U<span class="w"> </span><span class="k">$(</span>blkid<span class="w"> </span>-t<span class="w"> </span><span class="nv">LABEL</span><span class="o">=</span>SWAP<span class="w"> </span>-o<span class="w"> </span>value<span class="w"> </span>-s<span class="w"> </span>UUID<span class="k">)</span><span class="w"> </span>/dev/VGraid/swap
+<span class="gp"># </span>lvextend<span class="w"> </span>-rL<span class="w"> </span>5G<span class="w"> </span>/dev/VGraid/raiz
+<span class="gp"># </span>lvextend<span class="w"> </span>-rL<span class="w"> </span>1G<span class="w"> </span>/dev/VGraid/log
+</pre></div>
+</div>
+<p>Opcionalmente podemos reservar 5GiB para futuras instantáneas del sistema raíz<a class="footnote-reference brackets" href="#id16" id="id7" role="doc-noteref"><span class="fn-bracket">[</span>7<span class="fn-bracket">]</span></a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lvcreate<span class="w"> </span>-s<span class="w"> </span>-n<span class="w"> </span>raiz_snap<span class="w"> </span>-L<span class="w"> </span>5G<span class="w"> </span>/dev/VGraid/raiz
+</pre></div>
+</div>
+<p>y reservar para el <em>pool</em> el espacio restante. Los volúmnes que cohabitan en él,
+podemos extenderlos hasta el tamaño que estimemos oportuno, sabiendo que
+posteriomente podremos ampliarlos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lvextend<span class="w"> </span>-l<span class="w"> </span>+100%FREE<span class="w"> </span>/dev/VGraid/pool
+<span class="gp"># </span>lvextend<span class="w"> </span>-rL<span class="w"> </span>50G<span class="w"> </span>/dev/VGraid/home
+<span class="gp"># </span>lvextend<span class="w"> </span>-rL<span class="w"> </span>100G<span class="w"> </span>/dev/VGraid/srv
+<span class="gp"># </span>lvextend<span class="w"> </span>-rL<span class="w"> </span>2G<span class="w"> </span>/dev/VGraid/mysql
+<span class="gp"># </span>lvremove<span class="w"> </span>/dev/VGraid/raiz_snap
+</pre></div>
+</div>
+</section>
+<section id="sincronizacion-del-arranque">
+<h3><span class="section-number">5.10.4.2. </span>Sincronización del arranque<a class="headerlink" href="#sincronizacion-del-arranque" title="Link to this heading">¶</a></h3>
+<p>Dado que hemos dejado los arranques fuera del <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr> es obvio que, en nuestro
+caso, sólo el primer disco será arrancable, y que haber partícipe al segundo
+disco del <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr> no ha mejorado este asunto.</p>
+<p>Como nuestro objetivo no es hacer un sistema que arranque indistintamente con
+uno u otro <em>firmware</em>, podemos sincronizar únicamente un arranca: aquel que sea
+necesario.</p>
+<section id="bios">
+<h4><span class="section-number">5.10.4.2.1. </span><abbr title="Basic I/O System">BIOS</abbr><a class="headerlink" href="#bios" title="Link to this heading">¶</a></h4>
+<p>Si el firmware es <abbr title="Basic I/O System">BIOS</abbr>, la sincronización es enormemente sencilla. Basta con
+instalar <abbr title="GRand Unified Bootloader">GRUB</abbr> en el disco en el que falte el arranque:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>grub-install<span class="w"> </span>/dev/sdb
+</pre></div>
+</div>
+<p>Cada vez que haya que sustituir un disco, tras el proceso de sincronización se
+puede instalar <abbr title="GRand Unified Bootloader">GRUB</abbr> para que el nuevo disco</p>
+</section>
+<section id="uefi">
+<h4><span class="section-number">5.10.4.2.2. </span><abbr title="Unified Extensible Firmware Interface">UEFI</abbr><a class="headerlink" href="#uefi" title="Link to this heading">¶</a></h4>
+<p>En caso de que hayamos pasado el sistema para que arranque en <abbr title="Unified Extensible Firmware Interface">UEFI</abbr>, la cosa es
+bastante más complicada, ya que si mantenemos las particiones independientes el
+fichero <code class="file docutils literal notranslate"><span class="pre">/etc/fstab</span></code> tendrá que indicar cuál de las dos es la partición
+asociada al punto de montaje <code class="file docutils literal notranslate"><span class="pre">/boot/efi</span></code>.</p>
+<div class="admonition-todo admonition" id="id8">
+<p class="admonition-title">Por hacer</p>
+<p>Aegurarse que funciona lo afirmado aquí debajo.</p>
+</div>
+<p>Tenemos dos opciones:</p>
+<ul class="simple">
+<li><p>Mantener las particiones por separado y utilizar <strong class="command">grub-install</strong> para
+escribir en una y otra <abbr title="EFI System Partition">ESP</abbr>. Habrá que jugar con la opción
+<kbd class="kbd docutils literal notranslate">-</kbd>-<kbd class="kbd docutils literal notranslate">efi</kbd>-<kbd class="kbd docutils literal notranslate">directory</kbd>.</p></li>
+<li><p>Hacer un <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr> 1 constituido por ambas particiones <abbr title="EFI System Partition">ESP</abbr>, que será por su
+dificultad lo que expongamos.</p></li>
+</ul>
+<p>Partamos de que mantenemos las dos particiones por separado durante el tiempo en
+que el sistema arranca con <abbr title="Basic I/O System">BIOS</abbr> y que, cuando <a class="reference internal" href="../01.division/03.pract.html#bios-uefi"><span class="std std-ref">migramos a UEFI</span></a><a class="footnote-reference brackets" href="#id17" id="id9" role="doc-noteref"><span class="fn-bracket">[</span>8<span class="fn-bracket">]</span></a>, usamos la <abbr title="EFI System Partition">ESP</abbr> de <code class="file docutils literal notranslate"><span class="pre">/dev/sda</span></code> para almacenar el arranque.</p>
+<p>En esta situación vamos a copiar temporalmente el contenido de la partición:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mkdir<span class="w"> </span>/tmp/EFI
+<span class="gp"># </span>tar<span class="w"> </span>-C<span class="w"> </span>/boot/efi/EFI<span class="w"> </span>-cf<span class="w"> </span>-<span class="w"> </span>.<span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>-C<span class="w"> </span>/tmp/EFI<span class="w"> </span>-xvpf<span class="w"> </span>-
+<span class="gp"># </span>umount<span class="w"> </span>/boot/efi
+</pre></div>
+</div>
+<p>hecho lo cual, definimos un segundo <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr> 1:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mdadm<span class="w"> </span>--create<span class="w"> </span>/dev/md1<span class="w"> </span>--metadata<span class="o">=</span><span class="m">1</span>.0<span class="w"> </span>--homehost<span class="o">=</span>any<span class="w"> </span>--name<span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>--verbose<span class="w"> </span>--level<span class="o">=</span><span class="m">1</span><span class="w"> </span>--raid-devices<span class="o">=</span><span class="m">2</span><span class="w"> </span>--force<span class="w"> </span>/dev/sda2<span class="w"> </span>/dev/sdb2
+
+<span class="gp"># </span>mkfs.fat<span class="w"> </span>-nEFI<span class="w"> </span>-F32<span class="w"> </span>/dev/md1
+</pre></div>
+</div>
+<p>Obsérvese algo muy importante: se ha usado como versión de los metadatos la
+<strong>1.0</strong> que se caracteriza por almacenarlos al final, no al principio. La gracia
+de esto es que al formatear directamente el dispositivo <code class="file docutils literal notranslate"><span class="pre">/dev/md1</span></code> en
+<abbr title="File Allocation Table">FAT</abbr>32, las dispositivos integrantes podrán ser leídos directamente como como
+formateados en <abbr title="File Allocation Table">FAT</abbr>32 y, en consecuencia, el <em>firmware</em> será capaz de leer
+las particiones y arrancar. Debemos modificar la entrada en <code class="file docutils literal notranslate"><span class="pre">/etc/fstab</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">/dev/md1    /boot/efi      vfat  defaults 0  2</span>
+</pre></div>
+</div>
+<p>añadir el nuevo <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr> a <code class="file docutils literal notranslate"><span class="pre">/etc/mdadm/mdadm.conf</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mdadm<span class="w"> </span>--examine<span class="w"> </span>--scan<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>any:1<span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/mdadm/mdadm.conf
+</pre></div>
+</div>
+<p>y, por último, restituir los datos al <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mount<span class="w"> </span>/boot/efi
+<span class="gp"># </span>mv<span class="w"> </span>/tmp/EFI<span class="w"> </span>/boot/efi
+</pre></div>
+</div>
+<p>Además, hacemos que funcione la entrada para el dispositivo de disco:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>grub-install<span class="w"> </span>--no-nvram<span class="w"> </span>--force-extra-removable<span class="w"> </span>/dev/sda
+</pre></div>
+</div>
+<p>donde debemos añadir la opción <kbd class="kbd docutils literal notranslate">-</kbd>-<kbd class="kbd docutils literal notranslate">no</kbd>-<kbd class="kbd docutils literal notranslate">nvram</kbd> para que <abbr title="GRand Unified Bootloader">GRUB</abbr> no intente
+fallidamente añadir una entrada con <strong class="command">efibootmgr</strong>. Si nuestro <abbr title="Unified Extensible Firmware Interface">UEFI</abbr>
+añade entradas automáticas para ambos discos, estas entradas funcionarán sin
+problema.</p>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>La solución tiene el problema de que el <em>firmware</em> trata con
+los dispositivos miembros, no con el <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr> en sí. En consecuencia, si éste
+realiza alguna operación de escritura, la hará sobre uno de los miembros y
+al montarse el <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr>, éste fallará porque detectará que los miembros no
+están sincronizados. Un apaño para solucionar esto, lo brinda <a class="reference external" href="https://outflux.net/blog/archives/2018/04/19/uefi-booting-and-raid1/">la entrada de
+este blog</a>, que
+reproducimos por si desaparece:</p>
+<ol class="arabic">
+<li><p>Evitamos que que por mor de <code class="file docutils literal notranslate"><span class="pre">/etc/mdadm/mdadm.conf</span></code> se ensamble
+automáticamente este <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr>, sustituyendo el nombre del dispotivio por
+<kbd class="kbd docutils literal notranslate">&lt;ignore&gt;</kbd>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ARRAY &lt;ignore&gt; metadata=1.0 UUID=123...</span>
+</pre></div>
+</div>
+</li>
+<li><p>Evitamos que se monte automática el <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr> sobre <code class="file docutils literal notranslate"><span class="pre">/boot/efi</span></code> tocando
+la línea adecuada en <code class="file docutils literal notranslate"><span class="pre">/etc/fstab</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">/dev/md1    /boot/efi      vfat  noauto,defaults 0  2</span>
+</pre></div>
+</div>
+</li>
+<li><p>Creamos un nuevo servicio que ensamble el <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr> reincronizando los
+miembros y montándo el resultado sobre <code class="file docutils literal notranslate"><span class="pre">/boot/efi</span></code>:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[Unit]</span>
+<span class="na">Description</span><span class="o">=</span><span class="s">Resync /boot/efi RAID</span>
+<span class="na">DefaultDependencies</span><span class="o">=</span><span class="s">no</span>
+<span class="na">After</span><span class="o">=</span><span class="s">local-fs.target</span>
+
+<span class="k">[Service]</span>
+<span class="na">Type</span><span class="o">=</span><span class="s">oneshot</span>
+<span class="na">ExecStart</span><span class="o">=</span><span class="s">/sbin/mdadm --assemble /dev/md1 --uuid=123... --update=resync</span>
+<span class="na">ExecStart</span><span class="o">=</span><span class="s">/bin/mount /boot/efi</span>
+<span class="na">RemainAfterExit</span><span class="o">=</span><span class="s">yes</span>
+
+<span class="k">[Install]</span>
+<span class="na">WantedBy</span><span class="o">=</span><span class="s">sysinit.target</span>
+</pre></div>
+</div>
+</li>
+<li><p>Actualizamos la imagen de disco inicial:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>update-initramfs<span class="w"> </span>-u
+</pre></div>
+</div>
+</li>
+</ol>
+</div>
+<p class="rubric">Notas al pie</p>
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="id10" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
+<p>Tradicionalmente, <code class="file docutils literal notranslate"><span class="pre">/boot</span></code> también se ha colocado en sistema
+de ficheroa aparte por diversos motivos:</p>
+<ul class="simple">
+<li><p>Porque en <abbr title="Basic I/O System">BIOS</abbr> antiguas ésta no podía acceder más allá del cilintro
+<strong>1024</strong>, por lo que el arranque debía situarse antes. La forma de
+asegurarse ello, era incluirlo en una primera partición aparte.</p></li>
+<li><p>Para cifrar completamente el sistema y dejar el arranque fuera del cifrado.
+Sin embargo, <abbr title="GRand Unified Bootloader">GRUB</abbr> ya soporta <a class="reference external" href="https://wiki.archlinux.org/index.php/GRUB#Encrypted_/boot">estar cifrado con LUKS</a>.</p></li>
+</ul>
+</aside>
+<aside class="footnote brackets" id="id11" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id2">2</a><span class="fn-bracket">]</span></span>
+<p>Si el sistema tiene arranque <abbr title="Unified Extensible Firmware Interface">UEFI</abbr> podemos prescindir de hacer la
+partición <em>BIOSBOOT</em>, aunque esta no ocupa espacio ya que aprovecha el hueco
+anterior al sector <em>2048</em>. Si el arranque es <abbr title="Basic I/O System">BIOS</abbr>, no es necesaria la
+<abbr title="EFI System Partition">ESP</abbr>, pero no está de más que la creemos por si en el futuro acabamos
+migrando el servidor a un <em>hardware</em> con arranque <abbr title="Unified Extensible Firmware Interface">UEFI</abbr>.</p>
+</aside>
+<aside class="footnote brackets" id="id12" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id3">3</a><span class="fn-bracket">]</span></span>
+<p>Desde la versión <em>2.6</em> del núcleo, para memoria de intercambio, es tan
+eficiente usar un archivo como una partición separada. <a class="reference external" href="https://linuxize.com/post/create-a-linux-swap-file/">Este artículo de
+Linuxize</a> explica cómo
+utilizar un archivo.</p>
+</aside>
+<aside class="footnote brackets" id="id13" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id4">4</a><span class="fn-bracket">]</span></span>
+<p>El tamaño apropiado de la partición de <em>swap</em> depende de la cantidad de
+memoria disponible y de si se desea hibernar el equipo (cosa poco probable en un
+servidor). Como regla general podemos establecer que la cantidad de <em>swap</em>
+necesaria (<strong>s</strong>), <strong>sin hibernación</strong>, es del doble de la memoria
+<abbr title="Random Access Memory">RAM</abbr> cuando está es poca y del orden de su raíz cuadrada cuando es mucha
+(por encima de <strong>4</strong> GiB), con lo que matemáticamente podríamos escribir esta
+regla:</p>
+<div class="math notranslate nohighlight" id="equation-ram">
+<span class="eqno">(1)<a class="headerlink" href="#equation-ram" title="Link to this equation">¶</a></span>\[\begin{split}s(m) = \left\{ \begin{array}{rcr}
+                  2m &amp;  si &amp; m \leq 1 \\
+               \\ 2  &amp;  si &amp; 1 &lt; m &lt; 4 \\
+               \\ \sqrt{m} &amp;  si  &amp; m \geq 4
+               \end{array}
+       \right.\end{split}\]</div>
+<p><strong>Con hibernación</strong> necesitaremos añadir un tamaño adicional igual al tamaño
+de la <abbr title="Random Access Memory">RAM</abbr> (p.e. será <span class="math notranslate nohighlight">\(2 + m\)</span> cuando <span class="math notranslate nohighlight">\(1&lt;m&lt;4\)</span> ).  <a class="reference external" href="https://help.ubuntu.com/community/SwapFaq">Esta guía
+sobre memoria swap</a> de la página
+de <em>Ubuntu</em> es de muy recomendable lectura.</p>
+</aside>
+<aside class="footnote brackets" id="id14" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id5">5</a><span class="fn-bracket">]</span></span>
+<p>En nuestro caso, la segunda revisión de <a class="reference external" href="https://www.debian.org/News/2019/20190706">Buster</a>, esto es, la <strong>10.2</strong>.</p>
+</aside>
+<aside class="footnote brackets" id="id15" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id6">6</a><span class="fn-bracket">]</span></span>
+<p>El administrador, sin embargo, es mejor que <em>hable inglés</em>, ya que de
+esta forma los errores se expresarán en inglés y será más fácil encontrar una
+solución en internet. Cambiaremos más delante su lengua a él sólo.</p>
+</aside>
+<aside class="footnote brackets" id="id16" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id7">7</a><span class="fn-bracket">]</span></span>
+<p>Desgraciadamente la instantánea no se puede hacer sobre un volumen del
+<em>pool</em> de aprovisionamiento, porque ello exige que el volumen original se
+fije de sólo lectuta, operación que, dado que se trata del sistema raíz,
+exigiría parar el servidor y llevar a cabo la instantánea con ayuda de un
+sistema operativo externo.</p>
+</aside>
+<aside class="footnote brackets" id="id17" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id9">8</a><span class="fn-bracket">]</span></span>
+<p>Durante el proceso de migración, si seguimos los pasos referidos, seremos
+incapaces de acceder a los volúmenes lógicos que usan aprovisionamiento fino,
+ya que el instalador carece de soporte. Este error, sin embargo, es
+irrelevante, ya que no necesitamos esos sistema de archivos para instalar
+la versión <abbr title="Extensible Firmware Interface">EFI</abbr> de <abbr title="GRand Unified Bootloader">GRUB</abbr></p>
+</aside>
+</aside>
+</section>
+</section>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="../../index.html">Tabla de contenido</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">5.10. Instalación del servidor</a><ul>
+<li><a class="reference internal" href="#preinstalacion">5.10.1. Preinstalación</a><ul>
+<li><a class="reference internal" href="#sistemas-de-ficheros">5.10.1.1. Sistemas de ficheros</a></li>
+<li><a class="reference internal" href="#particionado">5.10.1.2. Particionado</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#instalacion">5.10.2. Instalación</a></li>
+<li><a class="reference internal" href="#postinstalacion">5.10.3. Postinstalación</a><ul>
+<li><a class="reference internal" href="#personalizacion">5.10.3.1. Personalización</a></li>
+<li><a class="reference internal" href="#aprovisionamiento-fino">5.10.3.2. Aprovisionamiento fino</a></li>
+<li><a class="reference internal" href="#generacion-de-la-imagen-final">5.10.3.3. Generación de la imagen final</a></li>
+<li><a class="reference internal" href="#configurar-el-servidor">5.10.3.4. Configurar el servidor</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#traslado-a-servidor-real">5.10.4. Traslado a servidor real</a><ul>
+<li><a class="reference internal" href="#constitucion-del-raid">5.10.4.1. Constitución del <abbr title="Redundant Array of Inexpensive Disks">RAID</abbr></a></li>
+<li><a class="reference internal" href="#sincronizacion-del-arranque">5.10.4.2. Sincronización del arranque</a><ul>
+<li><a class="reference internal" href="#bios">5.10.4.2.1. <abbr title="Basic I/O System">BIOS</abbr></a></li>
+<li><a class="reference internal" href="#uefi">5.10.4.2.2. <abbr title="Unified Extensible Firmware Interface">UEFI</abbr></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Tema anterior</h4>
+    <p class="topless"><a href="../09.recup/index.html"
+                          title="capítulo anterior"><span class="section-number">5.9. </span>Recuperación de datos</a></p>
+  </div>
+  <div>
+    <h4>Próximo tema</h4>
+    <p class="topless"><a href="../../06.infraestructura/index.html"
+                          title="próximo capítulo"><span class="section-number">6. </span>Servicios de infraestructura</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/05.discos/99.instalacion/index.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="../../06.infraestructura/index.html" title="6. Servicios de infraestructura"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="../09.recup/index.html" title="5.9. Recuperación de datos"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" ><span class="section-number">5. </span>Dispositivos de almacenamiento</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">5.10. </span>Instalación del servidor</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright CC BY 4.0, 2016-2025, José Miguel Sánchez Alés.
+      Creado usando <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    </div>
+  </body>
+</html>

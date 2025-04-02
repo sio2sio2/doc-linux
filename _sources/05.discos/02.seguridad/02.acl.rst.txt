@@ -1,0 +1,412 @@
+.. _acls:
+
+Permisos |ACL|
+**************
+Cuando el :ref:`sistema de permisos POSIX <ugo>`, esto es, el sistema |UGO|, no
+es suficiente y se requiere más granularidad en la definición de permisos, en
+Linux se puede recurrir a las listas de control de accesos (|ACL| por su
+acrónimo en inglés).
+
+.. note:: En realidad, las |ACL| también forman parte del estándar |POSIX|; y `tal
+   como se definen en este estándar es como se encuentran implementadas en Linux
+   <https://www.usenix.org/legacy/publications/library/proceedings/usenix03/tech/freenix03/full_papers/gruenbacher/gruenbacher_html/main.html>`_.
+
+Requisitos
+==========
+Para poder usar |ACL|\ s debemos cumplir dos requisitos:
+
+* Que el sistema de archivos las soporte y las tenga habilitadas.
+* Disponer la herramienta que permite manejarlas.
+  
+**Habilitación**
+   El soporte podemos darlo por descontado ya que los sistemas de archivos
+   modernos más usado en *Linux* las soportan (ext4, btrfs, xfs, zfs).
+
+   También es bastante probable que estén ya habilitadas y listas para usarse,
+   pero es conveniente cerciorarse. Pueden estar:
+
+   * Habilitadas como opciones de montaje por defecto al haber creado el
+     sistema. Podemos comprobar si esto es así\ [#]_ con::
+
+      # tune2fs -l /dev/sda3 | grep 'mount options'
+      Default mount options:    user_xattr acl
+
+     suponiendo que la partición sobre la que se asienta el sistema de archivos
+     es :file:`/dev/sda3`.
+
+   * Si no están habilitadas como opción por defecto, tenemos dos opciones:
+
+     + Fijar la opción de montaje *acl* en :file:`/etc/fstab`.
+     + Habilitarlas como opción de montaje por defecto::
+
+         # tune2fs -o acl /dev/sda3
+
+   .. note:: Para información sobre como habilitar las |ACL| en zfs puede leer
+      `este artículo <https://blog.alt255.com/post/posix-acls/>`_.
+
+**Instalación**
+   Tan fácil como instalar el paquete::
+
+      # apt install acl
+
+Filosofía de funcionamiento
+===========================
+Antes de que pasemos a ver cómo se definen las reglas |ACL| es indispensables
+que entendamos cuál es su filosofía de funcionamiento. Las |ACL|\ s |POSIX| no
+son un sistema alternativo al sistema |UGO|, sino complementario. Como
+consecuencia de ello:
+
+* Los archivos tienen un propietario y un grupo propietario.
+* Las reglas de permisos consisten en ternas que definen la lectura,
+  la escritura y la ejecución\ [#]_.
+* Las ternas de permisos se aplican según su especificidad, esto es, se comprueba
+  primero si es aplicable una terna de usuario; si no lo es, si es aplicable una
+  terna de grupo; y, si tampoco, se consulta la terna de otros.
+
+  Obviamente, cuando sólo hay definidos permisos |POSIX| sólo hay una terna de
+  usuario (la relativa al propietario) y una terna de grupo (la relativa al
+  grupo propietario).
+
+¿Qué novedades aportan las reglas |ACL|? Varias:
+
+* Podemos añadir ternas adicionales de permisos para usuarios o para grupos
+  específicos.
+
+* Hay dos tipos de reglas:
+
+  + Las :dfn:`reglas de acceso` que definen las ternas de permisos sobre el
+    archivo.
+  + Las :dfn:`reglas predeterminadas`, sólo útiles cuando se definen sobre
+    directorios, porque son **heredables**, esto es, permisos que
+    heredarán los subdirectorios y archivos que se incluyan dentro del
+    directorio en el que se definan.
+
+* Se introduce el concepto de :dfn:`máscara`, que limita los permisos máximos
+  efectivos que pueden proporcionar las ternas adicionales. Así, por ejemplo,
+  si una terna adicional es aplicable e indica que los permisos son :kbd:`rwx`,
+  pero la máscara es :kbd:`r-x`, entonces el usuario en cuestión no tendrá
+  permisos de escritura. 
+
+.. _getfacl:
+.. _setfacl:
+
+.. index:: getfacl, setfacl
+
+Operativa
+=========
+Las dos herramientas fundamentales son :manpage:`getfacl(1)`, para consultar
+las |ACL|\ s y :manpage:`setfacl(1)` para manipularlas. Para ilustrar su uso
+supongamos que tenemos cierto directorio llamado :file:`/tmp/share` sobre el
+que queremos definir |ACL|\ s.
+
+Comencemos por crear el directorio::
+
+   $ mkdir /tmp/share
+   $ cd /tmp/share
+   $ ls -ld .
+   drwxr-xr-x 2 usuario users 4096 oct 15 21:32 .
+
+Hasta aquí sabemos todo y todo nos es familiar, ya que de hecho no hemos
+definido ninguna regla adicional. Si usamos :ref:`getfacl <getfacl>`::
+
+   $ getfacl -c .
+   user::rwx
+   group::r-x
+   other::r-x
+
+obtenemos 3 reglas |ACL| que son la transposición de los permisos habituales del
+sistema |POSIX|.
+
+Reglas de acceso
+----------------
+Podemos empezar añadiendo una regla para un usuario llamado *enchufado*\ [#]_ al
+que le vamos a permitir cualquier acción sobre el directorio::
+
+   $ setfacl -m 'u:enchufado:7' .
+
+En este caso, la opción :kbd:`-m` indica que queremos modificar las reglas que
+ya haya definidas. A continuación, se indica la regla, donde la "u" expresa que
+es una regla para un usuario (podría ser también "g" para grupo); "enchufado",
+el usuario (también podría haberse usado su |UID|); y el "0" final,
+cuáles son los permisos en formato numérico. También puede usarse un formato de
+letras en que la ausencia del permiso se indica con un guión (por tanto, el
+equivalente de "7" es "rwx"). Si ahora usamos :ref:`ls <ls>`::
+
+   $ ls -ld .
+   drwxr-xr-x+ 2 usuario users 4096 oct 15 21:32 .
+
+aparecerá un signo "+" que indica que el archivo tiene definida alguna regla de
+permisos adicional:
+
+.. code-block:: console
+   :emphasize-lines: 3, 5
+
+   $ getfacl -c .
+   user::rwx
+   user:enchufado:rwx
+   group::r-x
+   mask::rwx
+   other::r-x
+
+Vemos dos novedades:
+
+a. La regla definida que, como esperábamos, concede todos lo permisos a
+   "enchufado" sobre el directorio.
+
+#. La *máscara* que se ha definido automáticamente como :kbd:`rwx`, y
+   que ya veremos más adelante :ref:`cómo manipular <acl-mask>`. Como tiene
+   ese valor y no limitará en absoluto los permisos., podemos olvidarnos por
+   ahora de ella.
+  
+Definamos ahora otro usuario "apestado"\ [#]_ y definamos estas reglas\ [#]_::
+
+   $ setfacl -m 'u:apestado:0,g:apestado:7' .
+
+En este caso, ambas reglas son aplicables al usuario, pero por su mayor
+especificidad sólo la terna de usuario tiene efecto y, en consecuencia, "apestado"
+no tendrá permiso sobre el directorio. Ahora bien, ¿qué ocurre si las dos reglas
+en principio aplicables al usuario son de la misma especificidad? Por ejemplo
+(suponiendo que "apestado sea también miembro de "users")::
+
+   $ setfacl -x 'u:apestado' -m 'g:users:3,g:apestado:5' .
+
+.. note:: Véase cómo con la opción :kbd:`-x` hemos eliminado una regla
+   existente. En este caso, no deben expresarse los permisos.
+
+Con esta orden no hay ternas de usuario y sólo hay dos ternas de grupo aplicables:
+
+.. code-block:: none
+
+   group:apestado:r-x
+   group:users:-wx
+
+En este caso, se aplica una regla, la más apropiada para la operación que
+pretendemos hacer. De este modo, si hacemos un :ref:`ls <ls>` sobre el
+directorio, se tomará la terna definida para el grupo "apestado"; pero si se
+pretende crear un archivo en el directorio, se aplicará la definida para
+"users". La consecuencia es que "apestado" ahora sí podrá hacer cualquier
+operación\ [#]_.
+
+Por último, cuando manipulemos reglas |ACL| no sólo necesitaremos crear nuevas
+reglas, sino también borrar ya creadas  para lo cual podemos usar :kbd:`-x`,
+como se ha ilustrado con el ejemplo anterior, o :kbd:`-b`, que las elimina
+todas::
+
+   $ setfacl -b .
+   $ ls -ld .
+   drwxr-xr-x 2 usuario users 4096 oct 16 09:29 .
+
+donde podemos ver que ya no aparece el signo "+" que denota la existencia de reglas |ACL| definidas para el directorio.
+
+.. note:: Existe la opción :kbd:`-R` para añadir reglas de forma recursiva.
+
+.. _reglas-heredables:
+
+Reglas predeterminadas (heredables)
+-----------------------------------
+Al crearse un archivo en el sistema de permisos |POSIX| los permisos se definen
+según la :ref:`máscara de usuario <umask>` definida\ [#]_, y propietario y grupo
+propietario se verán definidos por quién sea quien lleve a cabo la creación. Puede
+jugarse, además, con el :ref:`setgid <perm-especiales>` para modificar cuál será el
+grupo propietario. Si se quieren reglas diferentes, deberán redefinirse
+posteriormente a mano.
+
+El sistema de reglas |ACL| de |POSIX| permite, sin embargo, definir reglas sobre
+los directorios heredables en aquellos archivos y subdirectores que se creen
+dentro de él: son las llamadas reglas predeterminadas. Por ejemplo::
+
+   $ setfacl -dm 'g:enchufado:7' .
+   $ getfacl -c .
+   user::rwx
+   group::r-x
+   other::r-x
+   default:user::rwx
+   default:group::r-x
+   default:group:enchufado:rwx
+   default:mask::rwx
+   default:other::r-x
+
+Obsérvese que ahora han aparecido unas reglas predeterminadas además de las
+reglas de acceso y que pueden ser modificadas al margen de las de acceso.
+
+.. note:: Además de la opción :kbd:`-d` las reglas predeterminadas pueden
+   definirme incluyendo una "d" dentro de la expresión de la regla::
+
+      $ setfacl -m 'd:g:enchufado:7' .
+
+Estas reglas heredables no son reglas de acceso y, por tanto, no alteran los
+permisos del directorio (en este caso, "enchufado" seguirá sin poder crear
+archivos dentro del directorio). Sin embargo, se propagan a todo lo creado
+dentro de él. En consecuencia
+
+.. code-block:: console
+   :emphasize-lines: 5,10
+
+   $ mkdir subdirectorio
+   $ getfacl -c subdirectorio
+   user::rwx
+   group::r-x
+   group:enchufado:rwx
+   mask::rwx
+   other::r-x
+   default:user::rwx
+   default:group::r-x
+   default:group:enchufado:rwx
+   default:mask::rwx
+   default:other::r-x
+
+El nuevo subdirectorio conserva la regla predeterminada como predeterminada,
+pero además copia tal regla como regla de acceso. En consecuencia, el usuario
+"enchufado" sí tendrá todos los permisos dentro del directorio. 
+
+.. _acl-mask:
+
+La máscara
+----------
+Ya se ha definido la :dfn:`máscara` como el límite máximo en los permisos de las
+reglas |ACL|. Esta máscara está relacionada con los permisos del grupo
+propietario. De hecho, observemos lo siguiente::
+
+   $ setfacl -b .
+   $ ls -ld .
+   drwxr-xr-x 2 usuario users 4096 oct 19 19:44 .
+
+Los permisos de grupo son **5**. Sin embargo, si definimos::
+
+   $ setfacl -m 'u:enchufado:7' .
+   drwxrwxr-x+ 2 usuario users 4096 oct 19 19:44 .
+
+aparentemente los permisos de grupo pasan a ser **7**, porque esa acción determina
+que la máscara se defina como **7**:
+
+.. code-block:: console
+   :emphasize-lines: 3,5
+
+   $ getfacl -c .
+   user::rwx
+   user:enchufado:rwx
+   group::r-x
+   mask::rwx
+   other::r-x
+
+Los permisos efectivos del grupo propietario, sin embargo, seguirán siendo
+**5**. En cualquier caso, ¿por qué la máscara no se ha definido como **5**, si
+como hemos afirmado la máscara está relacionada con los permisos del grupo
+propietario? Esto se debe a que, como la máscara define el límite máximo, si
+definimos una terna de permisos más permisiva que la del grupo propietario, la
+máscara se acomodará a esta terna para no restringirla. Sin embargo, podemos
+añadir la opción :kbd:`-n` para evitarlo y que la máscara no pase de los
+permisos del grupo propietario. Para probarlo, volvamos a empezar:
+
+.. code-block:: console
+   :emphasize-lines: 4, 6
+
+   $ setfacl -b .
+   $ ls -ld .
+   drwxr-xr-x 2 usuario users 4096 oct 19 20:12 .
+   $ setfacl -nm 'u:enchufado:7' .
+   user::rwx
+   user:enchufado:rwx              #effective:r-x
+   group::r-x
+   mask::r-x
+   other::r-x
+
+Ahora la máscara si tiene el valor de la terna del grupo propietario y, aunque
+la terna para "enchufado" sea la que definimos, se nos advierte que la efectiva
+está limitada por la máscara. Y, efectivamente, es así. Si probamos con
+"enchufado" comprobaremos que no tiene permisos de escritura sobre el
+directorio.
+
+¿Hay forma de cambiar la máscara posteriormente? Sí, si la hay::
+
+   $ setfacl -m 'm::---' .
+   $ getfacl .
+   user::rwx
+   user:enchufado:rwx              #effective:---
+   group::r-x                      #effective:---
+   mask::---
+   other::r-x
+
+O sea, definirla en forma de regla con la letra "m", Hay otra forma de cambiar
+la máscara y es tener presente que está relacionada con los permisos de grupo
+(aunque se pueda luego redefinir de forma independiente). Por eso, si cambiamos
+los permisos del grupo propietario\ [#]_, cambiaremos la máscara::
+
+   $ chmod g=rwx .
+   $ getfacl .
+   user::rwx
+   user:enchufado:rwx
+   group::r-x
+   mask::rwx
+   other::r-x
+
+Y a todo esto, ¿qué utilidad tiene la máscara? Principalmente, reducir los
+permisos de todas las reglas |ACL| cuando no se quiere eliminar éstas. Por
+ejemplo, si hacemos::
+
+   $ setfacl -m 'm::---' .
+
+todos las ternas adicionales quedarán sin efecto mientras mantengamos la máscara
+con este valor.
+
+Backups
+=======
+Cuando se hace una copia de un sistema en que hay definidas |ACL|\ s, :ref:`tar
+<tar>`, por defecto, no copia tales reglas ni las restaura después. De hecho, en
+versiones antiguas ni siquiera había soporte para tales reglas\ [#]_. Para
+incluir las reglas hay que usar la opción :kbd:`--acl`::
+
+   $ tar --acl -acvf /tmp/backup.tar.gz /tmp/share
+
+Al restaurar la copia también habrá que usar la opción::
+
+   $ tar --acl -axvf backup.tar.xz
+
+.. rubric:: Enlaces de interés
+
+* `RHCSA – Access Control List (ACL) <https://codingbee.net/rhcsa/rhcsa-access-control-list-acl>`_.
+* `https://codingbee.net/rhcsa/rhcsa-the-acls-mask-setting <https://codingbee.net/rhcsa/rhcsa-the-acls-mask-setting>`_.
+
+.. rubric:: Notas al pie
+
+.. [#] La orden equivalente en xfs es :manpage:`xfs_info`.
+.. [#] E incluso :ref:`permisos especiales <perm-especiales>`, si estos son
+   necesarios.
+.. [#] Que deberá existir en el sistema, por lo que si seguimos las indicaciones
+   nos tocará crearlo::
+
+      # adduser --disabled-password --gecos "Usuario enchufado" --no-create-home enchufado
+
+.. [#] Siguiendo la creación del usuario anterior::
+
+      # adduser --disabled-password --gecos "Usuario apestado" --no-create-home apestado
+      # adduser apestado users
+
+.. [#] Obsérvese cómo podemos definir varias reglas a la vez.
+
+.. [#] Percátese que si "users" tuviera exclusivamente permiso de escritura,
+   pero no de ejecución, no podríamos escribir, puesto que para hacer la
+   operación de escritura tenemos también que tener acceso.
+
+.. [#] No se confunda con la máscara para las reglas |ACL| de la que trataremos
+   más adelante.
+ 
+.. [#] Al usar :ref:`chmod <chmod>` cuando hay definida ya alguna |ACL| los
+   permisos habituales cambian y esos cambios son permanentes y efectivos
+   incluso cuando se eliminan todas las |ACL|, excepto cuando se aplican sobre
+   el grupo propietario con objeto de aumentar los ya existentes. En ese caso,
+   solamente tienen el efecto de cambiar la máscara. Es el caso de este ejemplo.
+
+.. [#] En tal caso, aún podremos preservar las reglas, copiándolas en un
+   archivo::
+  
+      $ getfacl -R . > /lugar/de/almacenaje/permisos.acl
+
+   y restaurándolas después sobre la copia::
+
+      $ cd /lugar/de/restauración
+      $ setfacl --restore=/lugar/de/almacenaje/permisos.acl
+
+.. |UGO| replace:: :abbr:`UGO (User, Group, Other)`
+.. |UID| replace:: :abbr:`UID (User IDentifier)`
+.. |POSIX| replace:: :abbr:`POSIX (Portable Operating System Interface for uniX)`

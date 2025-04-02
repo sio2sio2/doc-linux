@@ -1,0 +1,402 @@
+
+
+<!DOCTYPE html>
+
+<html lang="es" data-content_root="../../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>9.1.3.6.2. Cifrado de bloques &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/classic.css?v=2bf1fcf8" />
+    <link rel="stylesheet" href="../../../../_static/custom.css" type="text/css" />
+    
+    <script src="../../../../_static/documentation_options.js?v=a621b78a"></script>
+    <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/translations.js?v=f85f4cfb"></script>
+    
+    <link rel="index" title="Índice" href="../../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../../search.html" />
+    <link rel="next" title="9.1.3.6.3. Cifrado con el sistema de archivos" href="03.fs.html" />
+    <link rel="prev" title="9.1.3.6.1. Cifrado por hardware" href="01.hardware.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="03.fs.html" title="9.1.3.6.3. Cifrado con el sistema de archivos"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="01.hardware.html" title="9.1.3.6.1. Cifrado por hardware"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" ><span class="section-number">9. </span>Apéndices</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../index.html" ><span class="section-number">9.1. </span>Criptografía</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../../03.aplicaciones.html" ><span class="section-number">9.1.3. </span>Aplicaciones de la criptografía</a> &#187;</li>
+          <li class="nav-item nav-item-4"><a href="../06.discos.html" accesskey="U"><span class="section-number">9.1.3.6. </span>Cifrado de discos</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">9.1.3.6.2. </span>Cifrado de bloques</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="cifrado-de-bloques">
+<h1><span class="section-number">9.1.3.6.2. </span>Cifrado de bloques<a class="headerlink" href="#cifrado-de-bloques" title="Link to this heading">¶</a></h1>
+<p>Mediante esta técnica el software hace de intermediario entre los bloques
+físicos y los bloques de un dispositivo virtual cifrando en las escrituras y
+descifrando en las lecturas.</p>
+<img alt="../../../../_images/dm-crypt.png" src="../../../../_images/dm-crypt.png" />
+<p>En consecuencia:</p>
+<ul class="simple">
+<li><p>Ciframos un dispositivo de bloques entero.</p></li>
+<li><p>Como el cifrado es independiente del sistema de archivos, se puede utilizar
+cualquier sistema de archivos.</p></li>
+<li><p>Permite no sólo el cifrado de datos, sino el cifrado del sistema operativo de
+arranque, preparando convenientemente el sistema (caso que no abordaremos
+aquí, pero que puede consultarse, por ejemplo, en un <a class="reference external" href="https://wiki.archlinux.org/index.php/Dm-crypt_(Espa%C3%B1ol)/Encrypting_an_entire_system_(Espa%C3%B1ol)#Modalidad_plain_de_dm-crypt">artículo de la wiki de
+Archlinux</a>).</p></li>
+</ul>
+<p>Utilizaremos <abbr title="Linux Unified Key Setup">LUKS</abbr> y abordaremos el caso más sencillo de querer cifrar una
+partición física, para lo cual debemos primero instalar el <em>software</em> de
+cifrado:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>apt<span class="w"> </span>install<span class="w"> </span>cryptsetup
+</pre></div>
+</div>
+<p class="rubric">Operativa manual</p>
+<p>Lo primero es mapear una partición física<a class="footnote-reference brackets" href="#id3" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a> (p.e. <code class="file docutils literal notranslate"><span class="pre">/dev/sda6</span></code>) sobre
+un dispositivo virtual:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>cryptsetup<span class="w"> </span>-y<span class="w"> </span>-v<span class="w"> </span>luksFormat<span class="w"> </span>/dev/sda6<span class="w">  </span><span class="c1"># Requerirá una contraseña</span>
+<span class="gp"># </span>cryptsetup<span class="w"> </span>open<span class="w"> </span>/dev/sda6<span class="w"> </span>cifrado<span class="w">      </span><span class="c1"># Debemos proporcionar la contraseña</span>
+</pre></div>
+</div>
+<p>Esto generará el dispositivo virtual de bloques <code class="file docutils literal notranslate"><span class="pre">/dev/mapper/cifrado</span></code>,
+sobre el cual podemos actuar como si se tratara de un dispositivo físico, o
+sea:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mkfs.ext4<span class="w"> </span>-L<span class="w"> </span>DATOSECRETOS<span class="w"> </span>/dev/mapper/cifrado
+<span class="gp"># </span>mount<span class="w"> </span>/dev/mapper/cifrado<span class="w"> </span>/mnt
+</pre></div>
+</div>
+<p>Si en algún momento quisiéramos desmontar todo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>umount<span class="w"> </span>/mnt
+<span class="gp"># </span>cryptsetup<span class="w"> </span>close<span class="w"> </span>cifrado
+</pre></div>
+</div>
+<p class="rubric">Operativa automatizada</p>
+<p>Que el administrador deba llevar a cabo estas operaciones cada vez que se
+arranca el sistema, no es algo operativo. Para semiautomatizar el montaje
+durante el arranque podemos añadir la asociación entre el dispositivo físico y
+el virtual en <code class="file docutils literal notranslate"><span class="pre">/etc/crypttab</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;cifrado /dev/sda6 none&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/crypttab
+</pre></div>
+</div>
+<p>y la asociación entre el dispositivo virtual y el punto de montaje en
+<code class="file docutils literal notranslate"><span class="pre">/etc/fstab</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;/dev/mapper/cifrado /mnt ext4 defaults 0 0&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/fstab
+</pre></div>
+</div>
+<p>El montaje será semiautomático, porque durante el proceso de arranque deberemos
+digitalizar la contraseña. Es posible, también, en vez de que la clave sea
+interactiva, guardarla en un archivo. Es más, <abbr title="Linux Unified Key Setup">LUKS</abbr> dispone de ocho slots para
+almacenar claves alternativas. Ahora mismo sólo habría una:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>cryptsetup<span class="w"> </span>luksDump<span class="w"> </span>/dev/sda6
+<span class="go">LUKS header information</span>
+<span class="go">Version:        2</span>
+<span class="go">Epoch:          8</span>
+<span class="go">Metadata area:  16384 [bytes]</span>
+<span class="go">Keyslots area:  16744448 [bytes]</span>
+<span class="go">UUID:           e26d3cf8-20a7-422f-ac8f-83340e63725f</span>
+<span class="go">Label:          (no label)</span>
+<span class="go">Subsystem:      (no subsystem)</span>
+<span class="go">Flags:          (no flags)</span>
+
+<span class="go">Data segments:</span>
+<span class="go">  0: crypt</span>
+<span class="go">        offset: 16777216 [bytes]</span>
+<span class="go">        length: (whole device)</span>
+<span class="go">        cipher: aes-xts-plain64</span>
+<span class="go">        sector: 512 [bytes]</span>
+
+<span class="hll"><span class="go">Keyslots:</span>
+</span><span class="go">  0: luks2</span>
+<span class="go">        Key:        512 bits</span>
+<span class="go">        Priority:   normal</span>
+<span class="go">        Cipher:     aes-xts-plain64</span>
+<span class="go">        Cipher key: 512 bits</span>
+<span class="go">        PBKDF:      argon2i</span>
+<span class="go">        Time cost:  4</span>
+<span class="go">        Memory:     98948</span>
+<span class="go">        Threads:    1</span>
+<span class="go">        Salt:       a0 a1 57 4c 30 6a af e5 de 76 d5 d8 a9 f0 11 b7</span>
+<span class="go">                    ac b5 c6 90 d0 1d 4e 92 4d 1c 4b b5 4c 07 97 70</span>
+<span class="go">        AF stripes: 4000</span>
+<span class="go">        AF hash:    sha256</span>
+<span class="go">        Area offset:32768 [bytes]</span>
+<span class="go">        Area length:58048 [bytes]</span>
+<span class="go">        Digest ID:  0</span>
+
+<span class="go">Tokens:</span>
+<span class="go">Digests:</span>
+<span class="go">  0: pbkdf2</span>
+<span class="go">        Hash:       sha256</span>
+<span class="go">        Iterations: 39337</span>
+<span class="go">        Salt:       2b c9 51 10 c7 29 4b 63 35 a4 83 63 bc 36 46 2f</span>
+<span class="go">                    49 92 af dd 32 a8 7c 9d 19 08 51 80 1b 58 6f 56</span>
+<span class="go">        Digest:     0c 52 b0 1d 8c 80 2e 6b 45 0a c8 ac 4a b2 e9 a2</span>
+<span class="go">                    f4 bf 81 e6 5a 00 c4 42 af 10 21 9c 3a 92 fe 6c</span>
+</pre></div>
+</div>
+<p>con lo que podemos añadir al mismo sistema otra clave que esté en un archivo.
+Para ello, vamos primero a generar esa clave, constituida por 512 <em>bytes</em>
+totalmente aleatorios:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>dd<span class="w"> </span>&lt;<span class="w"> </span>/dev/urandom<span class="w"> </span>&gt;<span class="w"> </span>/root/luks.key<span class="w"> </span><span class="nv">bs</span><span class="o">=</span><span class="m">512</span><span class="w"> </span><span class="nv">count</span><span class="o">=</span><span class="m">1</span>
+</pre></div>
+</div>
+<p>que, podemos consultar en formato hexadecimal, así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>od<span class="w"> </span>-v<span class="w"> </span>-An<span class="w"> </span>-tx1<span class="w"> </span>/root/luks.key<span class="w">  </span><span class="c1"># Consultamos la clave</span>
+<span class="go">dc 12 ae d8 2c b5 4e 12 56 a9 35 b4 5f a6 29 b9</span>
+<span class="go">[...]</span>
+</pre></div>
+</div>
+<p>Con la clave ya en el archivo <code class="file docutils literal notranslate"><span class="pre">/root/luks.key</span></code>, podemos añadirla a un
+<em>slot</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>cryptsetup<span class="w"> </span>luksAddKey<span class="w"> </span>/dev/sda6<span class="w"> </span>/root/luks.key
+<span class="gp"># </span>cryptsetup<span class="w"> </span>luksDump<span class="w"> </span>/dev/sda6
+<span class="go">[...]</span>
+<span class="go">Keyslots:</span>
+<span class="go">  0: luks2</span>
+<span class="go">        Key:        512 bits</span>
+<span class="go">        Priority:   normal</span>
+<span class="go">        Cipher:     aes-xts-plain64</span>
+<span class="go">        Cipher key: 512 bits</span>
+<span class="go">        PBKDF:      argon2i</span>
+<span class="go">        Time cost:  4</span>
+<span class="go">        Memory:     98948</span>
+<span class="go">        Threads:    1</span>
+<span class="go">        Salt:       a0 a1 57 4c 30 6a af e5 de 76 d5 d8 a9 f0 11 b7</span>
+<span class="go">                    ac b5 c6 90 d0 1d 4e 92 4d 1c 4b b5 4c 07 97 70</span>
+<span class="go">        AF stripes: 4000</span>
+<span class="go">        AF hash:    sha256</span>
+<span class="go">        Area offset:32768 [bytes]</span>
+<span class="go">        Area length:258048 [bytes]</span>
+<span class="go">        Digest ID:  0</span>
+<span class="go">  1: luks2</span>
+<span class="go">        Key:        512 bits</span>
+<span class="go">        Priority:   normal</span>
+<span class="go">        Cipher:     aes-xts-plain64</span>
+<span class="go">        Cipher key: 512 bits</span>
+<span class="go">        PBKDF:      argon2i</span>
+<span class="go">        Time cost:  4</span>
+<span class="go">        Memory:     100952</span>
+<span class="go">        Threads:    1</span>
+<span class="go">        Salt:       b1 63 a9 24 aa cc f5 9c b4 6c 8a 8b 27 7a cb 2c</span>
+<span class="go">                    72 cd f8 d9 68 b9 1b f4 43 c7 d6 b5 20 81 47 c5</span>
+<span class="go">        AF stripes: 4000</span>
+<span class="go">        AF hash:    sha256</span>
+<span class="go">        Area offset:290816 [bytes]</span>
+<span class="go">        Area length:258048 [bytes]</span>
+<span class="go">        Digest ID:  0</span>
+<span class="go">[...]</span>
+</pre></div>
+</div>
+<p>Por último, si en <code class="file docutils literal notranslate"><span class="pre">/etc/crypttab</span></code> modificamos la línea para que se use el
+archivo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cifrado     /dev/sda6      /root/luks.key</span>
+</pre></div>
+</div>
+<p>durante el arranque no se pedirá ninguna clave y el sistema se encontrará
+montado al acabar la secuencia.</p>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Ahora bien, ¿para qué ciframos una partición si dejamos la
+clave para su descifrado en un archivo de otra partición sin cifrar?</p>
+</div>
+<p>Lo interesante de lo anterior es, simplemente, comprobar que se puede guardar la
+clave en un archivo y usarlo para no tener que escribirla interactivamente. Y
+ello es útil, si almacenamos el archivo en un dispositivo externo como un pincho
+<abbr title="Universal Serial Bus">USB</abbr> que procuremos retirar y llevarnos lejos de la máquina cuando no la
+usemos. Además, es conveniente ocultar ese archivo para que pase desapercibido
+si alguien se hace con nuestro pincho. A este respecto, lo más juicioso es
+guardar los 512 <em>bytes</em> de la clave en algún espacio libre del pincho <abbr title="Universal Serial Bus">USB</abbr> y
+ajeno a los sistemas de archivos que pueda haber en él:</p>
+<ul class="simple">
+<li><p>Si el particionado es <abbr title="Disk Operating System">DOS</abbr>, podemos utilizar los últimos 512 bytes del espacio
+entre el <abbr title="Master Boot Record">MBR</abbr> y la primera partición, ya que al principio de ese espacio
+puede haber código de un gestor de arranque como <abbr title="GRand Unified Bootloader">GRUB</abbr>.</p></li>
+<li><p>Si el particionado es <abbr title="GUID Partition Table">GPT</abbr>, podemos utilizar los últimos 512 bytes del espacio
+que se reserva para definir particiones, ya que es bastante improbable que en
+el pincho hayamos creado más de 124 particiones.</p></li>
+</ul>
+<p>Pongamos este segundo caso de ejemplo. En un disco <abbr title="GUID Partition Table">GPT</abbr>:</p>
+<ul class="simple">
+<li><p>El primer sector es un <abbr title="Master Boot Record">MBR</abbr> ficticio (512B)</p></li>
+<li><p>El segundo sector es la cabecera <abbr title="GUID Partition Table">GPT</abbr> (512B)</p></li>
+<li><p>A continuación hay espacio para 128 definiciones de particiones cada una
+de las cuales ocupa 128 bytes (16KiB).</p></li>
+</ul>
+<p>En consecuencia el comienzo del disco ocupa 17KiB o lo que es lo mismo 34
+sectores, así que podemos ocupar el sector <strong>34</strong> para almacenar nuestra clave,
+con el único costo de que &quot;sólo&quot; podremos definir 124 particiones, lo cual,
+ciertamente, no parece ningún problema.</p>
+<p>Supongamos que el pincho se encuentra en <code class="file docutils literal notranslate"><span class="pre">/dev/sdb</span></code><a class="footnote-reference brackets" href="#id4" id="id2" role="doc-noteref"><span class="fn-bracket">[</span>2<span class="fn-bracket">]</span></a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>gdisk<span class="w"> </span>-l<span class="w"> </span>/dev/sdb
+<span class="go">[...]</span>
+<span class="go">Number  Start (sector)    End (sector)  Size       Code  Name</span>
+<span class="go">   1             416          103003   50.1 MiB    EF00  EFI System Partition</span>
+<span class="go">   2          103008        30719966   14.6 GiB    0700  Microsoft basic data</span>
+</pre></div>
+</div>
+<p>Vamos a crear una clave aleatoria de 512 bytes directamente sobre su sector
+<strong>34</strong>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>dd<span class="w"> </span>&lt;<span class="w"> </span>/dev/urandom<span class="w"> </span>&gt;<span class="w"> </span>/dev/sdb<span class="w"> </span><span class="nv">bs</span><span class="o">=</span><span class="m">512</span><span class="w"> </span><span class="nv">count</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="nv">seek</span><span class="o">=</span><span class="m">33</span>
+</pre></div>
+</div>
+<p>y, creada, la añadimos a un <em>slot</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span><span class="o">{</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;secreto&quot;</span><span class="w"> </span><span class="p">;</span><span class="w"> </span>dd<span class="w"> </span>&lt;<span class="w"> </span>/dev/sdb<span class="w"> </span><span class="nv">bs</span><span class="o">=</span><span class="m">512</span><span class="w"> </span><span class="nv">count</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="nv">skip</span><span class="o">=</span><span class="m">33</span><span class="p">;</span><span class="w"> </span><span class="o">}</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>cryptsetup<span class="w"> </span>luksAddKey<span class="w"> </span>/dev/sda6<span class="w"> </span>-
+</pre></div>
+</div>
+<p>donde «secreto» es la contraseña que introdujimos al crear el dispositivo
+cifrado y que nos servía para hacer el montaje interactivo. Añadida esta clave,
+podemos probar si funciona del siguiente modo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>dd<span class="w"> </span>&lt;<span class="w"> </span>/dev/sdb<span class="w"> </span><span class="nv">bs</span><span class="o">=</span><span class="m">512</span><span class="w"> </span><span class="nv">count</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="nv">skip</span><span class="o">=</span><span class="m">33</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>cryptsetup<span class="w"> </span>open<span class="w"> </span>/dev/sda6<span class="w"> </span>cifrado<span class="w"> </span>--key-file<span class="o">=</span>-
+</pre></div>
+</div>
+<p>que debe generar el dispositivo virtual y, si continua la línea en
+<code class="file docutils literal notranslate"><span class="pre">/etc/fstab</span></code>, montarnos directamente la partición sobre <code class="file docutils literal notranslate"><span class="pre">/srv</span></code>. Ya
+tenemos la mitad del trabajo hecho, ya que aún falta que al arrancar el sistema
+busque el dispositivo, lo monte y lleve a cabo justamente esta operación.</p>
+<p>Para ello, debemos crear una regla para <strong class="program">udev</strong>, que al detectar el
+dispositivo <abbr title="Universal Serial Bus">USB</abbr> lance un script:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>cat<span class="w"> </span>&gt;<span class="w"> </span>/etc/udev/rules.d/70-usb.rules
+<span class="go">SUBSYSTEMS==&quot;usb&quot;, ACTION==&quot;add&quot;, ATTRS{idVendor}==&quot;abcd&quot;, ATTRS{idProduct}==&quot;1234&quot;, \</span>
+<span class="go">   KERNEL==&quot;sd?&quot;, SYMLINK+=&quot;usbkey&quot;, RUN+=&quot;/usr/local/bin/unlock.sh&quot;</span>
+</pre></div>
+</div>
+<p>La regla identifica el dispositivo en el que hemos guardado la clave a través
+de su <em>idVendor</em> e <em>idProduct</em> que se pueden consultar fácilmente al hacer:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>lsusb
+<span class="go">[...]</span>
+<span class="go">Bus 002 Device 002: ID abcd:1234 Unknown</span>
+<span class="go">[...]</span>
+</pre></div>
+</div>
+<p>Además, aprovechamos la regla para añadir un enlace simbólico <code class="file docutils literal notranslate"><span class="pre">/dev/usbkey</span></code> que apunte
+al dispositivo. Con este nombre podremos referirnos al dispositivo dentro del <em>script</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span>!/bin/sh
+<span class="go">RT=&quot;/dev/sda6&quot;</span>
+<span class="go">DEVICE=&quot;/dev/usbkey&quot;</span>
+<span class="go">ENCVOL=&quot;cifrado&quot;</span>
+<span class="go">MOUNTP=&quot;/srv&quot;</span>
+
+<span class="go">{</span>
+<span class="go">   until [ -b &quot;$PART&quot; ]; do sleep .5; done</span>
+<span class="go">   dd &lt; &quot;$DEVICE&quot; bs=512 count=1 skip=33 | \</span>
+<span class="go">      cryptsetup open &quot;$PART&quot; &quot;$ENCVOL&quot; --key-file=-</span>
+<span class="go">} &amp;</span>
+</pre></div>
+</div>
+<p>Por último, en <code class="file docutils literal notranslate"><span class="pre">/etc/crypttab</span></code> no debe existir referencia alguna, ya
+que es el <em>script</em> el que realiza la operación de crear el dispositivo cifrado.
+En <code class="file docutils literal notranslate"><span class="pre">/etc/fstab</span></code>, sí podemos dejar la línea, pero añadiendo la opción
+<em>nofail</em>, para que no falle el montaje y pare el arranque en caso de que no se
+encuentre el pincho:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">/dev/mapper/cifrado /srv   ext4   defaults,nofail  0 0</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Esta estrategia está tomada de <a class="reference external" href="https://possiblelossofprecision.net/?p=300">esta entrada de /dev/blog</a> y sólo es válida si se cifra
+una partición de datos y no la partición del sistema. Si se lleva a cabo el
+cifrado del sistema, es necesario recurrir a otra estrategia totalmente
+distinta basada en manipular la imagen <a class="reference external" href="https://wiki.gentoo.org/wiki/Initramfs/Guide/es">initramfs</a>.</p>
+</div>
+<p class="rubric">Notas al pie</p>
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="id3" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
+<p>También puede ser un volumen lógico de <abbr title="Logical Volume Management">LVM</abbr>.</p>
+</aside>
+<aside class="footnote brackets" id="id4" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id2">2</a><span class="fn-bracket">]</span></span>
+<p>Si se observa con atención, la primera partición no empieza en 34.
+Sino más adelante. Es posible, puesto que la parte destinada a la definición
+de particiones puede ser mayor. Sin embargo, ese <abbr title="Universal Serial Bus">USB</abbr> procede de una imagen
+híbrida y es probable que empiece después, porque antes se ha situado el
+código de un gestor de arranque. En cualquier, como <abbr title="GUID Partition Table">GPT</abbr> obliga a que como
+mínimo se puedan definir 128 particiones, si escribimos en el sector 34,
+no nos cargaremos nada.</p>
+</aside>
+</aside>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h4>Tema anterior</h4>
+    <p class="topless"><a href="01.hardware.html"
+                          title="capítulo anterior"><span class="section-number">9.1.3.6.1. </span>Cifrado por <em>hardware</em></a></p>
+  </div>
+  <div>
+    <h4>Próximo tema</h4>
+    <p class="topless"><a href="03.fs.html"
+                          title="próximo capítulo"><span class="section-number">9.1.3.6.3. </span>Cifrado con el sistema de archivos</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../../_sources/98.apendice/01.cryto/03.aplicaciones/06.discos/02.luks.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="03.fs.html" title="9.1.3.6.3. Cifrado con el sistema de archivos"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="01.hardware.html" title="9.1.3.6.1. Cifrado por hardware"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" ><span class="section-number">9. </span>Apéndices</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../index.html" ><span class="section-number">9.1. </span>Criptografía</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../../03.aplicaciones.html" ><span class="section-number">9.1.3. </span>Aplicaciones de la criptografía</a> &#187;</li>
+          <li class="nav-item nav-item-4"><a href="../06.discos.html" ><span class="section-number">9.1.3.6. </span>Cifrado de discos</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">9.1.3.6.2. </span>Cifrado de bloques</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright CC BY 4.0, 2016-2025, José Miguel Sánchez Alés.
+      Creado usando <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    </div>
+  </body>
+</html>

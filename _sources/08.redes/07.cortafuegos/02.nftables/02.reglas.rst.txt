@@ -1,0 +1,681 @@
+.. _iptables-rules:
+
+Reglas
+******
+Si nuestro cortafuegos no lleva a cabo tareas muy complicadas, es posible seguir
+usando la :ref:`sintaxis de iptables <iptables-sintaxis>` a través de la familia
+de órdenes :program:`iptables-nft`, :program:`ip6tables-nft`,
+:program:`ebtables-nft` y :program:`arptables-nft` sin preocuparnos siquiera de crear
+tablas ni cadenas, puesto que estas órdenes, al ser ejecutadas, crean las
+cadenas pertinentes. Así pues\ [#]_::
+
+   # iptables-nft -vnL
+
+creará las cadenas incluidas en las tablas *filter*\ [#]_::
+
+   # nft list table filter
+   table ip filter {
+      chain INPUT {
+         type filter hook input priority filter; policy accept;
+      }
+
+      chain FORWARD {
+         type filter hook forward priority filter; policy accept;
+      }
+
+      chain OUTPUT {
+         type filter hook output priority filter; policy accept;
+      }
+   }
+
+y la expresión de una regla también será interpretada sin problemas::
+
+   # iptables -A INPUT -p tcp --dport 80 -j DROP
+   # nft list chain filter INPUT
+   table ip filter {
+      chain INPUT {
+         type filter hook input priority filter; policy accept;
+         meta l4proto tcp tcp dport 80 counter packets 0 bytes 0 drop
+      }
+   }
+
+Hay, además, un traductor que permite ver cuál es el equivalente sin
+llegar a hacer la orden efectiva::
+
+   # iptables-translate -A INPUT -p tcp --dport 80 -j DROP
+   nft add rule ip filter INPUT tcp dport 80 counter drop
+
+Para tareas más complicadas, en cambio, es forzoso conocer la sintaxis modernas
+y a ello nos dedicaremos.
+
+Sintaxis
+========
+Las reglas se añaden a las cadenas y se van comprobando en el orden en el que
+se encuentran en ella. se añaden del siguiente modo::
+
+   # nft add|insert rule [<famiy>] <table> <chain> [handle <value>] [<selectores>] [<acciones>] [comment "Comentario"]
+
+esto es:
+
+- Se puede añadir (:kbd:`add`) o insertar (:kbd:`ìnsert`).
+- Se indica la cadena a la que pertenece la regla.
+- Con :kbd:`handle` se indica la posición de adición o inserción. Añadir
+  implica hacerlo tras la posición e insertar antes de ella. Si no se indica
+  :kbd:`handle`, :kbd:`add` añadirá la regla al final de la cadena e
+  :kbd:`insert`, al commienza.
+- Los selectores (uno o varios) permiten especificar cuál es el tráfico al que
+  afecta la regla.
+- Debe especificarse cuál es el efecto o efectos de la regla sobre
+  el tráfico al que afecta.
+- Por último, puede añadirse un comentario que explique qué hace la regla.
+
+Por ejemplo::
+
+   # nft add rule filter INPUT ip daddr 10.0.0.0/8 accept
+
+en este caso, hay una condición, que la dirección de destino esté en la red
+*10.0.0.0/8*; y una acción terminal: aceptar el tráfico. Puede no incluirse
+acción alguna, en cuyo caso, la regla comprobará la condición... pero no
+hará nada en particular (aunque puede tener sentido si :ref:`se quieren contar
+paquetes <nftables-counter>`).
+
+Para listar reglas podemos:
+
+* Listar las reglas de una cadena::
+
+   nft list chain [<family>] <table> <nombre>
+
+  como, por ejemplo::
+
+   # nft list chain filter INPUT
+
+* Listas las reglas de todas las cadenas de una tabla::
+
+   nft list table [<family>] <nombre>
+
+  como por ejemplo::
+
+   # nft list table filter
+
+* Listar todas las reglas::
+
+   # nft list ruleset
+
+Es interesante la opción :kbd:`-a` que indica para cada regla el *handle* que le
+corresponde y que podemos usar para borrar reglas::
+
+   # nft delete rule [<family>] <table> <chain> handle <handle>
+
+como por ejemplo::
+
+   # nft delete rule filter INPUT handle 1
+
+Si sustituimos :kbd:`list` por :kbd:`flush` lograremos el efecto de vaciar de
+reglas la cadena, todas las cadenas de la tabla o todas las cadenas de todas las
+tablas::
+
+   # nft flush chain filter INPUT
+   # nft flush table filter
+   # nft flush ruleset
+
+Condiciones
+-----------
+Algunas de las condiciones que podemos indicar son:
+
+.. table::
+   :class: nftables-matches
+
+   +----------+-----------------+-----------------------------------------------------+
+   | Criterio | Argumento       | Descripción                                         |
+   +==========+=================+=====================================================+
+   | ip       | protocol        | Protocolo de la capa superior (incluido |ICMP|)     |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | ip protocol icmp                                    |
+   |          |                 | ip protocol != tcp                                  |
+   |          |                 | ip protocol {tcp, udp}                              |
+   |          +-----------------+-----------------------------------------------------+
+   |          | saddr           | Dirección de origen.                                |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | ip saddr 8.8.8.8                                    |
+   |          |                 | ip saddr 192.168.255.0/24                           |
+   |          +-----------------+-----------------------------------------------------+
+   |          | daddr           | Dirección de destino.                               |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | ip daddr 8.8.8.8                                    |
+   |          |                 | ip daddr != 192.168.255.0/24                        |
+   +----------+-----------------+-----------------------------------------------------+
+   | ip6      | saddr           | Dirección de origen.                                |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | ip saddr ::/64                                      |
+   |          +-----------------+-----------------------------------------------------+
+   |          | daddr           | Dirección de destino.                               |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | ip daddr ::/64                                      |
+   +----------+-----------------+-----------------------------------------------------+
+   | tcp      | sport           | Puerto de origen.                                   |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | tcp sport ssh                                       |
+   |          |                 | tcp sport 22-80                                     |
+   |          +-----------------+-----------------------------------------------------+
+   |          | dport           | Puerto de destino.                                  |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | tcp dport != telnet                                 |
+   |          |                 | tcp dport {22, 23}                                  |
+   |          +-----------------+-----------------------------------------------------+
+   |          | flags           | Indicadores |TCP|                                   |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | tcp dport != telnet                                 |
+   |          |                 | tcp dport {22, 23}                                  |
+   +----------+-----------------+-----------------------------------------------------+
+   | udp      | sport           | Puerto de origen.                                   |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | udp sport 53                                        |
+   |          +-----------------+-----------------------------------------------------+
+   |          | dport           | Puerto de destino.                                  |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | udp dport != 53                                     |
+   +----------+-----------------+-----------------------------------------------------+
+   | ether    | saddr           | |MAC| de origen.                                    |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | ether saddr 00:11:22:33:44:55                       |
+   |          +-----------------+-----------------------------------------------------+
+   |          | daddr           | |MAC| de destino.                                   |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | ether daddr 00:11:22:33:44:55                       |
+   |          +-----------------+-----------------------------------------------------+
+   |          | type            | Tipo de protocolo de capa superior.                 |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | | ether type arp                                    |
+   |          |                 | | ether type ip                                     |
+   |          |                 | | ether type vlan                                   |
+   +----------+-----------------+-----------------------------------------------------+
+   | vlan     | id              | Identificador de la |VLAN|.                         |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | vlan id 10                                          |
+   +----------+-----------------+-----------------------------------------------------+
+   | ct       | state           | Estado de la conexión: *new*, *established*,        |
+   |          |                 | *related*, *untracked*, *invalid*.                  |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | ct state {established, related}                     |
+   |          +-----------------+-----------------------------------------------------+
+   |          | status          | Estado de la conexión (*snat* o *dnat* si el        |
+   |          |                 | tráfico ha sufrido |SNAT| o |DNAT|, respectivamente)|
+   |          |                 +-----------------------------------------------------+
+   |          |                 | ct status dnat                                      |
+   |          +-----------------+-----------------------------------------------------+
+   |          | mark [set]      | Comprueba la marca de la conexión o la fija si se   |
+   |          |                 | usa :kbd:`set`.                                     |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | ct mark 1                                           |
+   |          |                 | ct mark set 1                                       |
+   |          +-----------------+-----------------------------------------------------+
+   |          | direction       | Dirección del paquete: *original* o *reply*         |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | ct direction reply                                  |
+   |          +-----------------+-----------------------------------------------------+
+   |          | count [over]    | Comprueba si la cantidad de conexiones simultáneas  |
+   |          |                 | no supera el límite indicado. Con :kbd:`over` se    |
+   |          |                 | comprueba si lo supera.                             |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | ct state new ct count 20                            |
+   +----------+-----------------+-----------------------------------------------------+
+   | meta     | | iifname       | Nombre de la interfaz de entrada o salida.          | 
+   |          | | oifname       +-----------------------------------------------------+
+   |          |                 | meta iifname "eth0"                                 |
+   |          |                 | meta iifname "eth*"                                 |
+   |          +-----------------+-----------------------------------------------------+
+   |          | | iif           | Índice de la interfaz que se adjudica al crearla    |
+   |          | | oif           | y puede consultarse en                              |
+   |          |                 | :file:`/class/net/eth0/ifindex`. La comparación es  |
+   |          |                 | más eficiente que para :kbd:`iifname`, pero el      |
+   |          |                 | índice no es                                        |
+   |          |                 | reciclable, por lo que sólo es recomendable usarlo  |
+   |          |                 | si la interfaz se crea una vez y no se destruye     |
+   |          |                 | (p.e. una interfaz física). Consulte `este enlace`_.|
+   |          |                 +-----------------------------------------------------+
+   |          |                 | meta iif eth0                                       |
+   |          +-----------------+-----------------------------------------------------+
+   |          | | iifgroup      | Grupo al que pertenece la interfaz de entrada o     |
+   |          | | oifgroup      | salida. Las interfaces pueden asignarse a un grupo  |
+   |          |                 | (ver :manpage:`ip-link(8)`) y definir los nombres   |
+   |          |                 | de los grupos en :file:`/etc/iproute2/groups`.      |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | meta iifgroup 99                                    |
+   |          +-----------------+-----------------------------------------------------+
+   |          | | iiftype       | Tipo de la interfaz (*ether*, *loopback*, etc.)     |
+   |          | | oiftype       |                                                     |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | meta iiftype loopback                               |
+   |          +-----------------+-----------------------------------------------------+
+   |          | mark [set]      | Comprueba o establece la marca del paquete.         |
+   |          |                 +-----------------------------------------------------+
+   |          |                 | meta mark 2                                         |
+   |          |                 | meta mark set 2                                     |
+   +----------+-----------------+-----------------------------------------------------+
+
+.. _este enlace: https://serverfault.com/a/985167
+
+.. note:: Consulte :manpage:`nft(8)` para una lista completa de criterios y
+   argumentos o `este artículo en la wiki de nftables
+   <https://wiki.nftables.org/wiki-nftables/index.php/Quick_reference-nftables_in_10_minutes>`_.
+
+Tenga presenta que:
+
+* Pueden acomularse condiciones en una misma sentencia::
+
+   ip saddr 8.8.8.8 tcp dport telnet
+
+* Cuando los valores son numéricos la igualdad se nota no indicando operador,
+  pero también pueden usarse operadores de comparación (:kbd:`!=`, :kbd:`<`),
+  rangos o valores hexadecimales (usando la notación :kbd:`0x`)::
+
+   tcp dport 80
+   tcp dport != 80
+   tcp dport >= 80
+   tcp dport 0x50
+   tcp dport 80-120
+
+  .. warning:: Si ejecuta órdenes directamente en la *shell* tendrá que escapar
+     algunos de estos caracteres.
+
+* Es posible incluir como valor conjuntos de valores::
+
+   tcp dport {http, https}
+   tcp dport != {http, https}
+   iif {eth0, eth1}
+
+  .. seealso:: Revise el :ref:`epígrafe dedicado a conjuntos <nftables-sets>`.
+
+Acciones
+--------
+Las acciones pueden ser:
+
+- *Terminales*, que terminan la evaluación de la regla.
+- *No terminales*, que son aquellas que no acaban la evaluación o establecen una condición.
+
+
+En una regla puede encontrarse como mucho una acción terminal, pero pueden añadirse varias no terminales.
+Además las terminales no tienen por qué encontrarse al final de la sentencia,
+sino que pueden intercalarse entre las condiciones. Por ejemplo::
+
+   # nft add table filter
+   # nft add chain filter INPUT "{type filter hook input priority 0;}"
+   # nft add rule filter INPUT ct state new ip protocol TCP log prefix '"TCP: "' \
+                                            tcp dport ssh log prefix '"SSH: "' accept
+
+generará una línea de registro advirtiendo de que una nueva conexión cuando ésta
+sea |TCP|, y añadirá otra línea adicional advirtiendo de que es |SSH| cuando,
+además, sea tráfico de este tipo.
+
+.. _nftables-acc-term:
+
+.. rubric:: Acciones terminales
+
+.. table::
+   :class: nftables-acc-term
+
+   +--------------+------------------------------------------------------------+
+   | Acción       |   Descripción                                              |
+   +==============+============================================================+
+   | accept       | Permite el paquete y acaba la evaluación de la cadena.     |
+   +--------------+------------------------------------------------------------+
+   | drop         | Desecha el paquete y acaba la evaluación.                  |
+   +--------------+------------------------------------------------------------+
+   | reject       | Rechaza el paquete, pero informando al emisor. Admite      |
+   |              | añadir la causa (el tipo |ICMP| o un |TCP| reset si el     |
+   |              | tráfico de origen es |TCP|). Si se prescinde de la causa,  |
+   |              | se envía un :kbd:`port-unreachable`                        |
+   |              +------------------------------------------------------------+
+   |              | reject with icmp type host-unreachable                     |
+   |              | reject with icmp type port-unreachable                     |
+   |              | reject with tcp reset                                      |
+   +--------------+------------------------------------------------------------+
+   | queue        | Envía el paquete a una cola en el espacio de usuario para  |
+   |              | que lo gestione una aplicación y acaba la evaluación.      |
+   |              | Véase `cómo enviarlos a la cola`_.                         |
+   +--------------+------------------------------------------------------------+
+   | continue     | Prosegue la evaluación con la siguiente regla.             |
+   +--------------+------------------------------------------------------------+
+   | return       | Deja de evaluar las reglas de la cadena actual y regresa   |
+   |              | a la regla posterior a la que invocó el salto. En una      |
+   |              | cadena base, equivale a *accept*.                          |
+   +--------------+------------------------------------------------------------+
+   | jump <chain> | Salta a la cadena de usuario que se especifique y, al      |
+   |              | término de ésta se prosigue por la siguiente regla.        |
+   +--------------+------------------------------------------------------------+
+   | goto <chain> | Salta también a la cadena especificada, pero al término    |
+   |              | prosigue al final de la cadena desde la que se invocó.     |
+   +--------------+------------------------------------------------------------+
+
+.. _cómo enviarlos a la cola: https://wiki.nftables.org/wiki-nftables/index.php/Queueing_to_userspace
+
+.. _nftables-acc-no-term:
+
+.. rubric:: Acciones no terminales
+
+No llevan acabo una acción que interrumpa la evaluación o introducen alguna
+condición adicional
+
+.. table::
+   :class: nftables-acc-no-term
+
+   +------------+-------------+---------------------------------------------------------------------------------------+
+   |  Acción    | Argumento   | Descripción                                                                           |
+   +============+=============+=======================================================================================+
+   | log        | | prefix    | Registra el paso de un paquete. :kbd:`prefix` añade un prefijo a la                   |
+   |            | | level     | cadena de registro y :kbd:`level` indica cuál debe ser la importancia:                |
+   |            |             | *emerg*, *alert*, *crit*, *err*, *warn*, *notice*, *info* o *debug*.                  |
+   |            |             +---------------------------------------------------------------------------------------+
+   |            |             | nft add rule filter INPUT ct state new dport ssh log prefix '"SSH: "' level info      |
+   +------------+-------------+---------------------------------------------------------------------------------------+
+   | counter    | [name]      | Añade un contador a la regla.                                                         |
+   |            |             +---------------------------------------------------------------------------------------+
+   |            |             | | nft add rule filter INPUT ct state new dport ssh counter                            |
+   |            |             | | nft add rule filter INPUT ct state new dport ssh counter name pines                 |
+   +------------+-------------+---------------------------------------------------------------------------------------+
+   | snat       | to          | Realiza un |SNAT|.                                                                    |
+   |            |             +---------------------------------------------------------------------------------------+
+   |            |             | nft add rule nat POSTROUNTING oif eth0 snat to 172.22.0.2                             |
+   +------------+-------------+---------------------------------------------------------------------------------------+
+   | masquerade | [to :port]  | Realiza un |SNAT| copiando la dirección de la interfaz de salida.                     |
+   |            |             +---------------------------------------------------------------------------------------+
+   |            |             | nft add rule nat POSTROUNTING oif eth0 masquerade                                     |
+   +------------+-------------+---------------------------------------------------------------------------------------+
+   | dnat       | to          | Realiza un |DNAT|.                                                                    |
+   |            |             +---------------------------------------------------------------------------------------+
+   |            |             | | nft add rule nat PREROUNTING iif eth0 tcp dport {http,https} dnat to 192.168.255.10 |
+   |            |             | | nft add rule nat PREROUNTING iif eth0 tcp dport 8080 dnat to 192.168.255.10:80      |
+   |            |             | | nft add rule nat PREROUNTING iif eth0 dnat tcp port map {80: 10.0.0.3,443: 10.0.0.4}|
+   +------------+-------------+---------------------------------------------------------------------------------------+
+   | redirect   | [to :port]  | Realiza un |DNAT| hacia la propia máquina.                                            |
+   |            |             +---------------------------------------------------------------------------------------+
+   |            |             | | nft add rule nat PREROUNTING iif eth0 tcp dport 80 redirect                         |
+   |            |             | | nft add rule nat PREROUNTING iif eth0 tcp dport 8080 redirect to :80                |
+   +------------+-------------+---------------------------------------------------------------------------------------+
+   | | add      | @setname    | Añade o actualiza elementos de un :ref:`conjunto <nftables-sets>` desde una regla.    |
+   | | update   |             +---------------------------------------------------------------------------------------+
+   |            |             | nft add rule filter INPUT icmp type echo-request add @testers {ip saddr timeout 2m}   |
+   +------------+-------------+---------------------------------------------------------------------------------------+
+
+.. _nftables-stateful-objects:
+
+Objetos de inspección de estado
+===============================
+Hay definidos tres:
+
+- Los contadores.
+- Los caudales de tráfico (o límites de ratio de tráfico si se prefiere).
+- Las cuotas.
+
+Los tres se caracterizan porque:
+
+- Pueden ser anónimos o definidos con un nombre. En el primer caso se crean
+  sobre la marcha al definir una regla, mientras que en el segundo se crean antes
+  y se usan luego en una o más reglas utilizando el nombre creado.
+
+- Son afectados por la regla en la que se encuentran. Por ejemplo, el contador::
+
+   # nft add filter input tcp dport ssh counter
+
+  incrementa en uno su valor al cumplir un paquete las condiciones incluidas en
+  la regla anteriores a su declaración. Por tanto cualquier paquete entrante de
+  trafico |SSH| incrementará el valor del contador. En cambio, en este otro
+  caso de dos contadores::
+
+   # nft add filter input tcp dport ssh counter ct state new counter
+
+  hay dos contadores, el primero de los cuales se actualiza con cualquier
+  paquete entrante |SSH|, pero el segundo sólo cuando uno de estos paquetes
+  inicia una conexión.
+
+- Un contador es una acción (se actualizan), pero no suponen ninguna condición;
+  mientras que el ratio y la cuota son ambas cosas: son acción porque se
+  actualizan y son condición porque establecen unos umbrales.
+
+Además de estos tres, tenemos una condición que se comporta de modo semejante y
+puede usarse en :ref:`conjuntos dinámicos <nftables-meters>`, la de conexiones
+simultáneas, por lo que la incluiremos dentro de este apartado.
+
+.. _nftables-counter:
+
+Contadores
+----------
+Partiendo de esto::
+
+   # nft add table filter
+   # nft add chain filter INPUT "{type filter hook input prority 0;}"
+   # nft add rule filter INPUT icmp type echo-request counter
+   # nft list table filter
+
+hemos creado un contador anónimo que contabilizará las peticiones |ICMP| entrantes.
+Podríamos en cambio haber creado un contador con nombre asociado a la tabla y
+usarlo en la regla::
+
+   # nft add counter filter pines
+   # nft add rule filter INPUT ip protocol icmp counter name pines
+
+Los contadores con nombre pueden usarse en varias reglas y, además, resetear su
+valor::
+
+   # nft reset counter filter pines
+
+.. _nftables-limit:
+
+Caudales
+--------
+El objeto *limit* permite contabilizar el tráfico de datos y mantenerlo dentro
+de un umbral máximo.
+
+.. table::
+   :class: nftables-acc-no-term
+
+   +------------+-------------+---------------------------------------------------------------------------------------+
+   | Acción     | Argumento   | Descripción                                                                           |
+   +============+=============+=======================================================================================+
+   | limit      | rate [over] | Establece una condición que será verdadera mientras no se supere (o sí con *over*)    |
+   |            |             | el ratio espeficiado. El ratio cuenta paquetes, *bytes*, *kbytes*, *mbytes* en        |
+   |            |             | periodos de *second*, *minute*, *hour*, *day* o *week*. Puede además añadir           |
+   |            |             | :kbd:`burst` para la :ref:`definición de la ráfaga <iptables-limit>`.                 |
+   |            |             +---------------------------------------------------------------------------------------+
+   |            |             | | nft add rule filter INPUT icmp type echo-request limit rate 1/second accept         |
+   |            |             | | nft add rule filter INPUT icmp type echo-request limit rate over 1/second drop      |
+   |            |             | | nft add rule filter INPUT iff eth0 limit rate over 10/seconds burst 50 packets drop |
+   +------------+-------------+---------------------------------------------------------------------------------------+
+
+Por ejemplo, esta regla contabiliza las peticiones |ICMP| entrantes y las acepta
+mientras no se supere la ratio de un paquete al segundo::
+
+   # nft add rule filter INPUT icmp type echo-request limit rate 1/second accept
+
+los que la superen acabarán rechazados si la política predeterminada es la de
+*lista blanca*. En cambio, si la política es de **lista negra**, lo que debemos
+hacer es rechazar las peticiones que superen la tasa::
+
+   # nft add rule netdev filter INGRESS icmp type echo-request limit rate over 1/second drop
+
+.. warning:: Hay que tener presente que, por defecto, la :ref:`ráfaga admisible
+   <iptables-limit>` es de **5**, por lo que si se hacen pruebas de concepto para
+   comprobar cómo funciona la limitación es preferible limitar la ráfaga al
+   ratio (es decir para *2/second*, *2*)::
+
+      # nft add rule filter INPUT icmp type echo-request limit rate 2/second burst 2 packets accept
+   
+Como ocurre con las cuotas, para limitar teniendo en cuenta también la dirección
+|IP| de origen de los paquetes, deberíamos combinar el objeto con el uso de
+:ref:`conjuntos dinámicos <nftables-meters>` y :ref:`concatenaciones
+<nftables-concat>`, ya que cada dirección de origen distinta debería
+contabilizar la ratio o la cuota de forma independiente.
+
+Es posible, por supuesto, definir una limitación con nombre, de forma análoga a
+como se hacía con los contadores::
+
+   # nft add limit filter icmpratio {rate 1/second}
+   # nft add rule filter INPUT icmp type echo-request limit name icmpratio accept
+
+o resetearlas.
+
+.. todo:: Implementar defensa contra ataque DoS a semejanza de iptables.
+
+.. _nftables-quota:
+
+Cuotas
+------
+De modo análogo podemos definir cuotas, que funcionan como límite del tráfico
+total que cumple con la regla.
+
+.. table::
+   :class: nftables-acc-no-term
+
+   +---------+-----------+-------------------------------------------------------------------+
+   | Acción  | Argumento | Descripción                                                       |
+   +=========+===========+===================================================================+
+   | quota   | [over]    | Establece una cuota para la tranferencia. Debe añadirse           |
+   |         |           | cuál es el umbral y las unidades (*bytes*, *kbytes*, *mbytes*)    |
+   |         |           +-------------------------------------------------------------------+
+   |         |           | nft add rule filter OUTPUT tcp sport 22 quota over 10 mbytes drop |
+   +---------+-----------+-------------------------------------------------------------------+
+
+Es posible crear cuotas con nombre::
+
+   # nft add quota ssh-quota {over 10 mbytes}
+   # nft add rule filter OUTPUT tcp sport 22 quota name ssh-quota drop
+
+aunque esto establecerá un límite general para todo el tráfico |SSH| de descarga
+y no por cliente lo que exige :ref:`conjuntos dinámicos <nftables-meters>`.
+
+.. _nftables-ctcount:
+
+Conexiones simultáneas
+----------------------
+:program:`nftables` brinda también la posibilidad de contar la cantidad de
+conexiones simultáneas:
+
+.. table::
+   :class: nftables-acc-no-term
+
+   +---------+--------------+---------------------------------------------------------------------------+
+   | Acción  | Argumento    | Descripción                                                               |
+   +=========+==============+===========================================================================+
+   | ct      | count [over] | Cuenta y comprueba que el número de conexiones simultáneas                |
+   |         |              | se mantenga en un umbral. Si se añade :kbd:`over`, se cumplirá            |
+   |         |              | la condición cuando se supere el umbral.                                  |
+   |         |              +---------------------------------------------------------------------------+
+   |         |              | nft add rule filter OUTPUT ct state new tcp sport 22 ct count over 2 drop |
+   +---------+--------------+---------------------------------------------------------------------------+
+
+.. warning:: Basta hacer la comprobación al primer paquete y, además, es
+   bastante costosa, por lo que los desarrolladores `recomiendan siempre
+   restringirla al paquete que abre la conexión
+   <https://patchwork.ozlabs.org/patch/859932/>`_ (véase el ejemplo ilustrativo
+   de la tabla).
+
+
+Persistencia
+============
+A diferencia de :ref:`iptables <iptables>`, :program:`nftables` tiene una
+pequeña capacidad de generación de *scripts* que permite definir reglas, incluir
+reglas definidas en otros ficheros, definir variables y añadir comentarios. No
+hay, sin embargo, ni sentencias condicionales ni bucles.
+
+Un script de estas características tenemos dos formas de ejecutarlo:
+
+#. Con :command:`nft`::
+
+      # nft -f reglas.nft
+
+#. Incluyendo en él una primera línea de *sheebang* y dándole permisos de
+   ejecución:
+
+   .. code-block:: bash
+
+      #!/usr/sbin/nft -f
+
+      # Borra todas las reglas
+      flush ruleset
+
+      # Configuración del cortafuegos ...
+
+Particularmente, en *Debian* existe deshabilitado un servicio *nftables* que si
+se habilita, lee el contenido del fichero :file:`/etc/nftables.conf`::
+
+   # systemctl status nftables
+   ● nftables.service - nftables
+      Loaded: loaded (/lib/systemd/system/nftables.service; disabled; vendor preset: enabled)
+      Active: inactive (dead)
+        Docs: man:nft(8)
+              http://wiki.nftables.org
+
+así que el modo más sencillo de configurar el cortafuegos es escribir dentro de
+este fichero las reglas y habilitar el servicio.
+
+Sentencias adicionales
+----------------------
+Pueden ser:
+
+**Comentarios**
+   Se notan, como en el lenguaje de la *shell* con "#". Cualquier texto incluido
+   tras uno, no se procesa.
+
+**Inclusión de ficheros externos**
+   Se hace mediante la sentencia :kbd:`include` y un argumento que indica el
+   fichero a leeri para el cual:
+
+   - Se permiten comodines.
+   - No se leen ficheros ocultos.
+   - Si se indca una ruta es relativa, esta es relativa al directorio que se haya
+     indicado mediante la opción :kbd:`--includepath` y, si esta no se incluye, a
+     un directorio predefinido en tiempo de compilación que en *Debian* es
+     :file:`/etc/`.
+
+   Por tanto, si incluímos dentro de :file:`/etc/nftables,conf` la línea:
+
+   .. code-block:: nginx
+
+      include "nftables.d/*.nft"
+
+   podremos crear el directorio :file:`/etc/nftables.d` y, dentro de él, crear
+   varios ficheros de extensión :file:`.nft` para una configuración modular.
+
+**Definición de variables**
+   Que pueden usarse luego en la definición de las reglas anteponiendo un "$" al
+   nombre::
+
+      # /etc/nftables.d/prueba.nft
+
+      define entrada eth0
+
+      add rule inet filter iif $entrada counter
+
+Reglas
+------
+Las definición reglas dentro del fichero puede hacerse mediante dos formatos
+distintos:
+
+* El que se usaría para escribir una regla con la orden :command:`nft`, pero sin
+  incluir el propio :kbd:`nft`. La regla con que acaba el epígrafe anterior es
+  un ejemplo.
+
+* Utilizando el mismo formato que devuelve una orden :kbd:`nft list`. Por
+  ejemplo, esto funciona perfectamente::
+
+      # echo "flush ruleset" > script.nft
+      # nft list ruleset >> script.nft
+      # nft -f script.nft
+
+
+.. rubric:: Notas al pie
+
+.. [#] En Buster_ basta con utilizar :command:`iptables`, puesto que es la
+   alternativa predeterminada frente al antiguo :command:`iptables` que ha
+   pasado a renombrase como :command:`iptables-legacy`.
+
+.. [#] No debe entenderse de lo dicho que para crear las tablas, hay que usar la
+   orden de listado primero. Insertar una regla, por ejemplo, ya crea la
+   infraestructura necesaria.
+
+.. |MAC| replace:: :abbr:`MAC (Media Access Control)`
+.. |VLAN| replace:: :abbr:`VLAN (Virtual LAN)`
+.. |DNAT| replace:: :abbr:`DNAT (Destination NAT)`
+.. |SNAT| replace:: :abbr:`SNAT (Source NAT)`
+.. |TCP| replace:: :abbr:`TCP (Transmission Control Protocol)`
+.. |ICMP| replace:: :abbr:`ICMP (Internet Control Message Protocol)`

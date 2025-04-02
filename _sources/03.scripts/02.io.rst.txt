@@ -1,0 +1,415 @@
+Entrada/Salida
+==============
+
+Salida
+------
+Fundamentalmente podemos usar dos órdenes:
+
+:ref:`echo <echo>`,
+   que es una órden interna de la *shell* y muestra el mensaje que se le pasa
+   como argumento::
+
+      $ echo "Hola, don Pepito"
+      Hola, don Pepito
+
+   La orden siempre añade un cambio de línea al final. Si se quiere evitar esto,
+   puede añadirse la opción ``-n``. La opción la soportan también :program:`dash`
+   y :program:`busybox`, aunque no forma parte del estándar.
+  
+   :command:`echo`, sin embargo, dará problemas de compatibilidad cuando la
+   cadena contenga caracteres especiales (``\n``, ``\t``, etc.):
+   
+   * :program:`bash` y :program:`busybox` se comportan del mismo modo y no
+     interpretan tales caracteres::
+    
+      $ echo 'a\nb'
+      a\nb
+  
+     a menos que se use la opción no estándar ``-e``::
+    
+      $ echo -e 'a\nb'
+      a
+      b
+    
+     o bien se usen las comillas :abbr:`ANSI (American National Standards
+     Society)`::
+   
+      bash$ echo $'a\nb'
+      a
+      b
+
+   * :program:`dash` sí interpreta los caracteres especiales y no entiende ni la
+     opción ``-e`` ni las comillas :abbr:`ANSI (American National Standards
+     Society)`.
+
+   En consecuencia, si nuestra cadena prevemos que contendrá caracteres
+   especiales es preferible evitar :program:`echo` y usar en sustitución de él
+   :command:`printf`, que el estándar establece que interprete los caracteres
+   especiales.
+
+   .. warning:: Si quiere hacer un *script* compatible y la cadena a imprimir
+      contiene caracteres especiales, use :command:`printf` y evite
+      :command:`echo`.
+
+.. _printf:
+.. index:: printf
+
+:command:`printf`,
+   que existe tanto como orden interna como comando independiente::
+
+      $ type -a printf
+      printf es una orden interna del shell
+      printf is /usr/bin/printf
+
+   la orden hace exactamente lo mismo que la función homónima de C: imprimir un
+   mensaje con formato. Por ejemplo::
+
+      $ printf "%07.2f\n" 50
+      0050,00
+
+   Para saber más de cómo expresar los formatos consulte `esta guía
+   <http://wiki.bash-hackers.org/commands/builtin/printf>`_.
+
+.. note:: Obviamente, si la salida no es a la pantalla, basta con usar :ref:`la
+   redirección <sh-ioredirect>`.
+
+.. _sh-in:
+
+.. index:: read
+
+Entrada
+-------
+La entrada de datos ya está analizada al tratar la orden interna :ref:`read
+<read>`. Sin embargo, es importante recalcar que la opción ``-s`` no forma parte
+del estándar y, consecuentemente :command:`dash` carece de ella (pero no
+:command:`busybox`). Para poder pedir contraseñas y ceñirnos al estándar
+podemos usar este *wrapper* para :ref:`read <read>`:
+
+.. code-block:: bash
+
+   # Monkeypatch de la función interna read
+   # para que soporte la opción -s.
+   read() {
+      local settings ret
+
+      if [ "$1" = "-s" ]; then
+         shift
+         settings=$(stty -g)
+         stty -echo
+      fi
+
+      command read "$@"
+      ret=$?
+
+      [ -n "$settings" ] && stty "$settings"
+      return $?
+   }
+
+que permite añadir la opción ``-s``:
+
+.. code-block:: bash
+
+   read -s -rp "Introduzca la contraseña: " pass
+
+aunque para simplificar el código sólo como primer argumento.
+
+.. _sh-ioredirect:
+
+Redirecciones
+-------------
+Es importante comprender bien el :ref:`mecanismo de la redirección <ioredirect>`.
+
+.. _sh-retcode:
+
+Valor de retorno
+----------------
+Todo programa, como resultado de su ejecución, debe devolver un *byte* al
+sistema (al proceso padre para ser más exactos), esto es, un valor entre *0* y
+*255*. El *0* se considera éxito.  mientras que cualquier otro número, fracaso.
+Tal valor puede consultarse a través de la variable ``$?``. Por ejemplo::
+
+   $ echo 'Hola' | grep -q '^H'
+   $ echo $?
+   0
+   $ echo 'Hola' | grep -q '^a'
+   $ echo $?
+   1
+   $ echo 'Hola' | grep --no-existe '^H' 2> /dev/null
+   $ echo $?
+   2
+
+Con :ref:`grep <grep>` obtenemos un *0* (éxito) al encontrar el patrón. un *1*
+(fracaso) al no encontrar el patrón, y un *2* (fracaso, también) al fallar el
+programa como consecuencia de un error de sintaxis. Es común que los programas,
+dependiendo de por qué fallen devuelvan un número y otro: esto permite
+diagnosticar qué ha pasado dentro del *script*.
+
+Si se quiere convertir el éxito en fracaso y el fracaso en éxito, puede
+anteponerse una exclamación ("!") a la orden::
+
+   $ true || echo "Esto ha sido un fracaso"
+   $ ! true || echo "Esto ha sido un fracaso"
+   Esto ha sido un fracaso
+
+.. warning:: Es indispensable separar la exclamación de la orden, de lo contrario
+   :program:`bash` entenderá que queremos hacer uso del :ref:`historial
+   <bash-historial>`.
+
+.. _sh-exit:
+
+Como nuestro propio *script* también es un programa. También devuelve un *byte*
+de resultado al sistema, En principio, devuelve el resultado de la última orden
+que ejecutó\ [#]_, pero se puede especificar qué devolverá usando la orden
+interna :command:`exit`:
+
+.. code-block:: bash
+
+   exit 2
+
+acabará inmediatamente el *script* y devolverá un **2**. Si :command:`exit` se
+usa sin argumentos, se devuelve un **0**.
+
+.. warning:: Advierta que no saldremos del *script*, si :command:`exit` se
+   ejecuta dentro de una *subshell*, porque como es normal si se encuentra
+   dentro de una, su efecto será el de sacarnos de la *subshell*. Por ejemplo,
+   estos casos no nos sacan de la sesión interactiva::
+
+      $ echo $(echo 1; exit 5; echo 2)
+      1
+      $ echo $?
+      5
+      $ echo "minúsculas" | { exit 4; tr '[:lower:]' '[:upper:]'; }
+      $ echo $?
+      4
+
+Aunque de forma general se devuelve un **0**, si hubo éxito, y cualquier otro
+valor, si fracaso, es necesario tener presente lo siguiente\ [#]_:
+
+======= ======================================================================
+Código   Significado
+======= ======================================================================
+0        Se ha completado la tarea sin problemas
+1        Se ha producido algún tipo de error en general.
+2        Falta algo para completar correctamente la orden.
+126      No se puede ejecutar la orden (p.e. por un problema de permisos).
+127      No se encuentra la orden.
+128      El programa intentó devolcer un código equivocado (p.e. "aaa").
+128+n    Donde "*n*" es el código: el programa se interrumpió por una señal.
+255      Código de retorno fuera de rango (p.e. 256).
+======= ======================================================================
+
+De lo cual podemos establecer las siguientes convenientes **convenciones**:
+
+* **0** debe usarse para devolver éxito.
+* No deberíamos usar de **126** a **165** (al menos) y **255** y, en general,
+  evitar cualquier código superior a **125**, ya que son códigos que genera la
+  propia *shell*. Por ejemplo, si intentáramos ejecutar un programa que no tiene
+  permisos de ejecución, el codigo de error resultante sería **126**. Ëste no es
+  un código que genere el propio programa, sino que lo genera la propia
+  *shell*.
+* Para códigos de error es conveniente usar códigos entre **1** y **125**
+  teniendo en cuenta que:
+
+  - Muchos programas usan **2** cuando se proporciona al programa un parámetro
+    inexistente.
+
+  - Cuando no necesitamos (o queremos) ser exhaustivos al devolver errores
+    podemos usar el código **1** (y **2** para el caso ya referido).
+
+  - Si queremos ser exhaustivos, podemos seguir los criterios establecidos
+    en :file:`/usr/include/sysexists.h`, que son sugerencias para programas
+    escritos en *C* (o *C++*), pero que a falta de un estándar podemos
+    trasladar a la programación de nuestros *scripts*. Por ejemplo, **77**
+    es el error sugerido para "*falta de permisos*".
+
+.. _sh-args:
+
+Argumentos
+----------
+Es común que los *script* requieran de datos, por lo que se les pueden
+proporcionar en forma de argumentos en la línea de órdenes::
+
+   $ ./miscript.sh a b c
+
+En este caso, tres: *a*, *b*, y *c*. Estos argumentos posicionales están
+disponibles en el código gracias a las variables **$1**, **$2**, etc:
+
+.. code-block:: bash
+
+   #!/bin/sh
+
+   echo "El primer argumento que me proporcionó fue: $1"
+
+Existe tambien la variable **$0**, que devuelve el nombre del *script* tal y
+como se invocase (en el ejemplo, contendría la cadena «*./miscript.sh*»). Además
+de estas variables posiciales, son útiles:
+
+**$#**,
+   que contiene la cantidad de argumentos posicionales que se han proporcionado.
+**$\*** y **$@**
+   que se expanden a todos los argumentos posicionales. La particularidad de
+   ambas variables se produce cuando se encierran entre comillas dobles.
+
+   Para la primera tomemos el siguiente programa::
+
+      #!/bin/sh
+
+      echo "Argumentos:" $*
+      echo "Argumentos: $*"
+
+   Al ejecutarlo, aparentemente no hay diferencia entre una y otra línea::
+
+      $ ./prueba.sh 1 2 3 4
+      Argumentos: 1 2 3 4
+      Argumentos: 1 2 3 4
+
+   pero sí la hay si se se modifica el valor de la :ref:`variable IFS <sh-ifs>`::
+
+      $ IFS="|"  ./prueba.sh 1 2 3 4
+      Argumentos: 1 2 3 4
+      Argumentos: 1|2|3|4
+
+   ya que entre comillas la variable se expande usando como carácter separador
+   el primer carácter del valor de *IFS*.
+
+   La segunda variable al encerrarse entre comillas dobles (, o sea,
+   :code:`"$@"`) se expande a :code:`"$1"`, :code:`"$2"`, etc. Esto cobra
+   importancia cuando los argumentos contienen espacios (o tabulaciones o
+   cambios de línea). Por ejemplo, este código\ [#]_::
+
+      #!/bin/sh
+
+      for arg in $@; do
+         echo $arg
+      done
+
+   devuelve esto::
+
+      $ ./prueba.sh 1 "2 3" 4
+      1
+      2
+      3
+      4
+
+   mientras que este otro::
+
+      #!/bin/sh
+
+      for arg in "$@"; do
+         echo $arg
+      done
+
+   devuelve esto otro::
+
+      $ ./prueba.sh 1 "2 3" 4
+      1
+      2 3
+      4
+
+.. note:: Para manipular ``$0`` y, en general, cualquier ruta, son útiles dos
+   comandos:
+
+   .. _basename:
+   .. index:: basename
+
+   :command:`basename`, que devuelve la última parte de la ruta::
+
+      $ basename /usr/bin/env
+      env
+      $ basename Documentos/interesante.txt
+      interesante.txt
+      $ basename fichero_aqui
+      fichero_aqui
+
+   .. _dirname:
+   .. index:: dirname
+
+   :command:`dirname`, que devuelve la ruta descontando la última parte de la
+   misma::
+
+      $ dirname /usr/bin/env
+      /usr/bin
+      $ dirname Documentos/interesante.txt
+      Documentos
+      $ dirname fichero_aqui
+      .
+
+   Podemos lograr algo parecido usando las sustituciones en variables con `%` y
+   `##`, pero usándolas habría casos particualres en que obtendríamos un
+   resultado incorrecto (como en el último ejemplo).
+
+Además, hay dos órdenes internas relacionadas con la manipulación de los
+argumentos posicionales:
+
+.. _shift:
+.. index:: shift
+
+**shift [n]**
+   Elimina los *n* primeros argumentos posicionales (empezando en ``$1``). Si no
+   se facilita un número, se sobreentiende **1**. Por ejemplo, en la
+   invocación::
+
+      $ ./script.sh a b c
+
+   Los argumentos posicionales son *a* (``$1``), *b* (``$2``) y *c* (``$3``). Si
+   en alguna línea del *script*\ [#]_, hacemos::
+
+      shift
+
+   entonces se perderá el valor *a*, ``$1`` pasará a valer *b*, ``$2`` pasará a
+   valor *c*; y ``$#`` devolverá **2**. En ``$*`` y ``$@`` tampoco quedará
+   rastro de *a*.
+
+**set**
+   Ya se introdujo :ref:`set <set>` para cambiar el comportamiento de algunos
+   aspectos de la *shell*. Sin embargo, permite más: cuando se le pasan
+   argumentos posicionales provoca que sus argumentos pasen a ser los argumentos
+   del programa (o función si estamos dentro de una)::
+
+      $ set -- -a -c 2 hola
+      $ echo $1
+      -a
+      $ echo $3
+      2
+
+   a partir de ese momento será como si en la línea de órdenes hubieramos
+   escrito esos cuatro argumentos y podremos acceder a ellos a través de *$1*,
+   *$2*, etc.
+
+.. seealso:: Manipular en crudo los argumentos posicionales para leer datos,
+   crea *scripts* bastante incómodos si los argumentos son varios. Llegado el
+   momento, ya veremos :ref:`cómo tratarlos <sh-gnu-args>` para que las opciones
+   del *script* sigan el estándar POSIX, :ref:`ya explicado <ordenar>`.
+
+.. rubric:: Notas al pie
+
+.. [#] Este inútil programa:
+
+   .. code-block:: bash
+
+      #!/bin/sh
+
+      false
+      true
+
+   devuelve al sistema un *0*, mientras que este otro:
+
+   .. code-block:: bash
+
+      #!/bin/sh
+
+      true
+      false
+
+   devuelve un *1*.
+
+.. [#] Extraído de `aquí <http://www.tldp.org/LDP/abs/html/exitcodes.html>`_
+
+.. [#] Más adelante se analizará el :ref:`bucle for <sh-for>`.
+
+.. [#] Dentro de una :ref:`función <sh-func>`, todas estas variables pasan a
+   almacenar los argumentos posicionales de la propia función; y
+   :command:`shift`, por ende, manipula estos argumentos; y no los del *script*.
+   Por tanto, *cualquier* línea no es cualquier línea a secas, sino cualquier
+   línea que esté en el cuerpo principal del *script* y no dentro de una
+   función.

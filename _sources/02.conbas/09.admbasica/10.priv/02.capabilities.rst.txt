@@ -1,0 +1,395 @@
+.. _capabilities-prof:
+
+Capacidades
+===========
+Lo fundamental es entender que para que un proceso pueda realizar con éxito una
+determinada llamada del núcleo debe tener habilitada de forma **efectiva** la
+capacidad que permite su invocación. Por ejemplo, analicemos la orden
+:command:`ping` para lo cual hagamos una copia del ejecutable::
+
+   $ cp /bin/ping /tmp
+
+Y intentemos usar esta copia para hacer el *ping*::
+
+   $ /tmp/ping -4c1 1.1.1.1V
+   /tmp/ping: socket: Operación no permitida
+
+Nos es imposible. Esto se debe a que tal orden debe abrir un *socket* y eso
+requiere un privilegio especial: si hubiéramos probado a ejecutar la orden como
+*root* no habríamos tenido problemas. La capacidad necesaria es *CAP_NET_RAW*.
+Sin entrar aún en detalles, probemos a hacer que un proceso derivado de este
+ejecutable disponga de esa capacidad::
+
+   # setcap 'cap_net_raw=p' /tmp/ping
+
+Y si volvemos a probar como usario::
+
+   $ /tmp/ping -4c1 1.1.1.1
+   PING 1.1.1.1 (1.1.1.1) 56(84) bytes of data.
+   64 bytes from 1.1.1.1: icmp_seq=1 ttl=64 time=0.621 ms
+
+   --- 1.1.1.1 ping statistics ---
+   1 packets transmitted, 1 received, 0% packet loss, time 0ms
+   rtt min/avg/max/mdev = 0.621/0.621/0.621/0.000 ms
+
+¿Qué ha pasado? En este caso, nuestra manipulación produjo que la capacidad
+*CAP_NET_RAW* estuviera *permitida* durante la ejecución de un proceso derivado
+de ese ejecutable. La orden, además, está programada para, antes de necesitar la
+capacidad, hacerla efectiva; y eso hace. Tras ello abre el *socket* y, como ya
+no es necesaria más la capacidad, deja de hacerla efectiva. De este modo, el
+privilegio sólo es efectivo durante el tiempo necesario para realizar la acción.
+¿Qué habria ocurrido si :command:`ping` no estuviera programado así y no hiciera
+efectiva la capacidad?  Simplemente que, como la capacidad no es efectiva, el
+:command:`ping` también habría fallado. Podemos hacer la prueba con
+:ref:`tcpdump <tcpdump>`, que requiere la misma capacidad para monitorizar el
+tráfico, pero no es un programa "*capabilities aware*" como :command:`ping`,
+esto es, no es capaz de hacer efectiva la capacidad cuando la requiere::
+
+   # apt install tcpdump
+   # cp /usr/bin/tcpdump /tmp/tcpdump
+   # setcap 'cap_net_raw=p' /tmp/tcpdump
+   # exit
+   $ /tmp/tcpdump -i eth0 icmp
+   tcpdump: eth0: You don't have permission to capture on that device
+   (socket: Operation not permitted)
+
+En este caso, la capacidad pertinente está permitida; pero como el ejecutable no
+está preparado para hacerla efectiva, la acción falla. Aún, sin embargo, hay una
+solución. Al ejecutable se le puede habilitar un *bit* para que al comienzo del
+proceso convierta en efectivas todas las capacidades permitidas::
+
+   $ su -
+   # setcap 'cap_net_raw=ep' /tmp/tcpdump
+   # exit
+   $ /tmp/tcpdump -i eth0 icmp
+   tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
+   listening on eth0, link-type EN10MB (Ethernet), capture size 262144 bytes
+
+De este modo, aunque el ejecutable no esté preparado para manejar capacidades,
+aún podremos realizar la acción como usuario sin privilegios. La
+contraprestacion es que la capacidad será efectiva durante todo el tiempo de
+ejecución del proceso y no sólo cuando es estrictamente necesario. No obstante,
+esto sigue siendo más seguro que ejecutar como administrador el binario
+(gracias, por ejemplo, al *setuid*).
+
+.. seealso:: En `este apéndice
+   <https://en.wikibooks.org/wiki/Grsecurity/Appendix/Capability_Names_and_Descriptions>`_
+   puede encontrar una relación de *capabilities* con una pequeña descripción de
+   qué habilita cada una.
+
+Profundización
+--------------
+Afinemos ahora los conocimientos. Los procesos definen cinco conjuntos distintos
+de capacidades. Por ejemplo, para nuestra sesión actual de :command:`bash`::
+
+   $ grep Cap /proc/$BASHPID/status
+   CapInh: 0000000000000000
+   CapPrm: 0000000000000000
+   CapEff: 0000000000000000
+   CapBnd: 0000003fffffffff
+   CapAmb: 0000000000000000
+
+.. _pcap-perm:
+
+:dfn:`Permitidas` (*Permitted*)
+   "CaPrm" es el conjunto de capacidades permitidas, esto es, todas las
+   capacidades que, llegada la necesidad. el proceso podría hacer efectivas (si
+   está preparado en su código para ello como :command:`ping`). El valor
+   está codificado en hexadecimal, pero podemos decodificarlo::
+
+      $ /sbin/capsh --decode=0000000000000000
+      0x0000000000000000=
+
+   Como es lógico, tanto cero significa que no tenemos ninguna capacidad
+   permitida en nuestra sesión como usuario sin privilegios.
+  
+   .. note:: Si realmente
+      queremos probar que la orden anterior nos decodifica los permisos podemos
+      probar con algo que no sean todo ceros::
+
+         $ /sbin/capsh --decode=0000000000000001
+         0x0000000000000001=cap_chown
+
+      De este modo el código **1** equivale a la capacidad *CAP_CHOWN* que elimina
+      las limitaciones en los cambios de propietario y grupo principal de un
+      archivo.
+
+.. _pcap-eff:
+
+:dfn:`Efectivas` (*Effective*)
+   "CapEff" es el conjunto de capacidades que realmente habilitan al proceso
+   a hacer una llamada privilegiada. En nuestro caso, no hay ninguna y, además,
+   no podrá haber ninguna, porque ninguna está permitida.
+
+Por ahora lleguemos hasta aquí, ya que con estos privilegios actúa el proceso.
+Ahora bien, ¿cuál será la situación si este proceso ejecuta un binario para
+generar un subproceso? En ese caso, intervienen los tres conjuntos que hasta
+ahora no hemos introducido y, además, las posibles capacidades adicionales que
+hayamos asociado al archivo ejecutable a través de los :ref:`atributos
+extendidos <xattr>`. Mediante los atributos del archivo podemos asociar las
+siguientes capacidades:
+
+.. _cap-perm:
+
+:dfn:`Permitidas` (*Permited*)
+   Que son las capacidades que queremos añadir al conjunto de capacidades
+   permitidas del subproceso. Precisamente de este modo fue como la copia de
+   :command:`ping` añadió como permitida la capacidad *CAP_NET_RAW*; y la copia
+   de :command:`date`, la capacidad *CAP_SYS_TIME*.
+
+   Téngase presente que las capacidades permitidas en el proceso padre no se
+   transmiten al hijo: se definen de nuevo y uno de los componentes que influyen
+   en su definición son estas capacidades permitidas fijadas al ejecutable.
+
+.. _cap-eff:
+
+:dfn:`Efectivas` (*Effective*)
+   Es en realidad un *bit*. Si se activa, todas las capacidades permitidas
+   serán efectivas. Este fue el *bit* que activamos antes en la copia del
+   ejecutable :ref:`date <date>`.
+
+.. _cap-inh:
+
+:dfn:`Heredables` (*Inheritable*)
+   Es el conjunto de capacidades que el subproceso aceptará como heredables.
+
+Introduzcamos, por último, los tres conjuntos de capacidades en los procesos que
+quedaron pendientes y que influyen en las capacidades que tendrán los
+subprocesos:
+
+.. _pcap-bnd:
+
+:dfn:`Limitantes` (*Bounding*)
+   "CapBnd" es el conjunto de capacidades que pueden añadirse al conjunto de
+   capacidades permitidas de un subproceso mediante el mecanismo de
+   :ref:`definir capacidades permitidas sobre el archivo ejecutable
+   <cap-perm>`. O dicho de otro modo, si se añade al ejecutable como capacidad
+   permitida una que no está en este conjunto de limitantes, el proceso derivado
+   de arrancar tal ejecutable no tendrá permitida esa capacidad.
+  
+   En nuestra *shell* de ejemplo, dentro de este conjunto están todas.
+   Precisamente por esto, cuando introdujimos los fundamentos, pudimos hacer que
+   :command:`ping` como usuario sin privilegios funcionara. En un principio,
+   nuestra copia del ejecutable :command:`ping` generaba un proceso también sin
+   ninguna capacidad permitida, por lo que la orden fallaba. Al usar
+   :command:`setcap` sobre el ejecutable indujimos que los procesos creados a
+   partir de él tuvieran permitida la capacidad *CAP_NET_RAW*. Pero esto
+   funciona porque el proceso padre (la sesión de :command:`bash`) tiene
+   incluido en su conjunto de capacidades limitantes tal capacidad::
+
+      $ /sbin/capsh --decode=000001ffffffffff | grep -o cap_net_ra
+      cap_net_raw
+
+.. _pcap-amb:
+
+:dfn:`De ambiente` (*Ambient*)
+   "CapAmb" es un conjunto de capacidades que se añadirá automáticamente al
+   conjunto de permitidas de un subproceso. Es, pues, otro componente que
+   contribuye a definir las capacidades permitidas en el subproceso y que se
+   añade al ya visto de las :ref:`permitidas sobre el ejecutable <cap-perm>`.
+
+   Este conjunto no es independiente del conjunto de permitidas y del de
+   heredables: toda capacidad que esté en este conjunto, debe estar también en
+   los otros dos.
+
+.. _pcap-inh:
+
+:dfn:`Heredables` (*Inheritable*)
+   Es el conjunto de capacidades que se quiere que el subproceso herede como
+   permitidas, siempre que también hayan sido marcadas como tales en el archivo
+   ejecutable. Este es el tercer componente que contribuye a definir las
+   capaciades permitidas del subproceso.
+
+Poniendo en forma de ecuaciones el algoritmo, según el manual de
+:manpage:`capabilities(7)` los conjuntos de capacidades del subproceso se
+calculan así:
+
+.. math::
+   :nowrap:
+
+   \begin{align*}
+      P'_\text{amb} &= (\text{archivo privilegiado}) ? 0 : P_\text{amb} \\
+      P'_\text{perm} &= (P_\text{inh} \: \& \: F_\text{inh}) \: \| \: (F_\text{perm} \: \& \: P_\text{bnd}) \: \| \: P'_\text{amb} \\
+      P'_\text{eff} &= F_\text{eff} ? P'_\text{perm} : P'_\text{amb} \\
+      P'_\text{inh} &= P_\text{inh} \\
+      P'_\text{bnd} &= P_\text{bnd}
+   \end{align*}
+
+donde :math:`P_{xxx}` es el conjunto de capacidades "XXX" del proceso padre,
+:math:`P'_{xxx}`, el conjunto de capacidades "XXX" del proceso hijo y
+:math:`F_{xxx}` las capacidades "XXX" definidas sobre el ejecutable.
+
+Manipulación
+------------
+Hay dos vías principales para alterar las *capabilities* desde la línea de
+órdenes:
+
+#. Crear un proceso con capacidades definidas a voluntad con :manpage:`capsh`,
+   que no trataremos, pero de lo que puede investigarse a través de `este hilo en
+   stackexchange
+   <https://unix.stackexchange.com/questions/196483/how-do-i-use-capsh-i-am-trying-to-run-an-unprivileged-ping-with-minimal-capabi>`_.
+#. Definir capacidades sobre el ejecutable, que será a lo que dediquemos el
+   epígrafe.
+
+En principio, las herramientas para definir capacidades sobre archivos
+ejecutables deben estar ya instaladas en el sistema, puesto que el paquete que
+las contiene (*libcap2-bin*) es dependencia de *systemd*.
+
+.. _getcap:
+.. index:: getcap
+
+:manpage:`getcap`
+   Permite comprobar cuáles son las capacidades definidas para un ejecutable::
+
+      $ /sbin/getcap /bin/ping
+      /bin/ping = cap_net_raw+ep
+
+   En este caso, el ejecutable :command:`ping` tiene en su conjunto de
+   permitidas la capacidad *CAP_NET_RAW* y, además, tiene habilitado el *bit*
+   para que sea efectivas\ [#]_.
+
+   Es posible incluir la opción :kbd:`-r` para hacer una consulta recursiva. De
+   este modo, la orden::
+
+      # getcap -r /
+
+   mostrará cuáles son los archivos que tiene definidas capacidades y cuáles son
+   éstas.
+
+   .. note:: Las capacidades sobre el ejecutable se definen utilizando
+      :ref:`atributos extendidos <xattr>`. De hecho, si usamos
+      :command:`getfattr`, podremos obtenerlas también, aunque de un modo
+      absolutamente críptico::
+
+         $ getfattr -m - -d /bin/ping
+         getfattr: Eliminando '/' inicial en nombres de ruta absolutos
+         # file: bin/ping
+         security.capability=0sAQAAAgAgAAAAAAAAAAAAAAAAAAA=
+
+:manpage:`setcap`
+   Permite definir las capacidades sobre los ejecutables::
+
+      # setcap 'cap_net_raw+ep cap_net_admin+eip' /tmp/ping
+
+   Téngase presente que "e" representa un *bit*, no un conjunto, por lo que, si
+   se utiliza, se tendrá que utilizar con todas las capacidades. En una misma
+   orden se pueden definir capacidades para varios archivos basta con ir
+   añadiendo sucesivamente cadenas de definición y archivos::
+
+      # setcap 'cap1' fichero1 'cap2' fichero2 ... 'capN' ficheroN
+
+   .. note:: La cadena de las capacidades no se añade a las que ya estén definidas
+
+   Si se quieren eliminar las capacidades, debe usarse la opción :kbd:`-r`::
+
+      # setcap -r /tmp/ping
+
+:file:`/proc/<PID>/status`
+   Para revisar las capacidades que tiene un proceso, puede consultarse su
+   archivo de estatus correspondiente. Por ejemplo, las capacidades definidas
+   sobre la *shell* actual pueden obtenerse así::
+
+      $ grep Cap /proc/$BASHPID/status
+      CapInh: 0000000000000000
+      CapPrm: 0000000000000000
+      CapEff: 0000000000000000
+      CapBnd: 0000003fffffffff
+      CapAmb: 0000000000000000
+
+.. _pam_cap:
+
+:program:`pam_cap`
+   Permite definir capacidades heredables para la sesión de los usuarios
+   indicados. La instalación y configuración inicial están automatizadas en
+   *Debian*::
+
+      # apt install libpam-cap
+
+   Y sólo queda definir dentro de :file:`/etc/security/capability.conf` (véase
+   :manpage:`capability.conf`) para qué usuarios cuáles son las capacidades que
+   se definirán como heredables. Por ejemplo, si en el archivo añadimos:
+
+   .. code-block:: none
+
+      cap_net_raw          usuario
+
+   entonces "usuario" tendrá para sus procesos la capacidad *CAP_NET_RAW*
+   incluida en el conjunto de heredables.
+
+   .. warning:: Para que la adición tenga efecto, debe incluirse **antes** de la
+      línea:
+
+      .. code-block:: none
+
+         none              *
+
+   La cuestión fundamental es ¿para qué sirve exactamente esto si es el conjunto
+   de permitidas/efefctivas el  que tiene efecto en los subprocesos que podemos
+   ejecutar como usuario sin privilegios (p.e. una orden ejecutada en nuestra
+   sesión interactiva de :command:`bash`).
+
+   La principal utilidad es limitar a quiénes se les conceden las capacidades al
+   utilizar un ejecutable. Ilustrémoslo con el ejecutable :ref:`tcpdump
+   <tcpdump>`. Este es un ejecutable que, en principio, no tiene definida
+   ninguna capacidad::
+
+      $ /sbin/getcap /usr/bin/tcpdump
+
+   Si quiéramos que nuestro usuariospudiera capturar tráfico de la interfaz
+   podríamos hacer::
+
+      # setcap 'cap_net_raw+ep' /usr/bin/tcpdump
+
+   pero permitiría a todos los usuarios monitorizar\ [#]_. Una solución más
+   restrictiva es marcar como heredable en :program:`pam_cap` la capacidad
+   *CAP_NET_RAW* para nuestro usuarios y en el ejecutable definir lo siguiente::
+
+      # setcap 'cap_net_raw+ei' /usr/bin/tcpdump
+
+   Como la capacidad permitente esta en el conjunto de heredables del proceso
+   (la sesión de :program:`bash`) y también en el del ejecutable, en el
+   subproceso (:command:`tcpdump`) la capacidad estará en el conjunto de
+   permitidas (véase en las ecuaciones que indicamos que es uno de los
+   componentes que definen las permitidas del subproceso). Y por mor del *bit*
+   de efectivas, también estará en el conjunto de efectivas. Pero esto sólo
+   ocurrirá para aquellos usuarios que hayamos configurado a través de
+   :program:`pam_cap`, y no para todos.
+
+.. note:: Como consejo, si se quiere comprobar cómo una configuración de
+   capacidades afecta a las de un proceso, puede hacerse una copia de la orden
+   :ref:`sleep <sleep>` en el directorio temporal. Esta orden tiene la ventaja
+   de que se puede hacer que dure su ejecución el tiempo que nos parezca
+   conveniente::
+
+      # cp /usr/bin/sleep /tmp/sleep
+      # setcap 'cap_sys_time+ep' /tmp/sleep
+      $ /tmp/sleep 120 > /dev/null &
+      [1] 2136
+      $ grep Cap /proc/2136/status
+      CapInh: 0000000000000000
+      CapPrm: 0000000002000000
+      CapEff: 0000000002000000
+      CapBnd: 0000003fffffffff
+      CapAmb: 0000000000000000
+      $ /sbin/capsh --decode='0000000002000000'
+      0x0000000002000000=cap_sys_time
+
+.. rubric:: Enlaces de interés
+
+#. `Capabilities - Compartimentar al todopoderoso root
+   <https://clibre.io/blog/por-secciones/hardening/item/417-capabilities-compartimentar-al-todopoderoso-root>`_.
+#. *Linux Capabilities*: `Part 1: Why They Exist and How They Work
+   <https://blog.container-solutions.com/linux-capabilities-why-they-exist-and-how-they-work>`_
+   y `Part 2: Linux Capabilities In Practice
+   <https://blog.container-solutions.com/linux-capabilities-in-practice>`_.
+
+.. rubric:: Notas al pie
+
+.. [#] Pese a que ya hemos visto que este *bit* no es necesario para este
+   ejeecutable, puesto que es *capabilities aware*.
+
+.. [#] Ciertamente podríamos restringir permisos para evitar que todos los
+   usuarios ejecutaran el programa, pero :ref:`tcpdump <tcpdump>` sirve también
+   para analizar archivos :file:`.pcap` y vetaríamos esta posibilidad que no req
+   uiere privilegio alguno.
+

@@ -1,0 +1,134 @@
+.. _sh-concat:
+
+Concatenación de órdenes
+========================
+
+Aunque lo habitual es escribir una orden en cada línea, en ocasiones resulta
+conveniente incluir más de una. El modo más sencillo de llevar a cabo esta
+concatenación de órdenes es mediante el carácter de punto y coma (``;``)::
+
+   $ echo "Esto se ejecuta primero" ; echo "Esto se ejecuta después"
+   Esto se ejecuta primero
+   Esto se ejecuta después
+
+La ejecución de las órdenes es equivalente a si las hubiéramos escrito en
+líneas separadas: primero se ejecuta una y, en cuanto acabe y con independencia
+si ha tenido éxito o ha fallado, se ejecuta la segunda. La única diferencia
+desde el punto de vista del usuario es que no tendrá que esperar la terminación
+de la primera orden para poder teclear la segunda. Por ejemplo::
+
+   $ sleep 1h ; echo "Me he tomado un buen descanso"
+
+Es posible también que se quiera hacer lo contrario, esto es, escribir en dos
+líneas un mismo comando porque este, por ejemplo, sea demasiado largo. En ese
+caso, lo que se hace es *escapar* el cambio de línea::
+
+   $ adduser pepe --gecos "Pepe Martinez" \
+                  --shell /bin/sh
+
+.. _sleep:
+.. index:: sleep
+
+:command:`sleep`
+   :command:`sleep` es un comando que hace que el sistema espere un determinado
+   tiempo expresado en el argumento como segundos (sufijo ``s``), minutos
+   (sufijo ``m``), horas (sufijo ``h``) o días (sufijo ``d``). Si no se incluye
+   sufijo, se sobrentenderá segundos. Así pues, la línea de órdenes de arriba
+   esperará una hora y a continuación escribirá la frase. Nosotros podemos
+   desentendernos sin más. Por el contrario, si hubiéramos usado dos líneas::
+
+      $ sleep 1h
+      $ echo "Me he tomado un buen descanso"
+
+   Deberíamos estar atentos a la pantalla del ordenador, para que en cuanto se
+   completase la hora, escribiéramos el segundo comando.
+
+Otro modo de concatenar órdenes es mediante los operadores ``&&`` (*and* lógico)
+y ``||`` (*o* lógico). El primer operador ejecutará la segunda orden sólo si la
+primera tuvo éxito, mientras que el segundo la ejecutará sólo si no la tuvo.
+
+Para ilustrarlo introduzcamos antes dos comandos más:
+
+.. _false:
+.. index:: false
+
+:command:`false`
+   No produce ningún efecto salvo fallar. Esto se traduce en que el programa
+   devuelve a la *shell* un valor distinto de 0 (véase la variable :ref:`$?
+   <$?>`).
+
+.. _true:
+.. index:: true
+
+:command:`true`
+   No produce otro efecto que tener éxito, lo que se traduce en que devuelve a
+   la *shell* el valor 0.
+
+Sabido esto::
+
+   $ true && echo "Éxito"
+   Éxito
+   $ true || echo "Éxito"
+
+La primera línea imprime la palabra, pero la segunda, no. Del mismo modo::
+
+   $ false || echo "Fracaso"
+   Fracaso
+   $ false && echo "Fracaso"
+
+Si en una misma línea aparecen varios comandos separados por operadores de
+concatenación, debe tenerse en cuenta que se evalúa de izquierda a
+derecha y que tienen más precedencia ``&&`` y ``||``, y menos ``;``\ [#]_.
+
+.. warning::
+   A diferencia de la mayoría de lenguajes de programación e incluso del propio
+   :program:`bash` en otras situaciones como el comando interno :ref:`test <test>`,
+   ambos operadores tienen la misma precedencia por lo que para evaluar una
+   línea en la que haya concatenados varios comandos a través de estos dos
+   operadores se sigue la regla de evaluar de izquierda a derecha. Por ese
+   motivo, esta línea::
+
+      $ true || echo "Uno" && echo "Dos"
+      Dos
+
+   Imprime la palabra en vez de no hacer nada, como se esperaría si tuviera más
+   precedencia el operador *and*.
+
+.. _agrupamiento-ordenes:
+
+Y dado que existe una regla general para saber el orden en que se realizan las
+operaciones, también debe existir una forma de alterar tal orden, del mismo modo
+que en matemáticas existen los paréntesis que permiten realizar antes una suma
+que una multiplicación.
+
+En :program:`bash` pueden usarse también los paréntesis::
+
+   $ true || ( echo "Uno" && echo "Dos" )
+
+pero usar paréntesis implica que el contenido se ejecuta en una *subshell*, no
+en la *shell* principal\ [#]_. Para que todos los comandos se ejecuten en la
+misma *shell* deben usarse para agrupar las llaves::
+
+   $ true || { echo "Uno" && echo "Dos"; }
+
+.. warning::
+   Deben separarse las llaves de su contenido y acabar la concatenación de
+   órdenes con un punto y coma.
+
+.. rubric:: Notas al pie
+
+.. [#] Falta como operador de concatenación la :ref:`tubería <pipeline>`
+   (``|``), que tiene más precedencia que todos ellos.
+
+.. [#] Para certificarlo no hay más que preguntar por el :ref:`PID <pid>` de la shell::
+
+      $ echo $BASHPID ; ( echo $BASHPID )
+      25933
+      26002
+
+   Y se obtendrán valores distintos, porque ambas shell son distintas.
+   En cambio, con las llaves::
+
+       $ echo $BASHPID ; { echo $BASHPID; }                                                                                     
+       25933
+       25933

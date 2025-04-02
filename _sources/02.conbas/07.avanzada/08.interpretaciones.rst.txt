@@ -1,0 +1,892 @@
+.. _sh-interp-cl:
+
+Interpretaciones en línea
+=========================
+
+La labor del intérprete de comandos no se limita a proporcionar el medio para
+que podamos ejecutar una orden pasando los argumentos adecuados. Antes de ello,
+el intérprete analiza la línea y realiza (o no) una serie de transformaciones.
+
+El objetivo de este epígrafe es describir cuáles son las interpretaciones y
+sustituciones que hace la *shell* antes de pasar definitivamente los argumentos
+al comando invocado.
+
+.. _sh-no-subs:
+
+No obstante, antes de empezar es conveniente saber cómo se puede evitar que
+*bash* **no** interprete un carácter especial, permitiendo así pasárselo
+literalmente a la orden. Hay tres métodos, que llamaremos de protección, porque
+protegen al carácter de ser interpretado por :program:`bash`:
+
+#. Escapar el carácter, que consiste en precederlo de la barra invertida
+   (``\``). Por ejemplo, la exclamación (``!``) tiene un significado especial,
+   sin embargo::
+
+      $ echo \!
+      !
+
+   Si se escapa no se hará interpretación alguna.
+
+#. Encerrar el carácter (o la expresión en la que se encuentra tal carácter)
+   dentro de comillas dobles::
+
+      $ echo "*"
+      *
+
+#. Encerrar el carácter (o la expresión en la que se encuentra tal carácter)
+   dentro de comillas simples::
+
+      $ echo '!'
+      !
+
+No obstante, estos tres métodos no son equivalentes, y hay interpretaciones que
+dejan de hacerse usando algún método, pero no otro. En cada caso, particular
+indicaremos qué métodos son efectivos.
+
+.. _sh-espacio:
+
+Espaciado
+---------
+
+Los caracteres de espaciado (el espacio normalmente, pero también la tabulación\
+[#]_) sirven a :program:`bash` para separar argumentos. Por ese motivo la
+orden::
+
+   $ cat x y
+
+Le pasa a :command:`cat` el argumento *x* y el argumento *y*. Para el caso de
+estos caracteres de espaciado cualquiera de los tres métodos de protección sirve
+para impedir la interpretación. Por tanto::
+
+   $ cat x\ y
+
+Intentará mostrar el contenido de un único archivo llamado "\ *x y*\ ".
+
+.. _bash-historial:
+
+Historial
+---------
+
+:program:`bash` almacena las ordenes que vamos introduciendo en la línea de
+comandos a fin de poder recuperarlas posteriormente.
+
+.. _history:
+.. index:: history
+
+:command:`history`
+   Muestra el historial de comandos::
+
+      $ history
+
+La manera más sencilla de recuperar instrucciones anteriores es usar la flecha
+*arriba*. Sin embargo, hay otros mecanismos que usan el carácter especial de
+exclamación (``!``). Los más habituales son los siguientes:
+
+#. Volver a ejecutar la última orden::
+
+   $ !!
+
+#. Ejecutar la orden 25º (:command:`history` muestra los comandos numerados)::
+
+   $ !25
+
+#. Ejecutar la penúltima orden (o sea, la segunda empezando por el final)::
+
+   $ !-2
+
+#. Ejecutar la última orden que empezaba por *se*::
+
+   $ !se
+
+Las expresiones anteriores ejecutan las órdenes completas, pero se pueden añadir
+dos puntos y, a continuación, expresar cuáles son los argumentos que se quieren
+repetir (el argumento **0** es el nombre del comando). Supongamos que ejecutamos
+lo siguiente::
+
+   $ cat archivo1 archivo2 archivo3
+
+Ahora analicemos las posibilidades:
+
+#. Un único número indica que se quiere repetir ese argumento::
+
+      $ more !!:1
+
+   Esto equivale a :code:`more archivo1`.
+
+#. Un rango de números *x-y* indica que se quiere repetir desde el argumento
+   *x* al argumento *y*::
+
+      $ !!:0-2
+
+   equivale a :code:`cat archivo1 archivo2`.
+
+#. Un rango de números *x-* indica que se quiere repetir desde el argumento
+   *x* hasta el último::
+
+      $ cat !!:2-
+
+   equivale a :code:`cat archivo2 archivo3`
+
+#. Un rango de números *-x* indica que se quiere repetir hasta el argumento
+   *x*::
+
+      $ !!:-2
+
+   equivale a :code:`cat archivo1 archivo2`.
+
+.. note:: Para repetir el último argumento :program:`bash` tiene, además, un
+   atajo de teclado: :kbd:`ESC + .`
+
+Para proteger la exclamación se puede tanto escapar como incluirla dentro de
+comillas simples, pero no dobles.
+
+Virgulilla
+----------
+:program:`bash` también expande la virgulilla bajo ciertas circunstancias que ya se
+expusieron :ref:`anteriormente al tratar las rutas <virgulilla>`.
+
+.. _comodines:
+
+Comodines
+---------
+
+Los comodines permiten hacer sustituciones a partir del nombre de los archivos.
+Los tres métodos de protección impiden que bash los interprete. Son tres:
+
+**?**
+   Representa cualquier carácter. Por ejemplo::
+
+      $ ls -d /s??
+      /srv /sys
+
+   En el directorio raíz sólo hay dos archivos (directorios en este caso) que
+   empiecen por *s* y que tengan dos caracteres más. Consecuentemente, eso es lo
+   que obtenemos.
+
+   .. warning::
+      Es muy importante tener presente que las interpretaciones las hace
+      :program:`bash`, no el comando (en este caso :command:`ls`). En el caso del
+      ejemplo, :command:`ls` ve tres argumentos: la opción ``-d`` el directorio
+      ``/srv`` y el directorio ``/sys`` sin tener conciencia de que realmente no
+      se llegó a escribir esto.
+
+**\ ***
+   Representa cero o más caracteres. Por ejemplo::
+   
+      $ echo /s*
+      /sbin  /srv  /sys
+
+   En este caso, dado que puede haber cualquier cantidad de caracteres, también
+   ``/sbin`` cumple con el patrón.
+
+**[...]**
+   Permite indicar un conjunto de caracteres, uno de los cuales puede
+   encontrarse en el nombre del archivo::
+
+       $ ls -d /s[by]*
+       /sbin /sys
+
+   En este caso no aparece ``/srv`` porque el segundo carácter sólo puede ser
+   una *b* o una *y*. Si a la relación de caracteres se antepone un ``^``,
+   entonces la expresión significa cualquier carácter que no sea uno de los
+   indicados en ella::
+
+       $ ls -d /s[^by]*
+       /srv
+
+   Se admite también la forma ``[b-e]`` para indicar que son válidos todos los
+   caracteres entre la b y la e, esto es, *b*, *c*, *d* y *e*.
+
+.. note::
+   Cuando no hay archivos que concuerden en absoluto con la expresión que usa
+   comodines, *bash* no realiza ninguna interpretación\ [#]_::
+
+      $ ls /?
+      ls: no se puede acceder a '/?': No existe el fichero o el directorio
+
+   Como no hay ningún archivo en el directorio raíz que sólo contenga una letra,
+   *bash* pasa el argumento sin interpretar, razón por la que (como se puede
+   observar en el mensaje de error) :command:`ls` ve la cadena ``/?``.
+
+.. _sh-expandibles:
+
+Expandibles
+-----------
+
+También existe en :program:`bash` (pero no en :program:`dash`) la llamada
+*expansión con llaves* que opera de la siguiente forma::
+
+   $ echo pre{11,22,33}su
+   pre11su pre22su pre33su
+
+es decir, se forman todas las cadenas resultantes de juntar el prefijo (en este
+caso, *pre*) con cada uno de los miembros de la expresión encerrada entre llaves
+y con el sufijo (en el ejemplo, *su*). Tanto el prefijo como el sufijo son
+opcionales. A diferencia de la expansión con corchetes, en este caso, las
+cadenas no están asociadas a nombres de archivos con lo que la expansión se
+producirá siempre.
+
+Otra *expansión con llaves* se expresa con dos caracteres separados por dos
+puntos::
+
+   $ echo {X..b}
+   X Y Z [  ] ^ _ ` a b
+   
+En este caso, la expresión se expande a todos los caracteres ascii que hay entre
+el primero y el segundo. También puede indicarse un paso::
+
+   $ echo {X..b..2}
+   X Z  ^ ` b
+   
+Con lo que :program:`bash` expandirá, pero saltando de 2 en 2. Si en vez de
+caracteres se usan números, :program:`bash` expandirá a todos los números que
+haya entre uno y otro (también se puede indicar un paso)::
+
+   $ echo {1..12}
+   1 2 3 4 5 6 7 8 9 10 11 12
+
+.. note::
+   Una vez que bash realiza la expansión con llaves, vuelve a probar si las
+   cadenas resultantes son interpretables o no, sea con una nueva expansión con
+   llaves o con cualquier otro tipo de expansión. Por ejemplo::
+
+      $ ls -d /{s*,li*}
+      /lib  /lib64  /sbin  /srv  /sys
+
+Como en el caso de los comodines, los tres métodos de protección son efectivos.
+
+Expansiones extendidas
+----------------------
+:program:`bash` (y sólo :program:`bash`) realiza también las *expansiones
+extendidas* cuando está habilitada la opción ``extglob`` (que lo está por
+defecto)::
+
+   $ shopt extglob
+   extglob         on
+
+Esto posibilita la expresión de varios patrones para expandir rutas:
+
+``?(lista-patrones)``
+   La ruta contiene los patrones una o ninguna vez::
+
+      $ ls *?(.tar).gz
+
+``+(lista-patrones)``
+   La ruta contiene los patrones una o más veces::
+
+      $ ls *([aeiou]).txt  # El nombre sólo contiene vocales.
+
+``*(lista-patrones)``
+   La ruta contiene los patrones ninguna o más veces.
+
+``@(lista-patrones)``
+   La ruta contiene uno de los patrones::
+
+      $ ls *.@(jpg|png)
+
+   Cuando se facilita más de un patrón, se separan con una tubería "*|*"
+   (también en los restantes casos, aunque el ejemplo no lo refleje).
+
+``!(lista-patrones)``
+   La ruta no contiene ninguno de los patrones::
+
+      $ ls !(*.jpg)  # Ficheros que no acaban en jpg.
+
+.. _subshell:
+
+*Subshells*
+-----------
+
+Ya se ha dicho que en :program:`bash` :ref:`los paréntesis generan una subshell
+<agrupamiento-ordenes>` en la que se ejecutan las órdenes encerradas dentro.
+Ahora bien, si a los paréntesis se antepone el símbolo del dólar, entonces
+:program:`bash` sustituirá la expresión entre paréntesis por la salida en pantalla
+que genera. Para entender esto, supongamos que queremos saber qué paquete es el
+responsable de instalar el intérprete :command:`python3`. En principio, :ref:`sabemos
+que esto se puede resolver así <dpkg-s>`::
+
+   $ dpkg -S python3
+   [...]
+
+Sin embargo, esta salida devuelve muchos paquetes porque cualquier archivo cuya
+ruta incluya la palabra "python3" se incluirá en ella. Nuestra intención es
+preguntar sobre el paquete, así que podríamos mejorar la consulta haciendo lo
+siguiente::
+
+   $ which python3
+   /usr/bin/python3
+   $ dpkg -S /usr/bin/python3
+   python3-minimal: /usr/bin/python3
+
+Es decir, preguntamos cuál es la ruta del ejecutable y, sabida, se la
+proporcionamos a :ref:`dpkg <dpkg>` para que nos indique exactamente el paquete
+que buscamos. Esto es algo tedioso porque tendremos que copiar la salida por
+pantalla de la primera orden como argumento de la segunda. Para evitarlo,
+podemos recurrir a una *subshell*::
+
+   $ dpkg -S "$(which  python3)"
+   python3-minimal: /usr/bin/python3
+
+Otro ejemplo algo más elaborado es el siguiente:  tenemos un usuario *pepe*, que
+pertenece a una serie de grupos; y queremos crear un usuario *llamado* maría que
+queremos que pertenezca también a esos mismos grupos. Ya sabemos cómo obtener la
+lista de grupos a los que pertenece *pepe*::
+
+   # id -Gn pepe
+   pepe audio video plugdev lpadmin
+
+Por tanto, la creación de *maria* consistiría en lo siguiente::
+
+   $ adduser maria
+   [...]
+   $ usermod maria -aG pepe,audio,video,plugdev,lpadmin 
+
+Lo cual implica el engorro de tener que ir copiando lo que nos indicó el primer
+comando :command:`id`. Ahora bien, más adelante aprenderemos que podemos
+modificar la salida que obtenemos::
+
+   $ id -Gn pepe | tr ' ' ','
+   pepe,audio,video,plugdev,lpadmin
+
+Y esta es justamente lo que necesitamos como argumento de ``-G``. Como hemos
+dicho que anteponer un dólar a la expresión de la subshell, sustituye ésta por
+su salida, resulta que el :command:`usermod` podemos hacerlo del siguiente
+modo::
+
+   ·$ usermod maria -aG $(id -Gn pepe | tr ' ' ',')
+
+sin necesidad de estar copiando y pegando.
+
+.. note::
+   La expresión :code:`$(...)` también puede expresarse con apóstrofes
+   invertidos::
+
+      $  usermod maria -aG `id -Gn pepe | tr ' ' ','`
+
+Sólo la comillas dobles no son efectivas para proteger esta interpretación.
+Téngase en cuenta que si se quiere proteger con el *símbolo de escape*, se deben
+proteger el dólar y los paréntesis de apertura y cierre, o sea, :kbd:`\\$\\(id
+... \\)`.
+
+.. note::
+   En :command:`bash` la expresión :kbd:`$(cat archivo)` puede sustituirse por
+   :kbd:`$(< archivo)`.
+
+.. _variables:
+
+Variables
+---------
+El entorno que proporciona la *shell* tiene definidas una serie de variables que
+rigen el comportamiento de algunos aspectos del intérprete de comandos. También
+pueden definirse variables propias, pero esto cobra sentido más bien cuando
+escribimos nuestros propios *scripts* y no cuando usamos de forma interactiva el
+sistema.
+
+.. _set:
+.. index:: set
+
+:command:`set`
+   Usado sin argumentos, lista las variables definidas::
+
+      $ set 
+      [... Listado de variables y funciones ...]
+
+   Cuando sepamos que es una :ref:`tubería <pipeline>` sabremos cómo poder
+   inspeccionar mejor la salida de este comando. En realidad, :command:`set`
+   permite hacer más cosas si se le añaden argumentos. Por ejemplo, esto hace que
+   :program:`bash` nos informe de la orden que está ejecutando::
+
+      $ set -v
+      $ ls -w80 /
+      ls -w80 /
+      bin   home            lib64       opt   sbin  usr
+      boot  initrd.img      lost+found  proc  srv   var
+      dev   initrd.img.old  media       root  sys   vmlinuz
+      etc   lib             mnt         run   tmp   vmlinuz.old
+
+   Lo cual no tiene mucho interés en el entorno interactivo. pero puede ser útil si
+   estamos depurando un *script* y queremos saber con qué orden falla. Para
+   deshacer el cambio basta con hacer :kbd:`set +v`.
+
+   Hay otras muchas opciones (``-f``, por ejemplo, deshabilita comodines y
+   expansiones) que pueden verse en la página de manual de :manpage:`bash` (o
+   mejor, de :manpage:`builtins`), ya que :command:`set`  es un comando interno.
+
+.. _env:
+.. index:: env
+
+:command:`env`
+   Sin argumentos, lista las variables de entorno definidas. Las *variables de
+   entorno* son aquellas heredables por un  hijo del proceso actual. Por
+   ejemplo::
+
+      $ sh -c 'echo valor=$HOME'
+      valor=/home/usuario
+      $ aa="No soy de entorno"
+      $ sh -c 'echo valor=$aa'
+      valor=
+
+   ``HOME`` es una variable de entorno. Por tanto, si se pregunta por su valor
+   en una *shell* hija, también existirá. En cambio, ``aa`` es una variable que
+   definimos en la *shell* actual, pero no es de ambiente\ [#]_ (o sea,
+   heredable), por tanto, en la *shell* hija no existirá. Como ambas son
+   variables, :ref:`set <set>` mostrará el valor de ambas; :command:`env`, en
+   cambio, sólo mostrará ``HOME``.
+
+Para obtener el valor de una variable, hay que anteponer a su nombre el símbolo
+del dolar::
+
+   $ echo $HOME
+   /home/usuario
+
+También es posible rodear el nombre con llaves para indicarle a :program:`bash`
+dónde empieza y acaba el nombre de la variable::
+
+   $ echo x${HOME}x
+   x/home/usuario/x
+
+ya que si escribiéramos :kbd:`$HOMEx`, la *shell* pensaría que el nombre de la
+variable es ``HOMEx``. Si la variable no existe, se sustituye por la cadena
+vacía::
+
+   $ echo x$HOMEx
+   x
+
+La interpretación del dólar puede protegerse escapándolo o con comillas simples,
+pero no con las dobles::
+
+   $ echo '${HOME}' -- \$\{HOME\} -- "${HOME}"
+   ${HOME} -- ${HOME} -- /home/usuario
+
+.. _sh-variables-predef:
+
+Variables predefinidas
+""""""""""""""""""""""
+
+Hay muchas `variables de entorno
+<http://www.tldp.org/LDP/abs/html/internalvariables.html>`_ disponibles. Algunas
+interesantes son:
+
+**$$**
+   Devuelve el :ref:`pid <pid>` del proceso actual. Si estamos en una sesión
+   interactiva, devolverá el *pid* de la sesión de :program:`bash`.
+
+.. _$?:
+
+**$?**
+   Devuelve el resultado del último programa ejecutado. Los programas para
+   informar de si han tenido éxito o no, devuelven a su entorno un *byte*, que
+   valdrá *0* si tuvo éxito, u otro valor distinto, si no lo tuvo. Por este
+   motivo::
+
+      $ true
+      $ echo $?
+      0
+      $ false
+      $ echo $?
+      1
+
+**$!**
+   Almacena el *pid* del último programa ejecutado en el background. Véase
+   el epígrafe sobre :ref:`gestión de procesos <procesos>`.
+
+.. _sh-EDITOR:
+
+**$EDITOR**
+   Determina cuál es el editor predeterminado que usarán programas como :ref:`crontab
+   <crontab>` o :ref:`visudo <visudo>`.
+
+   En *debian*, hay tres mecanismos\ [#]_ para que los programas que hacen uso
+   de la edición, escojan el editor. Por orden de prioridad son:
+
+   #. A través de las :ref:`alternativas <update-alternatives>` de *debian*.
+   #. Mediante la configuración del programa :command:`sensible-editor`.
+   #. Leyendo el valor de la variable **EDITOR**.
+
+.. _HISTFILE:
+
+**$HISTFILE**
+   Define cuál es el archivo en el que se almacenará el historial de
+   :program:`bash`. Habitualmente su valor es :file:`~/.bash_history`.
+
+**$HOME**
+   Devuelve el directorio personal del usuario.
+
+**$HOSTNAME**
+   Devuelve el nombre de la máquina. Puede usarse también el :index:`comando
+   <hostname>` :command:`hostname`.
+
+.. _sh-ifs:
+
+**$IFS**
+   Su nombre es el acrónimo de *Separador Interno de Campos*. y tiene
+   importancia en algunas operaciones de la *shell*.
+
+   .. seealso:: Consulte la explicación de la orden :ref:`read <read>` y la
+      :ref:`discusión sobre los argumentos de un programa <sh-args>` para ver
+      algunos ejemplo del usuo de este variable.
+
+**$OLDPWD**
+   Devuelve el nombre del directorio anterior al actual. Es útil si se quiere
+   volver a él::
+
+      $ cd $OLDPWD
+
+.. _PATH:
+
+**$PATH**
+   Lista los directorios que el sistema considera que contienen ejecutables. Se
+   separa un directorio del siguiente por dos puntos (``:``)::
+
+      $ echo $PATH
+      /usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games
+
+   Esto permite invocar órdenes sin tener que indicar la ruta completa. Por este
+   motivo es posible escribir::
+
+      $ cp archivo1 archivo2
+
+   Sin necesidad de escribir::
+
+      $ /bin/cp archivo1 archivo2
+
+   En el primer caso, el intérprete recorre la lista de directorios que contiene
+   la variable de izquierda a derecha, analizando si tal ejecutable está o no.
+   Al encontrarlo lo ejecuta; si no lo encuentra en ninguno de los directorios,
+   genera un error::
+
+      $ PATH=""  # <---- Ahora PATH está vacío y bash no busca.
+      $ cp archivo1 archivo2
+      -bash: cp: No existe el fichero o el directorio
+
+   .. note::
+      Obsérvese que el directorio actual no se encuentra en la lista de
+      directorios. Por ese motivo, para ejecutar un programa que se encuentra en
+      el directorio de trabajo es necesario::
+
+         $ ./mi_script.sh
+
+**$PS1**
+   Define el prompt de usuario.
+
+**$PWD**
+   Devuelve el directorio actual de trabajo, accesible también a través del
+   comando :ref:`pwd <pwd>`.
+
+.. _sh-variables-usuario:
+
+Variables de usuario
+""""""""""""""""""""
+Cualquier usuario puede definir sus propias variables simplemente dándoles
+valor::
+
+   $ MIVAR=4
+   $ echo ${MIVAR}
+   4
+
+Por supuesto, esto también es aplicable a las variables vistas en el apartado
+anterior::
+
+   $ PATH="~/bin/:$PATH"
+
+Salvo este último caso de redefinición de variables ya existentes, no suele
+tener gran utilidad en consolas interactivas, pero cobra capital importancia
+cuando se escriben *scripts*. Al tratarlos, :ref:`profundizaremos en ellas
+<sh-variables>`.
+
+No obstante, debe significarse que, cuando se definen variables, ha de tenerse
+en cuenta que estas, en principio, sólo existen dentro de la propia sesión de
+:program:`bash`, y no las heredan los programas hijo. Por ejemplo::
+
+   $ echo MIVAR=4
+   $ echo %${MIVAR}%
+   %4%
+   $ bash -c 'echo %${MIVAR}%'
+   %%
+
+Para que convertirlas en variables de entorno es necesario exportarlas.
+
+.. _export:
+.. index:: export
+
+:command:`export`
+   Permite convertir una variable en variable de entorno, es decir, hacerla heredable
+   por los procesos hijo. La sintaxis es::
+
+      export [-f|-n] nombre[=valor] [nombre2=valor2 ...]
+
+   Cuando la variable se exporta puede ya tener definido un valor. En ese caso,
+   basta con indicar el nombre de la variable::
+
+      $ MIVAR=4
+      $ export MIVAR
+
+   Pero también puede hacerse la asignación a la vez que se realiza la
+   exportación::
+
+      $ export MIVAR=4
+
+   Si se exportó la variable, entonces ya estará disponible en el entorno de
+   cualquier programa hijo::
+
+      $ bash -c 'echo %${MIVAR}%'
+      %4%
+
+   Si se desea desmarcar la variable como exportable, basta con usar la opción
+   ``-n``::
+
+      $ export -n MIVAR
+      $ bash -c 'echo %${MIVAR}%'
+      %%
+
+   Por último, es posible mostrar todas las variables exportadas usando la
+   opción ``-p``::
+
+      $ export -p
+      [... Lista de variables y funciones exportables ..]
+
+   .. note:: La opción ``-f`` sire para exportar :ref:`funciones <sh-func>` en
+      vez de variable (sólo en :command:`bash`, ya que :command:`dash` no puede
+      exportar funciones)
+
+Otra posibilidad que proporciona la *shell* es pasar la definición de una
+variable a un programa hijo. Esto se hace anteponiendo la asignación de la
+variable al comando::
+
+   $ A=1 bash -c 'echo $A'
+   1
+
+Pueden, asimismo, realizarse varias asignaciones::
+
+   $ A=1 B=2 bash -c 'echo $A -- $B'
+   1 -- 2
+
+.. _sh-ev-arit:
+
+Evaluación aritmética
+---------------------
+Para la realización de operaciones, pueden recurrirse a la evaluación aritmética
+usando la sintaxis::
+
+   $(( ... ))
+
+Entre paréntesis debemos colocar una expresión tal y como se escribiría en en
+lenguaje *C*::
+
+   $ SUMA=$((1+2))
+   $ echo $SUMA
+   3
+
+Las comillas dobles permiten a la *shell* interpretar la expresión; los
+otros dos mecanismos lo evitan::
+
+   $ echo "La suma de 1 y 2 es $((1+2))"
+   La suma de 1 y 2 es 3
+
+Además de estas operaciones, :command:`bash` permite con la sintaxis de los dos
+paréntesis, otras dos operaciones:
+
+#. Asignar valor a variables (lo cual sólo tiene sentido si hay involucradas
+   operaciones aritméticas, ya que de otro modo basta con usar el método
+   general para dar valor a la variable)::
+
+      $ ((A = 1+2))
+      $ echo $A
+      3
+      $ ((A++))
+      $ echo $A
+      4
+
+   .. note:: Obviamente, esta forma de asignación sólo tiene sentido si
+      incluimos alguna operación aritmética; de lo contrario, es más sencillo
+      usar directamente el método general de asignación.
+
+#. Hacer una evaluación lógica::
+
+      $ ((A == 3)) || echo "A no vale 3"
+      A no vale 3.
+
+
+   .. note:: Al tratar la programación, ya veremos :ref:`cómo realizar esto mismo
+      con test <sh-if>`.
+
+.. _alias:
+.. index:: alias
+
+Alias
+-----
+Los :dfn:`alias` son palabras que permiten acortar la digitalización de un
+comando. Habitualmente se usan para ejecutar siempre ciertos comandos con una o
+varias opciones predeterminadas. En realidad, lo más probable es que existan ya
+definidos en el sistema. Uno que viene en *debian* para el usuario sin
+privilegios es este::
+
+   $ alias ls
+   alias ls='ls --color=auto -F'
+
+O sea, que cuando ejecutamos :code:`ls`, en realidad, estamos ejecutando
+:code:`ls --color=auto -F`. Por esta razón, la salida sale coloreada. Cuando se
+quiere ejecutar el comando a secas y no el alias, es necesario anteponer al
+comando la barra invertida::
+
+   $ \ls
+
+.. _command:
+.. index:: command
+
+o bien usar la orden interna :command:`command`, que tiene el mismo efecto::
+
+   $ command ls
+
+Esto mostrará una salida sin colorear ni decorar los nombres, o sea, la
+ejecución pelada de :command:`ls`.
+
+Hemos visto ya cómo consultar el alias definido para un cierto comando. Es
+posible que se muestren todos, ejecutando :command:`alias` sin argumentos::
+
+   $ alias
+   alias ls='ls --color=auto -F'
+   alias tar='tar --no-overwrite-dir'
+   alias scp='scp -p'
+   alias tmux='tmux -2 attach || tmux -2 new-session'
+
+Para definir nuevos alias, basta con usar la sintaxis que ha aparecido en la
+salida. Por ejemplo, :ref:`cp <cp>`, :ref:`mv <mv>` y :ref:`rm <rm>` es muy
+recomendable usarlos añadiendo la opción ``-i``. Por tanto, es muy útil añadir
+los alias::
+
+   $ alias mv='mv -i'
+   $ alias cp='cp -i'
+   $ alias rm='rm -i'
+
+Sin embargo, todas estas definiciones sólo tienen validez hasta que acabe la
+sesión. Si queremos hacer cambios permanentes es necesario escribirlos en
+archivos que se lean al iniciar las sesiones. De esto trataremos en el siguiente
+apartado.
+
+.. _inicio-bash:
+
+¿Cómo definir variables de entorno y alias?
+-------------------------------------------
+
+La respuesta es sencilla: escribiendo la definición de las variables o los alias
+en los directorios que :program:`bash` lee al ejecutarse para abrir sesión.
+Estos archivo son:
+
+:file:`/etc/profile`
+   Sea cual sea el usuario que abre sesión. se lee este archivo. Por tanto, si
+   se desea hacer un cambio que afecte a todos los usuarios, puede escribirse
+   aquí. No obstante, este archivo llama a su vez a :file:`/etc/bash.bashrc` por
+   lo que deberíamos ver si nuestro nuestro cambio, será desecho después.
+
+   Sin embargo, lo mejor es escribir nuestro código en un nuevo archivo dentro
+   de :file:`/etc/profile.d/`, para no modificar los archivos de la propia
+   distribución. El archivo debe tener extensión ``.sh``.
+
+:file:`~/.bash_profile`, :file:`~/.bash_login`, :file:`~/.profile`
+   Los tres archivos son, obviamente, particulares de cada usuario.
+   Después de leer los archivos anteriores, :program:`bash` busca por el orden
+   especificado estos tres archivos y en cuanto encuentra uno, ese lee. Lo
+   habitual es que nos topemos con que existe :file:`~/.profile`, que a su vez
+   lee el archivo que se cita a continuación.
+
+:file:`~/.bashrc`
+   Es el archivo que lee :program:`bash` cuando la sesión es interactiva, pero
+   no de *login*. La mayor parte de las sesiones interactivas son de *login*,
+   pero no todas. Por ejemplo, no son de *login* las sesiones que se abren con
+   el comando :ref:`su <su>` si no se usa la opción ``-``.
+
+.. _bashrc.d:
+
+Por tanto, si quisiéramos que para nuestro usuario particular los comandos
+:ref:`cp <cp>`, :ref:`mv <mv>` y :ref:`rm <rm>` preguntaran antes de hacer una
+acción destructiva, podríamos incluir las tres líneas de *alias* mediante la
+edición del archivo :file:`~/.bashrc`. Ahora bien, añadir indiscriminadamente
+líneas a este archivo no es buena idea, porque se acabará convirtiendo en un
+monstruito con configuración predeterminada muy diversa. Es mejor en cambio,
+crear un directorio de configuraciones :file:`~/.bashrc.d` e incluir dentro de
+él la configuración modular. Para ello debe hacerse uso del comando
+interno:
+
+.. _source:
+.. index:: source
+
+:command:`source`
+   Lee en la *shell* actual una serie de órdenes almacenadas en un archivo. Su
+   sintaxis es::
+
+      source <archivo>
+
+   En vez de usar la palabra *source* puede escribirse simplemente un punto
+   (:kbd:`.`). De hecho, el punto es lo único que entiende :command:`dash`.
+
+Sabido esto, la forma de intergrar el directorio de configuraciones dentro de
+la configuración es añadir a :file:`~/.bashrc` las siguientes líneas::
+
+   if [ -d ~/.bashrc.d ]; then
+      for conf in ~/.bashrc.d/*.sh; do
+         . "$conf"
+      done
+   fi
+
+que provocará que se interpreten todas las instrucciones incluidas en archivos
+de ese directorio cuya extensión sea ``.sh``. Así pues::
+
+   $ mkdir ~/.bashrc.d
+   $ cat > ~/,bashrc.d/10-aliases.sh
+   alias mv='mv -i'
+   alias cp='cp -i'
+   alias rm='rm -i'
+
+.. note:: Los archivos se leen en orden alfabético, así que es buena idea
+   hacer comenzar los nombres con números de igual longitud para la ordenación
+   sea más evidente.
+
+Si quisiéramos que los tres *alias* se definieran para todos los usuarios
+podríamos crear el archivo :file:`/etc/profile.d/bash_aliases.sh`\ [#]_
+
+Hay una último aspecto interesante. En :file:`/etc/skell` se almacena el
+*esqueleto* que se usa para crear los directorios personales de usuario.
+Cualquier archivo que se incluya aquí o cualquier modificación que se introduzca
+en los archivos que ya existen, pasará a formar parte de los nuevos directorios
+personales que se creen.
+
+.. _ej-exp:
+
+.. include:: /99.ejercicios/06-expansiones.rst
+
+.. rubric:: Notas al pie
+
+.. [#] En la consola interactiva puede escribirse la tabulación pulsado Ctrl+v y
+   a continuación la propia tabulación.
+
+.. [#] Este comportamiento de no interpretar ante un patrón que no corresponde
+   con ningún archivo puede modificarse mediate::
+
+      $ shopt -s nullglob
+
+   Hecho esto, un patrón que no tiene correspondencia se resolverá a la cadena
+   nula::
+
+      $ echo Interpretación: /?
+      Interpretación: /?
+      $ shopt -s nullglob
+      $ echo Interpretación: /?
+      Interpretación: 
+
+.. [#] Para que la nueva variable, se convierta en variable de ambiente es
+   necesario :ref:`exportarla <export>`.
+
+.. [#] Cuando un programa necesita hacer uso de un editor, está preparado para
+   buscar entre las variables de ambiente el valor de *EDITOR*. Si existe, es
+   este el valor que usa; si no es así, invoca un :index:`editor
+   <sensible-editor>` llamado :command:`sensible-editor`, que es un programa que
+   comprueba si está definida la variable *SELECTED_EDITOR*, cuyo valor es el
+   editor preferido. Si lo está, ese es el editor que se lanza; si no, llama al
+   :index:`programa <selected-editor>` :command:`selected-editor` que permite
+   elegir uno y define de forma persistente (en :file:`~/.selected_editor`) el
+   valor de la variable. A partir de ese momento ese es el editor que se usará.
+   El tercer mecanismo intuyo que jamás llega a operar.
+
+.. [#] :file:`/etc/profile.d/` esta organizado respecto a :file:`/etc/profile`,
+   del mismo que hemos nosotros aquí.

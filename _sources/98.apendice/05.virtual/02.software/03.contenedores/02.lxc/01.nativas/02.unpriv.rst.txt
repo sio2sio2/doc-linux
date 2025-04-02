@@ -1,0 +1,296 @@
+Contenedores no privilegiados
+*****************************
+El uso de :ref:`contenedores no privilegiados <contenedor-no-privilegiado>`
+mejora la seguridad del contenedor al reducir las posibilidades de que una tarea
+del contenedor escape al anfitrión con permisos de administrador, puesto que el
+usuario *root* del contenedor no coincide con el del anfitrión. Esto se logra
+mediante el uso de espacios de nombres de usuario que permiten que el usuario
+*root* que actúa dentro de un contenedor (o sea, dentro el espacio de nombres
+de usuario asociado al contenedor) no sea el usuario *root* del anfitrión.
+
+Aunque no es indispensable, lo habitual es que el usuario del anfitrión que
+ejecuta un contenedor no privilegiado sea un usuario sin privilegios y no el
+administrador, por lo que reduciremos este epígrafe a este caso.
+
+.. _userns:
+
+UserNS
+======
+Antes de meternos de lleno en los contenedores sin privilegios, es conveniente
+entender bien qué ocurre cuando usamos espacios de nombres de usuario.
+Probemos a ejecutar un *shell* en un espacio de nombres de usuario distinto::
+
+   $ id -u
+   1000
+   $ unshare ---user
+   $ id
+   uid=65534(nobody) gid=65534(nogroup) grupos=65534(nogroup)
+   $ echo $$
+   1059
+
+La orden :command:`unshare` permite ejecutar procesos en espacios de nombres
+distintos al del proceso padre, y en este caso hemos creado tan solo un espacio
+de nombres de usuario distinto para una sesión de :program:`bash` con proceso
+**1059**. Como no hay definido ningún mapeo de usuarios para él\ [#]_, mi usuario del
+anfitrión con |UID| **1000** se resuelve a *nobody*. De hecho, si abrimos otra
+terminal para abandonar temporalmente el nuevo espacio de nombres, podemos
+comprobar que efectivamente no hay definido mapeo alguno::
+
+   $ cat /proc/1059/uid_map
+   $ cat /proc/1059/gid_map
+
+Ambos archivos están vacíos, pero pueden escribirse una única vez para definir
+el mapeo. En principio, un usuario sin privilegios sólo puede mapear su propio
+|UID| a cualquier otro (típicamente el **0** del administrador, aunque no
+necesariamente), por lo que podríamos hacer (no lo hagamos todavía)::
+
+   $ echo "0 1000 1" > /proc/1059/uid_map
+
+o bien::
+
+   $ echo "33 1000 1" > /proc/1059/uid_map
+
+En el primer caso, sería *root* en el nuevo espacio de nombres y en el segundo
+el usuario con |UID| **33** (que en *Debian* es *www-data*). La sintaxis de esa
+línea es ":kbd:`uid_newns uid_oldns numero`", donde número es el número de
+|UID|\ s que se mapean. Por ejemplo, si hubiéramos intentado::
+
+   $ echo "33 1000 2" > /proc/1059/uid_map
+
+se habría mapeado el |UID| **33** a nuestro |UID| en el espacio de nombres
+principal y el |UID| **34** al siguiente (el **1001**). Pero esto no lo tenemos
+permitido, porque sólo podemos mapear nuestro propio |UID|, así que se
+habría producido un error en caso de intentarlo.
+
+En los contenedores, sin embargo, se recrea un sistema completo donde hay muchos
+usuarios y grupos y es necesario que el usuario pueda mapear rangos completos,
+no sólo su propio |UID|. Para soslayar esta limitación existe el concepto de
+rango de identificadores subordinados::
+
+   $ cat /etc/subuid
+   usuario:100000:65536
+   $ cat /etc/subuid
+   usuario:100000:65536
+
+Esto significa que el usuario tiene subordinados 65536 |UID|\ s (del 100000 al 165535)
+y también 65536 |GID|\ s, de manera que cuando se ejecuten tareas dentro de un
+contenedor no privilegiado de mi usuario los distintos usuarios del contenedor
+podrán asociarse (mapearse) a identificadores de este rango (p.e. **0** será
+**100000**, **1** será **100001**, etc.).
+
+.. note:: Es probable que esta definición ya exista en nuestro sistema. Si no
+   existe, o quiere modificarse, puede usarse :ref:`usermod <usermod>` para
+   ello::
+
+      # usermod --add-subuids 100000-165535 usuario
+      # usermod --add-subgids 100000-165535 usuario
+
+Gracias a ello y a tener instalado el paquete :deb:`uidmap`, podremos hacer un
+mapeo que incluya más de un solo identificador para el nuevo espacio de nombres\
+[#]_::
+
+   $ newuidmap 1059 1 100000 65536 0 1000 1   # pid uid_newns uid_oldns tam [más rangos]
+   $ newgidmap 1059 1 100000 65536 0 1000 1
+   $ cat /proc/1059/uid_map
+            1     100000      65536
+            0       1000          1
+
+O sea, hemos asociado el **0** con nuestro |UID| del anfitrión y del **1** en
+adelante con el rango de identificadores subordinados. Si volvemos ahora a la
+sesión abierta en el nuevo espacio de nombres::
+
+   $ id -un
+   root
+
+Lo cual es lógico, porque si en el anfitrión soy el **1000**, en esta sesión se
+me identifica como administrador. De hecho, probemos a crear dos archivos en el
+directorio temporal::
+
+   $ touch /tmp/yo
+   $ touch /tmp/subordinado
+   $ chown 1 /tmp/subordinado
+   $ stat -c%U /tmp/yo /tmp/subordinado
+   root
+   daemon
+
+que son identificados como propiedad de los usuarios *root* (**0**) y *daemon*
+(**1**) dentro del espacio de nombres. Fuera, sin embargo::
+
+   $ stat -c%u /tmp/yo /tmp/subordinado
+   1000
+   100000
+
+lo cual es consecuente con nuestro mapeo. Lo lógico es que el rango de
+identificadores subordinados se hagan con números altos para que no interfiera
+con los usuarios reales del anfitrión. Con estos mimbres, ya podemos meternos
+en harina.
+
+Preliminares
+============
+Al utilizar |LXC| como usuario sin privilegios los directorios predeterminados
+varían:
+
+======================== ============================ =========================
+ root                     usuario                     Descripción
+======================== ============================ =========================
+ :file:`/etc/lxc`         :file:`~/.config/lxc`       Configuración
+ :file:`/var/lib/lxc`     :file:`~/.local/share/lxc`  Almacén de contenedores
+ :file:`/var/cache/lxc`   :file:`~/.cache/lxc`        Almacén de plantillas
+======================== ============================ =========================
+
+Esto puede ser algo impertinente, puesto que podría convenirme que el almacen de
+plantillas estuviera sobre un sistema |BTRFS| distinto al de mi directorio de
+usuario, que quizás esté sobre ext4. Por ahora no nos precuparemos de ello y nos
+daremos por satisfechos con lograr crear y usar este tipo de contenedores.
+
+Por supuesto, hemos de asegurarnos de que nuestro usuario tiene definidos ragos
+subordinados en :file:`/etc/subuid` y :file:`/etc/subgid`::
+
+   $ cat /etc/subuid
+   usuario:100000:65536
+   $ cat /etc/subuid
+   usuario:100000:65536
+
+De la instalación de:manpage:`uidmap` no debemos preocuparnos porque es
+dependencia de :manpage:`lxc`.
+
+Por último, para la red utilizaremos interfaces |VETH| asociadas a una interfaz
+puente (*lxcbr0*), así que nos conviene no tener instalado el paquete
+:manpage:`dnsmasq` y dejar que se encargue de la creación del puente
+:program:`lxc-net`. Como un usuario sin privilegios no puede crear
+interfaces |VETH|, |LXC| facilita un *script* llamado :command:`lxc-user-nic`
+con el bituid habilitado que se encarga de ello. Sin embargo, no crea
+indiscriminadamente interfaces, sino que tenemos explícitamente que dar permisos
+a los usuarios registrándolos en :file:`/etc/lxc/lxc-usernet`.  Podríamos
+dar permisos exclusivamente a *usuario* para crear hasta 10 interfaces |VETH|
+asociadas a la interfaz *lxcbr0* con::
+
+   # echo "usuario veth lxcbr0 10" >> /etc/lxc/lxc-usernet
+
+pero en vez de eso, crearemos un grupo llamado *lxc* en que incluiremos a todos
+los usuarios que pensamos que crearán contenedores no privilegiados::
+
+   # addgroup --system lxc
+   # adduser usuario lxc
+
+Y concederemos el permiso de esta manera::
+
+   # echo "@lxc veth lxcbr0 10" >> /etc/lxc/lxc-usernet
+
+Creación
+========
+Necesitamos un archivo de configuración para el usuario, así que::
+
+   $ mkdir -p ~/.config/lxc
+   $ cat > ~/.config/lxc/default.conf
+   # Red
+   lxc.net.0.type = veth
+   lxc.net.0.link = lxcbr0
+   lxc.net.0.flags = up
+   lxc.net.0.hwaddr = de:ad:be:ef:xx:xx
+
+   # Mapeo del usuario
+   lxc.idmap = u 0 100000 65536
+   lxc.idmap = g 0 100000 65536
+
+La configuración de la red no necesita explicación ni debería dar problemas si
+incluímos el permiso pertinente en :file:`/etc/lxc/lxc-usernet`. El mapeo sí
+admite más comentarios:
+
+* Es congruente con los rangos de identificadores subordinados definidos en
+  :file:`/etc/subuid` y :file:`/etc/subgid`.
+* Ambas líneas, una para usuarios y otra para grupos, implican que el
+  identificador **0** en el huésped se asocie al **100000** en el anfitrión;
+  el **1**, al **100001**, y así sucesivamente hasta el **65535**.
+
+Y, ¡listo!, ya podemos crear el contenedor::
+
+   $ lxc-create -n test -t download -- -d alpine -r 3.17 -a amd64
+
+.. warning:: No use :ref:`newgrp <newgrp>` para hacer que el usuario pertenezca
+   sobre la marcha al grupo *lxc*.
+
+Y una vez creado, su uso es ligeramente diferente. No debemos usar
+:command:`lxc-start` y :command:`lxc-attach`, sino :command:`lxc-unpriv-start` y
+:command:`lxc-unpriv-attach`\ [#]_::
+
+   $ lxc-unpriv-start -n test
+   $ lxc-unpriv-attach -n test -- passwd
+   $ lxc-unpriv-attach -n test -- /usr/sbin/adduser -s /bin/ash -g "" usuario
+   $ lxc-console -n test
+
+     [...]
+
+   $ lxc-stop -n test
+
+.. note:: Por supuesto, podremos definir dos :ref:`alias <alias>` para evitarnos
+   el cambio de orden.
+
+Si para albergar los contenedores hemos reservado un sistema de archivos en
+:file:`/var/lib/lxc` y queremos usarlo también con los contenedores no
+pivilegiados podemos seguir la siguiente estrategia:
+
+#. Permitirmos la escritura sobre el directorio al grupo *lxc*, el cual sugerimos
+   crear anteriormente::
+
+      # chgrp lxc /var/lib/lxc
+      # chmod g+w /var/lib/lxc
+
+#. Modificamos ls ruta para el almacen de contenedores privilegiados::
+
+      # echo "lxc.lxcpath = /var/lib/lxc/root" >> /etc/lxc/lxc.conf
+
+#. Modificamos la ruta para el almacen de los contenedores no privilegiados del
+   usuario "*usuario*"::
+
+      $ echo "lxc.lxcpath = /var/lib/lxc/$USER" >> ~/.config/lxc/lxc.conf
+
+De esta forma cada usuario almacenará sus contenedores en un subdirectorio de
+:file:`/var/lib/lxc`.
+
+Con el usuario administrador también se pueden hacer contenedores no
+privilegiados exactamente con la misma técnica: añadiendo la delegación de
+identificadores (en :file:`/etc/subuid` y :file:`/etc/subgid`) y añadiendo el
+mapeo correspondiente en la configuración (:kbd:`lxc.idmap`). Ahora bien:
+
+* Habrá problema al escribir en :file:`/var/cache/lxc`, porque parece intentar
+  guardar las plantillas no con el administrador, sino con el identificador
+  delegado. Obviamente, si se permiten todos los permisos en ese subdirectorio
+  (**777***) se acabará con el problema.
+* Hay que usar :command:`lxc-start` y :command:`lxc-attatch`, no las versiones
+  "*unpriv*".
+* No hay limitaciones en la creación de la interfaz de red, así que no hay que
+  añadir ningún permiso a :file:`/etc/lxc/lxc-usernet` ni tendremos por qué
+  ceñirnos a usar interfaces |VETH|.
+
+.. note:: El cacheo de las plantillas, sin embargo, seguirá produciéndose en los
+   directorios particulares :file:`~/.cache/lxc`.
+
+.. autostart para contenedores de usuario: https://serverfault.com/a/663490
+
+.. rubric:: Notas al pie
+
+.. [#] La versión de :command:`unshare` que trae *Bookworm* incorpora la
+   opciones :kbd:`--map-users` y :kbd:`--map-groups` para facilitar el mapeo en
+   el momento de crear el nuevo espacio.
+
+.. [#] En realidad, el contenido de :file:`/etc/subuid` y :file:`/etc/subgid` no
+   altera la incapacidad del usuario para mapear identificadores que no son
+   suyos, por lo que volcar directamente el mapeo en el
+   :file:`uid_map`/:file:`gid_map` del proceso nos seguirá resultado imposible.
+   Sin embargo, :command:`newuidmap` y :command:`newgidmap` tiene habilitado el
+   *bituid*
+
+.. [#] El *PATH* que se usa al ejecutar mediante :command:`lxc-unpriv-attrach`
+   la orden en el contenedor es el del usuario, no el del administrador, de ahí
+   que haya que habido que expresar la ruta completa de :ref:`adduser
+   <adduser>`.
+
+.. Unprivileged containers:
+   https://linuxcontainers.org/lxc/getting-started/
+
+.. |UID| replace:: :abbr:`UID (User IDentifier)`
+.. |GID| replace:: :abbr:`GID (Group IDentifier)`
+.. |LXC| replace:: :abbr:`LXC (LinuX Containers)`
+.. |BTRFS| replace:: :abbr:`BTRFS (B-TRee File System)`
+.. |VETH| replace:: :abbr:`VETH (Virtual ETHernet)`

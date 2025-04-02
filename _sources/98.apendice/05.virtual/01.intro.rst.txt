@@ -1,0 +1,204 @@
+Introducción
+============
+Dado nuestro propósito, centraremos el resto del epígrafe en la virtualización
+de plataforma cuyos tipos pueden resumirse en el siguiente esquema:
+
+.. image:: files/virtualizacion.png
+
+Antes de empezar, no obstante, hay que introducir cuatro conceptos:
+
+* :dfn:`Máquina virtual`, que es el sistema informático virtualizado, esto es,
+  el conjunto de un *hardware* virtual, un sistema operativo y las aplicaciones
+  que corren sobre ellos.
+* :dfn:`Hipervisor`, que es la plataforma *software* que controla la
+  virtualización de las distintas máquinas virtuales.
+* :dfn:`Sistema anfitrión`, que es aquel sobre el que se realiza la virtualización.
+* :dfn:`Sistema huésped`, que es aquel que se ejecuta dentro de la máquina virtual.
+
+.. _virt-completa:
+
+:dfn:`Virtualización completa`
+   Es aquella en la que se virtualiza por completo para el *huesped* una
+   plataforma *hardware* funcional, por lo que el *huésped* debe ser tan sólo
+   capaz de utilizar los componentes de esa plataforma, esto es, tener los
+   *drivers* adecuandos para todos ellos. Normalmente el *hardware* que se virtualiza
+   con componentes reales comúnmente utilizados por lo que es bastante probable
+   que el sistema huésped disponga de los drivers apropiados.
+
+   Dentro de la virtualización completa, podemos hacer dos distinciones. La
+   primera hace referencia al **tipo de hipervisor**:
+
+   #. Virtualización **nativa** o hipervisor de **tipo 1**: es aquella en que
+      el hipervisor se ejecuta directamente sobre el *hardware*.
+
+      .. image:: files/tipo1.png
+
+   #. Virtualización **alojada** o Hipervisor de **tipo 2**: es aquella en que
+      el hipervisor se ejecuta sobre un sistema operativo.
+
+      .. image:: files/tipo2.png
+
+   La nativa es más eficiente que la alojada, ya que el proceso de
+   virtualización se ahorra la intermediación del sistema operativo.
+
+   Por otro lado, a partir del año 2005 las `plataformas x86_64
+   <https://es.wikipedia.org/wiki/Virtualizaci%C3%B3n_x86>`_\ [#]_ empezaron a
+   incluir en sus procesadores instrucciones que ayudan en la virtualización de
+   *hardware* de la misma plataforma (**VT-x** en procesadores Intel y **AMD-V**
+   en procesadores AMD), a fin de que los sistemas huéspedes pudieran ejecutar
+   instrucciones directamente sobre el procesador sin afectar al anfitrión. Esto
+   da lugar a otra clasificación:
+
+   #. Virtualización **acelerada por hardware**, que es aquella que permite a
+      los sistemas huéspedes ejecutar instrucciones privilegiadas sobre el
+      *hardware* real, siempre que este lo soporte. Obviamente, se debe
+      virtualizar un *hardware* del mismo tipo.
+
+   #. **Emulación**, que es aquella en que la virtualización del *hardware* se
+      realiza toda mediante *software*. Esto es mucho menos eficiente que la
+      aceleración por *hardware*.
+
+.. _paravirt:
+
+:dfn:`Paravirtualización`
+   Es aquella en la que no se construye para el huésped un *hardware* virtual,
+   ya que este tiene los controladores adecuados para hacer las peticiones
+   directamente al anfitrión. Ello requiere modificar el sistema operativo
+   cliente para incorporar estos controladores. Evitando la virtualización del
+   *hardware* se mejora el rendimiento, pero a costa de no poder usar cualquier
+   sistema operativo, sino sólo aquellos previamente preparados para su
+   paravirtualización.
+
+   .. image:: files/paravirtualizacion.png
+
+:dfn:`Paravirtualización híbrida`
+   Es una solución a caballo entre las dos anteriores en que se usa
+   paravirtualización exclusivamente para algunos aspectos del *hardware* que
+   sea especialmente costoso virtualizarlos como operaciones de E/S y uso
+   intensivo de memoria, y para el resto se usa virtualización completa del
+   *hardware*.
+
+   Un ejemplo de *hardware* paravirtualizado es el `driver virtIO
+   <https://www.linux-kvm.org/page/Virtio>`_ para las tarjetas de red, que puede
+   ser usado en sistemas de virtualización completas como :ref:`Virtualbox
+   <virtualbox>` o :ref:`QEmu <qemu>`.
+
+.. _contenedores:
+
+:dfn:`Contenedores`
+   La virtualización por sistema operativo la llevan a cabo aquellos sistemas
+   operativos capaces de crear varios espacios de usuario completamente aislados
+   unos de otros. Cada uno de estos espacios de usuario constituye un
+   contenedor y es capaz de ver y manejar aquellos recursos hardware que se le
+   han asignado.
+
+   En consecuencia, en este tipo de virtualización no existe ni *hardware*
+   virtual, ni sistema operativo huésped, sino sólo aplicaciones (de base o de
+   usuario) que corren dentro del contenedor.
+
+   Dentro de esta virtualización, podemos distinguir dos clases:
+
+   #. :dfn:`Contenedores de sistema` que son aquellos contenedores dentro de los
+      cuales se proporciona un espacio de usuario  completo y aislado\ [#]_ del
+      anfitrión.  En ellos la gestión del sistema huésped es muy próxima a la de
+      la virtualización completa (usuarios, red, procesos, etc.)
+
+   #. :dfn:`Contenedores de aplicación` que con son aquellos contenedores destinados
+      a ejecutar un única aplicación aislada. Es una virtualización muy en
+      boga en los últimos tiempos, sobre todo a partir de la irrupción de Docker_.
+
+   .. seealso:: Para un explicación más exahustiva de estas dos clases, puede
+      leer el artículo `Operating System Containers vs. Application Containers
+      <https://blog.risingstack.com/operating-system-containers-vs-application-containers/>`_.
+
+   Las ventajas fundamentales de este sistema son su rendimiento y su pequeño
+   consumo de recurso frente a las soluciones anteriores. Por contra, tiene la
+   desventaja de que al no existir un sistema operativo huésped, las aplicaciones
+   huéspedes deben ser aplicaciones hechas para el sistema operativo anfitrión, o
+   lo que es lo mismo, en un contenedor de Linux sólo podremos correr aplicaciones
+   hechas para Linux.
+
+   .. image:: files/contenedor.png
+
+   .. seealso:: Sobre esta estrategia de virtualización hay explicaciones adicionales
+      centradas en *Linux* dentro del :ref:`epígrafe introductorio al
+      software de contenedores <software-contenedores>`.
+
+.. table:: Software de virtualización
+   :class: virtualizacion
+
+   +--------------------+-----------------+-------------+-----------------------+-------------------+-------------+
+   |  *Software*        | Tipo            | Aceleración | Anfitrión             | Huésped           | Licencia    |
+   |                    |                 |             +-----------+-----------+-----------+-------+             |
+   |                    |                 |             | |CPU|     | |SO|      | |CPU|     | |SO|  |             |
+   +====================+=================+=============+===========+===========+===========+=======+=============+
+   | VMware Workstation | Completa tipo 2 | Sí          | | x86     | | Windows | Anfitrión | \*    | Propietaria |
+   |                    |                 |             | | x86_64  | | Linux   |           |       | (freeware)  |
+   +--------------------+                 |             |           +-----------+           |       +-------------+
+   | Virtualbox         |                 |             |           | | Windows |           |       | |GPL|       |
+   |                    |                 |             |           | | Linux   |           |       |             |
+   |                    |                 |             |           | | MacOs   |           |       |             |
+   |                    |                 |             |           | | FreeBSD |           |       |             |
+   +--------------------+                 |             |           +-----------+           |       +-------------+
+   | Parallel           |                 |             |           | MacOs     |           |       | Propietaria |
+   +--------------------+-----------------+             |           +-----------+           |       +-------------+
+   | VMware ESXi        | Completa tipo 1 |             |           | \-        |           |       | Propietaria |
+   +--------------------+                 |             +-----------+-----------+           |       +-------------+
+   | |KVM|\ [#]_        |                 |             | | x86     | | Linux   |           |       | |GPL|       |
+   |                    |                 |             | | x86_64  | | FreeBSD |           |       |             |
+   |                    |                 |             | | IA-64   |           |           |       |             |
+   |                    |                 |             | | ARM     |           |           |       |             |
+   |                    |                 |             | | PowerPC |           |           |       |             |
+   +--------------------+                 |             +-----------+-----------+           +       +-------------+
+   | Hyper-V            |                 |             | | x86_64  | Windows   |           |       | Propietaria |
+   +--------------------+-----------------+-------------+-----------+-----------+-----------+-------+-------------+
+   | QEmu               | Completa tipo 2 | No\ [#]_    | | x86     | | Linux   | \*        | \*    | |GPL|       |
+   |                    |                 |             | | x86_64  | | FreeBSD |           |       |             |
+   |                    |                 |             | | IA-64   | | Windows |           |       |             |
+   |                    |                 |             | | ARM     | | MacOs   |           |       |             |
+   |                    |                 |             | | PowerPC | | FreeBSD |           |       |             |
+   |                    |                 |             | | MIPS    | | OpenBSD |           |       |             |
+   |                    |                 |             | | SPARC   | | Solaris |           |       |             |
+   +--------------------+-----------------+-------------+-----------+-----------+-----------+-------+-------------+
+   | Xen Project\ [#]_  | | Completa      | Sí          | | x86     | Linux     | Anfitrión | \*    | |GPL|       |
+   |                    | | Paravirt.     |             | | x86_64  |           |           |       |             |
+   |                    | | Paravirt. híb.|             | | PowerPC |           |           |       |             |
+   |                    | | Contenedor    |             | | ARM     |           |           |       |             |
+   +--------------------+-----------------+-------------+-----------+-----------+-----------+-------+-------------+
+   | OpenVZ             | Contenedores    | \-          | | x86     | Linux     | Anfitrión | \-    | |GPL|       |
+   |                    | de sistema      |             | | x86_64  |           |           |       |             |
+   |                    |                 |             | | IA-64   |           |           |       |             |
+   |                    |                 |             | | PowerPC |           |           |       |             |
+   |                    |                 |             | | SPARC   |           |           |       |             |
+   +--------------------+-----------------+-------------+-----------+-----------+-----------+-------+-------------+
+   | Docker             | Contenedores    | \-          | | x86_64  | | Linux   | Anfitrión | \-    | Apache      |
+   |                    | de aplicación   |             | | ARM     | | Windows |           |       | (tipo |BSD|)|
+   |                    |                 |             |           | | MacOs   |           |       |             |
+   +--------------------+-----------------+-------------+-----------+-----------+-----------+-------+-------------+
+   | |LXC|              | Contenedores    | \-          | | x86_64  |  Linux    | Anfitrión | \-    | |GPL|       |
+   |                    | de sistema      |             | | ARM     |           |           |       |             |
+   |                    |                 |             |           |           |           |       |             |
+   +--------------------+-----------------+-------------+-----------+-----------+-----------+-------+-------------+
+
+.. rubric:: Notas al pie
+
+.. [#] Más recientemente la incluyó también la plataforma ARM.
+.. [#] Entiéndase que en, este caso, :dfn:`aislada` no significa que no pueda
+   comunicarse con el exterior, sino que se ejecuta en un espacio de usuario
+   independiente.
+.. [#] |KVM| es un módulo de *Linux* que usa como interfaz una versión
+   modificada de QEmu_.
+.. [#] En arquitecturas x85 y x86_64 sí puede habilitarse la aceleración por hardware.
+.. [#] Xen ofrece distintas técnicas de virtualización dependiendo de cuál sea el
+   sistema operativo huésped.
+
+.. |KVM| replace:: :abbr:`KVM (Kernel-baed Virtual Machine)`
+.. |CPU| replace:: :abbr:`CPU (Central Processing Unit)`
+.. |SO| replace:: :abbr:`SO (Sistema operativo)`
+.. |GPL| replace:: :abbr:`GPL (GNU General Public License)`
+.. |BSD| replace:: :abbr:`BSD (Berkeley Software Distribution)`
+.. |LXC| replace:: :abbr:`LXC (LinuX Containers)`
+
+.. _Docker: https://www.docker.com/
+.. _QEmu: https://www.qemu.org/
+

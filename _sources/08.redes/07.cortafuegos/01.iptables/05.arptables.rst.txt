@@ -1,0 +1,84 @@
+|ARP|\ tables
+*************
+:command:`arptables` permite controlar el tráfico |ARP| que envía, recibe o transita por la
+máquina. Ya se ha visto en las :ref:`recetas de ebtables <ebtables-recetas>`
+que, cuando la interfaz es un *brigde*, podemos usar el propio ebtables; pero,
+cuando no es el caso, es el turno de :command:`arptables`.
+
+Es un herramienta relativamente sencilla con una sola tabla (*filter*) y dos
+cadenas: *INPUT* y *OUTPUT*. Los comandos sobre las cadenas son los mismos que
+para :command:`iptables` y las acciones se reducen a *ACCEPT*, *DROP*, *RETURN*,
+*CONTINUE* (para seguir comprobando reglas), el nombre de una cadena de
+usuario, o *mangle* que se verá más adelante.
+
+.. rubric:: Condiciones
+
+.. table::
+   :class: iptables-action
+
+   +------------------------+---------------------------------------------------------------------------------+
+   | Comparación            | Descripción                                                                     |
+   +========================+=================================================================================+
+   | -s, --source-ip        | IP de origen del paquete. Puede escribirse notación CIDR.                       |
+   |                        +---------------------------------------------------------------------------------+
+   |                        | arptables -A INPUT -s 192.168.1.1 -j DROP                                       |
+   +------------------------+---------------------------------------------------------------------------------+
+   | -d, --destination-ip   | IP de destino del paquete.                                                      |
+   |                        +---------------------------------------------------------------------------------+
+   |                        | arptables -A OUTPUT -d 192.168.1.1 -j DROP                                      |
+   +------------------------+---------------------------------------------------------------------------------+
+   | --source-mac           | |MAC| de origen del paquete. Puede escribirse una máscara en hexadecimal        |
+   |                        +---------------------------------------------------------------------------------+
+   |                        | arptables -A INPUT --source-mac 00:11:22:33:44:55/FF:FF:FF:00:00:00 -j ACCEPT   |
+   +------------------------+---------------------------------------------------------------------------------+
+   | --destination-mac      | |MAC| de destino del paquete.                                                   |
+   |                        +---------------------------------------------------------------------------------+
+   |                        | arptables -A INPUT --source-mac 00:11:22:33:44:55 -j ACCEPT                     |
+   +------------------------+---------------------------------------------------------------------------------+
+   | -i, --in-if            | Interfaz de entrada.                                                            |
+   |                        +---------------------------------------------------------------------------------+
+   |                        | arptables -A INPUT -i eth0 -s 192.168.1.1 -j DROP                               |
+   +------------------------+---------------------------------------------------------------------------------+
+   | -o, --out-if           | Interfaz de salida.                                                             |
+   |                        +---------------------------------------------------------------------------------+
+   |                        | arptables -A INPUT -o eth0 -d 192.168.1.1 -j DROP                               |
+   +------------------------+---------------------------------------------------------------------------------+
+   | --opcode               | Código de la operación: 1 (*Request*), 2 (*Reply*), etc.                        |
+   |                        +---------------------------------------------------------------------------------+
+   |                        | arptables -A INPUT -s 192.168.1.1 --opcode 1 -j DROP                            |
+   +------------------------+---------------------------------------------------------------------------------+
+
+.. rubric:: mangle
+
+Esta acción permite alterar las direcciones de origen o destino, ya sea |MAC| o
+|IP|:
+
+.. table::
+   :class: iptables-action
+
+   +------------------+-----------------------------------------------------------------------------------------------------+
+   | Opción           | Descripción                                                                                         |
+   +==================+=====================================================================================================+
+   | --mangle-ip-s    | Cambia la |IP| de origen.                                                                           |
+   |                  +-----------------------------------------------------------------------------------------------------+
+   |                  | arptables -A INPUT -s 192.168.1.1 --j mangle --mangle-ip-s 192.168.1.2                              |
+   +------------------+-----------------------------------------------------------------------------------------------------+
+   | --mangle-ip-d    | Cambia la |IP| de destino.                                                                          |
+   |                  +-----------------------------------------------------------------------------------------------------+
+   |                  | arptables -A OUTPUT -s 192.168.1.1 --j mangle --mangle-ip-d 192.168.1.2                             |
+   +------------------+-----------------------------------------------------------------------------------------------------+
+   | --mangle-mac-s   | Cambia la |MAC| de origen.                                                                          |
+   |                  +-----------------------------------------------------------------------------------------------------+
+   |                  | arptables -A OUTPUT -d 192.168.1.1 --j mangle --mangle-mac-s 00:11:22:33:44:55                      |
+   +------------------+-----------------------------------------------------------------------------------------------------+
+   | --mangle-mac-d   | Cambia la |MAC| de destino.                                                                         |
+   |                  +-----------------------------------------------------------------------------------------------------+
+   |                  | arptables -A INPUT -s 192.168.1.1 --j mangle --mangle-ip-s 00:11:22:33:44:55                        |
+   +------------------+-----------------------------------------------------------------------------------------------------+
+   | --marngle-target | Establece el objetivo para la regla. El predeterminado es *ACCEPT*.                                 |
+   |                  +-----------------------------------------------------------------------------------------------------+
+   |                  | arptables -A INPUT -s 192.168.1.1 --j mangle --mangle-ip-s 192.168.1.2 --mangle-target CONTINUE     |
+   +------------------+-----------------------------------------------------------------------------------------------------+
+
+.. |MAC| replace:: :abbr:`MAC (Media Access Control)`
+.. |ARP| replace:: :abbr:`ARP (Address Resolution Protocol)`

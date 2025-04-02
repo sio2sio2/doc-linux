@@ -1,0 +1,405 @@
+.. _app-mrbs:
+
+|MRBS|
+******
+`MRBS <https://mrbs.sourceforge.io/>`_ es una pequeña aplicación web que
+facilita la reserva anticipada de aulas.
+
+Preliminares
+============
+No tiene muchas dependencias y la instalación básica de |PHP|::
+
+   # apt-get install php{,-mysql} libapache2-mod-php7.0- mysql-{server,client}
+
+es más que suficiente. Además, como cualquier otra aplicación web, requiere que
+se le prepare una base de datos y un usuario para manipularla::
+
+   # mysql
+   mysql> CREATE DATABASE mrbs;
+   mysql> GRANT ALL PRIVILEGES ON mrbs.* TO 'mrbs'@'localhost' IDENTIFIED BY 'contraseñadificil';
+
+Configuración en :program:`nginx`
+=================================
+Basta con crear una :download:`configuración de sitio <files/site-mrbs>` con esta pinta:
+
+.. literalinclude:: files/site-mrbs
+   :language: nginx
+
+Instalación
+===========
+Lo primero es ir a la `página del proyecto <https://mrbs.sourceforge.io>`_,
+descargar la ultima versión\ [#]_ y descomprimirla en un directorio adecuado::
+
+   # mkdir -p /srv/www/mrbs
+   # tar -C /srv/www/mrbs --strip-component=2 -axvf mrbs-1.7.1.tar.gz mrbs-1.7.1/web
+
+.. note:: Sólo el contenido del subdirectorio :file:`web/` contiene los ficheros
+   de la aplicación.
+
+La instalación, a diferencia de otras aplicaciones web, es manual y requiere que
+la generación de la base de datos y la configuración básica, se haga en la
+consola. Para lo primero, la propia aplicación trae un guión |SQL| apropiado::
+
+   # tar -C /tmp --strip-component=1 -axvf mrbs-1.7.1.tar.gz mrbs-1.7.1/tables.my.sql
+   # mysql mrbs < /tmp/tables.my.sql
+
+Por último es necesario editar el fichero :file:`config.inc.php` y descomentar o
+modificar las siguientes líneas:
+
+.. code-block:: php
+
+   $timezone = "Europe/Madrid";
+
+   $dbsys = "mysql";
+   $db_host = "localhost";
+   $db_database = "mrbs";
+   $db_login = "mrbs";
+   $db_password = "crontraseñadificl";
+   $db_tbl_prefix = "mrbs_";
+
+Con esto, ya es suficiente para ver cómo queda la aplicación, aunque al
+visitarla se detectará que no existen usuarios y se forzará a crear al menos un
+usuario administrador. |MRBS| soporta `varios métodos de autenticación para
+gestionar usuarios
+<https://mrbs.sourceforge.io/view_text.php?section=Documentation&file=AUTHENTICATION>`_
+y el predeterminado es "db"\ [#]_, por lo que este administrador y todos los que
+usuarios que definamos desde la interfaz web se almacenarán en la base de datos
+*MySQL* que acabamos de crear\ [#]_.
+
+.. warning:: Si visita la aplicación para ver el resultado puede crear el
+   usuario administrador, pero no realice ninguna otra acción (como crear áreas
+   y aulas), porque es conveniente haber afinado antes la configuración.
+
+Configuración
+=============
+Una configuración mínima pasa por añadir las siguientes líneas al final del
+fichero de configuración :file:`config.inc.php`:
+
+.. code-block:: php
+
+   # En versiones modernas estas tres líneas posiblemene sean redundantes.
+   unset($periods);
+   unset($auth["user"]);
+   unset($auth["admin"]);
+
+   require "ies.inc.php";
+   
+en que básicamente borramos todos los usuarios predeterminados, eliminamos los
+periodos de tiempo predefinidos y pedimos que se lea un fichero
+:file:`ies.inc.php`, que será donde realmente escribamos la configuración.
+podemos empezarlo con las siiguientes líneas:
+
+.. code-block:: php
+
+   <?php
+   namespace MRBS;
+
+   #
+   # Configuración de la empresa
+   #
+   $mrbs_company = "IES Bla, bla, bla";
+   $mrbs_company_logo = "/logo.png";  # Y colocamos el logo dentro de /srv/www/mrbs
+   $mrbs_company_url = "http://web.del.centro.es";
+
+   #
+   # Autenticación de usuarios 
+   #
+   #$auth["type"] = "config";
+   #$auth["user"]["admin"]="una.buena.contraseña";
+   #$auth["user"]["profesor"]="roseforp";
+   ## admin, además, es administrador
+   #$auth["admin"][]="admin";
+
+   #
+   # Tramos horarios
+   #
+   $enable_periods = TRUE;
+   $periods[]="08:15-09:15";
+   $periods[]="09:15-10:15";
+   $periods[]="10:15-11:15";
+   $periods[]="Recreo";
+   $periods[]="11:45-12:45";
+   $periods[]="12:45-13:45";
+   $periods[]="13:45-14:45";
+
+Hay que destacar dos aspectos:
+
+#. La líneas de autenticación comentadas definen la autenticación más sencilla,
+   que consiste en indicar en un *array* asociativo de la propia configuración
+   quiénes son los usuarios y cuáles sus contraseñas. En otro array se indica
+   qué usuarios son administradores. Para el caso se han establecido dos únicos
+   usuarios: uno es administrador y el otro no.
+
+   No obstante, la configuración predeterminada es la que almacena usuarios en
+   la base de datos, de ahí que si se accede sin haber configurado nada o con
+   esta configuración propuesta con las líneas comentadas, la aplicación exija
+   la creación de un primer usuario administrador. Sin perjuicio de otras
+   autenticaciones más complejas, es preferible almacenar usuarios en la base de
+   datos que tenerlos definidos dentro de la configuración, así que se
+   desaconseja incluir estas líneas.
+
+#. Por defecto, la aplicación habilita unos tramos horarios de duración fija
+   (aunque ésta puede modificarse). Las líneas incluidas al respecto en la
+   configuración redefinen los tramos como periodos.
+
+   En realidad, la aplicación permite definir áreas (o sedes) y, dentro de cada
+   sede, salas (o aulas). Son las aulas las que se reservan y las áreas sirven
+   para definir salas que tienen características comunes como, por ejemplo, el
+   horario. Cada área puede tener definidos unos tramos distintos, pero con la
+   configuración que hemos propuesto, se crearán en principio copiando los
+   tramos predefinidos en la configuración.
+
+Configuración en la interfaz web
+--------------------------------
+La configuración a través de la interfaz web, consiste básicamente en la
+creación de las aulas (*salas* en la terminología de la aplicación) susceptibles
+de ser reservadas. La creación es sencilla y no requiere explicación, pero si es
+pertinente una aclaración: las *aulas* se agrupan en *sedes*, de manera que
+antes de crearlas es necesario crear al menos una sede.
+
+Personalización
+---------------
+Con la configuración anterior es suficiente para echar a andar la aplicación,
+pero puede pulirse un poco más esta, según el gusto de cada cual. Por gusto
+propio me gusta añadir lo siguiente en :file:`ies.inc.php`:
+
+.. code-block:: php
+
+   #
+   # Vista
+   #
+   $default_view='week';  # La página inicial muestra la semana en curso completa.
+   $dateformat=1;         # Ver día-mes, en vez de mes-día.
+
+   #
+   # Semana
+   #
+   $weekstarts = 1;           #Lunes, primer día.
+   $hidden_days = array(0,6); #Sábados y domingos, no.
+
+   #
+   # Las reservas periódicas y multidía sólo pueden hacerlas administradores.
+   #
+   $auth['only_admin_can_book_repeat'] = TRUE;
+   $auth['only_admin_can_book_multiday'] = TRUE;
+
+   #
+   # Anticipación en las reservas
+   #
+   $max_book_ahead_enabled = TRUE;
+   $max_book_ahead_secs = 60*60*24*7*4; # Máximo, cuatro semanas.
+
+   #
+   # Cancelación de reservas
+   #
+   $min_book_ahead_enabled = TRUE;
+   $min_book_ahead_secs = -10*60;   # Se puede cancelar la reserva de un aula
+                                    # hasta 10 min. después de empezada la clase
+
+La configuración es autoexplicativa, pero resumiendo:
+
+* Al visitar la aplicación se muestran las reservas de la semana en curso de la
+  primera de las aulas\ [#]_. Sin configurarlo, lo que se muestra son las
+  reservas del día en curso para todas las aulas.
+* Se eliminan los fines de semana, ya que siempre son festivos.
+* Se impide que los usuarios normales puedan hacer reservas periódicas. Esto
+  evita que un profesor acapare durante todo un curso una misma aula.
+* En consonancia con lo anterior, se limita la reserva anticipada a cuatro
+  semanas.
+* También se limita la cancelación de las reservas: diez minutos después de
+  haber empezado el tramo horario en que se hizo una reserva, la reserva no
+  podrá eliminarse del cuadrante.
+
+Podemos hacer una última configuración: la aplicación permite definir reservas
+de distinto tipo que se distinguen a la vista por el color. De hecho, por
+defecto hay definidos dos tipos distintos: *Externa* e *Interna*. Por otro lado,
+y al margen de los tipos, las reservas periódicas se distinguen de las reservas
+puntuales tan sólo por un pequeño circulito que aparece a la derecha de la
+leyenda. Dado que en nuestra situación las reservas periódicas sólo las realiza
+el administrador y que son en realidad asignaciones fijas de aula, se nos antoja
+que sería bastante conveniente hacer que se distinguieran también por el color,
+así que definiremos los siguientes tipos de reserva:
+
+* Tipo "Puntual", para que con ese tipo definan los profesores sus reservas de
+  aula (que forzosamente serán puntuales).
+* Tipo "Asignación fija", para que con ese tipo defina el administrador las
+  reservas que son periódicas.
+* Tipo "Festivo", para que el administrador reserve con este tipo todos los días
+  festivos, ya que la aplicación no tiene ninguna forma de marcar días
+  festivos e impedir la reserva en ellos.
+
+Hay, no obstante, un escollo para esto: que una reserva sea periódica o puntual
+nada tiene que ver con su tipo, así que un profesor podría elegir el tipo
+"Asignación fija" para hacer una reserva puntual. También podría hacer su
+reserva escogiendo el tipo "Festivo". Para evitarlo, actuaremos sobre la
+configuración añadiendo en :file:`config.inc.php` justo antes de la carga de
+:file:`ies.inc.php` lo siguiente:
+
+.. code-block:: php
+
+   #
+   # Tipos de reservas
+   #
+   unset($booking_types);
+   $booking_types[]="A";
+   $booking_types[]="I";
+   $booking_types[]="F";
+   $default_type="A";
+
+   $vocab_override["es"]["type.A"] = "Asign.fija";
+   $vocab_override["es"]["type.I"] = "Puntual";
+   $vocab_override["es"]["type.F"] = "Festivo";
+
+   # Tipos que reserva exclusivamente el administrador
+   $auth['admin_only_types'][]="A";
+   $auth['admin_only_types'][]="F";
+
+.. note:: La configuración está pensada para que el administrador, antes de que
+   los profesores empiecen a reservar aulas, establezca los festivos
+   (reservándolos como tipo "Festivo") y haga las asignaciones fijas (como
+   reservas periódicas). Al hacerlo ha de tener en cuenta dos cosas:
+
+   * Los festivos ha de marcarlos siempre como reservas puntuales, no
+     periódicas. Por ello, una Semana Santa, por ejemplo, deberá marcarla como
+     una reserva fija que dura una semana, y no como una reserva periódica de
+     día completo que se repite durante una semana con una frecuencia diaria.
+
+   * Deberá establecer primero los festivos y después hacer las asignaciones
+     fijas, ya que una reserva periódica puede llevarse a cabo aunque haya
+     conflictos con reservas puntuales (simplemente, no se reservarán los días
+     ya ocupados), pero no al revés.
+
+
+Autenticación con Google OpenID
+-------------------------------
+Otra posible mejora consiste en cambiar la autenticación para que sea más
+compleja que la simple de tener dos usuarios definidos en la propia
+configuración. Nótese que el hecho de que todos los profesores compartan el
+usuario con el que realizar las reservas supone que cualquiera podrá cancelar la
+reserva que haya hecho previamente otro, ya que a ojos de la aplicación todos
+serán el mismo sujeto.
+
+|MRBS| trae de serie algunas alternativas como la autenticación con |LDAP|, pero
+puede ser interesante habilitar la autenticación con *Google* ya que la `G Suite
+<https://gsuite.google.es/intl/es/>`_ es `gratuita para centros educativos
+<https://support.google.com/a/answer/2856827>`_ y el centro puedo haber
+asociado su dominio al servidor de correo de *Google* y hacer que todos sus
+trabajadores dispongan de una cuenta del dominio autenticable con *Google*.
+Desgraciadamente, |MRBS| no trae soporte para ello, pero hay disponible `una extensión
+que sí lo permite <https://github.com/AllSaintsHoole/mrbs-google-identity>`_.
+
+La extensión afirma ser usable al menos para la versión **1.6.1**, pero lo
+cierto es que el tema que trae consigo no funciona\ [#]_ ni con esa versión. En
+cualquier caso, puede usarse este :download:`arreglo para la extension
+<files/mrbs-google.tar.xz>` con estas diferencias respecto a la original:
+
+* Sirve para la versión **1.7.1**.
+* Incluye un tema (*google*) que añade al tema predeterminado lo necesario
+  para que funcione esta autenticación.
+* Añade la función *authGetUserMail* para que puedan implementarse los avisos
+  mediante correo electrónico.
+* Permite que cualquier usuario declarado en el array *$auth['admin']* sea
+  considerado administrador\ [#]_.
+* Al desautenticarnos de |MRBS|, también lo hacemos del propio sitio de
+  *Google*.
+
+.. rubric:: Instalación
+
+#. Acudir a `google
+   <https://developers.google.com/identity/sign-in/web/sign-in#before_you_begin>`_
+   para abrir un proyecto y obtener un *ID* que será necesario luego al escribir
+   la configuración.
+
+#. Descomprimir :download:`la extensión <files/mrbs-google.tar.xz>`. Los
+   ficheros contenidos pueden copiarse dentro de :file:`/srv/www/mrbs`::
+
+      # tar -C /srv/www/mrbs --strip-component=1 -axvf mrbs-google.tar.xz
+
+#. Borrar el fichero :file:`mrbs/edit_users.php` de la distribución original,
+   ya que deja de tener utilidad.
+
+#. Descargar `Google API PHP Client
+   <https://github.com/googleapis/google-api-php-client/blob/master/README.md>`_
+   e incluir los ficheros dentro de :file:`srv/www/mrbs/google-api`. En
+   cualquier caso, la referencia a esta |API| se hace dentro del fichero
+   :file:`auth/auth_google.inc`.
+
+#. Añadir la configuración necesaria en :file:`ies.inc.php`:
+
+   .. code-block:: php
+
+      #
+      # Autenticación
+      #
+      $theme = 'google';  # Este tema soporta la autenticación con google.
+      $auth["type"] = "google";
+      $auth["session"]  = "google";
+      $google_domain = 'midominio.es';
+      $google_client_id = 'ID-OBTENIDO-DE-GOOGLE.apps.googleusercontent.com';
+      $auth["admin"][] = "soy.el.jefe@midominio.es";
+
+      #
+      # Configuración de los avisos por mail
+      #
+      $mail_settings['from'] = 'no-reply@midominio.es';
+      $mail_settings['booker'] = true;  # Se envía correos al dueño de la reserva.
+      # Correos al crear o eliminar la reserva.
+      $mail_settings['on_new'] = true;
+      $mail_settings['on_delete'] = true;
+
+      $mail_settings['admin_lang'] = 'es';
+      # Configuración del envío.
+      $mail_settings['admin_backend'] = 'smtp';
+      $smtp_settings['host'] = 'smtp.servidorcorreo.com';
+      $smtp_settings['port'] = 465;
+      $smtp_settings['auth'] = true;
+      $smtp_settings['secure'] = 'ssl';
+      $smtp_settings['username'] = 'una_cuenta@servidorcorreo.com';
+      $smtp_settings['password'] = 'contraseña';
+
+      # $mail_settings['debug'] = true;
+
+
+   La primera parte de la configuración configura la autenticación en sí,
+   mientras que la segunda habilita el aviso por correo electrónico. En esta
+   segunda es necesario asegurarse de que los correos serán confiables y no
+   acabarán en la bandeja de *spam* de los usuarios. Un modo sencillo de
+   logararlo es utlizar una cuenta de correo que permita el envío por |SMTP|.
+
+.. rubric:: Problemas
+
+#. Para que la autenticación sea efectiva es necesario que el navegador acepte
+   *cookies* de terceros o al menos *cookies* definidas para nuestro servidor
+   procedentes del dominio *accounts.google.con*. En `Firefox
+   <https://www.mozilla.org/es-ES/firefox/new/>`_ esto es posible por defecto,
+   mientras que en `Chrome <https://www.google.com/chrome/>`_ se requiere acudir
+   a::
+
+      chrome://settings/content/cookies
+
+   y añadir en "*Permitir*" el dominio *accounts.google.com*.
+
+.. rubric:: Notas al pie
+
+.. [#] En el momento de la redacción es la versión **1.7.1**.
+.. [#] Véase el valor de :kbd:`$auth["type"]` en :file:`systemdefaults.inc.php`.
+.. [#] En versiones antiguas el *backend* predefinido era "user" que permitía
+   definir usuarios y contraseñas directamente en el archivo de configuración.
+   :file:`systemdefaults.inc.php` contenía la definición de algunos usuarios
+   como *administrator*/*secret* o *bob*/*b*.
+.. [#] La variable *$default_room* define cuál es el aula que se mostrará, pero
+   su valor debe ser igual al identificador que se usa en la base de datos para
+   el aula en cuestión. Tal identificador no aparecen en la página del sitio,
+   pero puede consultarse mirando la propia base de datos o mirando los
+   parámentros de la dirección |URL| cuando se pincha para editar tal aula.
+   También existe una variable *$default_area* que permite definir la sede
+   predeterminada.
+.. [#] Tal vez la incompatibilidad es en |PHP|.
+.. [#] El comportamiento predeterminado es que sea administrador el primer
+   usuario que se autentique.
+
+.. |MRBS| replace:: :abbr:`MRBS (Meeting Room Booking System)`
+.. |SQL| replace:: :abbr:`SQL (tructured Query Language)`
+.. |PHP| replace:: :abbr:`PHP (PHP Hypertext Preprocesor)`
+.. |API| replace:: :abbr:`API (Application Programming Interface)`
+.. |URL| replace:: :abbr:`URL (Uniform Resource Locator)`

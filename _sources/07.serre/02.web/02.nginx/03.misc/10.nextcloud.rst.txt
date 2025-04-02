@@ -1,0 +1,78 @@
+.. _nginx-nextcloud:
+
+Nextcloud
+*********
+Nextcloud_ es una plataforma para el acceso y la compartición de archivos en la
+nube a la manera de soluciones comerciales como Dropbox_ o Drive_, aunque es
+*software* libre y permite su instalación en un servidor web propio.
+
+Preliminares
+============
+Antes de proceder a su instalación, debemos tener instalado completamente un
+:ref:`servidor nginx <n-ginx>` con soporte para :ref:`contenido dinámico
+generado con PHP <nginx-php>` y base de datos MySQL. A partir de ello deberemos
+añadir al menos los siguientes paquetes::
+
+   # apt install php-{gd,curl,mbstring,intl,gmp,bcmath,xml,imagick,zip}
+
+Además consideraremos que la máquina tiene asociado el nombre de red
+*cloud.example.net*.
+
+Basándonos en `la guía proporcionada por la documentación oficial
+<https://docs.nextcloud.com/server/latest/admin_manual/installation/nginx.html>`_
+del propio proyecto, la configuración para :program:`nginx`, si se instala el
+servicio en el directorio raíz del sitio, puede ser esta:
+
+.. literalinclude:: files/nextcloud.nginx
+   :language: nginx
+
+En esta configuración (descargable :download:`aquí <files/nextcloud.nginx>`)
+hemos usado :ref:`robotsoff.conf <nginx-robotsoff>` y :ref:`acme.conf
+<nginx-acmeconf>`, ya presentados en recetas anteriores.
+
+Por último, deberemos modificar la configuración de |PHP|, de manera que en
+:file:`/etc/php/7.4/fpm/php.ini` aumentemos los tamaños permitidos:
+
+.. code-block:: ini
+
+   post_max_size = 512M
+   upload_max_filesize = 512M
+
+y en :file:`/etc/php/7.4/fpm/pool.d/www.conf` descomentemos:
+
+.. code-block:: ini
+
+   clear_env = no
+
+Instalación
+===========
+La instalación, como en otro tipo de aplicaciones web, consiste en descargar y
+situar la aplicación en el directorio establecido en la configuración
+(:file:`/srv/www/nextcloud`)::
+
+   # mkdir -p /srv/www/nextcloud
+   # wget -qO - 'https://download.nextcloud.com/server/releases/latest.tar.bz2' | tar -C /srv/www --strip-components=1 -jxvf -
+   # chown -R www-data:www-data /srv/www/nextcloud
+
+.. warning:: Bullseye_ tiene |PHP| 7.4 por lo que sólo será posible instalar la
+   versión **24** del *software*, ya que a partir de la versión **25** se exige
+   |PHP| 8.
+
+y preparar la base de datos y el usuario de tal base que se usará::
+
+   # mysql
+   mysql> CREATE DATABASE IF NOT EXISTS nextcloud CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+   mysql> GRANT ALL PRIVILEGES ON nextcloud.* TO 'nextcloud'@'localhost' IDENTIFIED BY 'contraseñadificil';
+
+Hecho lo cual, estará ya todo preparado para instalar el sistema accediendo al
+sitio *https://cloud.example.net* y respondiendo a las preguntas:
+
+.. image:: files/nextcloud.png
+
+.. Integración Onlyoffice/Nextcloud.
+
+.. |PHP| replace:: :abbr:`PHP (PHP Hypertext Preprocessor)`
+
+.. _Nextcloud: https://nextcloud.com
+.. _Dropbox: https://www.dropbox.com
+.. _Drive: https://drive.google.com

@@ -1,0 +1,123 @@
+.. highlight:: nginx
+
+.. _ngx-rewrite:
+
+Reescritura de direcciones
+==========================
+La reescritura de direcciones, posible gracias al módulo
+`ngx_http_rewrite_module
+<http://nginx.org/en/docs/http/ngx_http_rewrite_module.html>`_, posibilita
+modificar el recurso solicitado originalmente o, más exactamente, desviar
+la petición del recurso original a otro.
+
+.. note:: La documentación oficial analiza `el redireccionamiento con mayor
+   detalle <https://www.nginx.com/blog/creating-nginx-rewrite-rules/>`_ que
+   el aquí expuesto.
+
+Hay tres directivas relacionadas con ello:
+
+:ref:`try_files <nginx-try_files>`
+   Ya se ha visto que determina cuál es realmente el recurso que se envía
+   al cliente. Un valor típico es::
+
+      try_files $uri $uri/ =404;
+
+   El elemento final puede ser también una localización nominal::
+
+      try_files $uri $uri/ @almacen
+
+`return <http://nginx.org/en/docs/http/ngx_http_rewrite_module.html#return>`_
+   Para el procesamiento de la petición y envía al cliente el código indicado::
+
+      location = /no.quiero.hacer.creer.que.no.existe.html {
+         return 403;
+      }
+
+   También es posible añadir una redirección si el código lo requiere (códigos
+   **3XX**)::
+
+      server {
+         listen 80;
+         listen 443 ssl;
+
+         server_name _;
+
+         if($https != "on") {
+            return 301 https://$host/$uri$is_args$args;
+         }
+
+         # etc.
+      }
+
+   Para los restantes, puede añadirse una cadena que :program:`nginx` añadirá
+   al texto de la respuesta::
+
+      return 403 "Zona prohibidísima desde el exterior";
+
+   En caso de que el código de respuesta sea el **302**, puede omitirse el
+   código.
+
+   Además, la directiva `error_page
+   <http://nginx.org/en/docs/http/ngx_http_core_module.html#error_page>`_, ya citada, 
+   sirve:
+
+   * Para enviar un determinado recurso ante un error::
+
+      error_page 404    /404.html;
+
+   * Para enviar un recurso y, además, cambiar el código devuelto::
+
+      error_page 403    =404  /404.html;
+
+`rewrite <http://nginx.org/en/docs/http/ngx_http_rewrite_module.html#rewrite>`_
+   La directiva permite hacer redirecciones complejas para lo cual presenta la
+   siguiente sintaxis::
+
+      rewrite REGEX URL [flag]
+
+   La directiva sustituye las |URL|\ s que cumplan el patrón expresado por la
+   :ref:`expresión regular <regex>` por la |URL| definida a continuación.
+   Pueden capturarse grupos en la expresión regular y usarlos en la expresión
+   de la |URL| posterior. Si la |URL| no cumple el patrón, la directiva no
+   provoca ningún efecto. Por ejemplo, esta redirección::
+
+      rewrite ^(.+\.(?:jpe?g|png))$ /images$1 last;
+
+   modifica la ruta original añadiendo al comienzo :file:`/images` en el caso
+   de que se trate de una imagen. Por tanto, :file:`/foto.jpeg` se convertiría
+   en :file:`/images/foto.jpeg`.
+
+   .. note:: Cuando se quiere que la expresión regular concuerde con mayúsculas
+      o minúsuclas indistintamente, puede anteponerse al resto de la expresión
+      :kbd:`(?i)`::
+
+         rewrite "^(?i)(.+\.(?:jpe?g|png))$" /images$1 last
+
+      .. todo:: En realidad el modificador es propio de las expresiones PCRE.
+         Hablar de ello donde corresponda siguiendo las indicaciones de `este
+         enlace <https://www.regular-expressions.info/modifiers.html>`_
+
+   En principio, tras realizar un ``rewrite``, se sigue procesando la petición
+   con la |URL| modificada, a menos que la |URL| esté completa e incluya esquema
+   y máquina, en cuyo caso se devolverá la dirección al cliente para que realice
+   una nueva petición. Sin embargo, la existencia de la *flag* opcional altera
+   este comportamiento:
+
+   * Si es ``last``, se parará de procesar las reescrituras restantes del bloque y se
+     volverá a procesar la nueva |URL| en busca de un bloque ``location`` adecuado;
+     pero sin enviar ningún código de redirección al cliente.
+   * Si es ``break``, se para el procesamiento de las reescrituras y se
+     considera la |URL| obtenida como la definitiva. Por tanto, no se vuelve
+     a procesar en busca de un nuevo bloque ``location`` adecuado\ [#]_.
+   * Si es ``permanent``, se realiza un redirección con código **301** (es
+     decir, se manda una respuesta al cliente para que vuelva a realizar la
+     petición que se indica como |URL|).
+   * Si es ``redirect``, ocurre lo mismo pero con código **302**.
+
+.. rubric:: Notas al pie
+
+.. [#] La `documentación de rewrite
+   <http://nginx.org/en/docs/http/ngx_http_rewrite_module.html#rewrite>`_ tiene
+   un ejemplo muy ilustratico de la diferencia entre ``last`` y ``break``.
+
+.. |URL| replace:: :abbr:`URL (Uniform Resource Locator)`

@@ -1,0 +1,320 @@
+
+
+<!DOCTYPE html>
+
+<html lang="es" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>8.9.2.3. Envenamiento ARP &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/classic.css?v=2bf1fcf8" />
+    <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+    
+    <script src="../../../_static/documentation_options.js?v=a621b78a"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/translations.js?v=f85f4cfb"></script>
+    
+    <link rel="index" title="Índice" href="../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../search.html" />
+    <link rel="next" title="8.9.2.4. Ataques contra la autenticación" href="03.brute.html" />
+    <link rel="prev" title="8.9.2.2. Envenenamiento DNS" href="01.dns.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="03.brute.html" title="8.9.2.4. Ataques contra la autenticación"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="01.dns.html" title="8.9.2.2. Envenenamiento DNS"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" ><span class="section-number">8. </span>Redes</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" ><span class="section-number">8.9. </span>Ataques</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="index.html" accesskey="U"><span class="section-number">8.9.2. </span>Técnicas</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">8.9.2.3. </span>Envenamiento <abbr title="Address Resolution Protocol">ARP</abbr></a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="envenamiento-arp">
+<span id="arp-spoofing"></span><h1><span class="section-number">8.9.2.3. </span>Envenamiento <abbr title="Address Resolution Protocol">ARP</abbr><a class="headerlink" href="#envenamiento-arp" title="Link to this heading">¶</a></h1>
+<section id="concepto">
+<h2><span class="section-number">8.9.2.3.1. </span>Concepto<a class="headerlink" href="#concepto" title="Link to this heading">¶</a></h2>
+<p>Para entender por qué se puede provocar el envenenamiento, es necesario conocer
+primero cómo funciona el protocolo <abbr title="Address Resolution Protocol">ARP</abbr>.</p>
+<p>Entre las máquinas de una misma red el direccionamiento de los paquetes (o por
+ser más exacto, de las tramas) se realiza en capa <strong>2</strong>, por lo que el <em>switch</em>
+(o <em>switches</em>) que actúan como nodo de comunicación, usan la dirección <abbr title="Media Access Control">MAC</abbr>
+para saber el puerto por el que deben encaminar el paquete hacia su destino. Sin
+embargo, las aplicaciones usan la <abbr title="Internet Protocol">IP</abbr> para referirse al destino, por lo que es
+necesario que un protocolo se encargue de averiguar cuál es la <abbr title="Media Access Control">MAC</abbr> asociada a
+esa <abbr title="Internet Protocol">IP</abbr>. El procolo <abbr title="Address Resolution Protocol">ARP</abbr> es el encargado de esta tarea.</p>
+<p>Supongamos la siguiente red:</p>
+<img alt="../../../_images/arp.png" src="../../../_images/arp.png" />
+<p>en la que una máquina (la etiquetada como víctima) desea salir a internet. Como
+debe hacerlo a través de la puerta de enlace, necesitará averiguar cuál es la
+<abbr title="Media Access Control">MAC</abbr> asociada a la <abbr title="Internet Protocol">IP</abbr> <em>192.168.1.1</em> para lo cual enviará una petición <abbr title="Address Resolution Protocol">ARP</abbr>.
+En ausencia de ataque, el <em>router</em> contestará devolviendo un réplica <abbr title="Address Resolution Protocol">ARP</abbr> con
+<em>DE:AD:BE:EF:00:00</em> y la máquina será capaz de construir las tramas incluyendo
+como <abbr title="Media Access Control">MAC</abbr> de destino la antedicha, con lo cual el <em>switch</em> encaminará los
+paquetes hacia el <em>router</em> (trazo azul). Además, la máquina almacenará durante
+un tiempo la asociación entre <abbr title="Media Access Control">MAC</abbr> e <abbr title="Internet Protocol">IP</abbr> en un caché conocida como tabla <abbr title="Address Resolution Protocol">ARP</abbr>
+para no tener que preguntar cada vez que construye una trama.</p>
+<p>El defecto de diseño de este protocolo es que es un protocolo sin estado y las
+máquinas aceptan réplicas <abbr title="Address Resolution Protocol">ARP</abbr> para actualizar su tabla incluso si no envió
+ninguna petición o no ha caducada la entrada. Esta circunstancia la aprovecha el
+atacante para enviar constantemente réplicas <abbr title="Address Resolution Protocol">ARP</abbr> en que asocia la <abbr title="Internet Protocol">IP</abbr> de la
+puerta de enlace (<em>192.168.1.1</em>) con su <abbr title="Media Access Control">MAC</abbr> (<em>DE:AD:BE:EF:00:02</em>), réplicas
+con las que la víctima actualiza su tabla <abbr title="Address Resolution Protocol">ARP</abbr>. De este modo, cuando tenga que
+construir los paquetes para enviarlos a la puerta de enlace, la víctima tomará
+la <abbr title="Media Access Control">MAC</abbr> del atacante como <abbr title="Media Access Control">MAC</abbr> de destino. Como el <em>switch</em> sólo analiza la
+dirección física para saber el puerto por donde retransmitir la comunicación,
+mandará el paquete al puerto del atacante y este recibirá el paquete. Si el
+atacante retransmite los paquetes hacia su destino original y, además, envenena
+a la puerta de enlace para asociar la <abbr title="Internet Protocol">IP</abbr> de la víctima con su propia
+<abbr title="Media Access Control">MAC</abbr>, recibirá tambien las respuestas y podrá monitorizar toda la comunicación
+(trazo rosado).</p>
+<p>Por supuesto, el escenario descrito sólo es uno de los posibles y convierte un
+ataque de generación en otro que incluye también intercepción e incluso
+modificación si manipulamos, además, la información que llega a la víctima.
+También, podríamos, envenenar a la víctima enviándole una <abbr title="Media Access Control">MAC</abbr> inexistente con
+lo que esta sería incapaz de salir a internet. En este caso, se habría derivado el
+ataque hacia un ataque <abbr title="Denial of Service">DoS</abbr>.</p>
+</section>
+<section id="metodo">
+<h2><span class="section-number">8.9.2.3.2. </span>Método<a class="headerlink" href="#metodo" title="Link to this heading">¶</a></h2>
+<p>Utilicemos un modo artesanal de fabricar este ataque. Para ello supongamos
+que disponemos lo siguiente:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p></p></th>
+<th class="head"><p>Dirección <abbr title="Internet Protocol">IP</abbr></p></th>
+<th class="head"><p>Dirección <abbr title="Media Access Control">MAC</abbr></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Puerta de enlace</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">192.168.1.1</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">de:ad:be:ef:00:00</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Víctima</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">192.168.1.2</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">de:ad:be:ef:00:01</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>Atacante</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">192.168.1.254</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">de:ad:be:ef:00:02</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p>esto es, la misma red que mostrábamos en la ilustración anterior. En el
+atacantes instalaremos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">root@atacante# </span>apt<span class="w"> </span>install<span class="w"> </span>dsniff<span class="w"> </span>tcpdump<span class="w"> </span>dnsmasq
+</pre></div>
+</div>
+<p>y opcionalmente un servidor web como <a class="reference internal" href="../../../07.serre/02.web/02.nginx/index.html#n-ginx"><span class="std std-ref">nginx</span></a>. Lo primero es
+envenenar víctima y puerta de enlace para que el atacante intercepte las
+comunicaciones de la víctima con el exterior y, además, configurar el kernel
+para que admita paquetes ajenos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">root@atacante# </span><span class="nb">echo</span><span class="w"> </span><span class="m">1</span><span class="w"> </span>&gt;<span class="w"> </span>/proc/sys/net/ipv4/ip_forward
+<span class="gp">root@atacante# </span>arpspoof<span class="w"> </span>-t<span class="w"> </span><span class="m">192</span>.168.1.2<span class="w"> </span><span class="m">192</span>.168.1.1
+</pre></div>
+</div>
+<p>Esto logrará lo segundo y hará que la tabla <abbr title="Address Resolution Protocol">ARP</abbr> de la víctima tenga una
+entrada que relaciona la <abbr title="Media Access Control">MAC</abbr> del atacante con la <abbr title="Internet Protocol">IP</abbr> de la puerta de enlace.
+En otra terminal, hacemos lo propio con la puerta de enlace:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">root@atacante# </span>arpspoof<span class="w"> </span>-t<span class="w"> </span><span class="m">192</span>.168.1.1<span class="w"> </span><span class="m">192</span>.168.1.2
+</pre></div>
+</div>
+<p>Completado, toda la comunicación entre puerta de enlace y víctima debe pasar el
+atacante. Para probarlo, podemos monitorizar con <a class="reference internal" href="../../06.analisis/01.sniffer.html#tcpdump"><span class="std std-ref">tcpdump</span></a> el
+tráfico <abbr title="Internet Control Message Protocol">ICMP</abbr> con origen o destino la víctima:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">root@atacante# </span>tcpdump<span class="w"> </span>-ntieth0<span class="w"> </span>icmp<span class="w"> </span>and<span class="w"> </span>host<span class="w"> </span><span class="m">192</span>.168.1.2
+<span class="go">tcpdump: verbose output suppressed, use -v or -vv for full protocol decode</span>
+<span class="go">listening on eth0, link-type EN10MB (Ethernet), capture size 262144 bytes</span>
+<span class="go">IP 192.168.1.2 &gt; 8.8.8.8: ICMP echo request, id 1130, seq 1, length 64</span>
+<span class="go">IP 8.8.8.8 &gt; 192.168.1.2: ICMP echo reply, id 1130, seq 1, length 64</span>
+</pre></div>
+</div>
+<p>y desde la víctima enviar un paquete <abbr title="Internet Control Message Protocol">ICMP</abbr> al servidor <abbr title="Domain Name Server">DNS</abbr> de
+<em>Google</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">usuario@victima$ </span>ping<span class="w"> </span>-c1<span class="w"> </span><span class="m">8</span>.8.8.8
+</pre></div>
+</div>
+<p>Ejecutada esta orden, deberíamos ver con <strong class="program">tcpdump</strong> el paso del paquete,
+tal y como se ilustra.</p>
+<p>Con esto, habríamos completado un mero ataque de interceptación. Ahora podemos
+complementar nuestro ataque con algún man-in-the-middle, lo cual pasa inevitablemente por
+hacer también un <a class="reference internal" href="01.dns.html#dns-spoofing"><span class="std std-ref">envenenamiento DNS</span></a>, ya que es probable
+que la víctima use nombres y no direcciones <abbr title="Internet Protocol">IP</abbr>. La suite <em>dnsiff</em> trae un
+programa específico para ello (<strong class="program">dnsspoof</strong>), pero no soporta resolución
+de direcciones <abbr title="Internet Protocol">IP</abbr>v6 y eso es un problema, así que haremos esto usando
+<a class="reference internal" href="../../07.cortafuegos/01.iptables/index.html#iptables"><span class="std std-ref">iptables</span></a> para apropiarnos de las peticiones <abbr title="Domain Name Server">DNS</abbr> y
+<a class="reference internal" href="../../../06.infraestructura/02.dhcp/03.dnsmasq.html#dnsmasq"><span class="std std-ref">dnsmasq</span></a> para manipular las resoluciones:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">root@atacante# </span>iptables<span class="w"> </span>-t<span class="w"> </span>nat<span class="w"> </span>A<span class="w"> </span>PREROUTING<span class="w"> </span>-p<span class="w"> </span>udp<span class="w"> </span>--dport<span class="w"> </span><span class="m">53</span><span class="w"> </span>-j<span class="w"> </span>REDIRECT
+<span class="gp">root@atacante# </span>iptables<span class="w"> </span>-t<span class="w"> </span>nat<span class="w"> </span>A<span class="w"> </span>PREROUTING<span class="w"> </span>-p<span class="w"> </span>tcp<span class="w"> </span>--dport<span class="w"> </span><span class="m">53</span><span class="w"> </span>-j<span class="w"> </span>REDIRECT
+<span class="gp">root@atacante# </span>cat<span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/hosts
+<span class="go">192.168.1.254     www.google.es</span>
+<span class="go">192.168.1.254     ssh.example.com</span>
+<span class="gp">root@atacante# </span>invoke-rc.d<span class="w"> </span>dnsmasq<span class="w"> </span>restart
+</pre></div>
+</div>
+<p>donde <em>ssh.example.com</em> es un servidor <abbr title="Security SHell">SSH</abbr> en el que tenemos cuenta. Hecho
+esto, desde la víctima debería ocurrir lo siguiente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">usuario@victima$ </span>host<span class="w"> </span>-ta<span class="w"> </span>www.google.es
+<span class="go">www.google.es has address 192.168.1.254</span>
+<span class="gp">usuario@victima$ </span>host<span class="w"> </span>-ta<span class="w"> </span>ssh.example.com
+<span class="go">ssh.example.com has address 192.168.1.254</span>
+</pre></div>
+</div>
+<p>En consecuencia, si colocamos un servidor <abbr title="Security SHell">SSH</abbr> en la máquina atacante, la
+víctima se conectará a ella y no a su servidor<a class="footnote-reference brackets" href="#id2" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a>. La otra falsificación
+podemos aprovecharla para instalar un servidor <em>web</em> hacer que sea este el que
+sirva las páginas. En este segundo caso, la credibilidad del ataque dependerá no
+sólo de cómo sea de parecida la página fraudlenta sino también de si el tráfico
+es seguro.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p><em>dnsiff</em> es un <em>software</em> bastante antiguo y muchas de sus
+herramientas son ya inservibles. Existen, sin embargo, otras <em>suites</em> más
+modernas y eficaces que permiten, además, del envenenamiento <abbr title="Address Resolution Protocol">ARP</abbr> distintos
+ataques man-in-the-middle como <a class="reference external" href="http://www.oxid.it/cain.html">Caín y Abel</a> para
+<em>MS Windows</em> o <a class="reference internal" href="04.mitm.html#bettercap"><span class="std std-ref">bettercap</span></a> para sistemas <em>UNIX</em>.</p>
+</div>
+</section>
+<section id="contramedidas">
+<h2><span class="section-number">8.9.2.3.3. </span>Contramedidas<a class="headerlink" href="#contramedidas" title="Link to this heading">¶</a></h2>
+<p id="ip-neigh">El envenenamiento <abbr title="Address Resolution Protocol">ARP</abbr> es consecuencia del propio diseño del protocolo, de modo
+que el único modo de evitarlo es hacer fijas las entradas en la tabla <abbr title="Address Resolution Protocol">ARP</abbr>,
+especialmente aquella referente a la puerta de enlace que es la que se suele
+falsificar:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>ip<span class="w"> </span>neigh<span class="w"> </span>s
+<span class="go">192.168.1.1 dev eth0 lladdr d8:7d:7f:76:bb:1c STALE</span>
+<span class="gp"># </span>ip<span class="w"> </span>neigh<span class="w"> </span>add<span class="w"> </span><span class="m">192</span>.168.1.1<span class="w"> </span>lladdr<span class="w"> </span>d8:7d:7f:bb:1c<span class="w"> </span>dev<span class="w"> </span>eth0
+<span class="gp"># </span>ip<span class="w"> </span>neigh<span class="w"> </span>s
+<span class="go">192.168.1.1 dev eth0 lladdr d8:7d:7f:76:bb:1c PERMANENT</span>
+</pre></div>
+</div>
+<p>De este modo, cualquier envenenamiento será inútil, por jamás se actualizará esa
+entrada. Para eliminar una entrada previamente fijada basta con:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>ip<span class="w"> </span>neigh<span class="w"> </span>del<span class="w"> </span><span class="m">192</span>.168.1.1<span class="w"> </span>dev<span class="w"> </span>eth0
+</pre></div>
+</div>
+<p>El problema de esta solución es que es demasiado taxativa y provoca que al
+cambiar la puerta de enlace, la máquina deje de poder comunicarse con ella,
+a menos que se modifique la entrada:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>ip<span class="w"> </span>neigh<span class="w"> </span>replace<span class="w"> </span><span class="m">192</span>.168.1.1<span class="w"> </span>lladdr<span class="w"> </span>de:ad:be:ef:00:00<span class="w"> </span>dev<span class="w"> </span>eth0
+</pre></div>
+</div>
+<p>Si nuestra intención es añadir otras máquinas a la tabla y estas tienen <abbr title="Internet Protocol">IP</abbr>
+dinámica, el método es directamente inusable. Alternativas más laxas a fijar
+entradas son:</p>
+<ul class="simple">
+<li><p><strong class="program">arpalert</strong>, que permite indicar un listado de <abbr title="Media Access Control">MAC</abbr> autorizadas y
+monitoriza el tráfico <abbr title="Address Resolution Protocol">ARP</abbr> para advertirnos de la existencia de <abbr title="Media Access Control">MAC</abbr> ajenas
+a ese listado.</p></li>
+<li><p><strong class="program">arpwatch</strong>, que monitoriza los cambios en la <abbr title="Media Access Control">MAC</abbr> y advierte de los
+cambios mediante correos electrónicos al administrador.</p></li>
+</ul>
+<p class="rubric">Notas al pie</p>
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="id2" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
+<p>Obviamente, si el cliente se conectó con anterioridad, saltará un aviso
+bastante evidente, pero si no es así, el usuario no tendría por qué
+percatarse. A menos claro está que se fije en la dirección <abbr title="Internet Protocol">IP</abbr> que será una
+dirección local. Para evitar esto último, sería más conveniente, en vez de
+hacer un envenenamiento <abbr title="Domain Name Server">DNS</abbr> hacer una redirección del tráfico <abbr title="Security SHell">SSH</abbr>
+dirigido a <em>ssh.example.com</em> con <strong class="program">iptables</strong>. Se deja como ejercicio
+al lector.</p>
+</aside>
+</aside>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="../../../index.html">Tabla de contenido</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">8.9.2.3. Envenamiento <abbr title="Address Resolution Protocol">ARP</abbr></a><ul>
+<li><a class="reference internal" href="#concepto">8.9.2.3.1. Concepto</a></li>
+<li><a class="reference internal" href="#metodo">8.9.2.3.2. Método</a></li>
+<li><a class="reference internal" href="#contramedidas">8.9.2.3.3. Contramedidas</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Tema anterior</h4>
+    <p class="topless"><a href="01.dns.html"
+                          title="capítulo anterior"><span class="section-number">8.9.2.2. </span>Envenenamiento <abbr title="Domain Name Server">DNS</abbr></a></p>
+  </div>
+  <div>
+    <h4>Próximo tema</h4>
+    <p class="topless"><a href="03.brute.html"
+                          title="próximo capítulo"><span class="section-number">8.9.2.4. </span>Ataques contra la autenticación</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../_sources/08.redes/99.ataques/02.tecnicas/02.arp.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="03.brute.html" title="8.9.2.4. Ataques contra la autenticación"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="01.dns.html" title="8.9.2.2. Envenenamiento DNS"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" ><span class="section-number">8. </span>Redes</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" ><span class="section-number">8.9. </span>Ataques</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="index.html" ><span class="section-number">8.9.2. </span>Técnicas</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">8.9.2.3. </span>Envenamiento <abbr title="Address Resolution Protocol">ARP</abbr></a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright CC BY 4.0, 2016-2025, José Miguel Sánchez Alés.
+      Creado usando <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    </div>
+  </body>
+</html>

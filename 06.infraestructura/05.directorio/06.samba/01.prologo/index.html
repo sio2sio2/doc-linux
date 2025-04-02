@@ -1,0 +1,302 @@
+
+
+<!DOCTYPE html>
+
+<html lang="es" data-content_root="../../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>6.4.2.1. Preliminares &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/classic.css?v=2bf1fcf8" />
+    <link rel="stylesheet" href="../../../../_static/custom.css" type="text/css" />
+    
+    <script src="../../../../_static/documentation_options.js?v=a621b78a"></script>
+    <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/translations.js?v=f85f4cfb"></script>
+    
+    <link rel="index" title="Índice" href="../../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../../search.html" />
+    <link rel="next" title="6.4.2.2. Controlador de dominio" href="../02.install-addc/index.html" />
+    <link rel="prev" title="6.4.2. Samba" href="../index.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="../02.install-addc/index.html" title="6.4.2.2. Controlador de dominio"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="../index.html" title="6.4.2. Samba"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" ><span class="section-number">6. </span>Servicios de infraestructura</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../index.html" ><span class="section-number">6.4. </span>Servicio de directorio</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../index.html" accesskey="U"><span class="section-number">6.4.2. </span>Samba</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">6.4.2.1. </span>Preliminares</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="preliminares">
+<h1><span class="section-number">6.4.2.1. </span>Preliminares<a class="headerlink" href="#preliminares" title="Link to this heading">¶</a></h1>
+<p>Antes de instalar <em>samba</em>, debe tenerse convenientemente configurado el
+servidor.</p>
+<section id="red">
+<h2><span class="section-number">6.4.2.1.1. </span>Red<a class="headerlink" href="#red" title="Link to this heading">¶</a></h2>
+<p>Dado que queremos montar el servidor en la red interna, dejaremos in fichero
+<code class="file docutils literal notranslate"><span class="pre">/etc/network/interfaces</span></code> con este aspecto:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>The<span class="w"> </span>loopback<span class="w"> </span>network<span class="w"> </span>interface
+<span class="go">auto lo</span>
+<span class="go">iface lo inet loopback</span>
+
+<span class="gp"># </span>The<span class="w"> </span>primary<span class="w"> </span>network<span class="w"> </span>interface
+<span class="go">allow-hotplug eth0</span>
+<span class="go">iface eth0 inet dhcp</span>
+<span class="go">        address 192.168.1.20/24</span>
+<span class="go">        gateway 192.168.1.1</span>
+<span class="go">        up   iptables -t nat -A POSTROUTING -o $IFACE -j MASQUERADE</span>
+<span class="go">        down iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE</span>
+
+
+<span class="gp"># </span>Interfaz<span class="w"> </span>en<span class="w"> </span>la<span class="w"> </span>red<span class="w"> </span>interna
+<span class="go">allow-hotplug eth1</span>
+<span class="go">iface eth1 inet static</span>
+<span class="go">        address 192.168.255.1/24</span>
+</pre></div>
+</div>
+<p id="disable-dhclient-resolv">Obsérvese que se ha dejado que la interfaz externa reciba su configuración de un
+servidor <em>DHCP</em>. Puede también configurarse de modo estático (que además sería
+lo más normal), pero si se hace como se propone aquí nos encontraremos con el
+inconveniente de que la configuración dinámica alterará el fichero
+<code class="file docutils literal notranslate"><span class="pre">/etc/resolv.conf</span></code> en que se define el dominio de búsqueda y los
+servidores <em>DNS</em> que se usan. Nuestra intención es evitarlo así que podemos
+añadir a <code class="file docutils literal notranslate"><span class="pre">/etc/dhcp/dhclient.conf</span></code> las siguientes líneas:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>cat<span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/dhcp/dhclient.conf
+<span class="go">interface &quot;eth0&quot; {</span>
+<span class="go">    supersede domain-name &quot;iespjm.domus&quot;;</span>
+<span class="go">    supersede domain-search &quot;iespjm.domus&quot;;</span>
+<span class="go">    supersede domain-name-servers 127.0.0.1;</span>
+<span class="go">}</span>
+</pre></div>
+</div>
+<p>que forzarán a que sean esos los datos incluidos en <code class="file docutils literal notranslate"><span class="pre">/etc/resolv.conf</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Como el cliente <em>dhclient</em> no estaba configurado de este modo en el
+momento de obtener <em>ip</em>, si echamos un vistazo al fichero, veremos que no tiene
+los valores adecuados. No importa y, además, es necesario que siga así, puesto
+que como aún no tenemos servidor <em>DNS</em> seríamos incapaces de descargar paquetes.</p>
+</div>
+</section>
+<section id="hostname">
+<span id="smb-hostname"></span><h2><span class="section-number">6.4.2.1.2. </span>Hostname<a class="headerlink" href="#hostname" title="Link to this heading">¶</a></h2>
+<p>El nombre del controlador de dominio pretendemos que sea <em>dc</em>, de modo que
+debemos hacer lo siguiente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>hostname<span class="w"> </span>dc
+<span class="gp"># </span>hostname<span class="w"> </span>&gt;<span class="w"> </span>/etc/hostname
+</pre></div>
+</div>
+<p>Además deberíamos dejar así en <code class="file docutils literal notranslate"><span class="pre">/etc/hosts</span></code> la línea referida a la propia
+máquina:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">192.168.255.1     dc.iespjm.domus  dc</span>
+</pre></div>
+</div>
+<p>Hecho esto, debería ocurrir lo siguiente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>hostname
+<span class="go">dc</span>
+<span class="gp">$ </span>hostname<span class="w"> </span>-d
+<span class="go">iespjm.domus</span>
+</pre></div>
+</div>
+</section>
+<section id="sistema-de-ficheros">
+<h2><span class="section-number">6.4.2.1.3. </span>Sistema de ficheros<a class="headerlink" href="#sistema-de-ficheros" title="Link to this heading">¶</a></h2>
+<p>Hay que asegurarse de que el sistema de ficheros que compartiremos con samba<a class="footnote-reference brackets" href="#id3" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a> soporta <a class="reference internal" href="../../../../05.discos/04.attr/index.html#xattr"><span class="std std-ref">atributos extendidos de usuarios</span></a> y
+<a class="reference internal" href="../../../../05.discos/02.seguridad/02.acl.html#acls"><span class="std std-ref">permisos ACL</span></a>. Lo habitual en <em>linux</em> es que usemos <em>ext4</em> y este
+ya tiene habilitadas estas dos características por defecto. De todos modos,
+podemos cercionarnos revisando las opciones de montaje de la partición
+<code class="file docutils literal notranslate"><span class="pre">/dev/VGserver/samba</span></code>, que es en la que se supone que almacenaremos los
+ficheros que compartamos mediante el servidor:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>grep<span class="w"> </span>-E<span class="w"> </span><span class="s1">&#39;(acl|user_xattr)&#39;</span><span class="w"> </span>/proc/fs/ext4/<span class="k">$(</span>basename<span class="w"> </span><span class="sb">`</span>readlink<span class="w"> </span>/dev/VGserver/samba<span class="sb">`</span><span class="k">)</span>/options
+<span class="go">user_xattr</span>
+<span class="go">acl</span>
+</pre></div>
+</div>
+<p>Si no aparecen las dos opciones, habrá que corregirlo modificando la
+entrada en <a class="reference internal" href="../../../../02.conbas/02.informacion/04.devices.html#fstab"><span class="std std-ref">/etc/fstab</span></a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>La razón de que la orden se haya complicado de tal manera es
+debido a que en nuestro servidor de pruebas no tenemos particiones, sino
+volúmenes lógicos. Si el sistema de ficheros hubiera estado sobre una
+partición normal como <code class="docutils literal notranslate"><span class="pre">sda4</span></code> la ruta habría tan simple como
+<code class="file docutils literal notranslate"><span class="pre">/proc/fs/ext4/sda4/options</span></code>.</p>
+</div>
+</section>
+<section id="servidor-de-hora">
+<h2><span class="section-number">6.4.2.1.4. </span>Servidor de hora<a class="headerlink" href="#servidor-de-hora" title="Link to this heading">¶</a></h2>
+<p>Es absolutamente indispensable que todos los ordenadores de la red tengan
+sincronizada su hora, por lo que es inevitable instalar un <a class="reference internal" href="../../../04.ntp/index.html#ntp"><span class="std std-ref">servidor de
+hora</span></a>. No entraremos aquí a analizar concienzudamente cómo se configura
+uno, pero indicaremos una configuración que puede valernos:</p>
+<blockquote>
+<div><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="linenos"> 1</span><span class="gp"># </span>Politica<span class="w"> </span>predeterminada
+<span class="linenos"> 2</span><span class="go">restrict default ignore</span>
+<span class="linenos"> 3</span>
+<span class="linenos"> 4</span><span class="go">restrict 127.0.0.1</span>
+<span class="linenos"> 5</span><span class="go">restrict ::1</span>
+<span class="linenos"> 6</span>
+<span class="linenos"> 7</span><span class="go">driftfile /var/lib/ntp/ntp.drift</span>
+<span class="linenos"> 8</span><span class="gp">#</span>ntpsigndsocket<span class="w"> </span>/var/lib/samba/ntp_signd
+<span class="linenos"> 9</span>
+<span class="linenos">10</span><span class="gp"># </span>Servidor<span class="w"> </span>del<span class="w"> </span>Real<span class="w"> </span>Observatorio<span class="w"> </span>de<span class="w"> </span>la<span class="w"> </span>Armada.
+<span class="linenos">11</span><span class="go">server hora.roa.es iburst</span>
+<span class="linenos">12</span><span class="go">restrict hora.roa.es mask 255.255.255.255 nomodify notrap noquery</span>
+<span class="linenos">13</span>
+<span class="linenos">14</span><span class="gp"># </span>Hora<span class="w"> </span>local,<span class="w"> </span>en<span class="w"> </span>caso<span class="w"> </span>de<span class="w"> </span>que<span class="w"> </span>no<span class="w"> </span>haya<span class="w"> </span>conexión<span class="w"> </span>a<span class="w"> </span>internet.
+<span class="linenos">15</span><span class="go">server 127.127.1.0</span>
+<span class="linenos">16</span><span class="go">fudge 127.127.1.0 stratum 10</span>
+<span class="linenos">17</span>
+<span class="linenos">18</span><span class="gp">#</span>broadcastdelay<span class="w"> </span><span class="m">0</span>.008
+<span class="linenos">19</span><span class="go">restrict   192.168.1.0 mask     255.255.255.0 nomodify notrap</span>
+<span class="linenos">20</span><span class="go">restrict   192.168.255.0 mask   255.255.255.0 nomodify notrap mssntp</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>La únicas novedades de esta configuración son dos:</p>
+<ul class="simple">
+<li><p>La línea 8 que permite comunicar mediante <em>socket</em> al servidor de hora con
+<em>samba</em><a class="footnote-reference brackets" href="#id4" id="id2" role="doc-noteref"><span class="fn-bracket">[</span>2<span class="fn-bracket">]</span></a>. Permanecerá comentada hasta que dispongamos de este último.</p></li>
+<li><p>La directiva <em>restrict</em> para las red interna (línea 20) que ha añadido
+<em>mssntp</em> porque los clientes exigen que los paquetes de hora vayan firmados.</p></li>
+</ul>
+</section>
+<section id="servidor-dhcp">
+<h2><span class="section-number">6.4.2.1.5. </span>Servidor DHCP<a class="headerlink" href="#servidor-dhcp" title="Link to this heading">¶</a></h2>
+<p>Este servicio no tiene relación alguna con <em>samba</em>, pero es común que se
+encuentre habilitado en una red local, así que lo instalaremos también según
+<a class="reference internal" href="../../../02.dhcp/index.html#dhcp"><span class="std std-ref">lo estudiado en el epígrafe correspondiente</span></a>. La configuración es
+muy sencilla y basta con crear un <code class="file docutils literal notranslate"><span class="pre">/etc/dhcp/dhcpd.conf</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>/etc/dhcp/dhcpd.conf
+
+<span class="go">authoritative;</span>
+<span class="go">ddns-update-style none;</span>
+<span class="go">default-lease-time 6000;</span>
+<span class="go">max-lease-time 7200;</span>
+
+<span class="go">subnet 192.168.255.0 netmask 255.255.255.0 {</span>
+<span class="go">   option domain-name-servers  192.168.255.1;</span>
+<span class="go">   option domain-name &quot;iespjm.domus&quot;;</span>
+<span class="gp">#   </span>option<span class="w"> </span>domain-search<span class="w"> </span><span class="s2">&quot;iespjm.domus&quot;</span><span class="p">;</span>
+<span class="go">   option routers 192.168.255.1;</span>
+<span class="go">   option broadcast-address 192.168.255.255;</span>
+<span class="go">   range 192.168.255.100 192.168.255.150;</span>
+<span class="go">}</span>
+</pre></div>
+</div>
+<p class="rubric">Notas al pie</p>
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="id3" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
+<p>En este epígrafe se considera que hemos reservado una partición
+independiente (en realidad, un volumen lógico) para incluir en él los
+directorios que compartiremos con samba. <a class="reference internal" href="../02.install-addc/index.html#smb-part-indep"><span class="std std-ref">Más adelante</span></a> se
+explica cómo crear un nuevo volumen lógico y hacer que este se monte sobre
+<code class="file docutils literal notranslate"><span class="pre">/srv/samba</span></code>.</p>
+</aside>
+<aside class="footnote brackets" id="id4" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id2">2</a><span class="fn-bracket">]</span></span>
+<p>¡Ojo! En la línea se expresa el <em>directorio</em>, no el <em>socket</em>, que está
+dentro de él.</p>
+</aside>
+</aside>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="../../../../index.html">Tabla de contenido</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">6.4.2.1. Preliminares</a><ul>
+<li><a class="reference internal" href="#red">6.4.2.1.1. Red</a></li>
+<li><a class="reference internal" href="#hostname">6.4.2.1.2. Hostname</a></li>
+<li><a class="reference internal" href="#sistema-de-ficheros">6.4.2.1.3. Sistema de ficheros</a></li>
+<li><a class="reference internal" href="#servidor-de-hora">6.4.2.1.4. Servidor de hora</a></li>
+<li><a class="reference internal" href="#servidor-dhcp">6.4.2.1.5. Servidor DHCP</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Tema anterior</h4>
+    <p class="topless"><a href="../index.html"
+                          title="capítulo anterior"><span class="section-number">6.4.2. </span>Samba</a></p>
+  </div>
+  <div>
+    <h4>Próximo tema</h4>
+    <p class="topless"><a href="../02.install-addc/index.html"
+                          title="próximo capítulo"><span class="section-number">6.4.2.2. </span>Controlador de dominio</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../../_sources/06.infraestructura/05.directorio/06.samba/01.prologo/index.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="../02.install-addc/index.html" title="6.4.2.2. Controlador de dominio"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="../index.html" title="6.4.2. Samba"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" ><span class="section-number">6. </span>Servicios de infraestructura</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../index.html" ><span class="section-number">6.4. </span>Servicio de directorio</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../index.html" ><span class="section-number">6.4.2. </span>Samba</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">6.4.2.1. </span>Preliminares</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright CC BY 4.0, 2016-2025, José Miguel Sánchez Alés.
+      Creado usando <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    </div>
+  </body>
+</html>

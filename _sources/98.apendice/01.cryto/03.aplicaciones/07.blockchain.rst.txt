@@ -1,0 +1,1063 @@
+.. _blockchain:
+
+Cadenas de bloques
+******************
+Una de las aplicaciones de la criptografía que más impulso ha tomado en los
+últimos años es la tecnología de **blockchain** (o de *cadena de bloques*, si
+usamos su traducción literal). Conceptualmente fue desarrollada en los años 80
+y 90, pero su florecimiento definitivo se produjo a partir de 2009 a raíz de la
+creación del Bitcoin_. El 1 de noviembre de 2008, una persona (o un grupo de
+personas), bajo el seudónimo de `Natoshi Nakamoto`_, anunció en un grupo de
+noticias sobre cifrado (*gmane.comp.encryption.general*) la redacción de `un
+artículo <https://bitcoin.org/bitcoin.pdf>`_ en que propugnaba la creación
+de una divisa de dinero electrónico: el *Bitcoin*. Para ello había registrado
+previamente el dominio `bitcoin.org`_, creó el *software* para implementarlo y
+el 3 de enero de 2009 lanzó la red basada en el protocolo propuesto. Desde
+entonces, *Bitcoin* y muchas otras criptomonedas nacidas después han
+experimentado un desarrollo espectacular, y ya han excedido el ámbito puramente
+informático. Aunque su efecto económico (y especulativo) es enormemente
+interesante, el epígrafe se centra en los aspectos técnicos de la tecnología.
+
+.. _blockchain-propo:
+
+Propósito
+=========
+Cuando dos o más personas formalizan un acuerdo, requieren de la existencia de
+un tercero intermediario que lo avale. Por ejemplo:
+
+* En una compra con tarjeta, hay un empresa (*Visa*, *Mastercard*) que avala
+  ante el vendedor ese medio de pago.
+* En una compraventa de vivienda un notario avala la firma del contrato de
+  compraventa.
+* etc.
+
+La :dfn:`blockchain` es una tecnología que permite la realización de
+transacciones (acuerdos) entre particulares, **evitando** la necesidad de un
+**intermediario** confiable que tutele dichos acuerdos. Lo que se pretende con
+una *blockchain*, por tanto, es evitar que exista una autoridad central capaz de
+decidir qué es válido y qué no. Como no se quiere depender de ninguna figura
+central, la tecnología requiere una red descentralizada y, por tanto, es una
+tecnología |P2P|. Los acuerdos no tienen por qué limitarse a transacciones
+monetarias (trataremos más adelante el concepto de :ref:`contrato inteligente
+<smart-contract>`).
+
+.. note:: Téngase presente que la descentralización es consustancial a la
+   *blockchain*, porque es la razón de su existencia. La tecnología se idea para
+   lograrla y cualquier *blockchain* que no la asegure, es una tecnología
+   fallida, puesto que existen otras tecnologías directamente centralizadas
+   muchísimo más eficientes.
+
+El párrafo que acabamos de redactar, más que una definición, es la declaración
+de su finalidad; y exige el registro de todas esas transacciones:
+
+.. image:: files/red-desc.png
+
+El esquema nos ayudará a entender el funcionamiento:
+
+* Por un lado, hay una serie de **clientes** o usuarios interesados en realizar
+  transacciones entre ellos de manera segura y confiable: son el señor **A**, el
+  señor **B** y el señor **C**.
+
+* Por otro, se encuentran aquellos nodos que gestionan el libro de contabilidad
+  distribuido en el que se registran las transacciones. Téngase presente que,
+  como se quiere evitar la dependencia de cualquier agente particular, entonces
+  la base de datos debe ser distribuida y el acceso a formar parte de ella,
+  libre. Los nodos que gestionan la red distribuida se denominan
+  **mineros**, ya veremos por qué razón y contienen una copia completa de todas
+  las transacciones.
+
+* Por último, existe otro agente: el **código** que implementa el protocolo y que
+  define las reglas de intercambio, por lo cual, en un esquema tradicional
+  cumpliría la función del *regulador*. Como el código es escrito por los
+  **desarrolladores** puede parecer que la red funciona a su capricho, pero no
+  es tal: los desarrollos suelen ser de :ref:`software libre <free-software>` y
+  que sus cambios realmente se implemeten depende de que los adopten los
+  mineros. En consecuencia, el que las reglas cambien acaba siendo una decisión
+  consensuada.
+
+  .. note:: Si ante un cambio no existe un consenso absoluto, entonces se
+     produce lo que se llama un :dfn:`hard fork` y una parte de la red de
+     mineros implementará un protocolo y, otra parte, el otro. Para las
+     implicaciones de esto, échele un vistazo al `vídeo sobre hard fork de
+     Crypto Español
+     <https://www.youtube.com/channel/UC_TmOIPWu-hCVuE2fA3M8Tg>`_. Conviene
+     antes, no obstante, leer :ref:`el siguiente epígrafe <blockchain-desc>`
+     donde se expone formalmente lo que es una *cadena de bloques*.
+
+Por tanto, se siguen las reglas definidas en el *software* de gestión y los
+interesados en hacer transacciones acceden a la red de mineros pare que estas se
+registren. Los mineros, por su parte, se comunican entre sí para que sea posible
+por parte de todos conocer todas las transacciones producidas. Este, pues, es el
+esquema de funcionamiento, pero hacer que esta idea general funcione, no es en
+absoluto trivial. Aún debe exponerse cómo lograr que este sistema:
+
+.. _blockchain-prob:
+
+a. Distinga cada cliente de los restantes.
+#. Dado que en un libro de contabilidad los registros tiene un orden,
+   se consiga secuencialidad.
+#. Evite la manipulación interesada de transacciones (censura, doble gasto,
+   rectificación de transacciones, etc.)
+#. Evite registros simultáneos que provoquen inconsistencia, o sea, colisiones.
+   Por ejemplo, imaginemos que, teniendo el señor **A** 5\ |btc|, uno
+   de los nodos registra que cede al señor **B** 4\ |btc| y otro nodo
+   diferente, que aún no está enterado de ello, registra que cede al señor **C**,
+   3\ |btc|.
+#. Incentive el trabajo de los mineros.
+
+Todo ello se resuelve mediante la **cadena de bloques**, que es lo que
+describiremos a continuación.
+
+.. _blockchain-desc:
+
+Descripción
+===========
+.. seealso:: Es recomendabilísimo el vídeo `Cómo funciona blockchain
+   <https://www.youtube.com/watch?v=hEoYL5j0wYU>`_ del canal `Crypto Español
+   <https://www.youtube.com/channel/UC_TmOIPWu-hCVuE2fA3M8Tg>`_. Gran parte de
+   las explicaciones contenidas bajo este epígrafe se han tomado de él.
+
+Para implementar esta base de datos distribuida, las transacciones aún
+pendientes de registrar se agrupan en bloques y la base de datos distribuida
+toma la forma de una **cadena de bloques**, o sea, una secuencia ordenada de
+bloques en el que uno va detrás del anterior. Un bloque, de forma muy, muy
+resumida, tiene el siguiente aspecto:
+
+.. image:: files/bloque.png
+
+esto es:
+
+#. Una cabecera con metadatos, entre los cuales hemos querido mencionar dos: el
+   :ref:`hash <hash>` del bloque que le precede en la cadena, y el |nonce|, que
+   definiremos más adelante.
+
+#. La lista de transacciones contenidas en el bloque. Pero ¿por qué se agrupan
+   múltiples transacciones en un bloque? La razón se halla en el problema de
+   sincronización del tiempo. En un libro de contabilidad, el orden en que se
+   llevan a cabo las transacciones es fundamental. El problema es que al ser un
+   sistema distribuido, necesitaríamos que todos los nodos tuvieran
+   sincronizados sus relojes y esto es un problema. Una solución que evita
+   sincronizar es dividr el tiempo en intervalos (p.e. 10 minutos) y agrupar
+   todas las transacciones que se han producido dentro de ese intervalo. De este
+   modo, ya no es necesario que todos los nodos tengan exactamente la misma
+   hora; y no sabremos en qué orden se hicieron las transacciones incluidas en
+   un mismo bloque, pero sí podremos estar seguros de que se hicieron después de
+   las transacciones del bloque anterior y antes de las del posterior.
+
+   Por supuesto, obrar así implica definir ciertas restricciones sobre las
+   transacciones de un mismo bloque como, por ejemplo, que no se incluyan dos
+   o más transacciones que implican la transferencia de las mismas monedas.
+
+   .. note:: Puede ocurrir que no todas las transacciones pendientes se
+      incluyan en el bloque. En ese caso, las transacciones pendientes quedan en
+      cola para incluirse en un bloque posterior.
+
+.. _blockchain-img:
+
+La cadena de bloques, supuesto que ya tenga cuatro, se verá así:
+
+.. image:: files/cadena.png
+
+Por simplicidad, se ha supuesto que cada bloque sólo contiene una transacción y
+que sólo existen los tres clientes (señores **A**, **B** y **C**) que
+introdujimos bajo el epígrafe anterior. Como es necesario que alguno de los tres
+posea algo inicialmente, en el primer bloque cargamos con 5 monedas al señor
+**A**. Obsérvese, además, que la cadena de bloques es un mero libro de
+contabilidad donde se van registrando transacciones y, en consecuencia, cada
+cliente posee las monedas que la lectura de todas las transacciones arroja.
+En el ejemplo, **A** tiene :math:`5-3+1=3` *bitcoins*; **B**, :math:`3-2=1`
+*bitcoins*; y **C**, :math:`2-1=1` *bitcoin*.
+
+.. note:: En estas transacciones se pueden expresar hasta ocho decimales para
+   los *bitcoins*. A cada cien millonésima parte de un bitcoin (:math:`1*10^{-8}`)
+   se la denomina :dfn:`satoshi`. Por ejemplo, 0,00000321 *bitcoins* son 321
+   *satoshis*.
+
+Aunque podríamos pasar de puntillas sobre las transacciones, si nuestra
+intención sólo es dar una idea aproximada, profundizaremos un poco. Al realizar
+transacciones, se generan las denominadas |UTXO| (o *transacción de salida no
+gastada*). Una :dfn:`UTXO` es una cantidad *indivisible* de criptomoneda que
+resulta de su envío a una dirección de cliente a fin de que éste pueda gastarla
+en el futuro. Por ejemplo, el *Bloque* **1** crea una |UTXO| de 5\ |btc| para el
+señor **A**. ¿Qué significa que es indivisible?  Significa que en el *Bloque*
+**2**, en que se transfieren 3\ |btc| del total de cinco, no se toma como
+entrada una parte de esta |UTXO| (**3**) y el resto queda sin gastar (**2**). Es
+necesario gastarla por completo y, como consecuencia, la transacción que hemos
+reflejado en el *Bloque* **2** no es tan simple, sino que en realidad supone:
+
+* El gasto total de la |UTXO| de 5\ |btc| que se creó en el *Bloque* **1**.
+* La creación de una |UTXO| de 3\ |btc| para el señor **B**.
+* La creación de una |UTXO| de 2\ |btc| para el propio señor **A**.
+
+Hay analogías, pero también diferencias, con el intercambio de dinero. Si
+quieres pagar 3€ a alguien y lo haces con un billete de 5€, entregas tal billete
+y recibes una moneda de 2€\ [#]_. En el intercambio físico, sin embargo, el
+receptor se queda con el billete original. Esto no ocurre en esta tecnología: nadie
+se queda con la |UTXO| original, sino que esta se gasta para generar dos nuevas
+|UTXO|, una de 3€ a favor del señor **B** y otra de 2€ euros a favor del señor
+**A**. Obsérvese otra diferencia radical. En el dinero físico, el dinero físico
+existe en sí (tengo en el bolsillo un billete de 5 euros). En cambio, no se
+poseen *bitcoins* (o la moneda digital que sea), lo que se tienen escritas *a
+nuestro nombre*\ [#]_ en el libro de contabilidad son |UTXO| y sólo nosotros
+podremos hacer uso de ellas.
+
+Por supuesto, se puede crear una |UTXO| a partir de varias |UTXO| distintas,
+incluso de distinto propietario. Por ejemplo, si en el próximo *Bloque* **5** el
+señor **A** quiere transferir sus tres *bitcoins* al señor **B** entonces
+generará una |UTXO| de salida a partir de dos |UTXO| de entrada: la que se
+generó en el *Bloque* **2** como resultado del cambio y la que se generó en el
+*Bloque* **4**. Es muy interesante la lectura del artículo `Transacciones en
+Bitcoin <https://sheinix.medium.com/transacciones-en-bitcoin-841a087ff439>`_.
+
+Con este punto de partida, analicemos más detalladamente qué ocurre y cómo la
+**cadena de bloques** soluciona los :ref:`problemas expuestos al final del
+apartado anterior <blockchain-prob>`.
+
+**Distinción de clientes**
+   Dado que todo este esquema nos sirve para realizar transacciones entre
+   clientes, es fundamental que cada cliente esté individualizado y que, por
+   ejemplo, el hecho de que la transacción del segundo bloque que transfiere dos
+   monedas del señor **A** al señor **B**, suponga que fue **A** el que
+   la hizo y que sólo **B** sea a partir de ese momento capaz de transferir esas
+   dos unidades.
+
+   Esto se logra generando cada cliente :ref:`un par de claves ECDSA
+   <asimetrico>`\ [#]_, por lo que cada cual tendrá una clave privada y una
+   clave pública. Por lo general, no interesa en absoluto saber quién es
+   realmente el cliente (¿quién es en realidad el señor **A**?\ [#]_), muy al
+   contrario, se toma como uno de los objetivos preservar el anonimato.  Por ese
+   motivo, no hay certificados, sino simplemente parejas de claves que son
+   suficientes para individualizar a cada uno de los clientes.
+
+   De este modo, una |UTXO| se caracteriza por incluir un pequeño problema
+   criptográfico que debe ser resuelto al gastarla y requiere la **clave
+   privada** del destinatario. Esta es la manera de asegurarse de que una |UTXO|
+   sólo será gastada por aquel al que fue dirigida. Así, por ejemplo, la
+   transacción del Bloque **1** originó una |UTXO| con un problema que sólo
+   puede resolverse con la clave privada de **A**. La trasacción del Bloque
+   **2** supone el gasto por parte del señor **A** de dicha |UTXO| (gracias a
+   que dispone de su clave privada) y la creación de otra |UTXO| cuyo gasto
+   exige la clave privada del señor **B**.
+
+   Por otro lado, la **clave pública** sirve para identificar al cliente. Y,
+   así, cuando se transfiere criptomoneda al señor **B**, se transfiere a su
+   dirección pública, que deriva de :ref:`aplicar algoritmos de hash a su clave
+   pública <prac-claves>`.
+
+   En realidad, en el mundo de las criptomonedas se maneja el concepto de
+   :dfn:`wallet` (o :dfn:`monedero` o :dfn:`billetera`). Cada cliente está
+   representado por su *wallet*, de manera que cuando se hacen transacciones a
+   alguien se hacen transferencias a la dirección de su *wallet*. Sin embargo, a
+   diferencia de lo que podría parecer por su nombre y la analogía con el mundo
+   físico, los *wallets* no contienen monedas, sino la clave privada asociada al
+   cliente, a partir de la cual se obtiene la clave pública correspondiente.
+   Usando está clave pública y aplicando algoritmos de resumen (véase
+   :ref:`claves de bitcoin <prac-claves>`) se calcula la dirección del *wallet*.
+   que es el dato que debemos proporcionar a aquel que queremos que nos
+   transfiera criptomoneda. El *wallet* es personal e intransferible y, mientras
+   no nos lo roben, podemos estar seguros de que dispondremos de las monedas que
+   la cadena de bloques determina que son nuestras. Más adelante,
+   :ref:`profundizaremos en el conocimiento de estas billeteras <wallets>`.
+
+**Secuencialidad**
+   El orden de los bloques esta definido por el hecho de que cada bloque incluye
+   un *hash* (|SHA|\ -256) del bloque anterior. Nótese, además, que manipular un
+   bloque (pongamos que se intenta alterar a posteriori la transacción incluida
+   en el bloque 2) supone que habrá que cambiar todos los bloques subsiguientes,
+   porque dejarán de ser válidos los *hashes* contenidos en ellos.
+
+**Manipulación**
+   Las transacciones incluidas dentro de los bloques que componen la cadena deben
+   ser legítimas e inmutables:
+
+   * Nadie debería tener la potestad de decidir caprichosamente qué
+     transacciones son *aceptables* y cuáles no. Obsérvese que no usamos el
+     adjetivo *válido* sino *aceptable*. Las transacciones deben ser válidas,
+     porque de lo contrario serían fraudulentas. Pero *aceptable* es otra cosa
+     que refiere al concepto de "censura".  Nos referimos a que se decida que
+     no se van a aceptar transacciones que incluyan la dirección del señor
+     **A**. ¿Por qué? Porque se ha decidido que no.
+    
+   * Tampoco debería tener nadie la potestad de evitar (o retrasar) el registro
+     de alguna transacción válida con el propósito de que se pueda hacer doble
+     gasto. Por ejemplo, que se pudiera evitar el registro de la transacción
+     del *Bloque* **2**, de modo que no se registre que el señor **A** ha
+     gastado los 3\ |btc|. El gasto de esa cantidad responde a algo que el
+     señor **B** ha dado o hecho al señor **A**, pero, si no se registra, no
+     recibirá su pago. Durante ese tiempo en que no se registra, el señor **A**
+     seguirá teniendo la posibilidad de gastar los 3\ |btc| y, si lo hace y
+     esta segunda transacción sí se registra, entonces ya será imposible que se
+     registre la primera transacción y el señor **B** nunca recibirá el pago.
+
+   * Tampoco es admisible que se quiera revertir la cadena desechando bloques
+     que ya fueron aceptados. O dicho de otro modo, que la cadena ya
+     constituida no sea inmutable. Imaginemos, por ejemplo, que alguien
+     malintencionado pretende robar las tres monedas que obtiene el señor **B**
+     gracias a la transacción del bloque **2** rescribiendo esa transacción
+     para que las monedas se destinen al *wallet* de **C**. Tendría que hacer
+     ese cambio y luego, rescribir los bloques siguientes para alterar los
+     *hashes*: si lograra hacer prevalecer esta cadena alternativa en los
+     nodos, se habría consumado el fraude.
+
+   En definitiva, los mineros tienen que consensuar una cadena de bloques, pero
+   no hay ninguna entidad que supervise y valide su comportamiento, porque esto
+   supondría depender de algo o alguien y eso es precisamente lo que se
+   pretende evitar con esta tecnología.  *Bitcoin* proporcionó la primera
+   solución práctica al problema\ [#]_ de alcanzar un objetivo común cuando no
+   se puede estar seguro de la fiabilidad de todos los agentes implicados. Y la
+   solución es, criptográfica. En realidad, en estas cadenas de bloques no se
+   admite que el *hash* de cada bloque sea un número cualquiera de 256 *bits*
+   (recordemos que se usa |SHA|\ -256), sino que debe cumplir un requisito (por
+   ejemplo, que las 30 primeras cifras sean 0). Pero un resumen criptográfico
+   está determinado por el contenido que se resume, así que ¿cómo se le pueden
+   poner exigencias al *hash*? Saldrá el que tenga que salir. Aquí es donde
+   entra en juego el |nonce|. El :dfn:`nonce` es un número de 4 *bytes* cuya
+   función es exclusivamente alterar el valor del resumen. En consecuencia,
+   para que un bloque sea válido, un minero tiene que ir alterando el valor del
+   |nonce| hasta dar con uno para el que el *hash* resultante cumpla las
+   condiciones impuestas. Obtenido, remitirá el bloque al resto de mineros para
+   que lo confirmen, y, si es así, lo añadan al final de la cadena. No hay
+   fórmula para obtener un |nonce| apropiado: simplemente hay que ir probando
+   una y otra vez hasta dar con uno.  Cuando más estrictas son estas
+   condiciones, mayor :dfn:`dificultad` para obtenerlo.  Este proceso de
+   obtención del bloque (del |nonce|, en realidad) es lo que se conoce como
+   :dfn:`prueba de trabajo` y es la razón por la que a los nodos de esta red se
+   les conoce como "mineros": deben encontrar por trabajo bruto un bloque
+   adecuado antes de poder añadirlo a la cadena, del mismo modo que un minero
+   tiene que cavar en una mina para obtener el mineral. En el caso particular
+   del *bitcoin*, la dificultad es dinámica y se recalcula cada 2016 bloques
+   (unas dos semanas) para que aproximadamente se mine un bloque cada 10
+   minutos.
+
+   Por tanto, la posibilidad de que un minero sea capaz de minar el siguiente
+   bloque depende de su capacidad de cálculo. Si su capacidad es superior al
+   50%, entonces tiene más probabilidades que todos los demás mineros juntos de
+   minar el siguiente bloque, y, en consecuencia, de decidir qué transacciones
+   incluir en él. A esto se le conoce como :dfn:`ataque del 51%`.
+
+   .. note:: ¿Qué puede ocurrir si alguien tiene mucha capacidad de cálculo?
+      Supóngase que ese alguien realiza una transacción gastando criptomoneda en
+      ella y es capaz de minar un bloque donde no ha incluido tal transacción.
+      La transacción sigue pendiente, pero en el ínterin el destinatario ha
+      podido ya realizar la contraprestación por ella. El siguiente bloque
+      también lo mina él, pero en vez de incluir la transacción pendiente
+      incluye otra transacción en la que vuelve a gastar la misma |UTXO|
+      para transferir a una dirección que posee él mismo. Si esto
+      ocurre, la primera transacción sigue pendiente y además recibió su
+      contraprestación, pero ya ningún nodo la aceptará como válida, porque una
+      transacción incluida en el último bloque ha gastado ya ese dinero. Esto
+      es lo que se conoce como :dfn:`doble gasto`.
+
+   .. note:: El :dfn:`algoritmo de consenso`, esto es, el mecanismo que permite
+      decidir la validez de los bloques es la base del funcionamiento de la
+      cadena de bloques, ya que la utilidad que aporta una *blockchain* sobre una
+      solución centralizada es que nadie puede controlarla. Perdida la descentralización,
+      la *blockchain* es absurda, porque una solución centralizada
+      siempre es más eficiente desde un punto de vista técnico. *Bitcoin* usa
+      como *algoritmo de consenso*, la **prueba de trabajo** (|PoW| por sus
+      sigas en inglés), la cual se suele criticar por el enorme consumo energético
+      que supone. Por este motivo, se han ideado otros *algoritmos de consenso*.
+      El más usado es la **prueba de participación** (|PoS| por sus siglas en
+      inglés). La :dfn:`prueba de participación` escoge qué minero\ [#]_ añadirá
+      el nuevo bloque a la cadena, basándose en su riqueza, no en su potencia de
+      cálculo.  Todo aquellos que pretenden forjar el siguiente bloque deben
+      reservar (congelar) una cantidad de criptomoneda, que recibe el nombre de
+      *participación*, de modo que su probabilidad de ser escogido es
+      proporcional a tal dedicación monetaria.  Además, a aquel que intente
+      añadir un bloque inválido o a aquel que vote como válido un bloque que no
+      lo sea, se le retirará como penalización su participación de criptomoneda.
+      Como esta estrategia no se basa en la potencia de cálculo, no consume
+      grandes cantidades de energía. Sus detractores alegan, sin embargo, que
+      tiende a concentrar (centralizar) la cadena, ya que aquellos más ricos
+      tenderán a hacerse más ricos aún y, además, es prácticamente imposible
+      arrebatarles su posición predominante. Ethereum_ a mediados de septiembre
+      de 2022 cambió su estrategia de |PoW| a |PoS|\ [#]_.
+
+   .. seealso:: En `101blochains.com`_ hay algunos buenos artículos sobre
+      algoritmos de consenso: el completo `Consensus Algorithms: The Root Of
+      Blockchain Technology
+      <https://101blockchains.com/consensus-algorithms-blockchain/>`_, que puede
+      complementarse con el breve `Beginner’s Guide: What Is Consensus
+      Algorithm?  <https://101blockchains.com/what-is-consensus-algorithm/>`_; o
+      otro que compara |PoW| con |PoS|: `PoW Vs. PoS: A Comparison Between Two
+      Blockchain Consensus Algorithms
+      <https://101blockchains.com/pow-vs-pos-a-comparison/>`_.
+
+**Colisiones**
+   Por colisión entendemos que dos o más nodos obtengan de manera más o menos
+   contemporánea el siguiente bloque de la cadena. En nuestro ejemplo,
+   implica añadir el bloque **5**. Gracias a la *prueba de trabajo*, esta
+   coincidencia se producirá solamente si dos nodos han logrado minar con poca
+   diferencia de tiempo entre sí el bloque. Si se produce esta última
+   circunstancia, entonces ambos nodos difundirán su bloque en la red y nos
+   encontraremos con nodos que tienen como bloque **5** el de uno y nodos que
+   tienen como bloque **5** el otro. La cadena, no obstante, debe ser única,
+   así que la bifurcación se resolverá en el siguiente bloque. Alguno de los
+   nodos logrará resolver antes el bloque **6** y habrá partido para crearlo de
+   uno de los dos bloques **5** alternativo. Cuando esto ocurra, los nodos
+   tomarán como solución para la cadena de bloques estos bloques **5** y **6**
+   y desecharán el otro bloque **5**. Este candidato a bloque **5** que
+   finalmente no forma parte de la cadena se denomina :dfn:`bloque huérfano`.
+   Es relativamente frecuente la aparición de un bloque huérfano, lo que no es
+   tan habitual es que haya dos bloques huérfanos consecutivos (en nuestro
+   ejemplo, que también se hubieran generados dos bloques **6** alternativos
+   cada uno procedente de uno de los bloques **5** y la unicidad de la cadena
+   se hubiera resuelto en el bloque **7**), pero `puede suceder
+   <https://es.cointelegraph.com/news/rare-event-creates-two-orphaned-blocks-on-bitcoin-blockchain>`_.
+
+   .. seealso:: Puede conocer más sobre *bloques huérfanos* en `este artículo
+      de bit2me.com sobre ellos <https://academy.bit2me.com/que-es-un-bloque-huerfano/>`_.
+
+**Incentivos**
+   La labor de los mineros implica grandes costes en equipos y electricidad, por
+   lo que sin la existencia de incentivos, nadie minaría. Para asegurar su
+   existencia, pueden obtener como compensación criptomoneda por dos conceptos:
+
+   + Por **bloque minado**. Las nuevas monedas se crean al minar bloques y dar esa
+     recompensa al minero que ha logrado añadirlo. En el caso del
+     *bitcoin* como su creador decidió que su cantidad total estuviera limitada
+     a 21 millones, la recompensa decrece con el tiempo. Empezó siendo de 50\ |btc|
+     y cada 210.000 bloques (unos 4 años aproximadamente) se divide a la
+     mitad. A este hecho de dividir a la mitad la recompensa se lo conoce como
+     :dfn:`halving`.
+   + **Comisión** a las transacciones. En el caso particular de *bitcoin*, esta
+     será la forma de financiar la red cuando se llegue a la cantidad máxima.
+
+.. _smart-contract:
+
+*Smart contracts*
+=================
+.. https://www.youtube.com/watch?v=8AKysZg8ZsQ
+.. https://support.mycrypto.com/general-knowledge/ethereum-blockchain/what-is-gas/
+
+Hasta ahora nos hemos limitado a presentar el contenido de los bloques como un
+conjunto de apuntes en los que se registra la transferencia de una criptomoneda
+(**A** |ra| **B** la cantidad de 5\ |btc|). O sea, la criptomoneda que sustenta
+la *blockchain* (p.e. *Bitcoin*) se comporta como moneda de valor tal y como lo
+hace el `dinero fiat <https://es.wikipedia.org/wiki/Dinero_fiduciario>`_ (euro,
+dólar, etc.). Sin embargo, el texto que una *blockchain* certifica como válido e
+inalterable puede ser cualquiera, así que ¿por qué limitarse a ello?
+
+Un :dfn:`contrato inteligente` (:dfn:`smart contract`) es un acuerdo entre
+partes (o sea, un contrato) que en vez de estar redactado en una lengua natural
+adquiere la forma de un código informático a fin de que sus cláusulas puedan
+ejecutarse automáticamente cuando se cumplen las condiciones estipuladas en él.
+Esto supone que la cadena de bloques (o sea, la red de mineros) no sólo registra
+los términos del contrato, sino que se encarga de ejecutar el código.
+
+Por ejemplo, imaginemos que una nueva empresa tecnológica (lo que últimamente
+viene a llamarse `startup
+<https://www.camara.es/blog/creacion-de-empresas/que-es-una-startup>`_) requiere
+de financiación para empezar sus proyectos. Para ello puede recurrir a las
+fuentes de financiación habituales (préstamos bancarios, campaña de
+*crowdfunding*, etc.), pero también puede articular la financiación a través de
+un *contrato inteligente* que comprenda:
+
+* La generación de unas participaciones.
+* La compra de estas participaciones por parte de los inversores interesados.
+* Tal compra financia la actividad comercial de la empresa.
+* Si la actividad comercial prospera los inversores pueden recibir retribuciones
+  extra (algo así como unos dividendos en el mundo de la bolsa tradicional).
+
+Dicho de este modo tan vago, la descripción no se diferencia en nada de un
+método tradicional de financiación, así que afinaremos lo que hace la
+empresa:
+
++ Elige una *blockchain* que permita la formalización de contratos
+  inteligentes. La mayor de este tipo es Ethereum_.
+
+  .. note:: Hay, no obstante, otra solución: usar una plataforma que sea capaz
+     de añadir datos extra (p.e. *contratos inteligentes*) a una *blockchain*
+     como la de *Bitcoin*. Es el caso de OmniLayer_, de la que podemos leer una
+     pequeña introducción en `este tutorial de criptonoticias.com
+     <https://www.criptonoticias.com/tutoriales-guias/omni-plataforma-tokens-blockchain/>`_
+     o el protocolo |RGB| del que tenemos algunas explicaciones en `un artículo
+     de cointelegraph.com
+     <https://es.cointelegraph.com/explained/rgb-bitcoin-smart-contracts-and-lightning-network>`_
+     o `este otro de Bitcoin Magazine
+     <https://bitcoinmagazine.com/guides/a-brief-introduction-to-rgb-protocols>`_.
+
+.. _crypto-token:
+
++ Escribe el código de un *contrato inteligente* que supone la creación de un
+  *token*. Un :dfn:`token` es la representación de un determinado valor
+  dentro del ámbito definido para ese contrado por una entidad particular.
+  Conceptualmente, son exactamente lo mismo que las fichas dentro de un casino:
+  no tienen valor alguno fuera de él, pero dentro representan un valor que
+  podremos canjear en cualquier momento. Así pues, la idea es generar una
+  cantidad determinada de *tokens* (por ejemplo, un millón) y que esta
+  represente el total de la empresa, de este modo la participación de cada
+  inversor viene determinada por el número de *tokens* que adquiera.
++ Lanza los *tokens* con la esperanza de que los inversores los
+  adquieran y de esta forma consiga la financiación necesaria. Como el contrato
+  es inteligente, si en un plazo prestablecido no se llega al mínimo necesario,
+  el código puede restituir lo invertido en *token* a los inversores; y, si se
+  alcanza, puede entregar el dinero recaudado con esos *token* a la empresa. Todo
+  de forma automática. Por supuesto, los *token* pueden transferirse entre
+  usuarios con lo que puede crearse un mercado de intercambio de *token* análogo
+  al que se crea de intercambio de criptomonedas, los cuales valdrán más o menos
+  dependiendo de la marcha de la empresa (o de las expectativas que logre
+  crear).
++ Puede gratificar a los poseedores de los *token*, si así lo estipula el
+  contrato con más *token* o dinero.
+
+La pregunta que puede asaltarnos ahora es: en estas cadenas pensadas para la
+suscripción y ejecución de *contratos inteligentes*, ¿qué papel pintan las
+criptomonedas? La respuesta es que todo *blockchain* tiene asociada su propia
+criptomoneda (*ETH* en el caso de Ethereum_), porque es la criptomoneda la que
+hace atractiva la *blockchain* a los mineros. La criptomoneda sigue sirviendo
+para gratificar la generación de nuevos bloques, sigue sirviendo para permitir
+el registro de transacciones y, en el caso de *blockchains* destinadas a
+*contratos inteligentes*, sirven también para pagar la ejecución del código. En
+consecuencia, tiene utilidad y, por tanto, resultan valiosas (y, sí, `se
+intercambian por moneda fiat igual que el bitcoin
+<https://es.investing.com/crypto/ethereum>`_).
+
+.. warning:: Tanto para los **token** como para las **criptomonedas** hay mercado de
+   compraventa, por lo que se pueden adquirir o vender cambiándolos por *moneda
+   fiat* y, en consecuencia, podremos consultar cuál es su cotización. Por esta
+   razón es muy común ver aplicado el término de criptomoneda indistintamente a
+   ambos. Pero **no son lo mismo**, antes bien son muy diferentes: sobre una
+   criptomoneda no hay control centralizado, puesto que nadie controla su
+   *blockchain*\ [#]_. Un *token*, en cambio, no tiene una *blockchain* propia y,
+   además, es emitido por una entidad particular, por lo que su valor
+   estará supeditado al comportamiento del agente.
+
+Si echamos un vistazo a `coinmarketcap.com`_ para consultar las cotizaciones de
+las principales \"criptomonedas\" a comienzos de agosto de 2022, veremos que
+*token* y *criptomonedas* se hallan confundidos en una misma lista:
+
+.. table:: 
+   :class: crypto-list
+
+   ===== ================================= =====================================
+    No      Nombre                           Naturaleza
+   ===== ================================= =====================================
+      1      :crypto:`Bitcoin <bitcoin>`       criptomoneda
+      2      :crypto:`Ethereum <ethereum>`     criptomoneda
+      3      :crypto:`Theter <tether>`         token (omnilayer, ethereum et alia) 
+      4      :crypto:`USD Coin <usd-coin>`     token (ethereum et alia)
+      5      :crypto:`BNB <bnb>`               criptomoneda
+   ===== ================================= =====================================
+
+Un ejemplo de *token* con una finalidad totalmente distinta a la anterior es
+:crypto:`BAT <basic-attention-token>`, creado para que el navegador Brave_
+gratifique la publicidad que reciben sus usuarios. La idea tras el *token* es
+que el usuario, una vez que ha instalado el navegador, habilite el sistema de
+`recompensas del navegador <https://brave.com/es/brave-rewards/>`_ que a cambio
+de mostrarle publicidad a través del sistema de notificación de su sistema
+operativo gratifica cada anuncio con una determinada cantidad del *token* |BAT|.
+El *token* se acomula y puede cederse a los sitios web preferidos del usuario o,
+simplemente, canjearse por otra criptomoneda en algunos :ref:`exchanges
+<crypto-exchanges>`, dependiendo de cuál sea su cotización.
+
+.. note:: Hay dos términos más con los que se suelen referir criptomonedas y
+   *tokens*:
+
+   :dfn:`altcoin`
+      Cualquier criptomoneda o *token* que no sea *Bitcoin*, por ser ella
+      la primera que se creó.
+
+   :dfn:`shitcoin` 
+      Cualquier criptomoneda o *token* creada con el mero fin de especular o
+      estafar a sus compradores. Obviamente, para llegar a esta conclusión es
+      necesaria una valoración de la confianza que despiertan sus creadores, su
+      utilidad y cuáles novedades aporta, por lo que la aplicación del término
+      es muy subjetiva.
+
+   :dfn:`stablecoin`
+      Son tokens cuyo propósito es mantener su valor ligado al valor de un
+      activo externo como el oro o una moneda *fiat*  (típicamente el dólar).
+      `Tether`_ o `USD Coin`_ son dos ejemplos de ello: se crearon para que su
+      valor siempre sea de un dólar estadounidense.
+
+.. rubric:: Tipos de *token*
+
+Hay, fundamentalmente, dos tipos:
+
+:dfn:`Utility token` (:dfn:`token de utilidad`)
+   que son aquellos que se adquieren a la entidad particular a cambio de la promesa
+   de recibir en el futuro un servicio o una ventaja. En ningún caso suponen
+   propiedad. Por ejemplo, una *startup* que tenga intención de crear una
+   plataforma de video por *streaming* puede ofertar *token* que den derecho a
+   descuentos en la cuota mensual; u otra de almacenamiento en la nube un
+   *token* que de derecho a |MB| de almacenaje. El citado :crypto:`BAT
+   <basic-attention-token>` es un *token* de utilidad.
+
+   Este tipo de *token* no están sujetos al marco regulatorio legal. Sus ofertas
+   iniciales reciben el nombre de |ICO| (oferta inicial de criptomonedas).
+
+:dfn:`Security token` (:dfn:`token de seguridad`)
+   que son aquellos que representan la propiedad de un activo por lo que,
+   consecuentemente, se consideran instrumentos de inversión y su emisión está
+   sujeta al marco regulatorio\ [#]_. Sus ofertas iniciales reciben el nombre de
+   |STO| (*oferta de token de seguridad*).
+
+   Dependiendo de cuál sea el activo que respalden, toman distinto nombre:
+
+   + :dfn:`Equity token` (*token de acciones*), que representa la participación
+     en la propiedad de una empresa y pueden asimilarse, por tanto, al concepto
+     tradicional de *acción*. Puede suponer como ésta el derecho a dividendo o a
+     voto.
+   + :dfn:`Debt token` (*token de deuda*) que representan un préstamo y que, en
+     consecuencia, suponen la restitución futura del dinero más un interés.
+   + :dfn:`Asset-backend token` (*token de activos*), que representan la
+     adquisición de parte un activo físico y están respaldados por éste. El
+     activo puede ser de muy diversa naturaleza: propiedades inmobiliarias,
+     materias primas, etc.
+
+.. https://www.usvotefoundation.org/blockchain-voting-is-not-a-security-strategy
+
+.. _crypto-exchanges:
+
+Casas de cambio (exchanges)
+===========================
+En principio, para realizar una transacción de la criptomoneda sólo es necesario
+conectarse con un cliente a la red que sustenta la *blockchain* y conocer la
+dirección del destinatario. Esto puede ser suficiente si se usa la criptomoneda
+para el pago de un servicio o un producto (lo cual no es aún muy frecuente).
+Pero ¿cómo hacemos cuando nuestra intención es intercambiar criptomoneda por
+moneda *fiat* o por otra criptomoneda?
+
+Un :dfn:`exchange` es una plataforma a la que acuden usuarios para cambiar una
+criptomoneda por dinero fiat u otra criptomoneda. Por tanto, son el equivalente
+digital a la tradicionales `casas de cambio
+<https://es.wikipedia.org/wiki/Casa_de_cambio>`_. Son los valores de intercambio
+en estas plataformas, basados en la oferta y la demanda. los que definen el
+valor de la criptomoneda. Por supuesto, el valor no es el mismo en todas las
+plataformas, pero no puede ser muy dispar, porque tiende a equilibrarse ya que
+valores bajos atraen a compradores (lo cual aumenta la demanda) y valores altos
+atraen a vendedores (lo cual aumenta la oferta). Por ejemplo, `estos son los
+valores actuales para Bitcoin en distintos exchanges
+<https://cryptoradar.com/es/comprar-bitcoin>`_.
+
+Desde el punto de vista de su funcionamiento, hay dos tipos de *exchanges*:
+
+**Centralizado** (|CEX|)
+   Es aquel en que una entidad actúa como intermediario confiable por lo que
+   debe transferírsele de antemano a la entidad el dinero *fiat* o la
+   criptomoneda que se desea vender. Esto último significa que deberemos
+   transferir nuestra criptomoneda a una billetera creada y gestionada por el
+   propio *exchange* para nosotros. Lo habitual es que se desconozca la clave
+   privada de la billetera y que sea el propio *exchange* el que la utilice
+   cuando sea preciso en una transacción. Esto supone, de facto, que perdemos el
+   control sobre ella y que nuestras criptomonedas estén expuestas a ataques al
+   *exchange* o la quiebra de la entidad. En este tipo de casas de cambio pueden
+   intercambiarse criptomonedas por dinero *fiat* o criptomonedas entre sí.
+
+   Las operaciones de intercambio se lleva a cabo cuando comprador y vendedor se
+   ponen de acuerdo en un precio de venta tal y como ocurre cuando se compran y
+   venden acciones en el mercado tradicional. Por lo tanto, habrá clientes que
+   ofrezcan la compra o venta de una criptomoneda a un determinado precio
+   (:dfn:`makers`) y clientes que directamente compran o venden al precio
+   ofrecido por algún *maker* (:dfn:`takers`). Los primeros crean oferta y los
+   segunda eliminan oferta y suelen pagar unas comisiones al *exchange* más
+   elevadas.
+
+   Dado que estas entidades son empresas sujetas a la regulación de los estados,
+   exigirán conocer la identidad real y el domicilio de la persona que opera con
+   ellos (el llamado |KYC|, "`conozca a su cliente
+   <https://es.wikipedia.org/wiki/Conozca_a_su_cliente>`_").
+
+   `coinmarketcap.com`_ nos ofrece una `lista de exchanges centralizados
+   <https://coinmarketcap.com/es/rankings/exchanges/>`_.
+
+**Descentralizado** (|DEX|)
+   Es aquel en que no hay entidad intermediaria, sino que la transacción se
+   lleva a cabo a través de un :ref:`contrato inteligente <smart-contract>`. Lo
+   habitual es que estén limitadas al intercambio de criptomonedas propias de la
+   *blockchain* en la que se formaliza el contrato inteligente.
+
+   .. warning:: ¿Distintas criptomonedas todas propias de una misma
+      *blockchain*? ¿Es eso posible? Evidentemente no, según lo explicado ahora.
+      En realidad, los intercambios se realizan entre la criptomoneda y los
+      *tokens* asociados a la misma *blockchain*.
+   
+   Un |DEX| muy utilizado es `uniswap.org <https://app.uniswap.org/>`_, que
+   permite intercambios de criptomoneda y *tokens* en la *blockchain* de
+   *Ethereum*. El sitio web y una billetera de aplicación (véase :ref:`wallets
+   <wallets>`) adecuada, bastan para efectuar el intercambio.
+
+   .. note:: En principio, implementar un |DEX| que sea capaz de intercambiar
+      criptomonedas de distinta *blockchain* puede llevarse a cabo a través de
+      los `atomic swaps
+      <https://academy.binance.com/es/articles/atomic-swaps-explained>`_.
+
+   `coinmarketcap.com`_ nos ofrece una `lista de exchanges decentralizados
+   <https://coinmarketcap.com/es/rankings/exchanges/dex/>`_.
+
+.. _wallets:
+
+Billeteras
+==========
+Ya se ha expuesto que el dinero en posesión de cada cliente está determinado por
+el saldo que resulta de leer las transacciones registradas en la *blockchain*
+(recordemos que :ref:`el señor A posee 3 bitcoins <blockchain-img>`, porque
+:math:`5-3+1=3`).  No hay, pues, ningún lugar físico o digital en el que tenga
+almacenadas sus criptomenedas. Entonces, ¿qué es una **billetera** o un
+**monedero** o un **wallet**?  Desde luego no es lo equivalente a su homónimo
+físico (el monedero que llevamos en el bolsillo), porque no almacena dinero.
+
+Un :dfn:`wallet` (o :dfn:`billetera digital`) es el mecanismo que permite al
+cliente de una *blockchain* almacenar y gestionar las claves criptográficas que
+lo individualizan. Obsérvese que preferimos usar el término individualizar en
+vez de identificar, porque las claves criptográficas no certifican nuestra
+identidad física real en absoluto (eso lo haría un :ref:`certificado digital
+<cert-digital>`), pero sí nos diferencian de los demás, porque cada cual tiene
+un par distinto de claves.
+
+El *wallet* del señor **A** almacena sus claves, así que, si cualquier otro
+cliente realiza una |UTXO| a su dirección, sólo el señor **A**, que es el único
+que tiene acceso a su *wallet*, podrá consumir esa |UTXO| y, en consecuencia,
+posee esas criptomonedas. Todo es anónimo y, en principio, seguro... siempre
+que un tercero malintencionado no tenga acceso al *wallet* y se haga con las
+claves, en cuyo caso podría gastar todas las |UTXO| dirigidas a ese *wallet*
+enviándolas a un *wallet* distinto del que él sea propietario.
+
+Hay varios tipos de billeteras que podemos clasificar en dos grupos:
+
+:dfn:`Billeteras calientes` (*hot wallets*)
+   Son aquellas que almacenan las claves en lugares con conexión continua a
+   internet.
+
+   #. :dfn:`Billeteras online` (o :dfn:`billeteras web`):
+
+      Billeteras proporcionadas por plataformas online (:ref:`exchanges
+      <crypto-exchanges>`) en las que generalmente es el propio servicio el que
+      gestiona las claves y el usuario sólo dispone de credenciales de
+      identificación a la propia plataforma. Su uso es muy sencillo, pero se
+      pierde por completo el control sobre la criptomoneda propia que es,
+      precisamente, uno de los pilares en los que se fundamente el dinero
+      digital: cualquier ataque a la entidad gestora o su quiebra, provocará la
+      pérdida irremediable de los fondos.
+
+   #. :dfn:`Billeteras de aplicación`:
+
+      Billeteras almacenadas localmente y gestionadas desde una aplicación
+      cliente de escritorio o móvil (Electrum_, `Trust wallet`_). Estas
+      aplicaciones permiten interactuar directamente con la *blockchain* sin
+      necesidad de descargarla totalmente. Lo habitual (y deseable) es que
+      permitan exportar e importar las claves.
+
+      En este caso, las claves no salen del dispositivo en que se instala la
+      aplicación y suelen encontrarse cifradas con alguna contraseña que impida
+      su uso por terceros con acceso.
+
+:dfn:`Billeteras frías` (*cold wallets*)
+   Son aquellas que almacenan las claves en un dispositivo ajeno a internet.
+
+   3. :dfn:`Billeteras hardware`
+
+      Son dispositivos físicos especialmente diseñados para almacenar las claves
+      y que éstas nunca salgan de él. Para operar con las claves que contiene, se
+      conectan por |USB|, pero sin posibilidad de extraer las claves. También
+      disponen de mecanismos para evitar su manipulación física por lo que son
+      altamente seguros. Las más utilizadas son Trezor_ y Ledger_.
+
+   #. :dfn:`Billeteras en papel`
+
+      Son literalmente un papel donde se encuentran escritas las claves. Como
+      escribirlas y leerlas manualmente se presta a errores de
+      transcripción, suele recurrirse a un generador de claves que genere el
+      papel con los códigos transcritos y una versión en formato |QR|, que
+      facilite su posterior lectura. Por otro lado, cuando se quiera hacer uso
+      de los fondos, no sólo habrá que leer la clave, sino introducirla en una
+      billetera de aplicación con lo que se perderá la ventaja de seguridad de
+      haber usado una *billetera fría* y sería recomendable utilizar una nueva
+      billetera de papel para los fondos sobrantes.
+
+      Para generar la billetera en papel con formato |QR| podemos recurrir a
+      aplicaciones online con `bitaddress.org`_, que genera las claves en el
+      lado del cliente mediante *Javascript*.
+
+      .. seealso:: Para una discusión sobre estas billeteras es interesante el
+         artículo `Paper Wallets — A Relic of the Past
+         <https://blog.trezor.io/paper-wallets-a-relic-of-the-past-1f711ba82b8c>`_
+         (aunque, claro, está escrito en un blog de un fabricante de billeteras
+         *hardware*).
+
+Es importante tener presente que aquello que individualiza no es el *wallet* en
+sí, sino la clave privada\ [#]_ que éste almacena. En consecuencia, si
+exportamos las claves de una billetera de aplicación y creamos una billetera en
+papel, ambas billeteras, en realidad, son la misma billetera y, de hecho, nos
+podría servir como copia de seguridad por si olvidamos las claves de la
+aplicación que descifran la clave o perdemos el sistema en el que corría dicha
+aplicación. Hay, además de la copia, otra estrategia para recuperar una
+billetera tras su pérdida: generar la clave privada a partir de una semilla que
+podamos recordar, en vez de hacerlo de forma aleatoria. De este modo, ante la
+pérdida bastará con facilitar (recordar) la semilla, para regenerar la clave.
+Antes de entenderlo por completo, sin  embargo, nos conviene profundizar en las
+claves.
+
+Apéndice práctico
+=================
+
+.. _prac-claves:
+
+Obtención de claves
+-------------------
+El propósito de este apartado es echarle un vistazo a cómo son las claves
+criptográficas y, a efectos puramente ilustrativos ver cómo se generan partiendo
+de una herramienta que ya conocermos: :ref:`openssl <openssl>`. Las claves de
+otras criptomonedas pueden diferir en los detalles, pero conceptualmente son
+iguales.
+
+.. note:: El apartado tiene un interés práctico muy reducido, por cuanto las
+   aplicaciones cliente para *Bitcoin* como Electrum_ permiten generar claves
+   (incluso claves a partir de una semilla). Sin embargo, es probable que
+   obtenerlas a mano, nos ayude a conocerlas mejor.
+
+.. note:: También podemos generar muchos de los formatos aquí expuestos, usando
+   la web `bitaddress.org`_. Haremos referencia a ella a lo largo del texto.
+
+Antes de empezar, haremos dos definiciones que usaremos mucho:
+
+.. code-block:: bash
+
+   alias bin2hex="xxd -p -c 65"
+   alias hex2bin="xxd -p -r"
+   alias sha256="openssl dgst -sha256 | awk -v ORS= '{print \$2}'"
+   alias rmd160="openssl dgst -rmd160 -provider legacy | awk -v ORS= '{print \$2}'"
+
+La primera definición permite trascribir bytes en su codificación hexadecimal
+(según la :ref:`tabla ASCII extendida <ascii>`) y la segunda justamente realiza
+el proceso contrario. Las otras dos definiciones permiten calcular resúmenes
+criptográficos: la primera un |SHA|\ 256 y la segunda un |RIPEMD|\ -160.
+
+Una clave privada de bitcoin es una clave de 256 *bits* generada con la curva
+eclíptica "secp256k1", así que para generar a mano una basta con::
+
+   $ openssl ecparam -genkey -name secp256k1 -noout > key.pem
+   $ cat key.pem
+   -----BEGIN EC PRIVATE KEY-----
+   MHQCAQEEIOHXAYuXWlfjGiHVcyb17cjGgRDwPo1MX2CdmVIj1YiVoAcGBSuBBAAK
+   oUQDQgAE4AIVQf2ZIYd1RLFPrD2yM1+z1SYV44WsiSVzVCvwu6A2x3E1oOvHNsEG
+   jaMp4R/94/6lpo6tP14MOCMLOmazdQ==
+   -----END EC PRIVATE KEY-----
+
+Este archivo :file:`key.pem` contiene la clave de 265 *bits*, pero también
+información adicional para poder interpretarla como cuál es la curva elíptica
+con la que se generó. Sin embargo, si todas las claves para *Bitcoin* se generan
+del mismo modo, ¿por qué no prescindir de la información adicional y expresar
+estrictamente los 256 bytes de la clave? Así pues, expresamos la clave en su
+formato binario |ASN.1| y recortamos los bytes que anteceden y suceden a la
+clave::
+
+   $ openssl ec -in key.pem -outform DER | tail -c+8 | head -c32 | bin2hex
+   51920d4b6f072f3396e308687e05b98150e7beae84585cb61f125aeadff2b570
+
+Esos 64 dígitos hexadecimales representan exactamente los 32 *bytes* (256
+*bits*) que componen la clave privada y esta es una de las representaciones (la
+hexadecimal) en la que podemos ver escrita la clave privada, aunque no es la más
+frecuente. Y es aquí donde debemos hacer un inciso antes de continuar la
+exposición. Justamente 256 *bits* son la longitud de un :ref:`resumen
+critográfico <hash>` hecho con |SHA|\ -256, así que una alternativa a generar
+aleatoriamente la clave con :command:`openssl` es escoger una relación de
+palabras lo suficientemente larga (**semilla**), generar su resumen |SHA|\ -256
+y tomar la secuencia de 32 *bytes* resultantes como la clave::
+
+   $ key=$(printf "Pablito clavó un clavito" | sha256)
+   $ echo "$key"
+   146bf21792fbf84d6bd9f703459b3f505bb38cf071ba1ce3ceacff91286e5eb9
+   
+.. note:: Alternativamente, en la sección "Brain Wallet" de bitaddress.org_,
+   podemos generar la clave a partir de la semilla. Nos mostrará el formato
+   |WIF|, pero trasladándolo a la sección "Wallet Details" podremos obtener
+   otros. Esta sección es algo árida, pero sirve para ilustrar cómo las claves
+   criptográficas hasta ahora vistas (y que hemos ido generando con
+   :ref:`openssl <openssl>`) son las que sustentan también la *blockchain*,
+   aunque la forma de mostrarlos difiera del formato |PEM|.
+
+.. note:: En realidad, esta sencilla estrategia para obtener una clave a partir
+   de una semilla, no es la que se usa. El método estándar (que soportan muchas
+   billeteras *hardware*)  es más complejo (el |BIP|\ -39) y se basa en escoger
+   como semilla un número de palabras contenidas en un diccionario. La
+   explicación de este método puede hallarse en el artículo `Understanding BIP39
+   and Your Mnemonic Phrase <https://privacypros.io/wallets/mnemonic-phrase>`_. 
+
+Ahora bien, tenemos estrictamente los 32 *bytes* y para obtener la clave pública
+más adelante, necesitaremos obtener el archivo completo con la clave. Esto no es difícil,
+porque al generarse siempre con el mismo algoritmo las claves para *Bitcoin*,
+los *bytes* que codifican la metainformación son siempre los mismos. Por ello,
+la clave puede obtenerse así::
+
+   $ printf "%s%s%s" "302e0201010420" "$key" "a00706052b8104000a" | hex2bin | openssl ec -inform DER | tee key.pem
+   read EC key
+   writing EC key
+   -----BEGIN EC PRIVATE KEY-----
+   MHQCAQEEIBRr8heS+/hNa9n3A0WbP1Bbs4zwcboc486s/5Eobl65oAcGBSuBBAAK
+   oUQDQgAEBhH21ypZ1+kxclZ+VCKNCa+jrwyj5oXg1poHlbNhSld/lIhzM5sPGAD5
+   NrCYJjNXvwGcFzrkwsl/nQ2cqVOGrw==
+   -----END EC PRIVATE KEY-----
+
+Con lo que tendremos en :file:`key.pem` la clave privada originada por la
+**semilla** "*Pablito clavó un clavito*"\ [#]_. Si la perdiéramos, nos sería muy
+fácil regenerarla con sólo recordarla y seguir los pasos. Tomemos esta clave, en
+vez de la anterior y prosigamos porque aún no hemos acabado, ya que las claves
+criptográficos suelen facilitarse del siguiente modo:
+
+* La **clave privada** en formato |WIF|, esto es, en una codificación
+  `Base58 <https://crypto.bi/base58/>`_, que es semejante a `Base64
+  <https://es.wikipedia.org/wiki/Base64>`_, pero elimina caracteres no
+  alfanuméricos (p.e. el signo "+") y caracteres que pueden confundirse entre sí
+  (p.e. el cero y la o mayúscula, o la "i" y la "l" minúsculas).
+* Más que la **clave pública** (que aún no hemos calculado siquiera), lo que se
+  facilita es una **dirección pública** basada en ésta.
+
+.. warning:: Necesitará codificar en Base58. *Debian* tiene un paquete para ello
+   (:deb:`base58`).
+
+El formato |WIF| para la clave privada se forma añadiendo a la clave privada
+parte de un *hash* calculado a partir de ella, lo cual añade redundacia a la
+expresión y permite detectar errores de transcripción. Se añade también un
+prefijo que permite distinguir las claves de un cliente de las claves de un
+nodo::
+
+   $ prefijo="80"  # Para la mainnet, "EF" para la testnet
+   $ hash="$(printf "$prefijo$key" | hex2bin | sha256 | hex2bin | sha256)"
+   $ echo $hash
+   4e364fcbb321fdec011ba6332a6080fa9d4d86d50ec35749fe49ece30801d5ad
+
+El *hash* se calcula haciendo el resumen del resumen siempre usando en ambos
+casos |SHA|\ -256. Sin embargo, de este *hash* sólo se añaden los cuatro
+primeros *bytes*, así que la clave privada en formato |WIF| se acaba calculando
+así:
+
+.. code-block:: console
+   :emphasize-lines: 3
+
+   $ sufijo=$(printf "$hash" | head -c8)
+   $ printf "%s%s%s" "$prefijo" "$key" "$sufijo" | hex2bin | base58
+   5HyHE2kn2wx26ShQQGKyaNWzoUXJEvFSUKqWHXF7TgQJKeMwqY
+
+Esa, pues, sería la clave privada expresada en formato |WIF|. También existe el
+formato |WIFC| que se calcula exactamente igual. pero añadiendo el caracter "01"
+justamente después de la clave hexadecimal\ [#]_:
+
+.. code-block:: console
+   :emphasize-lines: 4
+
+   $ hash="$(printf "$prefijo${key}01" | hex2bin | sha256 | hex2bin | sha256)"
+   $ sufijo=$(printf "$hash" | head -c8)
+   $ printf "%s%s01%s" "$prefijo" "$key" "$sufijo" | hex2bin | base58
+   KwuQcWkDmbXqq2RLHgekiHyQ88Uj6S2jRc96FvVHWkuqT9Ef7j72
+
+Pasemos ahora a calcular la *clave pública* en formato hexadecimal, de la que
+hay también versión comprimida::
+
+   $ pubkey=$(openssl ec -in key.pem -pubout -outform DER | tail -c65 | bin2hex)
+   $ echo $pubkey
+   040611f6d72a59d7e93172567e54228d09afa3af0ca3e685e0d69a0795b3614a577f948873339b0f1800f936b098263357bf019c173ae4c2c97f9d0d9ca95386af
+   $ pubkeyc=$(openssl ec -in key.pem -pubout -outform DER -conv_form compressed | tail -c33 | bin2hex)
+   $ echo $pubkeyc
+   030611f6d72a59d7e93172567e54228d09afa3af0ca3e685e0d69a0795b3614a57
+
+Pero lo realmente interesante es obtener la dirección de *bitcoin* (la normal y
+la comprimida). La primera es:
+
+.. code-block:: console
+   :emphasize-lines: 5
+
+   $ prefijo="00"  # Para la mainnet, "6F" para la testnet.
+   $ hash="$prefijo$(printf "%s" "$pubkey" | hex2bin | sha256 | hex2bin | rmd160)"
+   $ sufijo="$(printf "$hash" | hex2bin | sha256 | hex2bin | sha256 | head -c8)"
+   $ printf "%s%s" "$hash" "$sufijo" | hex2bin | base58
+   1BoMhf1btEwwsHcvzxQiiRJowxwLxyz6kp
+
+Y para la segunda hay que hacer exactamente lo mismo con la versión comprimida:
+
+.. code-block:: console
+   :emphasize-lines: 4
+
+   $ hash="$prefijo$(printf "%s" "$pubkeyc" | hex2bin | sha256 | hex2bin | rmd160)"
+   $ sufijo="$(printf "$hash" | hex2bin | sha256 | hex2bin | sha256 | head -c8)"
+   $ printf "%s%s" "$hash" "$sufijo" | hex2bin | base58
+   1PSAfVwy7qDX7htzNKTYJ9cjn1oZr8jzoT
+
+Operando con la *blockchain* de *Bitcoin*
+-----------------------------------------
+.. todo:: Sería interesante practicar la operativa con *Bitcoin* creando una
+   *blockchain* privada o conectándose a la *Testnet*. Como punto de partida
+   puede utilizarse `este artículo de bit2me.com
+   <https://academy.bit2me.com/testnet-red-pruebas-bitcoin/>`_.
+
+   .. Tambien: https://gist.github.com/Danilo-Araujo-Silva/9dec9b83b3c22ab55049f9ede3f8ef6c
+
+.. rubric:: Notas al pie
+
+.. [#] En la realidad, la transacción será un poco más complicada, porque no
+   hemos tenido en cuenta las comisiones. Es posible que también se genere
+   una |UTXO| para recompensar al minero y a la :ref:`casa de cambios
+   <crypto-exchanges>`.
+.. [#] Y lo escribimos en cursiva, porque no están literalmente escritas a
+   nuestro nombre, sino asociadas a algo que sólo nosotros poseemos: una clave
+   privada. En este mundo digital, robar dinero equivale a robarnos la clave
+   privada, porque quien posee la clave, puede gastar la |UTXO|.
+.. [#] Las claves son |ECDSA| y no |RSA|, porque son más eficientes. En teoría,
+   las claves |RSA| también servirían para este propósito.
+.. [#] La primera trasacción de bitcoins se hizo el 12 de enero de 2009 entre
+   `Hal Finney <https://academy.bit2me.com/quien-es-hal-finney/>`_ y Satoshi
+   Nakamoto. Conocemos quién es (fue) Hal, pero aún sigue siendo un misterio
+   quién es en realidad Satoshi. Ni siquiera está claro que sea una persona.
+.. [#] Este es el conocido como `problema de los generales bizantinos
+   <https://es.wikipedia.org/wiki/Problema_de_los_generales_bizantinos>`_.
+.. [#] En realidad, ya no minan, así que no son mineros.
+.. [#] Y, por lo que parece, los `temores de centralización se han cumplido
+   <https://twitter.com/koeppelmann/status/1570436882483523585>`_.
+.. [#] Supuesto, claro está, que los nodos que constituyen la red de la
+   *blockchain* sean muchos y no estén monopolizados por nadie.
+.. [#] Véase `este artículo de dpoitlaw.com
+   <https://www.dpoitlaw.com/aspectos-juridicos-a-tener-en-cuenta-en-la-emision-de-criptoactivos-por-la-empresa-utility-token-vs-security-token/>`_.
+   Además, en breve se aprobará una `reforma de la Ley de los Mercados de
+   Valores <https://elderecho.com/reforma-ley-mercado-valores>`_.
+.. [#] A estas alturas ya debemos saber que la clave pública se obtiene a partir
+   de la clave privada.
+.. [#] Evidentemente, la secuencia de palabras debe ser lo suficientemente
+   extravagante. La escogida no es que digamos la mejor opción.
+.. [#] Obviamente, si se añade un carácter más, la clave será un *byte* más
+   larga, aunque paradójicamente la "C" signifique comprimida.
+
+.. _Bitcoin: https://es.wikipedia.org/wiki/Bitcoin
+.. _Natoshi Nakamoto: https://es.wikipedia.org/wiki/Satoshi_Nakamoto
+.. _bitcoin.org: https://bitcoin.org
+.. _Ethereum: https://ethereum.org
+.. _OmniLayer: https://www.omnilayer.org
+.. _coinmarketcap.com: https://coinmarketcap.com
+.. _Tether: https://tether.to
+.. _BNB: https://www.binance.com/es/bnb
+.. _USD Coin: https://www.circle.com/en/usdc
+.. _Brave: https://www.brave.com
+.. _Electrum: https://electrum.org
+.. _Trust wallet: https://trustwallet.com
+.. _Trezor: https://trezor.io
+.. _Ledger: https://www.ledger.com
+.. _bitaddress.org: https://www.bitaddress.org
+.. _101blochains.com: https://101blockchains.com
+
+.. |nonce| replace:: :abbr:`nonce (Number Only Used Once)`
+.. |RSA| replace:: :abbr:`RSA (Rivest, Shamir y Adleman)`
+.. |ECDSA| replace:: :abbr:`ECDSA (Elliptic Curve Digital Signature Algorithm)`
+.. |SHA| replace:: :abbr:`SHA (Sechure Hash Algorithm)`
+.. |P2P| replace:: :abbr:`P2P (Peer-to-Peer)`
+.. |BAT| replace:: :abbr:`BAT (Basic Attention Token)`
+.. |MB| replace:: :abbr:`MB (Megabyte)`
+.. |STO| replace:: :abbr:`STO (Security Token Offering)`
+.. |ICO| replace:: :abbr:`ICO (Initial Coin Offering)`
+.. |PoW| replace:: :abbr:`PoW (Proof Of Work)`
+.. |PoS| replace:: :abbr:`PoS (Proof Of Stake)`
+.. |UTXO| replace:: :abbr:`UTXO (Unspent Transaction Output)`
+.. |KYC| replace:: :abbr:`KYC (Know your customer)`
+.. |CEX| replace:: :abbr:`CEX (Centralized EXchange)`
+.. |DEX| replace:: :abbr:`DEX (Decentralized EXchange)`
+.. |USB| replace:: :abbr:`USB (Universal Serial Bus)`
+.. |QR| replace:: :abbr:`QR (Quick Response)`
+.. |ASN.1| replace:: :abbr:`ASN.1 (Abrtract Syntax Notation One)`
+.. |WIF| replace:: :abbr:`WIF (Wallet Information Format)`
+.. |WIFC| replace:: :abbr:`WIFC (Wallet Information Format Compressed)`
+.. |RIPEMD| replace:: :abbr:`RIPEMD (RACE Integrity Primitives Evaluation Message Digest)`
+.. |PEM| replace:: :abbr:`PEM (Private Enhaced Mail)`
+.. |RGB| replace:: :abbr:`RGB (Really Good For Bitcoin)`
+.. |BIP| replace:: :abbr:`BIP (Bitcoin Improvement Proposal)`
+
+.. |btc| unicode:: U+20BF .. bitcoin sign
+.. |ra| unicode:: U+27F6 .. long right arrow

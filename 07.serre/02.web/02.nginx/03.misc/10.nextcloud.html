@@ -1,0 +1,316 @@
+
+
+<!DOCTYPE html>
+
+<html lang="es" data-content_root="../../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>7.2.2.3.9. Nextcloud &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/classic.css?v=2bf1fcf8" />
+    <link rel="stylesheet" href="../../../../_static/custom.css" type="text/css" />
+    
+    <script src="../../../../_static/documentation_options.js?v=a621b78a"></script>
+    <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../../_static/translations.js?v=f85f4cfb"></script>
+    
+    <link rel="index" title="Índice" href="../../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../../search.html" />
+    <link rel="next" title="7.2.2.4. Chuleta" href="../04.chuleta/index.html" />
+    <link rel="prev" title="7.2.2.3.8. SimpleSAMLphp" href="09.simplesamlphp.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="../04.chuleta/index.html" title="7.2.2.4. Chuleta"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="09.simplesamlphp.html" title="7.2.2.3.8. SimpleSAMLphp"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" ><span class="section-number">7. </span>Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../index.html" ><span class="section-number">7.2. </span>Web</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../index.html" ><span class="section-number">7.2.2. </span>nginx</a> &#187;</li>
+          <li class="nav-item nav-item-4"><a href="index.html" accesskey="U"><span class="section-number">7.2.2.3. </span>Recetas</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">7.2.2.3.9. </span>Nextcloud</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="nextcloud">
+<span id="nginx-nextcloud"></span><h1><span class="section-number">7.2.2.3.9. </span>Nextcloud<a class="headerlink" href="#nextcloud" title="Link to this heading">¶</a></h1>
+<p><a class="reference external" href="https://nextcloud.com">Nextcloud</a> es una plataforma para el acceso y la compartición de archivos en la
+nube a la manera de soluciones comerciales como <a class="reference external" href="https://www.dropbox.com">Dropbox</a> o <a class="reference external" href="https://drive.google.com">Drive</a>, aunque es
+<em>software</em> libre y permite su instalación en un servidor web propio.</p>
+<section id="preliminares">
+<h2><span class="section-number">7.2.2.3.9.1. </span>Preliminares<a class="headerlink" href="#preliminares" title="Link to this heading">¶</a></h2>
+<p>Antes de proceder a su instalación, debemos tener instalado completamente un
+<a class="reference internal" href="../index.html#n-ginx"><span class="std std-ref">servidor nginx</span></a> con soporte para <a class="reference internal" href="../02.avanz/06.dynamic.html#nginx-php"><span class="std std-ref">contenido dinámico
+generado con PHP</span></a> y base de datos MySQL. A partir de ello deberemos
+añadir al menos los siguientes paquetes:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>apt<span class="w"> </span>install<span class="w"> </span>php-<span class="o">{</span>gd,curl,mbstring,intl,gmp,bcmath,xml,imagick,zip<span class="o">}</span>
+</pre></div>
+</div>
+<p>Además consideraremos que la máquina tiene asociado el nombre de red
+<em>cloud.example.net</em>.</p>
+<p>Basándonos en <a class="reference external" href="https://docs.nextcloud.com/server/latest/admin_manual/installation/nginx.html">la guía proporcionada por la documentación oficial</a>
+del propio proyecto, la configuración para <strong class="program">nginx</strong>, si se instala el
+servicio en el directorio raíz del sitio, puede ser esta:</p>
+<div class="highlight-nginx notranslate"><div class="highlight"><pre><span></span><span class="c1"># Set the `immutable` cache control options only for assets with a cache busting `v` argument</span>
+<span class="k">map</span><span class="w"> </span><span class="nv">$arg_v</span><span class="w"> </span><span class="nv">$asset_immutable</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kn">&quot;&quot;</span><span class="w"> </span><span class="s">&quot;&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">default</span><span class="w"> </span><span class="s">&quot;immutable&quot;</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">server</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kn">listen</span><span class="w"> </span><span class="mi">80</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">listen</span><span class="w"> </span><span class="mi">443</span><span class="w">      </span><span class="s">ssl</span><span class="w"> </span><span class="s">http2</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">server_name</span><span class="w"> </span><span class="s">cloud.example.net</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kn">if</span><span class="w"> </span><span class="s">(</span><span class="nv">$https</span><span class="w"> </span><span class="s">!=</span><span class="w"> </span><span class="s">&quot;on&quot;)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">       </span><span class="kn">return</span><span class="w"> </span><span class="mi">301</span><span class="w"> </span><span class="s">https://</span><span class="nv">$host$request_uri</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kn">root</span><span class="w"> </span><span class="s">/srv/www/nextcloud</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">index</span><span class="w"> </span><span class="s">index.php</span><span class="w"> </span><span class="s">index.html</span><span class="w"> </span><span class="s">/index.php</span><span class="nv">$request_uri</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kn">include</span><span class="w"> </span><span class="s">snippets/snakeoil.conf</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1"># Opcional: impide que el servidor se identifique ante el cliente</span>
+<span class="w">    </span><span class="kn">server_tokens</span><span class="w"> </span><span class="no">off</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1"># Aumentamos la información que podemos subir</span>
+<span class="w">    </span><span class="c1"># y el tiempo de subida para evitar errores de timeout.</span>
+<span class="w">    </span><span class="c1"># ¡Ojo! Habrá que tocar solidariamente la configuración de PHP.</span>
+<span class="w">    </span><span class="kn">client_max_body_size</span><span class="w"> </span><span class="s">512M</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">client_body_timeout</span><span class="w"> </span><span class="s">300s</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">fastcgi_buffers</span><span class="w"> </span><span class="mi">64</span><span class="w"> </span><span class="s">4K</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1"># Habilitamos compresión para algunos tipos de archivos.</span>
+<span class="w">    </span><span class="kn">gzip</span><span class="w"> </span><span class="no">on</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">gzip_vary</span><span class="w"> </span><span class="no">on</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">gzip_comp_level</span><span class="w"> </span><span class="mi">4</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">gzip_min_length</span><span class="w"> </span><span class="mi">256</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">gzip_proxied</span><span class="w"> </span><span class="s">expired</span><span class="w"> </span><span class="s">no-cache</span><span class="w"> </span><span class="s">no-store</span><span class="w"> </span><span class="s">private</span><span class="w"> </span><span class="s">no_last_modified</span><span class="w"> </span><span class="s">no_etag</span><span class="w"> </span><span class="s">auth</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">gzip_types</span><span class="w"> </span><span class="s">application/atom+xml</span><span class="w"> </span><span class="s">application/javascript</span><span class="w"> </span><span class="s">application/json</span>
+<span class="w">               </span><span class="s">application/ld+json</span><span class="w"> </span><span class="s">application/manifest+json</span><span class="w"> </span><span class="s">application/rss+xml</span>
+<span class="w">               </span><span class="s">application/vnd.geo+json</span><span class="w"> </span><span class="s">application/vnd.ms-fontobject</span><span class="w"> </span><span class="s">application/wasm</span>
+<span class="w">               </span><span class="s">application/x-font-ttf</span><span class="w"> </span><span class="s">application/x-web-app-manifest+json</span>
+<span class="w">               </span><span class="s">application/xhtml+xml</span><span class="w"> </span><span class="s">application/xml</span><span class="w"> </span><span class="s">font/opentype</span><span class="w"> </span><span class="s">image/bmp</span>
+<span class="w">               </span><span class="s">image/svg+xml</span><span class="w"> </span><span class="s">image/x-icon</span><span class="w"> </span><span class="s">text/cache-manifest</span><span class="w"> </span><span class="s">text/css</span><span class="w"> </span><span class="s">text/plain</span>
+<span class="w">               </span><span class="s">text/vcard</span><span class="w"> </span><span class="s">text/vnd.rim.location.xloc</span><span class="w"> </span><span class="s">text/vtt</span><span class="w"> </span><span class="s">text/x-component</span>
+<span class="w">               </span><span class="s">text/x-cross-domain-policy</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1"># Sólo si el servidor tiene el módulo `ngx_pagespeed`</span>
+<span class="w">    </span><span class="c1">#pagespeed off;</span>
+
+<span class="w">    </span><span class="c1"># Para optimizar HTTP2</span>
+<span class="w">    </span><span class="c1"># Véase https://blog.cloudflare.com/delivering-http-2-upload-speed-improvements/</span>
+<span class="w">    </span><span class="kn">client_body_buffer_size</span><span class="w"> </span><span class="mi">512k</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1"># Cabeceras de respuesta HTTP</span>
+<span class="w">    </span><span class="kn">add_header</span><span class="w"> </span><span class="s">Referrer-Policy</span><span class="w">                   </span><span class="s">&quot;no-referrer&quot;</span><span class="w">       </span><span class="s">always</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">add_header</span><span class="w"> </span><span class="s">X-Content-Type-Options</span><span class="w">            </span><span class="s">&quot;nosniff&quot;</span><span class="w">           </span><span class="s">always</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">add_header</span><span class="w"> </span><span class="s">X-Download-Options</span><span class="w">                </span><span class="s">&quot;noopen&quot;</span><span class="w">            </span><span class="s">always</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">add_header</span><span class="w"> </span><span class="s">X-Frame-Options</span><span class="w">                   </span><span class="s">&quot;SAMEORIGIN&quot;</span><span class="w">        </span><span class="s">always</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">add_header</span><span class="w"> </span><span class="s">X-Permitted-Cross-Domain-Policies</span><span class="w"> </span><span class="s">&quot;none&quot;</span><span class="w">              </span><span class="s">always</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">add_header</span><span class="w"> </span><span class="s">X-Robots-Tag</span><span class="w">                      </span><span class="s">&quot;noindex,</span><span class="w"> </span><span class="s">nofollow&quot;</span><span class="w"> </span><span class="s">always</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">add_header</span><span class="w"> </span><span class="s">X-XSS-Protection</span><span class="w">                  </span><span class="s">&quot;1</span><span class="p">;</span><span class="w"> </span><span class="kn">mode=block&quot;</span><span class="w">     </span><span class="s">always</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1"># Evitamos dar más información de la debida.</span>
+<span class="w">    </span><span class="kn">fastcgi_hide_header</span><span class="w"> </span><span class="s">X-Powered-By</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1"># Debemos añadir .mjs como tipo application/javascript</span>
+<span class="w">    </span><span class="kn">include</span><span class="w"> </span><span class="s">mime.types</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">types</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kn">application/javascript</span><span class="w"> </span><span class="s">mjs</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1"># Para soporte de los clientes WebDav de Microsoft</span>
+<span class="w">    </span><span class="kn">location</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">/</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kn">if</span><span class="w"> </span><span class="s">(</span><span class="w"> </span><span class="nv">$http_user_agent</span><span class="w"> </span><span class="p">~</span><span class="w"> </span><span class="sr">^DavClnt</span><span class="w"> </span><span class="s">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="kn">return</span><span class="w"> </span><span class="mi">302</span><span class="w"> </span><span class="s">/remote.php/webdav/</span><span class="nv">$is_args$args</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1"># Véase la configuración sugerida para Wordpress</span>
+<span class="w">    </span><span class="kn">include</span><span class="w"> </span><span class="s">snippets/robotsoff.conf</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kn">include</span><span class="w"> </span><span class="s">snippets/acme.conf</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">location</span><span class="w"> </span><span class="s">^~</span><span class="w"> </span><span class="s">/.well-known</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kn">location</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">/.well-known/carddav</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kn">return</span><span class="w"> </span><span class="mi">301</span><span class="w"> </span><span class="s">/remote.php/dav/</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">        </span><span class="kn">location</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="s">/.well-known/caldav</span><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="kn">return</span><span class="w"> </span><span class="mi">301</span><span class="w"> </span><span class="s">/remote.php/dav/</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">        </span><span class="kn">location</span><span class="w"> </span><span class="s">/.well-known/pki-validation</span><span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="kn">try_files</span><span class="w"> </span><span class="nv">$uri</span><span class="w"> </span><span class="nv">$uri/</span><span class="w"> </span><span class="p">=</span><span class="mi">404</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">        </span><span class="kn">return</span><span class="w"> </span><span class="mi">301</span><span class="w"> </span><span class="s">/index.php</span><span class="nv">$request_uri</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1"># Evitamos que los clinetes accedan a estos recursos</span>
+<span class="w">    </span><span class="kn">location</span><span class="w"> </span><span class="p">~</span><span class="w"> </span><span class="sr">^/(?:build|tests|config|lib|3rdparty|templates|data)(?:$|/)</span><span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="kn">return</span><span class="w"> </span><span class="mi">404</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">    </span><span class="kn">location</span><span class="w"> </span><span class="p">~</span><span class="w"> </span><span class="sr">^/(?:\.|autotest|occ|issue|indie|db_|console)</span><span class="w">                </span><span class="p">{</span><span class="w"> </span><span class="kn">return</span><span class="w"> </span><span class="mi">404</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kn">location</span><span class="w"> </span><span class="p">~</span><span class="w"> </span><span class="sr">\.php(?:$|/)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="kn">rewrite</span><span class="w"> </span><span class="s">^/(?!index|remote|public|cron|core\/ajax\/update|status|ocs\/v[12]|updater\/.+|oc[ms]-provider\/.+|.+\/richdocumentscode\/proxy)</span><span class="w"> </span><span class="s">/index.php</span><span class="nv">$request_uri</span><span class="p">;</span>
+
+<span class="w">      </span><span class="kn">include</span><span class="w"> </span><span class="s">snippets/fastcgi-php.conf</span><span class="p">;</span>
+<span class="w">      </span><span class="kn">fastcgi_pass</span><span class="w"> </span><span class="s">php</span><span class="p">;</span>
+
+<span class="w">      </span><span class="kn">fastcgi_param</span><span class="w"> </span><span class="s">modHeadersAvailable</span><span class="w"> </span><span class="s">true</span><span class="p">;</span>
+<span class="w">      </span><span class="kn">fastcgi_param</span><span class="w"> </span><span class="s">front_controller_active</span><span class="w"> </span><span class="s">true</span><span class="p">;</span>
+<span class="w">      </span><span class="kn">fastcgi_intercept_errors</span><span class="w"> </span><span class="no">on</span><span class="p">;</span>
+<span class="w">      </span><span class="kn">fastcgi_request_buffering</span><span class="w"> </span><span class="no">off</span><span class="p">;</span>
+<span class="w">      </span><span class="kn">fastcgi_max_temp_file_size</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kn">location</span><span class="w"> </span><span class="p">~</span><span class="w"> </span><span class="sr">\.(?:css|js|svg|gif|png|jpg|ico|wasm|tflite|map)$</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kn">try_files</span><span class="w"> </span><span class="nv">$uri</span><span class="w"> </span><span class="s">/index.php</span><span class="nv">$request_uri</span><span class="p">;</span>
+<span class="w">        </span><span class="kn">add_header</span><span class="w"> </span><span class="s">Cache-Control</span><span class="w"> </span><span class="s">&quot;public,</span><span class="w"> </span><span class="s">max-age=15778463,</span><span class="w"> </span><span class="nv">$asset_immutable&quot;</span><span class="p">;</span>
+<span class="w">        </span><span class="kn">access_log</span><span class="w"> </span><span class="no">off</span><span class="p">;</span>
+
+<span class="w">        </span><span class="kn">location</span><span class="w"> </span><span class="p">~</span><span class="w"> </span><span class="sr">\.wasm$</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="kn">default_type</span><span class="w"> </span><span class="s">application/wasm</span><span class="p">;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kn">location</span><span class="w"> </span><span class="p">~</span><span class="w"> </span><span class="sr">\.woff2?$</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kn">try_files</span><span class="w"> </span><span class="nv">$uri</span><span class="w"> </span><span class="s">/index.php</span><span class="nv">$request_uri</span><span class="p">;</span>
+<span class="w">        </span><span class="kn">expires</span><span class="w"> </span><span class="s">7d</span><span class="p">;</span>
+<span class="w">        </span><span class="kn">access_log</span><span class="w"> </span><span class="no">off</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kn">location</span><span class="w"> </span><span class="s">/remote</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kn">return</span><span class="w"> </span><span class="mi">301</span><span class="w"> </span><span class="s">/remote.php</span><span class="nv">$request_uri</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="kn">location</span><span class="w"> </span><span class="s">/</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kn">try_files</span><span class="w"> </span><span class="nv">$uri</span><span class="w"> </span><span class="nv">$uri/</span><span class="w"> </span><span class="s">/index.php</span><span class="nv">$request_uri</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>En esta configuración (descargable <a class="reference download internal" download="" href="../../../../_downloads/a2312dd83c7f052dff56ecbdba5cb5f0/nextcloud.nginx"><code class="xref download docutils literal notranslate"><span class="pre">aquí</span></code></a>)
+hemos usado <a class="reference internal" href="03.wordpress.html#nginx-robotsoff"><span class="std std-ref">robotsoff.conf</span></a> y <a class="reference internal" href="../02.avanz/07.https.html#nginx-acmeconf"><span class="std std-ref">acme.conf</span></a>, ya presentados en recetas anteriores.</p>
+<p>Por último, deberemos modificar la configuración de <abbr title="PHP Hypertext Preprocessor">PHP</abbr>, de manera que en
+<code class="file docutils literal notranslate"><span class="pre">/etc/php/7.4/fpm/php.ini</span></code> aumentemos los tamaños permitidos:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="na">post_max_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">512M</span>
+<span class="na">upload_max_filesize</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">512M</span>
+</pre></div>
+</div>
+<p>y en <code class="file docutils literal notranslate"><span class="pre">/etc/php/7.4/fpm/pool.d/www.conf</span></code> descomentemos:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="na">clear_env</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">no</span>
+</pre></div>
+</div>
+</section>
+<section id="instalacion">
+<h2><span class="section-number">7.2.2.3.9.2. </span>Instalación<a class="headerlink" href="#instalacion" title="Link to this heading">¶</a></h2>
+<p>La instalación, como en otro tipo de aplicaciones web, consiste en descargar y
+situar la aplicación en el directorio establecido en la configuración
+(<code class="file docutils literal notranslate"><span class="pre">/srv/www/nextcloud</span></code>):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mkdir<span class="w"> </span>-p<span class="w"> </span>/srv/www/nextcloud
+<span class="gp"># </span>wget<span class="w"> </span>-qO<span class="w"> </span>-<span class="w"> </span><span class="s1">&#39;https://download.nextcloud.com/server/releases/latest.tar.bz2&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>tar<span class="w"> </span>-C<span class="w"> </span>/srv/www<span class="w"> </span>--strip-components<span class="o">=</span><span class="m">1</span><span class="w"> </span>-jxvf<span class="w"> </span>-
+<span class="gp"># </span>chown<span class="w"> </span>-R<span class="w"> </span>www-data:www-data<span class="w"> </span>/srv/www/nextcloud
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p><a class="reference external" href="https://www.debian.org/News/2021/20210814">Bullseye</a> tiene <abbr title="PHP Hypertext Preprocessor">PHP</abbr> 7.4 por lo que sólo será posible instalar la
+versión <strong>24</strong> del <em>software</em>, ya que a partir de la versión <strong>25</strong> se exige
+<abbr title="PHP Hypertext Preprocessor">PHP</abbr> 8.</p>
+</div>
+<p>y preparar la base de datos y el usuario de tal base que se usará:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mysql
+<span class="go">mysql&gt; CREATE DATABASE IF NOT EXISTS nextcloud CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;</span>
+<span class="go">mysql&gt; GRANT ALL PRIVILEGES ON nextcloud.* TO &#39;nextcloud&#39;@&#39;localhost&#39; IDENTIFIED BY &#39;contraseñadificil&#39;;</span>
+</pre></div>
+</div>
+<p>Hecho lo cual, estará ya todo preparado para instalar el sistema accediendo al
+sitio <em>https://cloud.example.net</em> y respondiendo a las preguntas:</p>
+<img alt="../../../../_images/nextcloud.png" src="../../../../_images/nextcloud.png" />
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="../../../../index.html">Tabla de contenido</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">7.2.2.3.9. Nextcloud</a><ul>
+<li><a class="reference internal" href="#preliminares">7.2.2.3.9.1. Preliminares</a></li>
+<li><a class="reference internal" href="#instalacion">7.2.2.3.9.2. Instalación</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Tema anterior</h4>
+    <p class="topless"><a href="09.simplesamlphp.html"
+                          title="capítulo anterior"><span class="section-number">7.2.2.3.8. </span>SimpleSAMLphp</a></p>
+  </div>
+  <div>
+    <h4>Próximo tema</h4>
+    <p class="topless"><a href="../04.chuleta/index.html"
+                          title="próximo capítulo"><span class="section-number">7.2.2.4. </span>Chuleta</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../../_sources/07.serre/02.web/02.nginx/03.misc/10.nextcloud.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="../04.chuleta/index.html" title="7.2.2.4. Chuleta"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="09.simplesamlphp.html" title="7.2.2.3.8. SimpleSAMLphp"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" ><span class="section-number">7. </span>Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../../index.html" ><span class="section-number">7.2. </span>Web</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../index.html" ><span class="section-number">7.2.2. </span>nginx</a> &#187;</li>
+          <li class="nav-item nav-item-4"><a href="index.html" ><span class="section-number">7.2.2.3. </span>Recetas</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">7.2.2.3.9. </span>Nextcloud</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright CC BY 4.0, 2016-2025, José Miguel Sánchez Alés.
+      Creado usando <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    </div>
+  </body>
+</html>

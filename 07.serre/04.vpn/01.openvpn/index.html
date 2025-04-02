@@ -1,0 +1,209 @@
+
+
+<!DOCTYPE html>
+
+<html lang="es" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>7.4.3.1. OpenVPN &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/classic.css?v=2bf1fcf8" />
+    <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+    
+    <script src="../../../_static/documentation_options.js?v=a621b78a"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/translations.js?v=f85f4cfb"></script>
+    
+    <link rel="index" title="Índice" href="../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../search.html" />
+    <link rel="next" title="7.4.3.1.1. Preparativos" href="01.previo.html" />
+    <link rel="prev" title="7.4. Redes VPN" href="../index.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="01.previo.html" title="7.4.3.1.1. Preparativos"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="../index.html" title="7.4. Redes VPN"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" ><span class="section-number">7. </span>Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" accesskey="U"><span class="section-number">7.4. </span>Redes VPN</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">7.4.3.1. </span>OpenVPN</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="openvpn">
+<span id="id1"></span><h1><span class="section-number">7.4.3.1. </span>OpenVPN<a class="headerlink" href="#openvpn" title="Link to this heading">¶</a></h1>
+<p>Al abordar el estudio de las redes <abbr title="Virtual Private Network">VPN</abbr> debemos tener presentes los siguientes
+cuatro aspectos:</p>
+<dl>
+<dt><strong>Capa de implementación del túnel</strong></dt><dd><p>El túnel puede establecerse en la <em>capa de enlace</em> con lo que ambos extremos se
+encontrarán en la misma red; o bien puede establecerse en la <em>capa de red</em> lo
+que determina que los segmentos local y remoto pertenezcan a redes distintas.</p>
+<p>En el primer caso, el establecimiento en capa 2 supone que las interfaces
+virtuales creadas sean interfaces tipo <em>TAP</em> que operan con paquetes de capa
+2 (o sea, tramas) como <em>ethernet</em>. En el segundo caso, las interfaces creadas
+serán de tipo <em>TUN</em>, que operan en capa 3 con paquetes <abbr title="Internet Protocol">IP</abbr>,</p>
+</dd>
+<dt><strong>Naturaleza del cliente</strong></dt><dd><p>Éste puede ser un <em>equipo móvil</em> (lo que en la jerga se llama <em>road warrior</em>)
+que se conecta para participar en la red local de la sede en la que se
+encuentra el servidor; o bien, el propósito de establecer el túnel pueda ser
+el de comunicar dos sedes entre sí de modo que el cliente no es un cliente
+aislado sino toda una red remota (una sede) que se desea sumar a la sede del
+servidor.</p>
+</dd>
+<dt><strong>Autenticación del cliente</strong></dt><dd><p>Puede hacerse con <em>certificado digital</em> emitido por el servidor; o bien,
+mediante el uso de usuario y contraseña.</p>
+</dd>
+<dt><strong>Tipo de certificado de servidor</strong></dt><dd><p>El certificado de servidor podemos obtenerlo a través de una entidad
+certificadora como <a class="reference internal" href="../../02.web/02.nginx/02.avanz/07.https.html#certbot"><span class="std std-ref">Let’s Encrypt</span></a>, o bien, crear nosotros una
+entidad certificadora y con ella acreditar el certificado del servidor.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Esta misma entidad se encarga de acreditar también los
+certificados de los clientes, por lo que, si nuestra intención es usarlos
+como método de autenticación para clientes, deberemos olvidarnos de usar
+<em>Let’s Encrypt</em>.</p>
+</div>
+</dd>
+</dl>
+<p>En el estudio trataremos cómo establecer redes <abbr title="Virtual Private Network">VPN</abbr> entre una sede y un equipo
+móvil o entre dos sedes; y para ambos casos se implementará la conexión en capa
+de enlace y de red. Son, por tanto, cuatro casos posibles. Para no multiplicar
+en exceso los casos, implementaremos la autenticación de clientes con
+certificado y la generación del certificado de servidor mediante entidad
+certificadora, en los casos de conexión entre dos sedes y la autenticación con
+usuario y contraseña y certificado de <em>Let’s Encrypt</em> en los casos de conexión
+entre equipo móvil y sede.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>La configuración «sede-equipo móvil» implementada en capa 3, por ser
+la primera que se desarrolla tiene la configuración abundantemente comentada.
+Muchos de estos comentarios son pertinentes en las restantes configuraciones,
+pero no se repiten. Échele un ojo a esta configuración, aunque no sea la que
+usted pretende.</p>
+</div>
+<p>Posiblemente, no todos los casos sean igual de pertinentes y nos convendrá
+elegir uno u otro según sean nuestras necesidades:</p>
+<ul class="simple">
+<li><p>Cuando se pretende conectar con la sede central equipos móviles, hacer que en
+estos equipos se encuentren en la misma red no suele aportar nada, pero en
+cambio sí que aumenta el tráfico (p.e. los paquetes de broadcast circularán
+por el túnel). En consecuencia, lo natural es que las conexiones sede-equipo
+móvil sean conexiones en capa de red.</p></li>
+<li><p>Por el contrario, en conexiones sede-sede:</p>
+<ul>
+<li><p>Si en la sede del servidor se encuentran centralizados todos los servicios,
+de nuevo no aporta gran cosa que la sucursal se encuentre en la misma red,
+por lo que lo lógico es que se establezca el túnel en capa de red.</p></li>
+<li><p>En cambio, si las sucursales también aportan servicios, esto querrá decir
+que necesitaremos acceder desde cualquier máquina a máquinas concretas
+de otras sedes. Para ello, lo más fácil es situar todas las máquinas en la
+misma red y, por tanto, establecer una conexión en capa de enlace.</p></li>
+</ul>
+</li>
+</ul>
+<p class="rubric">Contenidos</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="01.previo.html">7.4.3.1.1. Preparativos</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="01.previo.html#instalacion">7.4.3.1.1.1. Instalación</a></li>
+<li class="toctree-l2"><a class="reference internal" href="01.previo.html#carga-de-la-configuracion">7.4.3.1.1.2. Carga de la configuración</a></li>
+<li class="toctree-l2"><a class="reference internal" href="01.previo.html#preparacion">7.4.3.1.1.3. Preparación</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="02.rw.html">7.4.3.1.2. Conexión sede-equipo móvil</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="02.rw.html#capa-de-red">7.4.3.1.2.1. Capa de red</a></li>
+<li class="toctree-l2"><a class="reference internal" href="02.rw.html#capa-de-enlace">7.4.3.1.2.2. Capa de enlace</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="03.ss.html">7.4.3.1.3. Conexión sede-sede</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="03.ss.html#capa-de-red">7.4.3.1.3.1. Capa de red</a></li>
+<li class="toctree-l2"><a class="reference internal" href="03.ss.html#capa-de-enlace">7.4.3.1.3.2. Capa de enlace</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="04.misc.html">7.4.3.1.4. Redes restringidas</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="04.misc.html#servidor">7.4.3.1.4.1. Servidor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="04.misc.html#cliente">7.4.3.1.4.2. Cliente</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h4>Tema anterior</h4>
+    <p class="topless"><a href="../index.html"
+                          title="capítulo anterior"><span class="section-number">7.4. </span>Redes VPN</a></p>
+  </div>
+  <div>
+    <h4>Próximo tema</h4>
+    <p class="topless"><a href="01.previo.html"
+                          title="próximo capítulo"><span class="section-number">7.4.3.1.1. </span>Preparativos</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../_sources/07.serre/04.vpn/01.openvpn/index.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="01.previo.html" title="7.4.3.1.1. Preparativos"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="../index.html" title="7.4. Redes VPN"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" ><span class="section-number">7. </span>Servicios de red</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" ><span class="section-number">7.4. </span>Redes VPN</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">7.4.3.1. </span>OpenVPN</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright CC BY 4.0, 2016-2025, José Miguel Sánchez Alés.
+      Creado usando <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    </div>
+  </body>
+</html>

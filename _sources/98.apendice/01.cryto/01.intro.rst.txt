@@ -1,0 +1,177 @@
+.. _intro-crypto:
+
+Introducción
+************
+La :dfn:`criptografía` es la disciplina que estudia la alteración de mensajes
+mediante técnicas de cifrado y descifrado\ [#]_.
+
+En todo proceso criptográfico hay cuatro elementos:
+
+#. Los *extremos* de la comunicación, esto es, el emisor y el receptor. Un caso
+   particular se produce cuando emisor y receptor son el mismo sujeto y la
+   comunicación, más que comunicación, es almacenamiento, esto es, el sujeto
+   busca almacenar la información para recuperarla en un momento posterior,
+   y pretende asegurarse de que en el ínterin nadie, en caso de acceder a ella,
+   sea capaz de entenderla. En el caso del almacenamiento, pues, no hay dos
+   extremos físicos separados, sino dos *instantes* distintos de tiempo.
+
+#. La *información original* que se desea proteger.
+
+#. La *información ofuscada* que recibe el nombre de :dfn:`criptograma` o
+   :dfn:`texto cifrado`.
+
+#. El :dfn:`algoritmo de cifrado` que permite realizar la conversión de texto
+   original a texto cifrado (:dfn:`proceso de cifrado`) y la restitución del
+   texto cifrado al texto original (:dfn:`proceso de descifrado`).
+
+.. todo:: Añadir un esquema gráfico que reproduzca  lo que se emula a
+   continuación con la terminal.
+
+Ilustremos el proceso criptográfico con nuestra terminal::
+
+   $ emisor="openssl enc -aes256 -pass pass:x -a -pbkdf2"
+   $ receptor="$emisor -d"
+   $ miron="tee /dev/tty"
+
+Hemos definido un *emisor* que se encarga de cifrar y enviar el *mensaje
+cifrado* a la salida estándar (poco importa ahora cómo lo hemos hecho), un
+*receptor* capaz de descifrar lo que recibe de la entrada estándar y mostrarlo
+en la salida estándar; y un *mirón*, que interpondremos entre ambos y observará
+el mensaje tal cual lo recibe por la entrada estándar, lo mostrará por pantalla,
+y lo reenviará a la salida estándar:
+
+.. code-block:: console
+   :linenos:
+
+   $ $emisor <<< "Secreto" | $miron | $miron | $receptor
+   U2FsdGVkX18LAj+WgwhVuFgN93FL/9dmQXy2x9zB3jo=
+   U2FsdGVkX18LAj+WgwhVuFgN93FL/9dmQXy2x9zB3jo=
+   Secreto
+
+Vemos que el *emisor* envía el mensaje "``Secreto``" al receptor, pero lleva a
+cabo un *proceso de cifrado* para ofuscarlo.  Por este motivo, los dos mirones
+que se interponen entre ambos ven algo absolutamente ininteligible (el
+*criptograma* "``U2FsdGVkX18LAj+WgwhVuFgN93FL/9dmQXy2x9zB3jo=``" de las líneas 2
+y 3). En cambio, cuando el receptor captura el mensaje, resuelve el criptograma
+gracias a un *proceso de descifrado* por lo que es capaz de mostrar el *mensaje
+original* (línea 4).
+
+Estrategias
+===========
+Pueden cifrarse textos partiendo de dos estrategias distintas:
+
+**Algoritmo secreto**
+   que es sólo conocido por emisor y receptor y cuya seguridad se basa,
+   exclusivamente, en que el algoritmo siga manteniéndose en secreto.
+
+   Esta estrategia está obsoleta, pero era la que se usaba antiguamente. Dentro
+   de estos cifrados pueden citarse:
+
+   * El `cifrado por trasposición
+     <https://es.wikipedia.org/wiki/Cifrado_por_transposici%C3%B3n>`_ que
+     consiste en desordenar (trasponer) los caracteres del texto siguiendo
+     alguna regla como, por ejemplo, escribir al revés las palabras.
+
+   * El `cifrado por sustitución
+     <https://es.wikipedia.org/wiki/Cifrado_por_sustituci%C3%B3n>`_ que consiste
+     en remplazar cada carácter por otro distinto del alfabeto. Un ejemplo
+     histórico de este cifrado es el llamado :dfn:`cifrado César` o
+     :dfn:`cifrado por desplazamiento` que consiste en reemplazar cada letra por
+     otra que se encuentra un número fijo de posiciones más adelante en el
+     alfabeto. Recibe su nombre porque `Suetonio
+     <https://es.wikipedia.org/wiki/Suetonio>`_ en su `Vidas de los doce césares
+     <https://es.wikipedia.org/wiki/Vidas_de_los_doce_c%C3%A9sares>`_ cuenta que
+     lo usaba el propio `Julio César
+     <https://es.wikipedia.org/wiki/Julio_C%C3%A9sar>`_ aplicando un
+     desplazamiento de tres posiciones.  En nuestro país, también `Felipe II
+     <https://es.wikipedia.org/wiki/Felipe_II_de_Espa%C3%B1a>`_ usaba un `método
+     de cifrado por sustitución
+     <https://www.lavanguardia.com/cultura/20161226/412829983932/mensajes-encriptados-felipe-ii.html>`_.
+
+**Algoritmo público**
+   que es conocido, pero que para cuya aplicación se requiere un dato (una
+   clave), que es la que se mantiene en secreto. Por consiguiente, el cifrado
+   depende de que esta clave no se robe. Tradicionalmente, la clave se ha
+   almacenado en un archivo regular, quizás cifrado a su vez (esto es,
+   protegido) con una contraseña más sencilla de recordar y teclear, pero los
+   equipos modernos comienzan a incluir un chip |TPM| que se encarga de
+   almacenar estas claves secretas y hacer las operaciones que las involucran a
+   fin de que nunca abandonen el propio chip.
+
+   .. seealso:: Hay un explicación técnica de que és |TPM| `en esta guía en
+      Github <https://google.github.io/tpm-js/#pg_welcome>`_ y alguna
+      explicación adicional para esa guía en `esta respuesta de
+      security.stackexchange.com
+      <https://security.stackexchange.com/questions/257863/what-does-it-mean-to-certify-a-key>`_.
+  
+   A esta estrategia de cifrado, que es la usada modernamente, es a la que
+   dedicaremos el resto del apéndice.
+
+
+.. _crypto-amenazas:
+
+Amenazas
+========
+En la **transmisión de información** entre dos puntos, dos son las **amenazas**
+que ponen en peligro su seguridad:
+
+#. La **intercepción** del mensaje por un tercero no autorizado, que podría
+   explotar dos vulnerabilidades: su *legilibilidad* (y, por tanto, la pérdida de
+   su secreto) y su *modificabilidad*.
+#. La **suplantación** de la identidad del receptor, esto es, que el emisor crea
+   que se está comunicación con alguien, cuando en realidad se está comunicando
+   con otro que se hace pasar por él.
+
+En el **almacenamiento**, sin embargo, la única **amenaza** es la
+**intercepción**, esto es, que un tercero no autorizado acceda al material
+almacenado y pueda **leerlo** o **modificarlo**.
+
+.. _crypto-objetivos:
+
+Objetivos
+=========
+Tres son los objetivos que persigue el tratamiento criptográfico de la
+información:
+
+:dfn:`Confidencialidad` (o **privacidad**),
+   esto es, que la información sólo pueda ser entendida por el receptor al que
+   pretende hacer llegar el mensaje el emisor.
+
+:dfn:`Integridad`,
+   esto es, que la información llegue al destino sin haber sido alterada por
+   terceros durante el proceso de transmisión.
+
+:dfn:`Autenticidad`,
+   esto es, que el receptor sepa con absoluta seguridad que el emisor es quien
+   dice ser. Este hecho junto al de **integridad** permite establecer el
+   concepto de **imposibilidad de rechazo**, o sea, la imposibilidad de que el
+   emisor pueda negar que envió un mensaje que contenía lo que leyó el receptor.
+
+Téngase presente que el segundo y el tercer objetivo están intimamente ligados,
+en la medida en que de poco sirve corroborar la identidad del otro extremo, si no
+se está seguro de que lo que dice se conserva íntegro.
+
+Si relacionamos estos objetivos con las amenazas y las correspondientes
+contramedidas, podemos construir la siguiente tabla:
+
+.. table::
+   :class: obj-seg
+
+   +---------------------+------------------+------------------+-------------------------------------+
+   | Objetivo            | Amenaza          | Contramedida     | Comentario                          |
+   +=====================+==================+==================+=====================================+
+   | Confidencialidad    | Intercepción     | Cifrado          | La ilegibilidad asegura el secreto. |
+   +---------------------+------------------+------------------+-------------------------------------+
+   | Autenticidad        | Suplantación     |                  | La firma certifica tanto la         |
+   +---------------------+------------------+ Firma digital    | identidad del autor original como   |
+   | Integridad          | Modificación     |                  | la invarianza de la información.    |
+   +---------------------+------------------+------------------+-------------------------------------+
+
+.. |TPM| replace:: :abbr:`TPM (Trust Platform Module)`
+
+
+.. rubric:: Notas al pie
+
+.. [#] Originariamente, a fin de hacerlos ininteligibles a terceros no
+   autorizados. Ya veremos, sin embargo, que los usos modernos de la
+   criptografía pueden perseguir otros fines.

@@ -1,0 +1,504 @@
+
+
+<!DOCTYPE html>
+
+<html lang="es" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>2.7.3.2. Capacidades &#8212; documentación de Linuxnomicón - rolling</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/classic.css?v=2bf1fcf8" />
+    <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+    
+    <script src="../../../_static/documentation_options.js?v=a621b78a"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/translations.js?v=f85f4cfb"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <link rel="index" title="Índice" href="../../../genindex.html" />
+    <link rel="search" title="Búsqueda" href="../../../search.html" />
+    <link rel="next" title="2.7.4. Configuración de red" href="../11.red.html" />
+    <link rel="prev" title="2.7.3.1. sudo" href="01.sudo.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             accesskey="I">índice</a></li>
+        <li class="right" >
+          <a href="../11.red.html" title="2.7.4. Configuración de red"
+             accesskey="N">siguiente</a> |</li>
+        <li class="right" >
+          <a href="01.sudo.html" title="2.7.3.1. sudo"
+             accesskey="P">anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" ><span class="section-number">2. </span>Conceptos básicos</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" ><span class="section-number">2.7. </span>Administración básica</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../10.priv.html" accesskey="U"><span class="section-number">2.7.3. </span>Privilegios</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">2.7.3.2. </span>Capacidades</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="capacidades">
+<span id="capabilities-prof"></span><h1><span class="section-number">2.7.3.2. </span>Capacidades<a class="headerlink" href="#capacidades" title="Link to this heading">¶</a></h1>
+<p>Lo fundamental es entender que para que un proceso pueda realizar con éxito una
+determinada llamada del núcleo debe tener habilitada de forma <strong>efectiva</strong> la
+capacidad que permite su invocación. Por ejemplo, analicemos la orden
+<strong class="command">ping</strong> para lo cual hagamos una copia del ejecutable:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>cp<span class="w"> </span>/bin/ping<span class="w"> </span>/tmp
+</pre></div>
+</div>
+<p>Y intentemos usar esta copia para hacer el <em>ping</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>/tmp/ping<span class="w"> </span>-4c1<span class="w"> </span><span class="m">1</span>.1.1.1V
+<span class="go">/tmp/ping: socket: Operación no permitida</span>
+</pre></div>
+</div>
+<p>Nos es imposible. Esto se debe a que tal orden debe abrir un <em>socket</em> y eso
+requiere un privilegio especial: si hubiéramos probado a ejecutar la orden como
+<em>root</em> no habríamos tenido problemas. La capacidad necesaria es <em>CAP_NET_RAW</em>.
+Sin entrar aún en detalles, probemos a hacer que un proceso derivado de este
+ejecutable disponga de esa capacidad:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>setcap<span class="w"> </span><span class="s1">&#39;cap_net_raw=p&#39;</span><span class="w"> </span>/tmp/ping
+</pre></div>
+</div>
+<p>Y si volvemos a probar como usario:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>/tmp/ping<span class="w"> </span>-4c1<span class="w"> </span><span class="m">1</span>.1.1.1
+<span class="go">PING 1.1.1.1 (1.1.1.1) 56(84) bytes of data.</span>
+<span class="go">64 bytes from 1.1.1.1: icmp_seq=1 ttl=64 time=0.621 ms</span>
+
+<span class="go">--- 1.1.1.1 ping statistics ---</span>
+<span class="go">1 packets transmitted, 1 received, 0% packet loss, time 0ms</span>
+<span class="go">rtt min/avg/max/mdev = 0.621/0.621/0.621/0.000 ms</span>
+</pre></div>
+</div>
+<p>¿Qué ha pasado? En este caso, nuestra manipulación produjo que la capacidad
+<em>CAP_NET_RAW</em> estuviera <em>permitida</em> durante la ejecución de un proceso derivado
+de ese ejecutable. La orden, además, está programada para, antes de necesitar la
+capacidad, hacerla efectiva; y eso hace. Tras ello abre el <em>socket</em> y, como ya
+no es necesaria más la capacidad, deja de hacerla efectiva. De este modo, el
+privilegio sólo es efectivo durante el tiempo necesario para realizar la acción.
+¿Qué habria ocurrido si <strong class="command">ping</strong> no estuviera programado así y no hiciera
+efectiva la capacidad?  Simplemente que, como la capacidad no es efectiva, el
+<strong class="command">ping</strong> también habría fallado. Podemos hacer la prueba con
+<a class="reference internal" href="../../../08.redes/06.analisis/01.sniffer.html#tcpdump"><span class="std std-ref">tcpdump</span></a>, que requiere la misma capacidad para monitorizar el
+tráfico, pero no es un programa «<em>capabilities aware</em>» como <strong class="command">ping</strong>,
+esto es, no es capaz de hacer efectiva la capacidad cuando la requiere:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>apt<span class="w"> </span>install<span class="w"> </span>tcpdump
+<span class="gp"># </span>cp<span class="w"> </span>/usr/bin/tcpdump<span class="w"> </span>/tmp/tcpdump
+<span class="gp"># </span>setcap<span class="w"> </span><span class="s1">&#39;cap_net_raw=p&#39;</span><span class="w"> </span>/tmp/tcpdump
+<span class="gp"># </span><span class="nb">exit</span>
+<span class="gp">$ </span>/tmp/tcpdump<span class="w"> </span>-i<span class="w"> </span>eth0<span class="w"> </span>icmp
+<span class="go">tcpdump: eth0: You don&#39;t have permission to capture on that device</span>
+<span class="gp gp-VirtualEnv">(socket: Operation not permitted)</span>
+</pre></div>
+</div>
+<p>En este caso, la capacidad pertinente está permitida; pero como el ejecutable no
+está preparado para hacerla efectiva, la acción falla. Aún, sin embargo, hay una
+solución. Al ejecutable se le puede habilitar un <em>bit</em> para que al comienzo del
+proceso convierta en efectivas todas las capacidades permitidas:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>su<span class="w"> </span>-
+<span class="gp"># </span>setcap<span class="w"> </span><span class="s1">&#39;cap_net_raw=ep&#39;</span><span class="w"> </span>/tmp/tcpdump
+<span class="gp"># </span><span class="nb">exit</span>
+<span class="gp">$ </span>/tmp/tcpdump<span class="w"> </span>-i<span class="w"> </span>eth0<span class="w"> </span>icmp
+<span class="go">tcpdump: verbose output suppressed, use -v or -vv for full protocol decode</span>
+<span class="go">listening on eth0, link-type EN10MB (Ethernet), capture size 262144 bytes</span>
+</pre></div>
+</div>
+<p>De este modo, aunque el ejecutable no esté preparado para manejar capacidades,
+aún podremos realizar la acción como usuario sin privilegios. La
+contraprestacion es que la capacidad será efectiva durante todo el tiempo de
+ejecución del proceso y no sólo cuando es estrictamente necesario. No obstante,
+esto sigue siendo más seguro que ejecutar como administrador el binario
+(gracias, por ejemplo, al <em>setuid</em>).</p>
+<div class="admonition seealso">
+<p class="admonition-title">Ver también</p>
+<p>En <a class="reference external" href="https://en.wikibooks.org/wiki/Grsecurity/Appendix/Capability_Names_and_Descriptions">este apéndice</a>
+puede encontrar una relación de <em>capabilities</em> con una pequeña descripción de
+qué habilita cada una.</p>
+</div>
+<section id="profundizacion">
+<h2><span class="section-number">2.7.3.2.1. </span>Profundización<a class="headerlink" href="#profundizacion" title="Link to this heading">¶</a></h2>
+<p>Afinemos ahora los conocimientos. Los procesos definen cinco conjuntos distintos
+de capacidades. Por ejemplo, para nuestra sesión actual de <strong class="command">bash</strong>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>grep<span class="w"> </span>Cap<span class="w"> </span>/proc/<span class="nv">$BASHPID</span>/status
+<span class="go">CapInh: 0000000000000000</span>
+<span class="go">CapPrm: 0000000000000000</span>
+<span class="go">CapEff: 0000000000000000</span>
+<span class="go">CapBnd: 0000003fffffffff</span>
+<span class="go">CapAmb: 0000000000000000</span>
+</pre></div>
+</div>
+<dl id="pcap-perm">
+<dt><em class="dfn">Permitidas</em> (<em>Permitted</em>)</dt><dd><p>«CaPrm» es el conjunto de capacidades permitidas, esto es, todas las
+capacidades que, llegada la necesidad. el proceso podría hacer efectivas (si
+está preparado en su código para ello como <strong class="command">ping</strong>). El valor
+está codificado en hexadecimal, pero podemos decodificarlo:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>/sbin/capsh<span class="w"> </span>--decode<span class="o">=</span><span class="m">0000000000000000</span>
+<span class="go">0x0000000000000000=</span>
+</pre></div>
+</div>
+<p>Como es lógico, tanto cero significa que no tenemos ninguna capacidad
+permitida en nuestra sesión como usuario sin privilegios.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Si realmente
+queremos probar que la orden anterior nos decodifica los permisos podemos
+probar con algo que no sean todo ceros:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>/sbin/capsh<span class="w"> </span>--decode<span class="o">=</span><span class="m">0000000000000001</span>
+<span class="go">0x0000000000000001=cap_chown</span>
+</pre></div>
+</div>
+<p>De este modo el código <strong>1</strong> equivale a la capacidad <em>CAP_CHOWN</em> que elimina
+las limitaciones en los cambios de propietario y grupo principal de un
+archivo.</p>
+</div>
+</dd>
+</dl>
+<dl class="simple" id="pcap-eff">
+<dt><em class="dfn">Efectivas</em> (<em>Effective</em>)</dt><dd><p>«CapEff» es el conjunto de capacidades que realmente habilitan al proceso
+a hacer una llamada privilegiada. En nuestro caso, no hay ninguna y, además,
+no podrá haber ninguna, porque ninguna está permitida.</p>
+</dd>
+</dl>
+<p>Por ahora lleguemos hasta aquí, ya que con estos privilegios actúa el proceso.
+Ahora bien, ¿cuál será la situación si este proceso ejecuta un binario para
+generar un subproceso? En ese caso, intervienen los tres conjuntos que hasta
+ahora no hemos introducido y, además, las posibles capacidades adicionales que
+hayamos asociado al archivo ejecutable a través de los <a class="reference internal" href="../../../05.discos/04.attr/index.html#xattr"><span class="std std-ref">atributos
+extendidos</span></a>. Mediante los atributos del archivo podemos asociar las
+siguientes capacidades:</p>
+<dl id="cap-perm">
+<dt><em class="dfn">Permitidas</em> (<em>Permited</em>)</dt><dd><p>Que son las capacidades que queremos añadir al conjunto de capacidades
+permitidas del subproceso. Precisamente de este modo fue como la copia de
+<strong class="command">ping</strong> añadió como permitida la capacidad <em>CAP_NET_RAW</em>; y la copia
+de <strong class="command">date</strong>, la capacidad <em>CAP_SYS_TIME</em>.</p>
+<p>Téngase presente que las capacidades permitidas en el proceso padre no se
+transmiten al hijo: se definen de nuevo y uno de los componentes que influyen
+en su definición son estas capacidades permitidas fijadas al ejecutable.</p>
+</dd>
+</dl>
+<dl class="simple" id="cap-eff">
+<dt><em class="dfn">Efectivas</em> (<em>Effective</em>)</dt><dd><p>Es en realidad un <em>bit</em>. Si se activa, todas las capacidades permitidas
+serán efectivas. Este fue el <em>bit</em> que activamos antes en la copia del
+ejecutable <a class="reference internal" href="../../06.conbas/01.hora.html#date"><span class="std std-ref">date</span></a>.</p>
+</dd>
+</dl>
+<dl class="simple" id="cap-inh">
+<dt><em class="dfn">Heredables</em> (<em>Inheritable</em>)</dt><dd><p>Es el conjunto de capacidades que el subproceso aceptará como heredables.</p>
+</dd>
+</dl>
+<p>Introduzcamos, por último, los tres conjuntos de capacidades en los procesos que
+quedaron pendientes y que influyen en las capacidades que tendrán los
+subprocesos:</p>
+<dl id="pcap-bnd">
+<dt><em class="dfn">Limitantes</em> (<em>Bounding</em>)</dt><dd><p>«CapBnd» es el conjunto de capacidades que pueden añadirse al conjunto de
+capacidades permitidas de un subproceso mediante el mecanismo de
+<a class="reference internal" href="#cap-perm"><span class="std std-ref">definir capacidades permitidas sobre el archivo ejecutable</span></a>. O dicho de otro modo, si se añade al ejecutable como capacidad
+permitida una que no está en este conjunto de limitantes, el proceso derivado
+de arrancar tal ejecutable no tendrá permitida esa capacidad.</p>
+<p>En nuestra <em>shell</em> de ejemplo, dentro de este conjunto están todas.
+Precisamente por esto, cuando introdujimos los fundamentos, pudimos hacer que
+<strong class="command">ping</strong> como usuario sin privilegios funcionara. En un principio,
+nuestra copia del ejecutable <strong class="command">ping</strong> generaba un proceso también sin
+ninguna capacidad permitida, por lo que la orden fallaba. Al usar
+<strong class="command">setcap</strong> sobre el ejecutable indujimos que los procesos creados a
+partir de él tuvieran permitida la capacidad <em>CAP_NET_RAW</em>. Pero esto
+funciona porque el proceso padre (la sesión de <strong class="command">bash</strong>) tiene
+incluido en su conjunto de capacidades limitantes tal capacidad:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>/sbin/capsh<span class="w"> </span>--decode<span class="o">=</span>000001ffffffffff<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-o<span class="w"> </span>cap_net_ra
+<span class="go">cap_net_raw</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+<dl id="pcap-amb">
+<dt><em class="dfn">De ambiente</em> (<em>Ambient</em>)</dt><dd><p>«CapAmb» es un conjunto de capacidades que se añadirá automáticamente al
+conjunto de permitidas de un subproceso. Es, pues, otro componente que
+contribuye a definir las capacidades permitidas en el subproceso y que se
+añade al ya visto de las <a class="reference internal" href="#cap-perm"><span class="std std-ref">permitidas sobre el ejecutable</span></a>.</p>
+<p>Este conjunto no es independiente del conjunto de permitidas y del de
+heredables: toda capacidad que esté en este conjunto, debe estar también en
+los otros dos.</p>
+</dd>
+</dl>
+<dl class="simple" id="pcap-inh">
+<dt><em class="dfn">Heredables</em> (<em>Inheritable</em>)</dt><dd><p>Es el conjunto de capacidades que se quiere que el subproceso herede como
+permitidas, siempre que también hayan sido marcadas como tales en el archivo
+ejecutable. Este es el tercer componente que contribuye a definir las
+capaciades permitidas del subproceso.</p>
+</dd>
+</dl>
+<p>Poniendo en forma de ecuaciones el algoritmo, según el manual de
+<em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/capabilities(7)">capabilities(7)</a></em> los conjuntos de capacidades del subproceso se
+calculan así:</p>
+<div class="math notranslate nohighlight">
+\begin{align*}
+   P'_\text{amb} &amp;= (\text{archivo privilegiado}) ? 0 : P_\text{amb} \\
+   P'_\text{perm} &amp;= (P_\text{inh} \: \&amp; \: F_\text{inh}) \: \| \: (F_\text{perm} \: \&amp; \: P_\text{bnd}) \: \| \: P'_\text{amb} \\
+   P'_\text{eff} &amp;= F_\text{eff} ? P'_\text{perm} : P'_\text{amb} \\
+   P'_\text{inh} &amp;= P_\text{inh} \\
+   P'_\text{bnd} &amp;= P_\text{bnd}
+\end{align*}</div><p>donde <span class="math notranslate nohighlight">\(P_{xxx}\)</span> es el conjunto de capacidades «XXX» del proceso padre,
+<span class="math notranslate nohighlight">\(P'_{xxx}\)</span>, el conjunto de capacidades «XXX» del proceso hijo y
+<span class="math notranslate nohighlight">\(F_{xxx}\)</span> las capacidades «XXX» definidas sobre el ejecutable.</p>
+</section>
+<section id="manipulacion">
+<h2><span class="section-number">2.7.3.2.2. </span>Manipulación<a class="headerlink" href="#manipulacion" title="Link to this heading">¶</a></h2>
+<p>Hay dos vías principales para alterar las <em>capabilities</em> desde la línea de
+órdenes:</p>
+<ol class="arabic simple">
+<li><p>Crear un proceso con capacidades definidas a voluntad con <em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/capsh">capsh</a></em>,
+que no trataremos, pero de lo que puede investigarse a través de <a class="reference external" href="https://unix.stackexchange.com/questions/196483/how-do-i-use-capsh-i-am-trying-to-run-an-unprivileged-ping-with-minimal-capabi">este hilo en
+stackexchange</a>.</p></li>
+<li><p>Definir capacidades sobre el ejecutable, que será a lo que dediquemos el
+epígrafe.</p></li>
+</ol>
+<p>En principio, las herramientas para definir capacidades sobre archivos
+ejecutables deben estar ya instaladas en el sistema, puesto que el paquete que
+las contiene (<em>libcap2-bin</em>) es dependencia de <em>systemd</em>.</p>
+<span id="getcap"></span><dl id="index-0">
+<dt><em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/getcap">getcap</a></em></dt><dd><p>Permite comprobar cuáles son las capacidades definidas para un ejecutable:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>/sbin/getcap<span class="w"> </span>/bin/ping
+<span class="go">/bin/ping = cap_net_raw+ep</span>
+</pre></div>
+</div>
+<p>En este caso, el ejecutable <strong class="command">ping</strong> tiene en su conjunto de
+permitidas la capacidad <em>CAP_NET_RAW</em> y, además, tiene habilitado el <em>bit</em>
+para que sea efectivas<a class="footnote-reference brackets" href="#id3" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a>.</p>
+<p>Es posible incluir la opción <kbd class="kbd docutils literal notranslate">-r</kbd> para hacer una consulta recursiva. De
+este modo, la orden:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>getcap<span class="w"> </span>-r<span class="w"> </span>/
+</pre></div>
+</div>
+<p>mostrará cuáles son los archivos que tiene definidas capacidades y cuáles son
+éstas.</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Las capacidades sobre el ejecutable se definen utilizando
+<a class="reference internal" href="../../../05.discos/04.attr/index.html#xattr"><span class="std std-ref">atributos extendidos</span></a>. De hecho, si usamos
+<strong class="command">getfattr</strong>, podremos obtenerlas también, aunque de un modo
+absolutamente críptico:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>getfattr<span class="w"> </span>-m<span class="w"> </span>-<span class="w"> </span>-d<span class="w"> </span>/bin/ping
+<span class="go">getfattr: Eliminando &#39;/&#39; inicial en nombres de ruta absolutos</span>
+<span class="gp"># </span>file:<span class="w"> </span>bin/ping
+<span class="go">security.capability=0sAQAAAgAgAAAAAAAAAAAAAAAAAAA=</span>
+</pre></div>
+</div>
+</div>
+</dd>
+<dt><em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/setcap">setcap</a></em></dt><dd><p>Permite definir las capacidades sobre los ejecutables:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>setcap<span class="w"> </span><span class="s1">&#39;cap_net_raw+ep cap_net_admin+eip&#39;</span><span class="w"> </span>/tmp/ping
+</pre></div>
+</div>
+<p>Téngase presente que «e» representa un <em>bit</em>, no un conjunto, por lo que, si
+se utiliza, se tendrá que utilizar con todas las capacidades. En una misma
+orden se pueden definir capacidades para varios archivos basta con ir
+añadiendo sucesivamente cadenas de definición y archivos:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>setcap<span class="w"> </span><span class="s1">&#39;cap1&#39;</span><span class="w"> </span>fichero1<span class="w"> </span><span class="s1">&#39;cap2&#39;</span><span class="w"> </span>fichero2<span class="w"> </span>...<span class="w"> </span><span class="s1">&#39;capN&#39;</span><span class="w"> </span>ficheroN
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>La cadena de las capacidades no se añade a las que ya estén definidas</p>
+</div>
+<p>Si se quieren eliminar las capacidades, debe usarse la opción <kbd class="kbd docutils literal notranslate">-r</kbd>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>setcap<span class="w"> </span>-r<span class="w"> </span>/tmp/ping
+</pre></div>
+</div>
+</dd>
+<dt><code class="file docutils literal notranslate"><span class="pre">/proc/&lt;PID&gt;/status</span></code></dt><dd><p>Para revisar las capacidades que tiene un proceso, puede consultarse su
+archivo de estatus correspondiente. Por ejemplo, las capacidades definidas
+sobre la <em>shell</em> actual pueden obtenerse así:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>grep<span class="w"> </span>Cap<span class="w"> </span>/proc/<span class="nv">$BASHPID</span>/status
+<span class="go">CapInh: 0000000000000000</span>
+<span class="go">CapPrm: 0000000000000000</span>
+<span class="go">CapEff: 0000000000000000</span>
+<span class="go">CapBnd: 0000003fffffffff</span>
+<span class="go">CapAmb: 0000000000000000</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+<dl id="pam-cap">
+<dt><strong class="program">pam_cap</strong></dt><dd><p>Permite definir capacidades heredables para la sesión de los usuarios
+indicados. La instalación y configuración inicial están automatizadas en
+<em>Debian</em>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>apt<span class="w"> </span>install<span class="w"> </span>libpam-cap
+</pre></div>
+</div>
+<p>Y sólo queda definir dentro de <code class="file docutils literal notranslate"><span class="pre">/etc/security/capability.conf</span></code> (véase
+<em class="manpage"><a class="manpage reference external" href="https://manpages.debian.org/capability.conf">capability.conf</a></em>) para qué usuarios cuáles son las capacidades que
+se definirán como heredables. Por ejemplo, si en el archivo añadimos:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>cap_net_raw          usuario
+</pre></div>
+</div>
+<p>entonces «usuario» tendrá para sus procesos la capacidad <em>CAP_NET_RAW</em>
+incluida en el conjunto de heredables.</p>
+<div class="admonition warning">
+<p class="admonition-title">Advertencia</p>
+<p>Para que la adición tenga efecto, debe incluirse <strong>antes</strong> de la
+línea:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>none              *
+</pre></div>
+</div>
+</div>
+<p>La cuestión fundamental es ¿para qué sirve exactamente esto si es el conjunto
+de permitidas/efefctivas el  que tiene efecto en los subprocesos que podemos
+ejecutar como usuario sin privilegios (p.e. una orden ejecutada en nuestra
+sesión interactiva de <strong class="command">bash</strong>).</p>
+<p>La principal utilidad es limitar a quiénes se les conceden las capacidades al
+utilizar un ejecutable. Ilustrémoslo con el ejecutable <a class="reference internal" href="../../../08.redes/06.analisis/01.sniffer.html#tcpdump"><span class="std std-ref">tcpdump</span></a>. Este es un ejecutable que, en principio, no tiene definida
+ninguna capacidad:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>/sbin/getcap<span class="w"> </span>/usr/bin/tcpdump
+</pre></div>
+</div>
+<p>Si quiéramos que nuestro usuariospudiera capturar tráfico de la interfaz
+podríamos hacer:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>setcap<span class="w"> </span><span class="s1">&#39;cap_net_raw+ep&#39;</span><span class="w"> </span>/usr/bin/tcpdump
+</pre></div>
+</div>
+<p>pero permitiría a todos los usuarios monitorizar<a class="footnote-reference brackets" href="#id4" id="id2" role="doc-noteref"><span class="fn-bracket">[</span>2<span class="fn-bracket">]</span></a>. Una solución más
+restrictiva es marcar como heredable en <strong class="program">pam_cap</strong> la capacidad
+<em>CAP_NET_RAW</em> para nuestro usuarios y en el ejecutable definir lo siguiente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>setcap<span class="w"> </span><span class="s1">&#39;cap_net_raw+ei&#39;</span><span class="w"> </span>/usr/bin/tcpdump
+</pre></div>
+</div>
+<p>Como la capacidad permitente esta en el conjunto de heredables del proceso
+(la sesión de <strong class="program">bash</strong>) y también en el del ejecutable, en el
+subproceso (<strong class="command">tcpdump</strong>) la capacidad estará en el conjunto de
+permitidas (véase en las ecuaciones que indicamos que es uno de los
+componentes que definen las permitidas del subproceso). Y por mor del <em>bit</em>
+de efectivas, también estará en el conjunto de efectivas. Pero esto sólo
+ocurrirá para aquellos usuarios que hayamos configurado a través de
+<strong class="program">pam_cap</strong>, y no para todos.</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Como consejo, si se quiere comprobar cómo una configuración de
+capacidades afecta a las de un proceso, puede hacerse una copia de la orden
+<a class="reference internal" href="../../07.avanzada/07.concatenacion.html#sleep"><span class="std std-ref">sleep</span></a> en el directorio temporal. Esta orden tiene la ventaja
+de que se puede hacer que dure su ejecución el tiempo que nos parezca
+conveniente:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>cp<span class="w"> </span>/usr/bin/sleep<span class="w"> </span>/tmp/sleep
+<span class="gp"># </span>setcap<span class="w"> </span><span class="s1">&#39;cap_sys_time+ep&#39;</span><span class="w"> </span>/tmp/sleep
+<span class="gp">$ </span>/tmp/sleep<span class="w"> </span><span class="m">120</span><span class="w"> </span>&gt;<span class="w"> </span>/dev/null<span class="w"> </span><span class="p">&amp;</span>
+<span class="go">[1] 2136</span>
+<span class="gp">$ </span>grep<span class="w"> </span>Cap<span class="w"> </span>/proc/2136/status
+<span class="go">CapInh: 0000000000000000</span>
+<span class="go">CapPrm: 0000000002000000</span>
+<span class="go">CapEff: 0000000002000000</span>
+<span class="go">CapBnd: 0000003fffffffff</span>
+<span class="go">CapAmb: 0000000000000000</span>
+<span class="gp">$ </span>/sbin/capsh<span class="w"> </span>--decode<span class="o">=</span><span class="s1">&#39;0000000002000000&#39;</span>
+<span class="go">0x0000000002000000=cap_sys_time</span>
+</pre></div>
+</div>
+</div>
+<p class="rubric">Enlaces de interés</p>
+<ol class="arabic simple">
+<li><p><a class="reference external" href="https://clibre.io/blog/por-secciones/hardening/item/417-capabilities-compartimentar-al-todopoderoso-root">Capabilities - Compartimentar al todopoderoso root</a>.</p></li>
+<li><p><em>Linux Capabilities</em>: <a class="reference external" href="https://blog.container-solutions.com/linux-capabilities-why-they-exist-and-how-they-work">Part 1: Why They Exist and How They Work</a>
+y <a class="reference external" href="https://blog.container-solutions.com/linux-capabilities-in-practice">Part 2: Linux Capabilities In Practice</a>.</p></li>
+</ol>
+<p class="rubric">Notas al pie</p>
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="id3" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
+<p>Pese a que ya hemos visto que este <em>bit</em> no es necesario para este
+ejeecutable, puesto que es <em>capabilities aware</em>.</p>
+</aside>
+<aside class="footnote brackets" id="id4" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id2">2</a><span class="fn-bracket">]</span></span>
+<p>Ciertamente podríamos restringir permisos para evitar que todos los
+usuarios ejecutaran el programa, pero <a class="reference internal" href="../../../08.redes/06.analisis/01.sniffer.html#tcpdump"><span class="std std-ref">tcpdump</span></a> sirve también
+para analizar archivos <code class="file docutils literal notranslate"><span class="pre">.pcap</span></code> y vetaríamos esta posibilidad que no req
+uiere privilegio alguno.</p>
+</aside>
+</aside>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="../../../index.html">Tabla de contenido</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">2.7.3.2. Capacidades</a><ul>
+<li><a class="reference internal" href="#profundizacion">2.7.3.2.1. Profundización</a></li>
+<li><a class="reference internal" href="#manipulacion">2.7.3.2.2. Manipulación</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Tema anterior</h4>
+    <p class="topless"><a href="01.sudo.html"
+                          title="capítulo anterior"><span class="section-number">2.7.3.1. </span><strong class="command">sudo</strong></a></p>
+  </div>
+  <div>
+    <h4>Próximo tema</h4>
+    <p class="topless"><a href="../11.red.html"
+                          title="próximo capítulo"><span class="section-number">2.7.4. </span>Configuración de red</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>Esta página</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../../_sources/02.conbas/09.admbasica/10.priv/02.capabilities.rst.txt"
+            rel="nofollow">Mostrar el código</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Búsqueda rápida</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Ir a" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navegación</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="Índice General"
+             >índice</a></li>
+        <li class="right" >
+          <a href="../11.red.html" title="2.7.4. Configuración de red"
+             >siguiente</a> |</li>
+        <li class="right" >
+          <a href="01.sudo.html" title="2.7.3.1. sudo"
+             >anterior</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" ><span class="section-number">2. </span>Conceptos básicos</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="../index.html" ><span class="section-number">2.7. </span>Administración básica</a> &#187;</li>
+          <li class="nav-item nav-item-3"><a href="../10.priv.html" ><span class="section-number">2.7.3. </span>Privilegios</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">2.7.3.2. </span>Capacidades</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright CC BY 4.0, 2016-2025, José Miguel Sánchez Alés.
+      Creado usando <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    </div>
+  </body>
+</html>

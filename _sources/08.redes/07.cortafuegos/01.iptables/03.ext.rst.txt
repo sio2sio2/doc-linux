@@ -1,0 +1,400 @@
+.. _iptables-ext:
+
+Extensiones
+***********
+:program:`iptables` dispone de algunas extensiones que amplían enormemente las
+posibilidades del cortafuegos. Repasaremos las más interesantes
+
+.. _iptables-limit:
+
+limit
+=====
+En general, las extensiones de limitación (*limit*, *connlimit*, *haslimit*)
+permiten establecer límites en el flujo de paquetes.
+
+.. table:: 
+   :class: iptables-ext
+
+   +-----------+--------------------------------------------------------------------------------------------------------------------+
+   | Extensión | Opción                                                                                                             |
+   +===========+====================================================================================================================+
+   | limit     | Límita el flujo de paquetes.                                                                                       |
+   |           +-------------------+------------------------------------------------------------------------------------------------+
+   |           | --limit           | Ratio máximo admisible.                                                                        |
+   |           +-------------------+------------------------------------------------------------------------------------------------+
+   |           | --limit-burst     | Ráfaga mayor admisible.                                                                        |
+   |           |                   +------------------------------------------------------------------------------------------------+
+   |           |                   | iptables -A FORWARD -i eth0 -p tcp --syn -m limit --limit 5/s --limit-burst 10 -j ACCEPT       |
+   +-----------+-------------------+------------------------------------------------------------------------------------------------+
+   | hashlimit | Limita el flujo de paquetes considerando el origen y el destino.                                                   |
+   |           +-------------------+------------------------------------------------------------------------------------------------+
+   |           | --hashlimit-mode  | Qué parámetros se consideran para definir la condición entre *srcip*, *srcport*, *dstip* y     |
+   |           |                   | *dstport*. Si no se especifica, el módulo se comporta como ``limit``.                          |
+   |           +-------------------+------------------------------------------------------------------------------------------------+
+   |           | --hashlimit-upto  | Ratio máximo admisible.                                                                        |
+   |           +-------------------+------------------------------------------------------------------------------------------------+
+   |           | --hashlimit-burst | Ráfaga maypr admisible.                                                                        |
+   |           |                   +------------------------------------------------------------------------------------------------+
+   |           |                   | iptables -A FORWARD -m conntrack --ctstate DNAT -m hashlimit  --hashlimit-upto 5/s             |
+   |           |                   | --hashlimit-burst 10 --haslimit-mode srcip,dstip -j ACCEPT                                     |
+   +-----------+-------------------+------------------------------------------------------------------------------------------------+
+   | connlimit | Límite de conexiones simultáneas.                                                                                  |
+   |           +-------------------+------------------------------------------------------------------------------------------------+
+   |           | --connlimit-upto  | Número máximo de conexiones simultáneas con un mismo cliente.                                  |
+   |           |                   +------------------------------------------------------------------------------------------------+
+   |           |                   | iptables -A FORWARD -m conntrack --ctstate DNAT -m connlimit --connlimit-upto 3 -j ACCEPT      |
+   +-----------+-------------------+------------------------------------------------------------------------------------------------+
+
+*limit* y *hashlimit* funcionan de forma semenjante: se establece un ratio medio
+(``--limit``, ``--hashlimit-upto``) y un límite máximo para las ráfagas
+(``--limit-burst``, ``--hashlimit-burst``) y el sistema funciona de forma
+semejante a como lo haría un embudo:
+
+.. image:: files/limit.png
+
+El ratio representa el caudal de desagüe, pero el embudo posee un vaso que
+permite verter puntualmente más agua hasta un límite máximo. Cada paquete viene
+representado en el dibujo por una bolita, de modo que se pueden acomular como
+máximo el número de paquetes indicado con ``--limit-burst``, lo que permite
+absorber una ráfaga intensa.
+
+.. seealso:: Una aplicación práctica del uso de este módulo puede verse bajo el
+   :ref:`epígrafe dedicado a ataques DoS <dos-limit>`.
+
+.. _ipt-ipset:
+
+set
+===
+:kbd:`-s` o :kbd:`-d` permiten establecer condiciones al origen o el destino de
+los paquetes, pero admiten un argumento individual que a lo más nos permite
+expresar una red. Sin embargo, hay ocasiones en que nuestro propósito es referir
+un conjunto heterogéneo de direcciones (un caso típico es el del *software* :ref:`fail2ban <fail2ban>`
+que veta accesos según detecta ataques). En estos casos, el número de
+direcciones |IP| puede ser considerable y, como cada dirección, requerirá una regla,
+el número de reglasd, también.
+
+El módulo *set* junto a la orden :program:`ipset` permite definir conjuntos de
+direcciones o puertos a los que dinámicamente se pueden ir añadiendo o
+eliminando integrantes; y que una única regla se limite a pedirle a
+:program:`iptables` que busque dentro del conjunto.
+
+Por ejemplo, supongamos que queremos permitir el acceso al servidor desde
+nuestras redes locales, lo cual sin el módulo sería así::
+
+   # iptables -A INPUT -s 192.168.128.0/24 -j ACCEPT
+   # iptables -A INPUT -s 192.168.129.0/24 -j ACCEPT
+   # iptables -A INPUT -s 192.168.130.0/24 -j ACCEPT
+   # iptables -A INPUT -s 192.168.134.0/24 -j ACCEPT
+   # iptables -A INPUT -s 192.168.135.0/24 -j ACCEPT
+
+Ciertamente en este caso particular podríamos haber reducido las reglas jugando
+con las máscaras, pero el caso es que salen varias líneas de reglas y si otro
+fuera el caso, podrían ser miles. En cambio, si definiéramos, como se verá más
+adelante, un conjunto *hash:net* con :program:`ipset` que contuviera todas esas
+redes, nos bastaría la siguiente regla::
+
+   # iptables -A INPUT -m set --match-set miredeslocales src -j ACCEPT
+
+donde la creación del conjunto "*miredeslocales*" y la gestión de las redes
+que contiene se hace a través del command:`ipset`. Esto permite trabajar de
+forma más clara y eficiente.
+
+.. _ipset:
+.. index:: ipset
+
+.. rubric:: ipset
+
+:command:`ipset` no forma parte de la instalación base, por lo que es necesaria
+su instalación manual::
+
+   # apt install ipset
+
+Lo más básico y previo a cualquier uso es ser capaz de crear un conjunto, lo
+cual se hace a través del subcomando *create*::
+
+   ipset create <tipo_conjunto> <nombre_conjunto> <opciones_de_creacion>
+
+donde *tipo de conjunto* indica qué valores contendrá. Por ejemplo, si
+quisiéramos almacenar simplemente una lista de redes, el tipo sería *hash:net*.
+En cambio, si dispusiéramos una lista de direcciones |IP|, podríamos usar
+*hash:ip*. Los conjuntos pueden ser algo más complejos. Por ejemplo, quizás
+quermos almacenar una lista de tuplas (|IP|, puerto); para lo cual existe el
+tipo *hash:ip,port*. Hay diversos tipos de conjuntos que pueden consultarse con
+la opción :kbd:`--help` de :command:`ipset` o en su página del manual.
+
+También pueden incluirse *opciones de creación* que alteran el comportamiento
+del conjunto. Una muy útil es *timeout*, que permite indicar el tiempo en
+segundos que durará la entrada en el conjunto. Por ejemplo::
+
+   # ipset create bannedip hash:ip timeout 120
+
+crea un conjunto llamado *bannedip* que contiene direcciones |IP|, las cuales se
+mantendrán en él durante dos minutos. Si no se hubiera añadido la opción, las
+direcciones se habrían mantenido indefinidamente a menos que las
+elimináramos manualmente. Para consultar el conjunto que acabamos de crear::
+
+   # ipset list bannedip
+   Name: bannedip
+   Type: hash:ip
+   Revision: 3
+   Header: family inet hashsize 1024 maxelem 65536 timeout 120
+   Size in memory: 16504
+   References: 0
+   Members:
+
+Hecho esto, pueden añadirse |IP|\ s al conjunto::
+
+   # ipset add bannedip 80.80.80.80
+   # ipset add bannedip 80.80.80.81
+   # ipset add bannedip 80.80.80.82
+   # ipset add bannedip 80.80.80.80
+   ipset v6.23: Element cannot be added to the set: it's already added
+
+Hemos añadido tres ips y la cuarta, al estar repetida, no. Si volvemos a
+consultar el conjunto veremos lo siguiente::
+
+   # ipset list bannedip
+   Name: bannedip
+   Type: hash:ip
+   Revision: 3
+   Header: family inet hashsize 1024 maxelem 65536 timeout 120
+   Size in memory: 16744
+   References: 0
+   Members:
+   80.80.80.81 timeout 94
+   80.80.80.82 timeout 94
+   80.80.80.80 timeout 92
+
+O sea, lo mismo de antes y, además, los ips incluidas en el conjunto y el tiempo
+que falta para que salgan de él. Si esperamos lo suficiente::
+
+   # ipset list bannedip
+   Name: bannedip
+   Type: hash:ip
+   Revision: 3
+   Header: family inet hashsize 1024 maxelem 65536 timeout 120
+   Size in memory: 16744
+   References: 0
+   Members:
+
+habrán desaparecido. Cuando al conjunto se le incluyó un tiempo de eliminación
+predeterminado, se puede añadir entradas que tengan otro distinto::
+
+   # ipset add bannedip 80.80.80.80 timeout 86400
+   # ipset list bannedip
+   Name: bannedip
+   Type: hash:ip
+   Revision: 3
+   Header: family inet hashsize 1024 maxelem 65536 timeout 120
+   Size in memory: 16584
+   References: 0
+   Members:
+   80.80.80.80 timeout 86397
+
+Además, si se incluye la opción :kbd:`-exist` y la entrada ya existe, en vez de generar
+un error, se reseteará el contador de tiempo::
+
+   # ipset -exist add bannedip 80.80.80.80
+   # ipset list bannedip
+   Name: bannedip
+   Type: hash:ip
+   Revision: 3
+   Header: family inet hashsize 1024 maxelem 65536 timeout 120
+   Size in memory: 16584
+   References: 0
+   Members:
+   80.80.80.80 timeout 118
+
+Del mismo modo que creamos un conjunto, podemos destruirlo::
+
+   # ipset destroy bannedip
+
+.. rubric:: Uso del módulo
+
+La utilidad de crear conjuntos está en usarlos en las reglas de
+:program:`iptables` mediante el módulo *set*:
+
+.. table::
+   :class: iptables-ext
+
+   +-----------+--------------------+--------------------------------------------------------------------------------+
+   | Extensión | Opción             | Descripción                                                                    |
+   +===========+====================+================================================================================+
+   | set       | --match-set        | Comprueba si el dato se encuentre en el conjunto. Debe añadirse el             |
+   |           |                    | nombre del conjunto y :kbd:`src` o :kbd:`dst` indican si se tomarán            |
+   |           |                    | datos de origen o destino.                                                     |
+   |           |                    +--------------------------------------------------------------------------------+
+   |           |                    | iptables -A INPUT -m set --match-set bannedip src -j DROP                      |
+   |           +--------------------+--------------------------------------------------------------------------------+
+   |           | --return-nomatch   | Invierte el resultado de la operación.                                         |
+   |           |                    +--------------------------------------------------------------------------------+
+   |           |                    | iptables -A INPUT -M set --match-set bannedip --return-nomatch src -j DROP     |
+   +-----------+--------------------+--------------------------------------------------------------------------------+
+
+Además, se define un objeto que permite manipular el contenido de los conjuntos,
+lo cual posibilita gestionarlos de forma dinámica según analice
+:program:`iptables` el tráfico:
+
+.. table::
+   :class: iptables-objetivo
+
+   +--------+------------+-----------------------------------------------------------------------------------------+
+   | Tabla  | Objetivo   | Descripción                                                                             |
+   +========+============+============+============================================================================+
+   | Todas  | SET        | --add-set  | Añade un dato al conjunto. Debe expresarse el nombre del conjunto y si     |
+   |        |            |            | son datos de origen o destino. Para el ejemplo se supondrá que             |
+   |        |            |            | *bannedconn* es de tipo *hash:ip,port*.                                    |
+   |        |            |            +----------------------------------------------------------------------------+
+   |        |            |            | iptables -A INPUT -m mark --mark 0x1 -j SET --add-set bannedconn src,dst   |
+   |        |            +------------+----------------------------------------------------------------------------+
+   |        |            | --del-set  | Elimina una entrada del conjunto.                                          |
+   |        |            |            +----------------------------------------------------------------------------+
+   |        |            |            | iptables -A INPUT -m mark --mark 0x2 -j SET --del-set bannedconn src,dst   |
+   |        |            +------------+----------------------------------------------------------------------------+
+   |        |            | --timeout  | Añade un tiempo de vida a la entrada distinto al predefinido del conjunto. |
+   |        |            |            +----------------------------------------------------------------------------+
+   |        |            |            | iptables -A INPUT -m mark --mark 1 -j SET --add-set bip src --timeout 120  |
+   |        |            +------------+----------------------------------------------------------------------------+
+   |        |            | --exist    | Al añadir la entrada, resetea el contador de tiempo si esta ya existía.    |
+   |        |            |            +----------------------------------------------------------------------------+
+   |        |            |            | iptables -A INPUT -m mark --mark 0x1 -j SET --add-set bannedip src --exist |
+   +--------+------------+------------+----------------------------------------------------------------------------+
+
+.. _iptables-recent:
+
+recent
+======
+*recent* es un módulo de iptables que permite crear una lista dinámica con las
+direcciones |IP| (en principio, direcciones |IP| de origen) que establecen
+conexión con nuestro servidor y toma decisiones en base a ello. Por ello, es
+útil para poner en práctica tanto el *port-knocking* como la *limitación de
+accesos*. Antes de ello, estudiemos brevemente las posibilidades del módulo:
+
+.. note:: En todos los casos, la |IP| es la de origen.
+
+.. table::
+   :class: iptables-ext
+
+   +-----------+----------------------+--------------------------------------------------------------------------------+
+   | Extension | Opción               | Descripción                                                                    |
+   +===========+======================+================================================================================+
+   | recent    | --set                | Añade la dirección |IP| a la lista o actualiza la entrada si ya estaba.        |
+   |           |                      +--------------------------------------------------------------------------------+
+   |           |                      | iptables -A INPUT -i eth0 -p icmp -m recent --set -j DROP                      |
+   |           +----------------------+--------------------------------------------------------------------------------+
+   |           | --rcheck             | Comprueba si la dirección |IP| se encuentra en la lista                        |
+   |           |                      +--------------------------------------------------------------------------------+
+   |           |                      | iptables -A INPUT -i eth0 -m recent --rcheck -j DROP                           |
+   |           +----------------------+--------------------------------------------------------------------------------+
+   |           | --update             | Además de comprobar, actuailiza la lista para añadir el instante de tiempo     |
+   |           |                      | como la última vez que se ha visto la |IP|.                                    |
+   |           |                      +--------------------------------------------------------------------------------+
+   |           |                      | iptables -A INPUT -i eth0 -m recent --update -j DROP                           |
+   |           +----------------------+--------------------------------------------------------------------------------+
+   |           | --remove             | Elimina la |IP| de la lista.                                                   |
+   |           |                      +--------------------------------------------------------------------------------+
+   |           |                      | iptables -A INPUT -i eth0 -m recent --remove -j DROP                           |
+   |           +----------------------+--------------------------------------------------------------------------------+
+   |           | --name <NOMBRE>      | Indica el nombre de la lista. Si no incluye, la lista es "DEFAULT".            |
+   |           |                      +--------------------------------------------------------------------------------+
+   |           |                      | iptables -A INPUT -i eth0 -p icmp -m recent --set --name PING -j DROP          |
+   |           +----------------------+--------------------------------------------------------------------------------+
+   |           | --seconds <SEGUNDOS> | Restringe la búsqueda en la lista sólo a los últimos segundos que se           |
+   |           |                      | especifique. Por tanto, si se añade, :code:`--seconds 60`, la coincidencia     |
+   |           |                      | sólo se producirá si se añadió la |IP| en el último minuto.                    |
+   |           +----------------------+--------------------------------------------------------------------------------+
+   |           | --hitcount <N>       | La búsqueda tendrá éxito sólo si la dirección se encuentra en la lista el      |
+   |           |                      | número de veces indicado. Por supuesto, puede usar en conjunción con           |
+   |           |                      | :kbd:`--seconds`.                                                              |
+   |           +----------------------+--------------------------------------------------------------------------------+
+   |           | --reap               | Usado en conjunción con :kbd:`--seconds` provoca que se eliminen de la lista   |
+   |           |                      | las entradas de la |IP| anteiores al periodo de tiempo indicado.               |
+   |           +----------------------+--------------------------------------------------------------------------------+
+   |           | --rdest              | Usa la |IP| de destino, en vez de de la de origen.                             |
+   |           +----------------------+--------------------------------------------------------------------------------+
+   |           | --mask <MASCARA>     | Máscara que debe aplicarse a la lista de direcciones.                          |
+   +-----------+----------------------+--------------------------------------------------------------------------------+
+
+Tengase en cuenta que:
+
+* :kbd:`--set`, :kbd:`--update`, :kbd:`--remove`, además de condiciones,
+  provocan la manipulación de la lista. Como condiciones, :kbd:`--set` siempre
+  devuelve verdadero; :kbd:`--remove` y :kbd:`--update`, verdadero si la |IP|
+  estaba en la lista.
+
+* Cuando se comprueba si la entrada existe (:kbd:`--rcheck` o :kbd:`-update`)
+  es posible añadir :kbd:`--seconds`, :kbd:`--hitcount` y :kbd:`--reap`.
+
+Por otro lado, la listas pueden consultarse dentro del directorio
+:file:`/proc/net/xt_recent/` e incluso aplicar manualmente modificaciones sobre
+ellas según lo que expone la `página de manual
+<http://ipset.netfilter.org/iptables-extensions.man.html#lbBW>`_.
+
+Para ilustrar el uso, tomemos y comentemos un par de ejemplos inspirados en los
+de la documentación oficial:
+
+.. rubric:: Ejemplo 1
+
+.. code-block:: bash
+
+   iptables -A INPUT -m recent --rcheck --seconds 120 -j DROP
+   iptables -A INPUT -i eth0 -p icmp -m recent --set -j DROP
+
+Con estas reglas, si una máquina cualquiera intentos hacernos :command:`ping`
+por primera vez, la primera regla se evalúa a falso, ya que la |IP| no se
+encuentra aún en la lista *DEFAULT*. En consecuencia, este primer paquete prueba
+la segunda regla y al ser un paquete *ping* provocará la inclusión en la lista
+de la |IP| y, además, se rechazará el paquete, ya que ``--set`` siempre se
+evalúa a verdadero. A partir de la recepción de este paquete |ICMP| y durante 2
+minutos cualquier paquete procedente de esta |IP|, sea de la naturaleza que sea,
+se rechazará al toparse con la primera regla. Pasados los dos minutos, la
+primera regla se evaluará a falso para paquetes procedentes de la esa |IP| y
+sólo si vuelve a mandar un paquete |ICMP|, volveremos a vetar la dirección.
+
+En conclusión: si a una máquina se le ocurre mandarnos un paquete |ICMP| no
+podrá comunicarse con nosotros durante dos minutos.
+
+Para **comprobar** cómo funciona, podemos probar a hacer una conexión |SSH| a
+esta máquina (|IP| *192.168.1.239*) desde otra máquina (de |IP| *192.168.1.240*):
+deberíamos acceder sin problemas, supuesto que haya un servidor |SSH| instalado,
+claro está. Ahora bien, si hacemos desde *192.168.1.240* un :command:`ping`::
+
+   $ ping -c1 -W1 192.168.1.239
+
+No recibiremos respuesta (ya que la segunda regla lo impide) y además habremos
+metido a la dirección de origen en la lista::
+
+   # cat /proc/net/xt_recent/DEFAULT 
+   src=192.168.1.240 ttl: 1 last_seen: 4296132894 oldest_pkt: 1 4296132894
+
+A partir de este momento y durante dos minutos, no podremos conectar desde
+*192.168.1.240*. Si esperamos, volveremos a poder acceder por |SSH| a menos que
+en algún momento se nos ocurra volver a hacer un :command:`ping`.
+
+.. rubric:: Ejemplo 2
+
+.. code-block:: bash
+
+   iptables -A INPUT -m recent --update --seconds 120 -j DROP
+   iptables -A INPUT -i eth0 -p icmp -m recent --set -j DROP
+
+El segundo ejemplo es semejante, pero al sustituir ``--rcheck`` por ``--update``
+cualquier paquete que envíe la dirección |IP| renovará la entrada en la lista y,
+en consecuencia, la |IP| sólo dejará de estar vetada si pasa dos minutos sin
+enviarnos ningún paquete.
+
+.. seealso:: Aplicaciones prácticas del uso de este módulo pueden consultarse
+   :ref:`bajo el epígrafe dedicado a los ataques de fuerza bruta <iptables-bruta>`.
+
+.. _iptables-log:
+
+Registro
+========
+
+.. Logs alternativos:
+   nlog y ulogd2
+   https://unix.stackexchange.com/questions/342855/how-to-customize-the-format-of-iptable-log-info
+   https://wiki.wireshark.org/CaptureSetup/NFLOG
+   http://www.luispa.com/archivos/704
+
+.. |ICMP| replace:: :abbr:`ICMP (Internet Control Message Protocol)`

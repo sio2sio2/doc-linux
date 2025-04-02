@@ -1,0 +1,164 @@
+.. _ss:
+.. index:: ss
+
+Conexiones
+==========
+Es más que conveniente conocer cuáles son las conexiones establecidas por
+nuestro servidor o cuáles son los puertos por los que escucha algún servicio. El
+comando que se encarga de ello es :command:`ss`.
+
+Su sintaxis general es::
+
+   ss [opciones] [filtro]
+
+Las *opciones* nos permiten, por un lado, alterar su comportamiento y, por otro,
+afinar cuáles son las conexiones que deseamos ver, mientras que el *filtro* nos
+permite lo segundo, pero de una manera mucho más exhaustiva.
+
+.. rubric:: Opciones:
+
+**-s**
+   Muestra un resumen de todas las conexiones::
+
+      $ ss -s
+      Total: 514
+      TCP:   10 (estab 2, closed 2, orphaned 0, timewait 0)
+
+      Transport Total     IP        IPv6
+      RAW       0         0         0        
+      UDP       6         3         3        
+      TCP       8         5         3        
+      INET      14        8         6        
+      FRAG      0         0         0
+
+**-n**
+   Hace que en los resultados se muestren números de puerto y no los nombres del
+   servicio asociado a ese puerto\ [#]_, es decir, que aparezca **80** en vez de
+   *http*::
+
+      $ ss -4lt 
+      State       Recv-Q       Send-Q              Local Address:Port   Peer Address:Port       
+      LISTEN      0            128                       0.0.0.0:ssh    0.0.0.0:*          
+      LISTEN      0            100                     127.0.0.1:smtp   0.0.0.0:*
+      $ ss -4ltn 
+      State       Recv-Q       Send-Q              Local Address:Port   Peer Address:Port       
+      LISTEN      0            128                       0.0.0.0:22     0.0.0.0:*          
+      LISTEN      0            100                     127.0.0.1:25     0.0.0.0:*
+
+**-a**/**-l**
+   Muestra todas las conexiones o sólo aquellas que son de escucha. En el
+   ejemplo ilustrativo anterior, usamos **-l** y descubrimos que tenemos a la
+   escucha el servicio |SSH| y un servidor de correo, pero sólo para entrega
+   local, ya que escucha únicamente en la interfaz de *loopback*.
+
+**-4/-6**
+   Muestra conexiones IPv4 o IPv6. En el ejemplo anterior, sólo se muestran las
+   conexiones de IPv4.
+
+**-p**
+   Añade a la salida cuál es el proceso local que escucha o establece la
+   conexión.
+  
+   .. warning:: Sólo funciona si la orden se ejecuta cómo administrador. 
+
+
+.. rubric:: Filtros:
+
+Aunque las opciones anteriores permiten seleccionar conexiones (p.e. sólo las
+que sean de IPv4), puede añadirse también un filtro que selecciona según
+aspectos más particulares como el número de puerto, la |IP| de conexión o el
+estado de la conexión. Nos centraremos en seleccionar según puerto, dirección
+|IP| o estado:
+
+#. Puertos |TCP| en escucha de IPv4 (esto lo determinan las opciones), cuya
+   interfaz de escucha sea la de *localhost*::
+
+      $ ss -4ltn 'src 127.0.0.1'
+      State       Recv-Q       Send-Q              Local Address:Port   Peer Address:Port       
+      LISTEN      0            100                     127.0.0.1:25     0.0.0.0:*
+
+#. Ídem, pero cuya interfaz de escucha **no** sea la de *localhost*::
+
+      $ ss -4ltn 'not src 127.0.0.1'
+      State       Recv-Q       Send-Q              Local Address:Port   Peer Address:Port       
+      LISTEN      0            128                       0.0.0.0:22     0.0.0.0:*          
+
+#. Conexiones IPv4 realizadas desde la propia máquina al servidor |SSH| externo
+   *80.80.80.80*::
+
+      $ ss -4tn 'dst 80.80.80.80:22'
+
+   También pueden usarse el nombre de servicio asociado::
+
+      $ ss -4tn 'dst 80.80.80.80:ssh'
+
+   .. note:: Al usar direcciones puede usarse la notación |CIDR| para hacer
+      referencia a toda una red. Por ejemplo::
+
+         $ ss -4tn 'dst 80.0.0.0/8:ssh'
+
+#. Conexiones IPv4 realizadas desde la propia máquina a cualquier servidor |SSH|
+   externo::
+
+      $ ss -4tn 'dst :ssh'
+
+#. Ídem::
+
+      $ ss -4tn 'dport = :ssh'
+
+   .. note:: Obsérvese que el puerto siempre se antecede con dos puntos.
+
+#. Conexiones |TCP| a nuestro servidor |SSH|::
+
+      $ ss -4tn 'sport = :ssh'
+
+   lo cual también podríamos haber hecho así::
+
+      $ ss -4tn 'src :ssh'
+
+
+#. Conexiones |TCP| establecidas::
+
+      $ ss -t state established
+
+   .. note:: Hay varios estados de conexión (*established*, *syn-sent*, etc.).
+      Para saber cuáles son los posibles estados consulte la página de manual de
+      :manpage:`ss(8)`.
+
+#. Conexiones establecidas a nuestro servidor |SSH|::
+
+      $ ss -4t state established 'src :ssh'
+
+   .. note:: Nótese que la leyenda "*state established*" ha de colocarse antes
+      del filtro y fuera de cualquier comilla.
+
+#. Suponiendo que seamos un ordenador cliente, conexiones que tenemos
+   establecidas con servidores web::
+
+      $ ss -t state established 'dst :80'
+
+#. Conexiones |TCP| con nuestros puertos privilegiados::
+
+      $ ss -4tn 'sport < :1024'
+
+   .. note:: Pueden usarse los operadores ``<``, ``lt``, ``<=``, ``le``, ``=``,
+      ``eq``, ``!=``, ``ne``, ``>=``, ``ge``, ``>``, ``gt``.
+
+Para expresar varias condiciones a la vez podemos valernos de ``or``, ``and`` y
+paréntesis, estos últimos siempre separados del resto de componentes del
+filtro::
+
+   $ ss -4n '( sport < :1024 or dst 172.22.0.2 ) and dport > :10000'
+
+.. note:: ``and`` puede elidirse::
+
+      $ ss -4n '( sport < :1024 or dst 172.22.0.2 ) dport > :10000'
+   
+
+.. rubric:: Notas al pie
+
+.. [#] La relación entre los números de puerto y los nombres de los servicios
+   puede consultarse en el fichero :file:`/etc/services`.
+
+.. |TCP| replace:: :abbr:`TCP (Transmission Control Protocol)`
+.. |CIDR| replace:: :abbr:`CIDR (Classless Inter-Domain Routing)`

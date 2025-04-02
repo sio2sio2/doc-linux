@@ -1,0 +1,183 @@
+Software de virtualización
+==========================
+De las múltiples soluciones disponibles en *Linux* incluimos guía de unas pocas
+de ellas, que en algunos casos serán meras notas, y en otros relaciones más extensas.
+
+.. _software-virt-completa:
+
+Virtualización completa
+-----------------------
+Al utilizar un *software* de virtualización para instalar y probar sistemas
+operativos nos será muy útil conocer varios aspectos (además de los evidentes):
+
+* Manipular el modo en que la máquina virtual se conecta a la red para poder
+  simular distintos escenarios. Por ejemplo, no es lo mismo que queramos
+  virtualizar un sistema de escritorio en que lo único que se necesita por lo
+  general es salida a internet que un servidor en que muy probablemente
+  necesitemos que el anfitrión pueda conectarse a él.
+
+* Preservar estados de disco para recuperarlos cuando sea preciso (lo que se
+  conoce como :dfn:`instantáneas`).
+
+* Crear discos que puedan utilizarse como plantilla para la creación de varias
+  máquinas virtuales. Por ejemplo, crear un único disco con una instalación
+  limpia de *Windows* 10, y usar éste como base para todos los discos de las
+  máquinas virtuales en que vayamos a virtualizar un *Windows* 10.
+
+* Virtualizar tanto *firmware* |BIOS| como *firmware* |UEFI|.
+
+* Tener mecanismos sencillos para poder transferir datos entre el anfitrión
+  y el huésped (p.e. un directorio compartido por ambos).
+
+* Exportar máquinas virtuales a otros anfitriones o importarlas desde ellos.
+
+Trataremos dos hipervisores: :program:`Virtualbox` porque ofrece la posibilidad
+de ejecutarse en otros sistemas operativos como *Windows*, y |KVM| que es una
+solución integrada oficialmente en el propio núcleo de *Linux*:
+
+.. toctree::
+   :glob:
+   :maxdepth: 1
+
+   02.software/01.completa/[0-9]*
+
+.. _software-contenedores:
+
+Contenedores
+------------
+Los contenedores son una solución mucho más ligera\ [#]_ y eficiente con la
+limitación de que tendrán que contener un sistema de idéntica naturaleza a la
+del anfitrión, puesto que carecen de sistema operativo propio.
+
+En los sistemas *Linux* este tipo de virtualización, muy esquemáticamente, se
+basa en dos conceptos:
+
+#. El **aislamiento** a través de:
+
+   * los :dfn:`espacios de nombres` (*namespaces*) del núcleo, que proporcionan
+     a los procesos una visión parcial de los procesos y recursos que gestiona
+     el sistema operativo. Todo aquello que no haya sido incluido en el mismo
+     espacio de nombres, no es accesible ni aparentemente existe. Para entender
+     este conceptos resulta indispensable la lectura del artículo `Digging into
+     Linux namespaces`_ (y `su segunda parte`_)\ [#]_.
+
+   * el :dfn:`enjaulamiento` (:manpage:`chroot`, :manpage:`pivot_root`) dentro de
+     un árbol de directorios, que logra su aislamiento del resto del sistema de
+     archivos.
+
+#. La **limitación** de recursos a través de los :dfn:`grupos de control`
+   (abreviado *cgroups*). Gracias a ellos, por ejemplo, podremos impedir que un
+   proceso ocupe más de 128MiB de memoria |RAM|, aunque la máquina disponga de
+   mucha más. Para profundizar en ellos es conveniente el artículo `Cgroups
+   Introduction
+   <https://www.lewisgaul.co.uk/blog/coding/2022/05/13/cgroups-intro/>`_. Tenga
+   presente que la versión predeterminada en *Debian* a partir de *Bulleye* es
+   la v2, así que es ésta versión la que se tomará como referencia.
+
+En consecuencia, la creación de un contenedor supone:
+
+* Crearle un conjunto de espacios de nombres propios (uno para su red, otro para
+  sus procesos, etc). De esta manera, dentro del contenedor sólo se tiene acceso
+  a aquello que el sistema operativo del anfitrión gestiona para el propio
+  contenedor.
+* Enjaularlo dentro la porción del árbol de directorios que constituya su
+  \"sistema de archivos\".
+* Crearle los grupos de control propios para limitar su uso de recursos.
+
+Es relativamente frecuente utilizar el término |VM| para referir la máquina
+virtual de la virtualización completa y |VE| (entorno virtual) para referir al
+contenedor. Antes de comenzar, no obstante, es preciso saber que existen
+distintos tipos de contenedores:
+
+Según los **permisos** de sus usuarios
+   Hay dos tipos distintos:
+
+   .. _contenedor-privilegiado:
+
+   :dfn:`Contenedor privilegiado` (*privileged container*)
+      es aquel en que no se hace uso del concepto de *espacio de nombres de
+      usuario*  y, en consecuencia, los usuarios y grupos del contenedor se
+      corresponden con los usuarios y grupos del anfitrión. Dicho de otro modo, la
+      acción que realice el usuario *root* en el contenedor es una acción que el
+      sistema operativo del anfitrión considera que está ejecutando su propio
+      *root*.
+
+   .. _contenedor-no-privilegiado:
+
+   :dfn:`Contenedor no privilegiado` (*unprivileged container*)
+      es aquel que hace uso de tal concepto, por lo que se mapean identificadores
+      de usuarios y grupos; y, en consecuencia, el administrador del contenedor
+      (|UID| **0**  en  el contenedor) no se corresponde con el administrador del
+      anfitrión (|UID| **0** en el anfitrión). Esto evita la posibilidad de que el
+      administrador escape del confinamiento del contenedor con permisos de
+      administrador.
+
+   .. note:: Todos estos conceptos se entienden muy bien si se leen con
+      detenimiento las explicaciones ya recomendadas del artículo `Digging into
+      Linux namespaces`_ y, en especial, `su segunda parte`_ en que se desarrolla
+      el concepto de espacio de nombres de usuario (*user namespace*). Más
+      adelante, además, se expone :ref:`un pequeño ejemplo de espacio de nombres de
+      usuario <userns>`.
+
+Según los **procesos** que encierre
+   De nuevo, son dos los tipos:
+
+   .. _contenedor-sistema:
+
+   :dfn:`contenedor de sistema`
+      Es aquel diseñado para ejecutar aisladamente múltiples procesos a la
+      manera en que lo hace un sistema completo por lo que, en consecuencia,
+      ejecutará como primer proceso un programa :program:`init` (como
+      :ref:`systemd <systemd>`). Es, por tanto, una solución más cercana al de
+      una virtualización completa, ya que dispondremos de un espacio de usuario
+      completo que recrea fielmente una distribución de *Linux*. |LXC| provee
+      contenedores de este tipo.
+
+   .. _contenedor-aplicacion:
+
+   :dfn:`contenedor de aplicaciones`
+      Es aquel diseñado para ejecutar aisladamente una única aplicación (por lo
+      general, un servicio), por lo que ejecutará como primer proceso tal
+      aplicación y no un programa :program:`init`. Estos contenedores, por
+      tanto, no ofrecen un sistema completo que gestionar. :program:`Docker`
+      provee contenedores de este tipo.
+
+.. https://www.schutzwerk.com/en/blog/linux-container-intro/
+
+Trataremos ambos tipos de contenedores:
+
+.. toctree::
+   :glob:
+   :maxdepth: 1
+
+   02.software/03.contenedores/[0-9]*
+
+.. rubric:: Notas al pie
+
+.. [#] De hecho, este tipo de virtualización también recibe el nombre de
+   *virtulización ligera*.
+
+.. [#] Esto incluye también a usuarios y grupos, de manera que un usuario que
+   dentro del contenedor actuara como usuario privilegiado (o sea, con el |UID|
+   0) fuera de él podría no serlo en absoluto. El interesantísimo artículo
+   mencionado ilustra `cómo crear a mano un entorno absolutamente aislado
+   <https://blog.quarkslab.com/digging-into-linux-namespaces-part-2.html#combining-almost-everything>`_
+   que nos puede ayudar a entender cómo funciona la *magia* de los contenedores.
+   Si a ese procedimiento se le añade limitación con *cgroups* (véase `Docker
+   Resource Management in Detail
+   <https://tbhaxor.com/docker-resource-management-in-detail/>`_), obtendremos
+   un contenedor *artesanal* sin necesidad de haber utilizado *software*
+   específico como |LXC| o *Docker*.
+
+.. |BIOS| replace:: :abbr:`BIOS (Basic I/O System)`
+.. |UEFI| replace:: :abbr:`UEFI (Unified Extensible Firmware Interface)`
+.. |KVM| replace:: :abbr:`KVM (Kernel-based Virtual Machine)`
+.. |LXC| replace:: :abbr:`LXC (LinuX Containers)`
+.. |RAM| replace:: :abbr:`RAM (Random Access Memory)`
+.. |UID| replace:: :abbr:`UID (User IDentifier)`
+.. |GID| replace:: :abbr:`GID (Group IDentifier)`
+.. |VM| replace:: :abbr:`VM (Virtual Machine)`
+.. |VE| replace:: :abbr:`VE (Virtual Environment)`
+
+.. _Digging into Linux namespaces: https://blog.quarkslab.com/digging-into-linux-namespaces-part-1.html
+.. _su segunda parte: https://blog.quarkslab.com/digging-into-linux-namespaces-part-2.html
