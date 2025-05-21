@@ -33,4 +33,6 @@ SystemD
 
 #. Revisar los mensajes generados por cron en las últimas ocho horas,
 
-#. Contar cuántas |IP|\ s ha concedido el servidor |DHCP| en la última hora.
+#. Contar cuántas |IP|\ s ha concedido el servidor |DHCP| del |ISC| en la última
+   hora. **Nota**: Este servidor es el servicio ``dhcpd`` y los mensajes de
+   concesión contienen la palabra "``DHCPACK``".
