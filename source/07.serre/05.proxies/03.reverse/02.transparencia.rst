@@ -358,7 +358,17 @@ Y los cambios, según optemos por una estrategia u otra:
      mientras que la segunda escuchar en puerto privilegiado.
 
      .. warning:: Cada vez que se sustituya el ejecutable con una actualización,
-        se perderán estas capacidades y habrá que volver a definirlas.
+        se perderán estas capacidades y el *proxy* fallará. Una estrategia para
+        recuperarlas automáticamente es usar los `file triggers
+        <https://sources.debian.org/src/dpkg/1.17.25/doc/triggers.txt/>`_ del
+        gestor :manpage:`dpkg` de *Debian*. Básicamente consiste en que
+        definamos nosotros mismos un paquete auxiliar que demuestre interés por
+        el archivo :file:`/usr/sbin/haproxy`. Cuando algún otro paquete altera
+        este archivo al instalarse, actualizarse o eliminarse, se acaba
+        ejecutando el script :file:`debian/postinst` de nuestro paquete, de modo
+        que podemos incluir en él el :command:`setcap` necesario. Descargue el
+        paquete :download:`package-patcher.deb
+        <files/package-patcher_1.0-1_all.deb>` y échele un vistazo\ [#]_.
 
    * Comentar en la sesión *global* las dos líneas anteriores y también otra
      referente a una jaula que ya es imposible e innecesaria:
@@ -415,6 +425,17 @@ Y los cambios, según optemos por una estrategia u otra:
 
 .. [#] Se añade :kbd:`--no-check-certificate` para evitar problemas si en
    nuestras pruebas usamos certificados autofirmados.
+
+.. [#] Tras instalarlo podemos comprobar que funciona (sin necesidad de
+       reinstalar :deb:`haproxy`) del siguiente modo:
+
+       .. code-block:: console
+
+          # dpkg-trigger --by-package=haproxy /usr/sbin/haproxy
+          # dpkg --status haproxy
+          # dpkg --status package-patcher
+          # dpkg --configure --pending
+          # journalctl -t haproxy-hook 
 
 .. |SSL| replace:: :abbr:`SSL (Secure Socket Layer)`
 .. |SNI| replace:: :abbr:`SNI (Server Name Indication)`
