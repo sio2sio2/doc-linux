@@ -84,15 +84,27 @@ Además, las ediciones pueden presentar variantes sobre su forma original:
 
 .. rubric:: Requisitos
 
-Como cualquier otro sistema operativo, *Windows* exige un *hardware* mínimo
+Como cualquier otro sistema operativo, *Windows* 11 exige un *hardware* mínimo
 (que puede consultarse `aquí
-<https://www.microsoft.com/es-es/windows/windows-10-specifications#primaryR2>`_),
+<https://www.microsoft.com/en-us/windows/windows-11-specifications>`_),
 aunque estas exigencias mínimas no permiten más que arrancar el sistema y
 utilizar con cierta pesadez la interfaz. Para un uso habitual en el que se usan
 aplicaciones, el *hardware* debe ser mucho mejor. Para virtualizar el sistema y
 realizar las prácticas del curso basta con crear una máquina virtual que cumpla
-los requisitos mínimos (2GiB de memoria RAM), aunque si podemos es preferible
-darle dos núcleos al procesador en vez de 1.
+los requisitos mínimos:
+
+* 64 GiB de disco duro.
+* 4 GiB de memoria |RAM|.
+* Dos núcleos.
+* Sistema de arranque |EFI|.
+* |TPM| versión 2.0. En Virtualbox se puede activar en ``Sistema > Placa base``.
+
+.. caution:: *Virtualbox* no soporta *Windows* 11 hasta una versión posterior a
+   7.0, así que procure al menos usar *Virtuabox* 7.1. Además, *Windows* 11 no
+   viene con soporte de fábrica para la tarjeta de red PCnet-FAST III, así que
+   conviene que utilice como tarjera *Intel PRO/1000 MT Desktop*. También puede
+   usar la más eficiente red paravirtualizada que ofrece virtIO, pero necesitará
+   instalar a posteriori los *drivers*.
 
 .. rubric:: Particiones
 
@@ -236,6 +248,7 @@ Recuperación
 .. |MSR| replace:: :abbr:`MSR (Microsoft System Reserved)`
 .. |SRP| replace:: :abbr:`MSR (System Reserved Partition)`
 .. |RAM| replace:: :abbr:`RAM (Random Access Memory)`
+.. |TPM| replace:: :abbr:`TPM (Trusted Platform Module)`
 
 .. _Debian: https://www.debian.org
 .. _Slackware: https://es.wikipedia.org/wiki/Slackware
