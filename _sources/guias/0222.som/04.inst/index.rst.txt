@@ -96,21 +96,25 @@ darle dos núcleos al procesador en vez de 1.
 
 .. rubric:: Particiones
 
-*Windows* necesita al menos una partición de tamaño mínimo de 32GiB formateada
-en |NTFS| para instalarse. Sin embargo, la instalación puede crear otras
-particiones:
+*Windows* necesita al menos una :ref:`partición de sistema <tipos-particion>` de
+tamaño mínimo de 32GiB formateada en |NTFS| para instalarse. Sin embargo, si le
+es posible\ [#]_, la instalación puede crear algunas :ref:`particiones especiales
+propias <tipos-particion>`:
 
-+ En sistemas con arranque |EFI|, se crea una pequeña *partición reservada de
-  Microsoft* (|MRP|) de 16MiB.
-+ Cuanto en el proceso de instalación se da libertad a *Windows* para instalarse
-  en el espacio libre disponible se crean, además:
+a. En sistemas con arranque |EFI|, una pequeña partición |MSR| (partición
+   *reservada para sistema de Microsoft*) de 16 MiB que ayuda a la gestión de
+   las particiones (véase la `propia información de Microsoft
+   <https://learn.microsoft.com/en-us/windows-hardware/manufacture/desktop/configure-uefigpt-based-hard-drive-partitions?view=windows-11#microsoft-reserved-partition-msr>`_).
 
-  * Sólo con arranque |BIOS|, una pequeña partición de 50 ó 100 MiB para
-    almacenar  los archivos del gestor de arranque y los que permiten arrancar
-    si la partición del sistema se cifró con :program:`BitLocker`.
-  * Tanto para arranque |BIOS| como |EFI|, una partición de recuperación
-    *WinRE*. En caso contrario, los archivos se guardan dentro de la partición
-    del sistema (:file:`%SystemDrive%\Recovery`).
+#. En sistemas con arranque |BIOS|, una pequeña partición |SRP| de 50 ó 100 MiB
+   para almacenar los archivos del gestor de arranque y los que permiten
+   arrancar si la partición del sistema se cifró con :program:`BitLocker`\ [#]_.
+
+#. Sea cual sea el sistema de arranque, una partición de recuperación *WinRE*,
+   que contiene las herramientas de recuperación de *Windows* que se utilizan
+   cuando no se puede arrancar el sistema operativo por algún problema grave.
+   En caso deque no sea posible crearla, los archivos se guardan en una ruta
+   dentro de la partición del sistema (:file:`%SystemDrive%\Recovery`).
 
 .. seealso:: *Microsoft* desarrolla en dos documentos la descripción de las
    particiones `en sistemas BIOS
@@ -213,12 +217,15 @@ Recuperación
    * Descripción de *Windows Boot Manager* y cómo se recupera.
    * Descripción de |GRUB| y como se recupera.
 
-.. Partición reservada de Windows: https://adictec.com/particion-reservada-sistema-eliminar/
-   MSR: Partición reservada de Microsoft ¿En GPT?
-   SRP: Partición reservada del sistema ¿En BIOS? 
-
-
 .. include:: /guias/0222.som/99.ejercicios/031.part.rst
+
+.. rubric:: Notas al pie
+
+.. [#] Le separá posible crear estas particiones especiales si *Windows* detecta
+   espacio libre en el disco que pueda utilizar para su creación.
+
+.. [#] Esta partición no es necesaria en sistemas con arranque |UEFI|, porque el
+   arranqe ya exige la existencia de la partición |ESP|.
 
 .. |GPT| replace:: :abbr:`GPT (GUID Partition Table)`
 .. |LTSC| replace:: :abbr:`LTSC (Long Term Servicing Channel)`
@@ -226,7 +233,8 @@ Recuperación
 .. |NTFS| replace:: :abbr:`NTFS (NT File System)`
 .. |EFI| replace:: :abbr:`EFI (Extensible Firmware Interface)`
 .. |ESP| replace:: :abbr:`ESP (EFI System Partition)`
-.. |MRP| replace:: :abbr:`MRP (Microsoft Reserved Partition)`
+.. |MSR| replace:: :abbr:`MSR (Microsoft System Reserved)`
+.. |SRP| replace:: :abbr:`MSR (System Reserved Partition)`
 .. |RAM| replace:: :abbr:`RAM (Random Access Memory)`
 
 .. _Debian: https://www.debian.org
