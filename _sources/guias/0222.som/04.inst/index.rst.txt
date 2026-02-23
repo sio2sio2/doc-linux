@@ -106,6 +106,10 @@ los requisitos mínimos:
    usar la más eficiente red paravirtualizada que ofrece virtIO, pero necesitará
    instalar a posteriori los *drivers*.
 
+.. note:: Si queremos respetar el estado del disco al instalar, es preciso
+   escoger el *sistema tradicional de instalación*. En caso contrario, sólo
+   podremos realizar una instalación destructiva.
+
 .. rubric:: Particiones
 
 *Windows* necesita al menos una :ref:`partición de sistema <tipos-particion>` de
