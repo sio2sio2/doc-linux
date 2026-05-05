@@ -24,17 +24,28 @@ Tradicionales
 
 SystemD
 -------
-#. Ver los últimos 20 mensajes generados por el núcleo.
-
-#. Hacer persistentes los registros, pero que no ocupen más de 100MB de espacio
-   en disco.
+#. Consultar los accesos fallidos al sistema.
 
 #. Mostrar los mensajes de la última hora.
 
+#. Revisar los mensajes generados por cron.
+  
 #. Revisar los mensajes generados por cron en las últimas ocho horas,
+
+#. Ver los últimos 20 mensajes generados por el núcleo.
+
+#. Ver los mensajes generados por el núcleo las últimas 24 horas.
+
+#. Consultar los mensajes generados por el núcleo con al menos un nivel de
+   advertencia (*warning*).
+
+#. Ídem pero en las últimas 24 horas.
 
 #. Contar cuántas |IP|\ s ha concedido el servidor |DHCP| del |ISC| en la última
    hora. **Nota**: Este servidor es el servicio ``dhcpd`` y los mensajes de
    concesión contienen la palabra "``DHCPACK``".
+
+#. Hacer persistentes los registros, pero que no ocupen más de 100MB de espacio
+   en disco.
 
 .. |ISC| replace:: :abbr:`ISC (Internet Systems Consortium)`
