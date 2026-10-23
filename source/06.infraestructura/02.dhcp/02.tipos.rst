@@ -5,14 +5,14 @@ Software
 
 Clientes
 ========
-En *Linux* se usan, fundamentalmente, dos clientes:
+En *Linux* se usan, fundamentalmente, tres clientes:
 
 .. _dhclient:
-.. index:: index
+.. index:: dhclient
 
-:program:`dhclient`
-   Es el cliente del |ISC| y el habitual en las distribuciones normales. Su uso
-   es bastante sencillo:
+:program:`dhclient` (ya obsoleto)
+   Es el cliente del |ISC| y hasta no hace tanto el más habitual en las distribuciones.
+   Su uso es bastante sencillo:
 
    * Para pedir configuración para la interfaz *eth0*::
 
@@ -27,6 +27,81 @@ En *Linux* se usan, fundamentalmente, dos clientes:
 
    Este cliente revisa el fichero :file:`/etc/dhcp/dhclient.conf` dentro del
    cual puede manipularse la forma en que se pide la configuración al servidor.
+
+.. _dhcpcd:
+.. index:: dhcpcd
+
+:program:`dhcpcd`
+   Es el sustituto natural del anterior (en *Debian* a partir de *Trixie*) y
+   bastante más completo y más flexible.  Almacena su configuración en
+   :file:`/etc/dhcpcd.conf` y en ese archivo, entre otras cosas, permite
+   especificar incluso configuraciones estáticas para interfaces o qué
+   interfaces no queremos configurar a través de la aplicación.  Esto es debido
+   a que puede usarse de dos maneras\ [#]_:
+
+   a. Gestionado de forma manual las interfaces al estilo de como lo hace
+      :command:`dhclient`.
+   #. Como demonio, lo que determina que cobre sentido lo que acabamos de decir
+      acerca del archivo de configuración. Por ejemplo:
+
+      .. code-block:: ini
+
+         noipv6  # No nos interesa IPv6.
+
+         denyinterfaces eth2  # No queremos hacernos cargo de eth2
+         #allowinterfaces eth0 eth1  # Es una alternativa.
+
+         # eth0 no requiere bloque, ya que se configura de forma predeterminada.
+
+         # Configuración estática de eth1
+         interface eth1
+            static ip_address=192.168.255.2/24
+            static routers=192.168.255.1
+            static domain_name_servers=1.1.1.1 8.8.8.8
+
+      Con esta configuración\ [#]_, podemos configurar las interfaces manipulando el
+      servicio asociado:
+
+      .. code-block:: console
+
+           # systemctl restart dhcpcd
+
+      En cualquier caso, *Debian* no tiene habilitado el servicio (ya que todo
+      se gestiona con :program:`ifupdown`), por lo que tendríamos que gestionar
+      manualmente las interfaces.
+
+   Cuando no se usa como demonio, se utiliza de modo semejante a
+   :command:`dhclient`:
+
+   .. code-block:: console
+
+      # dhcpcd -b eth0 eth1  # Podemos gestionar varias. -b para segundo plano.
+      # dhcpcd eth2          # Rehusará hacer nada con eth2.
+
+   Aun usándose de forma manual, el archivo de configuración sigue siendo válido
+   y, por tanto, *eth0* se configurará dinámicamente, *eth1* recibirá una
+   asignación estática, y *eth2* no se configurará en absoluto.
+
+   Para liberar las interfaces y desconfigurarlas:
+
+   .. code-block:: console
+
+      # dhcpcd -k eth0 eth1
+
+   que provocará que para *eth0* se notifique al servidor la liberación
+   (paquete *DHCPRELEASE*).
+
+   .. note:: A diferencia de :program:`dhclient`, por defecto, las configuraciones dinámicas
+      soportan la técnica `IPv4ALL o Zeroconf <https://es.wikipedia.org/wiki/Zeroconf>`_
+      lo que determina que cuando no existe servidor |DHCP|, la interfaz se
+      autoconfigura escogiendo una dirección |IP| de la red ``169.254.0.0/16``.
+      Este comportamiento, no obstante, puede alterarse añadiendo:
+
+      .. code-block:: ini
+
+         noipv4ll
+
+      a la configuración global o a la configuración particular de una interfaz.
 
 .. _udhcpc:
 
@@ -91,9 +166,26 @@ Las implementaciones libres de servidores |DHCP| más usadas son las siguientes:
    :program:`bind`). Es bastante más pesado que el anterior, pero permite un
    mayor control sobre la configuración.
 
-`ISC KEA <https://kea.isc.org/wiki>`_
+`ISC KEA <https://www.isc.org/kea/>`_
    Es el nuevo servidor del |ISC|, que previsiblemente sustituirá al anterior en
    el futuro.
+
+
+.. rubric:: Notas al pie
+
+.. [#] En *Debian* la gestión de las interfaces corre a cargo de la aplicación
+   :program:`ifupdown`, por lo que el uso como demonio de este cliente entra en
+   conflicto. Por ese motivo, el cliente está desdoblado en dos paquetes:
+   :deb:`dhcpcd-base`, que contiene el cliente en sí, y :deb:`dhcpcd` que
+   contiene los archivos necesarios para correrlo como demonio. Por defecto,
+   sólo está instalado el primero.
+
+.. [#] En la configuración hemos identificado las interfaces que no queremos
+   configurar (:code:`denyinterfaces eth2`), lo cual no es exactamente
+   equivalente a que declaremos qué interfaces queremos configurar
+   (:code:`allowinterfaces eth0 eth1`). Esto es así, porque ante una nueva
+   interfaz *eth3*, en el primer caso :program:`dhcpcd` se encargaría de su
+   gestión (dinámica como *eth0*), mientras que en el segundo, no.
 
 .. |ISC| replace:: :abbr:`ISC (Internet Systems Consortium)`
 .. |TFTP| replace:: :abbr:`TFTP (Trivial FTP)`
