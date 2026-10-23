@@ -50,10 +50,10 @@
 <h1><span class="section-number">6.1.2. </span>Software<a class="headerlink" href="#software" title="Link to this heading">¶</a></h1>
 <section id="clientes">
 <span id="dhcp-clients"></span><h2><span class="section-number">6.1.2.1. </span>Clientes<a class="headerlink" href="#clientes" title="Link to this heading">¶</a></h2>
-<p>En <em>Linux</em> se usan, fundamentalmente, dos clientes:</p>
+<p>En <em>Linux</em> se usan, fundamentalmente, tres clientes:</p>
 <span id="dhclient"></span><dl id="index-0">
-<dt><strong class="program">dhclient</strong></dt><dd><p>Es el cliente del <abbr title="Internet Systems Consortium">ISC</abbr> y el habitual en las distribuciones normales. Su uso
-es bastante sencillo:</p>
+<dt><strong class="program">dhclient</strong> (ya obsoleto)</dt><dd><p>Es el cliente del <abbr title="Internet Systems Consortium">ISC</abbr> y hasta no hace tanto el más habitual en las distribuciones.
+Su uso es bastante sencillo:</p>
 <ul>
 <li><p>Para pedir configuración para la interfaz <em>eth0</em>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>dhclient<span class="w"> </span>-v<span class="w"> </span>eth0
@@ -70,6 +70,71 @@ debe usarse la opción <kbd class="kbd docutils literal notranslate">-x</kbd></p
 </ul>
 <p>Este cliente revisa el fichero <code class="file docutils literal notranslate"><span class="pre">/etc/dhcp/dhclient.conf</span></code> dentro del
 cual puede manipularse la forma en que se pide la configuración al servidor.</p>
+</dd>
+</dl>
+<span id="dhcpcd"></span><dl id="index-1">
+<dt><strong class="program">dhcpcd</strong></dt><dd><p>Es el sustituto natural del anterior (en <em>Debian</em> a partir de <em>Trixie</em>) y
+bastante más completo y más flexible.  Almacena su configuración en
+<code class="file docutils literal notranslate"><span class="pre">/etc/dhcpcd.conf</span></code> y en ese archivo, entre otras cosas, permite
+especificar incluso configuraciones estáticas para interfaces o qué
+interfaces no queremos configurar a través de la aplicación.  Esto es debido
+a que puede usarse de dos maneras<a class="footnote-reference brackets" href="#id4" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a>:</p>
+<ol class="loweralpha">
+<li><p>Gestionado de forma manual las interfaces al estilo de como lo hace
+<strong class="command">dhclient</strong>.</p></li>
+<li><p>Como demonio, lo que determina que cobre sentido lo que acabamos de decir
+acerca del archivo de configuración. Por ejemplo:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="na">noipv6  # No nos interesa IPv6.</span>
+
+<span class="na">denyinterfaces eth2  # No queremos hacernos cargo de eth2</span>
+<span class="c1">#allowinterfaces eth0 eth1  # Es una alternativa.</span>
+
+<span class="c1"># eth0 no requiere bloque, ya que se configura de forma predeterminada.</span>
+
+<span class="c1"># Configuración estática de eth1</span>
+<span class="na">interface eth1</span>
+<span class="w">   </span><span class="na">static ip_address</span><span class="o">=</span><span class="s">192.168.255.2/24</span>
+<span class="w">   </span><span class="na">static routers</span><span class="o">=</span><span class="s">192.168.255.1</span>
+<span class="w">   </span><span class="na">static domain_name_servers</span><span class="o">=</span><span class="s">1.1.1.1 8.8.8.8</span>
+</pre></div>
+</div>
+<p>Con esta configuración<a class="footnote-reference brackets" href="#id5" id="id2" role="doc-noteref"><span class="fn-bracket">[</span>2<span class="fn-bracket">]</span></a>, podemos configurar las interfaces manipulando el
+servicio asociado:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>systemctl<span class="w"> </span>restart<span class="w"> </span>dhcpcd
+</pre></div>
+</div>
+<p>En cualquier caso, <em>Debian</em> no tiene habilitado el servicio (ya que todo
+se gestiona con <strong class="program">ifupdown</strong>), por lo que tendríamos que gestionar
+manualmente las interfaces.</p>
+</li>
+</ol>
+<p>Cuando no se usa como demonio, se utiliza de modo semejante a
+<strong class="command">dhclient</strong>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>dhcpcd<span class="w"> </span>-b<span class="w"> </span>eth0<span class="w"> </span>eth1<span class="w">  </span><span class="c1"># Podemos gestionar varias. -b para segundo plano.</span>
+<span class="gp"># </span>dhcpcd<span class="w"> </span>eth2<span class="w">          </span><span class="c1"># Rehusará hacer nada con eth2.</span>
+</pre></div>
+</div>
+<p>Aun usándose de forma manual, el archivo de configuración sigue siendo válido
+y, por tanto, <em>eth0</em> se configurará dinámicamente, <em>eth1</em> recibirá una
+asignación estática, y <em>eth2</em> no se configurará en absoluto.</p>
+<p>Para liberar las interfaces y desconfigurarlas:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>dhcpcd<span class="w"> </span>-k<span class="w"> </span>eth0<span class="w"> </span>eth1
+</pre></div>
+</div>
+<p>que provocará que para <em>eth0</em> se notifique al servidor la liberación
+(paquete <em>DHCPRELEASE</em>).</p>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>A diferencia de <strong class="program">dhclient</strong>, por defecto, las configuraciones dinámicas
+soportan la técnica <a class="reference external" href="https://es.wikipedia.org/wiki/Zeroconf">IPv4ALL o Zeroconf</a>
+lo que determina que cuando no existe servidor <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr>, la interfaz se
+autoconfigura escogiendo una dirección <abbr title="Internet Protocol">IP</abbr> de la red <code class="docutils literal notranslate"><span class="pre">169.254.0.0/16</span></code>.
+Este comportamiento, no obstante, puede alterarse añadiendo:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="na">noipv4ll</span>
+</pre></div>
+</div>
+<p>a la configuración global o a la configuración particular de una interfaz.</p>
+</div>
 </dd>
 </dl>
 <dl id="udhcpc">
@@ -137,6 +202,27 @@ mayor control sobre la configuración.</p>
 el futuro.</p>
 </dd>
 </dl>
+<p class="rubric">Notas al pie</p>
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="id4" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
+<p>En <em>Debian</em> la gestión de las interfaces corre a cargo de la aplicación
+<strong class="program">ifupdown</strong>, por lo que el uso como demonio de este cliente entra en
+conflicto. Por ese motivo, el cliente está desdoblado en dos paquetes:
+<a class="extlink-deb reference external" href="https://packages.debian.org/stable/dhcpcd-base">dhcpcd-base</a>, que contiene el cliente en sí, y <a class="extlink-deb reference external" href="https://packages.debian.org/stable/dhcpcd">dhcpcd</a> que
+contiene los archivos necesarios para correrlo como demonio. Por defecto,
+sólo está instalado el primero.</p>
+</aside>
+<aside class="footnote brackets" id="id5" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id2">2</a><span class="fn-bracket">]</span></span>
+<p>En la configuración hemos identificado las interfaces que no queremos
+configurar (<code class="code docutils literal notranslate"><span class="pre">denyinterfaces</span> <span class="pre">eth2</span></code>), lo cual no es exactamente
+equivalente a que declaremos qué interfaces queremos configurar
+(<code class="code docutils literal notranslate"><span class="pre">allowinterfaces</span> <span class="pre">eth0</span> <span class="pre">eth1</span></code>). Esto es así, porque ante una nueva
+interfaz <em>eth3</em>, en el primer caso <strong class="program">dhcpcd</strong> se encargaría de su
+gestión (dinámica como <em>eth0</em>), mientras que en el segundo, no.</p>
+</aside>
+</aside>
 </section>
 </section>
 </section>
@@ -214,7 +300,7 @@ el futuro.</p>
     </div>
     <div class="footer" role="contentinfo">
     &#169; Copyright CC BY 4.0, 2016-2026, José Miguel Sánchez Alés.
-      Creado usando <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.1.
+      Creado usando <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.2.0.
     </div>
   </body>
 </html>

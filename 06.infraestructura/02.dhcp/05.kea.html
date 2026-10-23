@@ -7,7 +7,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>6.1.5. ISC KEA &#8212; documentación de Linuxnomicón - rolling</title>
+    <title>6.1.5. Kea DHCP &#8212; documentación de Linuxnomicón - rolling</title>
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
@@ -37,7 +37,7 @@
         <li class="nav-item nav-item-0"><a href="../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" ><span class="section-number">6. </span>Servicios de infraestructura</a> &#187;</li>
           <li class="nav-item nav-item-2"><a href="index.html" accesskey="U"><span class="section-number">6.1. </span>DHCP</a> &#187;</li>
-        <li class="nav-item nav-item-this"><a href=""><span class="section-number">6.1.5. </span><abbr title="Internet Systems Consortium">ISC</abbr> KEA</a></li> 
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">6.1.5. </span>Kea <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr></a></li> 
       </ul>
     </div>  
 
@@ -46,8 +46,111 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <section id="isc-kea">
-<span id="kea"></span><h1><span class="section-number">6.1.5. </span><abbr title="Internet Systems Consortium">ISC</abbr> KEA<a class="headerlink" href="#isc-kea" title="Link to this heading">¶</a></h1>
+  <section id="kea-dhcp">
+<span id="kea"></span><h1><span class="section-number">6.1.5. </span>Kea <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr><a class="headerlink" href="#kea-dhcp" title="Link to this heading">¶</a></h1>
+<p>El <a class="reference external" href="https://www.isc.org/kea/">servidor Kea</a> es el remplazo del <abbr title="Internet Systems Consortium">ISC</abbr> para
+<a class="reference internal" href="04.isc.html#isc-dhcp"><span class="std std-ref">su antiguo servidor</span></a>, cuyo desarrollo abandonó definitivamente en 2022.
+Tiene un diseño modular más moderno y permite el almacenamiento de asignaciones
+en bases de datos.</p>
+<p>Ilustremos su configuración para el mismo servidor que ya hemos ido estudiando:
+uno que tiene una interfaz externa a través de la cual no queremos proporcionar
+configuraciones de red y dos interfaces internas a través de las que sí:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span># Interfaz externa.
+allow-hotplug eth0
+iface eth0 inet dhcp
+
+# Red interna 1 (interna1.local)
+allow-hotplug eth1
+iface eth1 inet static
+   address 192.168.255.1/24
+
+# Red interna 2 (interna2.local)
+allow-hotplug eth2
+iface eth2 inet static
+   address 192.168.254.1/24
+</pre></div>
+</div>
+<p><em>Debian</em> separa los módulos del servidor en distintos paquetes. Como, en
+principio, sólo nos interesa aprender cómo se configura de forma básica para
+<abbr title="Internet Protocol">IP</abbr>v4:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>apt<span class="w"> </span>install<span class="w"> </span>kea-dhcp4-server
+</pre></div>
+</div>
+<section id="configuracion-basica">
+<h2><span class="section-number">6.1.5.1. </span>Configuración básica<a class="headerlink" href="#configuracion-basica" title="Link to this heading">¶</a></h2>
+<p>La configuración del servidor se encuentra toda dentro del directorio
+<code class="file docutils literal notranslate"><span class="pre">/etc/kea</span></code> y es ahí donde debemos crear los archivos de configuración.
+Debe crearse un archivo independiente por cada módulo del servidor (p.ej. un
+archivo para el módulo encargado de <abbr title="Internet Protocol">IP</abbr>v4 y otro distinto para el módulo
+encargado de <abbr title="Internet Protocol">IP</abbr>v6) y, en teoría, los nombres son arbitrarios. Sin embargo,
+la configuración del servicio en <em>Debian</em> está pensada para que en el caso del
+módulo para <abbr title="Internet Protocol">IP</abbr>v4 el nombre del archivo sea <code class="file docutils literal notranslate"><span class="pre">kea-dhcp4.conf</span></code> (que por
+otro lado el nombre que suele asignarse por convención).</p>
+<p>Así pues comencemos por una configuración muy, muy básica con la que se
+proporciona configuraciones a una red sin distinguir máquinas clientes:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">   </span><span class="nt">"Dhcp4"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"interfaces-config"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">          </span><span class="c1">// Intefaces por las que se proporciona configuración de red</span>
+<span class="w">         </span><span class="nt">"interfaces"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="s2">"eth1"</span><span class="w"> </span><span class="p">]</span>
+<span class="w">      </span><span class="p">},</span>
+
+<span class="w">      </span><span class="c1">// Almacenamiento de las asignaciones (sin base de datos: CSV)</span>
+<span class="w">      </span><span class="nt">"lease-database"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">         </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"memfile"</span><span class="p">,</span>
+<span class="w">         </span><span class="nt">"persist"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">         </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/var/lib/kea/kea-leases4.csv"</span>
+<span class="w">      </span><span class="p">},</span>
+
+<span class="w">      </span><span class="c1">// -- Parámetro globales</span>
+<span class="w">      </span><span class="nt">"authoritative"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"valid-lifetime"</span><span class="p">:</span><span class="w"> </span><span class="mi">6000</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"max-valid-lifetime"</span><span class="p">:</span><span class="w"> </span><span class="mi">7200</span><span class="p">,</span>
+
+<span class="w">      </span><span class="c1">// -- Opciones DHCP aplicables a todas la redes</span>
+<span class="w">      </span><span class="nt">"option-data"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">         </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ntp-servers"</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"data"</span><span class="p">:</span><span class="w"> </span><span class="s2">"hora.roa.es"</span>
+<span class="w">         </span><span class="p">}</span>
+<span class="w">      </span><span class="p">],</span>
+
+<span class="w">      </span><span class="c1">// -- Configuración de subredes</span>
+<span class="w">      </span><span class="nt">"subnet4"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">         </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">"subnet"</span><span class="p">:</span><span class="w"> </span><span class="s2">"192.168.255.0/24"</span><span class="p">,</span>
+<span class="w">            </span><span class="c1">// Opciones DHCP específicas de esta subred</span>
+<span class="w">            </span><span class="nt">"option-data"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">               </span><span class="p">{</span>
+<span class="w">                  </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"routers"</span><span class="p">,</span>
+<span class="w">                  </span><span class="nt">"data"</span><span class="p">:</span><span class="w"> </span><span class="s2">"192.168.255.1"</span>
+<span class="w">               </span><span class="p">},</span>
+<span class="w">               </span><span class="p">{</span>
+<span class="w">                  </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"domain-name-servers"</span><span class="p">,</span>
+<span class="w">                  </span><span class="nt">"data"</span><span class="p">:</span><span class="w"> </span><span class="s2">"192.168.255.1"</span>
+<span class="w">               </span><span class="p">},</span>
+<span class="w">               </span><span class="p">{</span>
+<span class="w">                  </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"domain-name"</span><span class="p">,</span>
+<span class="w">                  </span><span class="nt">"data"</span><span class="p">:</span><span class="w"> </span><span class="s2">"smr2.luna"</span>
+<span class="w">               </span><span class="p">},</span>
+<span class="w">               </span><span class="p">{</span>
+<span class="w">                  </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"broadcast-address"</span><span class="p">,</span>
+<span class="w">                  </span><span class="nt">"data"</span><span class="p">:</span><span class="w"> </span><span class="s2">"192.168.255.255"</span>
+<span class="w">               </span><span class="p">}</span>
+<span class="w">            </span><span class="p">]</span>
+<span class="w">            </span><span class="c1">// Pools de asignaciones.</span>
+<span class="w">            </span><span class="nt">"pools"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">               </span><span class="p">{</span>
+<span class="w">                  </span><span class="nt">"pool"</span><span class="p">:</span><span class="w"> </span><span class="s2">"192.168.255.100 - 192.168.255.150"</span>
+<span class="w">               </span><span class="p">}</span>
+<span class="w">            </span><span class="p">],</span>
+<span class="w">         </span><span class="p">}</span>
+<span class="w">      </span><span class="p">]</span>
+<span class="w">   </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
 </section>
 
 
@@ -57,6 +160,16 @@
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="Main">
         <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="../../index.html">Tabla de contenido</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">6.1.5. Kea <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr></a><ul>
+<li><a class="reference internal" href="#configuracion-basica">6.1.5.1. Configuración básica</a></li>
+</ul>
+</li>
+</ul>
+
+  </div>
   <div>
     <h4>Tema anterior</h4>
     <p class="topless"><a href="04.isc.html"
@@ -103,12 +216,12 @@
         <li class="nav-item nav-item-0"><a href="../../index.html">documentación de Linuxnomicón - rolling</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" ><span class="section-number">6. </span>Servicios de infraestructura</a> &#187;</li>
           <li class="nav-item nav-item-2"><a href="index.html" ><span class="section-number">6.1. </span>DHCP</a> &#187;</li>
-        <li class="nav-item nav-item-this"><a href=""><span class="section-number">6.1.5. </span><abbr title="Internet Systems Consortium">ISC</abbr> KEA</a></li> 
+        <li class="nav-item nav-item-this"><a href=""><span class="section-number">6.1.5. </span>Kea <abbr title="Dynamic Host Configuration Protocol">DHCP</abbr></a></li> 
       </ul>
     </div>
     <div class="footer" role="contentinfo">
     &#169; Copyright CC BY 4.0, 2016-2026, José Miguel Sánchez Alés.
-      Creado usando <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.1.
+      Creado usando <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.2.0.
     </div>
   </body>
 </html>
