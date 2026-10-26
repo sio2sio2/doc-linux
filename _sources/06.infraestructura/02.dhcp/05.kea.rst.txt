@@ -52,5 +52,215 @@ proporciona configuraciones a una red sin distinguir máquinas clientes:
 .. literalinclude:: files/kea-dhcp4.simple.conf
    :language: json
 
-.. |ISC| replace:: :abbr:`ISC (Internet Systems Consortium)`
+Las claves son las siguientes:
 
+* Los archivos de configuración están en formato |JSON|\ [#]_.
+* La propiedad de nivel superior que gestiona este módulo es *Dhcp4*.
+* Sus propiedades hijas podemos clasificarlas en cuatro tipos:
+
+  a. Algunas que afectan al funcionamiento del propio módulo como
+     *interfaces-config* y *lease-database* y que, por tanto, sólo pueden
+     definirse en este ámbito global.
+
+  #. Características del servicio |DHCP| como si es autoritario o cuál
+     es el tiempo máximo de concesión. Éstas sí pueden ser sobrescritas por una
+     configuración específica en una subred.
+
+  #. Opciones |DHCP| que se aplicarán a todas las redes y que se introducen con
+     *option-data*. También pueden ser sobreeescritas.
+
+  #. La propiedad *subnet* que permite definir cada una de las redes en las
+     que actuará el servidor.
+
+* En cada subred debemos definir varios aspectos:
+
+  - Un identificador obligatorio (un número entero de 4 *bytes*).
+  - Cuál es la subred en formato |CIDR|.
+  - Las características del servicio |DHCP| que queremos que sobreescriban los
+    valores globales (en la configuración de ejemplo no hay).
+  - Las opciones |DHCP| particulares para la subred que sobrescribirán cualquier
+    valor global.
+  - Los distintos *pools* de asignación. Para definir el rango, se puede usar la
+    notación utilizada en el archivo o una notación |CIDR|: "``192.168.255.32/26``".
+
+.. tip:: Una propiedad muy útil (definible a nivel global o de subred) es:
+
+   .. code-block:: json
+
+      "match-client-id": false
+
+   que evita que el servidor identifique al cliente por el identificador que
+   éste le envía (opcion |DHCP| 61) y los identifique por su dirección |MAC|.
+   Esta opción es muy útil en escenarios en los que los clientes están
+   configurados para arrancar primero por red y pueden, si no se configura esta
+   propiedad, llegar a consumir dos direcciones |IP|: una este arranque por red
+   y, fallado éste, otra la del sistema operativo local, ya que ambas peticiones
+   se identifican de distinto modo.
+
+Declaración de máquinas
+=======================
+Podemos identificar máquinas conocidas mediante distintos criterios (como su
+identificador de cliente o su dirección |MAC|) para definirles alguna opción
+|DHCP|, incluida una dirección |IP|. Para ello, debemos incluir un array *reservations*
+dentro de alguna de las subredes:
+
+
+.. code-block:: json
+
+   {
+      "subnet4": [
+         {
+            "id": 1,
+            "subnet": "182.168.255.0/24",
+
+            // ...
+
+            "reservations": [
+               {"hw-address": "de:ad:be:ef:00:11"},
+               {"hw-address": "de:ad:be:ef:00:12"}
+            ]
+         }
+      ]
+   }
+
+En este caso hemos declarado dos máquinas identificadas por su dirección |MAC|,
+aunque no hemos definido qué opciones |DHCP| particulares tiene cada una de
+ellas. ¿Tiene algún sentido? Sí, porque el servidor predefine dos :ref:`clases
+de máquinas <kea-clases>` (``KNOWN`` y ``UNKNOW``), pero ya veremos cómo tratar
+esto. Por ahora, limitémonos a definir opciones particulares para estas
+másquinas identificadas:
+
+.. code-block:: json
+
+   {
+      "reservations" : [
+         {
+            "hw-address": "de:ad:be:ef:00:11",
+            "ip-address": "192.168.255.10",  // Fuera del rango.
+            "option-data": [
+               {
+                  "name": "dhcp-lease-time", 
+                  "data": 86400 // Un día entero.
+               } 
+            ]
+         },
+         {
+            "hw-address": "de:ad:be:ef:00:12",
+            "ip-address": "192.168.255.32"  // Dentro de un pool definido.
+         }
+      ]
+   }
+
+Como puede verse es válido asignar |IP| que estén incluidas en algún rango de
+asignación que definamos con *pool*. Sin embargo, esto implica hacer más
+comprobaciones, por lo que mejora el rendimiento del servidor que lo evitemos y
+declaremos explícitamente en la definición de la subred o en a nivel global que
+nuestras definiciones serán siempre fuera de los rangos establecidos:
+
+.. code-block:: json
+
+   {
+      "subnet4": [
+         {
+            "id": 1,
+            "subnet": "182.168.255.0/24",
+            "reservations-out-of-pool": true,
+
+            // ...
+
+            "reservations": [
+               {
+                  "hw-address": "de:ad:be:ef:00:11",
+                  "ip-address": "192.168.255.10"
+               },
+               {
+                  "hw-address": "de:ad:be:ef:00:12",
+                  "ip-address": "192.168.255.10"
+               }
+            ]
+         }
+      ]
+   }
+
+Lo habitual es que la identificación de máquinas se realice a nivel de subred,
+que es lo que hemos hecho hasta ahora. Sin embargo, puede ocurrir que nos
+interese identificar algunas máquinas a nivel global (p.ej. portátiles que se
+conectan a distintas redes). Para ello necesitamos, no sólo escribir un bloque
+*reservations* en fuera de las subredes, sino habilitar explícitamente las
+reservas globales:
+
+.. code-block:: json
+   :emphasize-lines: 3
+
+   {
+      "Dhcp4": {
+         "reservations-global": true,  // Habilitamos reservas globales
+         "reservations": [             // Bloque global
+            {
+               "hw-address": "de:ad:be:ef:12:34",
+               "option-data": [
+                  {
+                     "name": "dhcp-lease-time",
+                     "data": 3600
+                  }
+               ]
+            }
+         ],
+
+         // ... Resto de configuración (incluidas subredes) ...
+      }
+   }
+
+Obviamente, si las reservas son globales, no tiene sentido definir opciones que
+sean propias de alguna subred (como una dirección |IP| fija).
+
+.. _kea-clases:
+
+Clases
+======
+Las clases permiten agrupar clientes por alguna de sus características, a fin de
+asignarles un rango particular de asignación o unas opciones |DHCP| distintas al
+resto. Antes de ver cómo definirlas es conveniente que sepamos que ya existen
+algunas clases predefinidas:
+
+``ALL``
+   que es la clase que engloba a todos los clientes.
+
+``KNOWN``
+   que es la clase que engloba a todas aquellas máquinas que han sido definidas
+   usando lo explicado bajo el epígrafe anterior.
+
+``UNKNOWN``
+   que es la clase complementaria a la anterla clase que engloba a todas
+   aquellas máquinas que han sido definidas usando lo explicado bajo el epígrafe
+   anterior.
+
+``UNKNOWN``
+   que es la clase complementaria a la anterior.
+
+Para definir una clase hay que hacerlo en el nivel global:
+
+.. code-block:: json
+
+   {
+      "Dhcp4": {
+         "client-classes": [
+            {
+               "name": "virtualbox",
+               "test": "substring(pkt4.mac, 0, 3) == 0x080027"
+            }
+         ]
+      }
+   }
+
+.. rubric:: Notas al pie
+
+.. [#] En realidad, en un formato |JSON| relajado, ya que se admiten comentarios
+   (también con el caracter '``#``') y comas finales como los que podemos encontrar
+   en los archivos de configuración de `Visual Studio Code
+   <https://code.visualstudio.com/>`_.
+
+.. |ISC| replace:: :abbr:`ISC (Internet Systems Consortium)`
+.. |CIDR| replace:: :abbr:`CIDR (Classless Inter-Domain Routing)`
+.. |JSON| replace:: :abbr:`JSON (Javascript Object Notation)`
+.. |MAC| replace:: :abbr:`MAC (Media Access Control)`
