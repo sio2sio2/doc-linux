@@ -97,6 +97,39 @@ Las claves son las siguientes:
    y, fallado éste, otra la del sistema operativo local, ya que ambas peticiones
    se identifican de distinto modo.
 
+Una vez escrito el archivo de configuración, puede comprobarse a mano su validez
+con:
+
+.. code-block:: console
+
+   # kea-dhcp4 -t kea-dhcp4.conf
+
+.. caution:: En *Debian* el servicio está asegurado por :ref:`Apparmor
+   <apparmor>` y el acceso al directorio de configuración :file:`/etc/kea` está
+   restringido al usuario y grupo *_kea*. Esto supone que la prueba, que se hace
+   como administrador, fallará por falta de permisos. Para evitarlo, podemos
+   ejecutar la prueba con el usuario apropiado:
+
+   .. code-block:: console
+
+      # runuser -u _kea -- kea-dhcp4 -t kea-dhcp4.conf
+
+   o bien, si prevemos hacer más pruebas y no queremos usar continuamente
+   :ref:`runuser`:
+
+   .. code-block:: console
+
+      # newgrp _kea  # root pertenecerá temporalmente al grupo _kea.
+      # kea-dhcp4 -t kea-dhcp4.conf
+
+Por último, es conveniente saber cómo consultarle al servidor las asignaciones
+que ha realizado. Sin necesidad de instalar servicios adicionales, se puede,
+simplemente consultar el |CSV| de asignaciones:
+
+.. code-block:: console
+
+   # column -ts, /var/lib/kea/kea-leases4.csv
+
 Declaración de máquinas
 =======================
 Podemos identificar máquinas conocidas mediante distintos criterios (como su
@@ -231,11 +264,6 @@ algunas clases predefinidas:
    usando lo explicado bajo el epígrafe anterior.
 
 ``UNKNOWN``
-   que es la clase complementaria a la anterla clase que engloba a todas
-   aquellas máquinas que han sido definidas usando lo explicado bajo el epígrafe
-   anterior.
-
-``UNKNOWN``
    que es la clase complementaria a la anterior.
 
 Para definir una clase hay que hacerlo en el nivel global:
@@ -253,6 +281,54 @@ Para definir una clase hay que hacerlo en el nivel global:
       }
    }
 
+.. caution:: A diferencia de lo que ocurre con el servidor |ISC| |DHCP|, el
+   campo que contiene la |MAC| es estrictamente la |MAC| y no contiene en su
+   primer *byte* el tipo de red.
+
+Cuando se quiere comprobar una opción |DHCP| debe hacerse lo siguiente:
+
+.. code-block:: json
+
+   {
+      "Dhcp4": {
+         "client-classes": [
+            {
+               "name": "virtualbox",
+               "test": "substring(option[60].hex, 0, 9) == 'PXEClient'"
+            }
+         ]
+      }
+   }
+
+En este caso, nos hemos centrado en la opción **60** (*Vendor Class*), que
+identifica al tipo de dispositivo. Por tanto, la clase identifica a las máquinas
+que han arrancado por red (|PXE|).
+
+.. note:: Obsérvese que en este caso la cadena se ha escrito entre comillas para
+   que la comparación sea de caracteres. En el caso anterior de la |MAC| nos
+   interesaba directamente el código hexadecimal, por lo que añadimos el prefijo
+   "*0x*" y no usamos comillas.
+
+Las opciones permiten incluir los operadores lógicos *and*, *or* y *not* para
+crear operaciones más complejas:
+
+.. code-block:: json
+
+   {
+      "Dhcp4": {
+         "client-classes": [
+            {
+               "name": "virtualbox",
+               // PXE o clientes Windows.
+               "test": "substring(option[60].hex, 0, 9) == 'PXEClient' or substring(option[60].hex, 0, 8) == 'MSFT 5.0'"
+            }
+         ]
+      }
+   }
+
+La precedencia de estos operadores es la habitual y pueden usarse parántesis
+para modificarla.
+
 .. rubric:: Notas al pie
 
 .. [#] En realidad, en un formato |JSON| relajado, ya que se admiten comentarios
@@ -264,3 +340,5 @@ Para definir una clase hay que hacerlo en el nivel global:
 .. |CIDR| replace:: :abbr:`CIDR (Classless Inter-Domain Routing)`
 .. |JSON| replace:: :abbr:`JSON (Javascript Object Notation)`
 .. |MAC| replace:: :abbr:`MAC (Media Access Control)`
+.. |PXE| replace:: :abbr:`PXE (Preboot eXecution Environment)`
+.. |CSV| replace:: :abbr:`CSV (Comma-Separated Values)`
