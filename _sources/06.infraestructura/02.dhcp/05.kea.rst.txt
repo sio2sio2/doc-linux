@@ -83,6 +83,18 @@ Las claves son las siguientes:
   - Los distintos *pools* de asignación. Para definir el rango, se puede usar la
     notación utilizada en el archivo o una notación |CIDR|: "``192.168.255.32/26``".
 
+* Como podemos ver, características del servicio y opciones |DHCP| pueden definirse
+  en distinto nivel, así que conviene saber cuál es la prioridad (de mayor a menor):
+
+  a. :ref:`Reservas de máquinas <kea-reservations>`.
+  #. *Pools*.
+  #. Subredes.
+  #. Red compartida.
+  #. :ref:`Clases <kea-classes>`
+  #. Nivel global.
+
+  Ya iremos aprendiendo qué son algunos de estos niveles que no hemos introducido aún.
+
 .. tip:: Una propiedad muy útil (definible a nivel global o de subred) es:
 
    .. code-block:: json
@@ -130,8 +142,10 @@ simplemente consultar el |CSV| de asignaciones:
 
    # column -ts, /var/lib/kea/kea-leases4.csv
 
-Declaración de máquinas
-=======================
+.. _kea-reservations:
+
+Reservas de máquinas
+====================
 Podemos identificar máquinas conocidas mediante distintos criterios (como su
 identificador de cliente o su dirección |MAC|) para definirles alguna opción
 |DHCP|, incluida una dirección |IP|. Para ello, debemos incluir un array *reservations*
@@ -247,7 +261,7 @@ reservas globales:
 Obviamente, si las reservas son globales, no tiene sentido definir opciones que
 sean propias de alguna subred (como una dirección |IP| fija).
 
-.. _kea-clases:
+.. _kea-classes:
 
 Clases
 ======
@@ -288,15 +302,17 @@ Para definir una clase hay que hacerlo en el nivel global:
 Cuando se quiere comprobar una opción |DHCP| debe hacerse lo siguiente:
 
 .. code-block:: json
+   :emphasize-lines: 6
 
    {
       "Dhcp4": {
          "client-classes": [
             {
-               "name": "virtualbox",
+               "name": "pxe",
                "test": "substring(option[60].hex, 0, 9) == 'PXEClient'"
             }
-         ]
+         ],
+         // ...
       }
    }
 
@@ -313,12 +329,13 @@ Las opciones permiten incluir los operadores lógicos *and*, *or* y *not* para
 crear operaciones más complejas:
 
 .. code-block:: json
+   :emphasize-lines: 7
 
    {
       "Dhcp4": {
          "client-classes": [
             {
-               "name": "virtualbox",
+               "name": "pxe_win",
                // PXE o clientes Windows.
                "test": "substring(option[60].hex, 0, 9) == 'PXEClient' or substring(option[60].hex, 0, 8) == 'MSFT 5.0'"
             }
@@ -328,6 +345,165 @@ crear operaciones más complejas:
 
 La precedencia de estos operadores es la habitual y pueden usarse parántesis
 para modificarla.
+
+Como condición podemos incluir en *test*  la pertenecia a otra clase:
+
+.. code-block:: json
+   :emphasize-lines: 10
+
+   {
+      "Dhcp4": {
+         "client-classes": [
+            {
+               "name": "pxe",
+               "test": "substring(option[60].hex, 0, 9) == 'PXEClient'"
+            },
+            {
+               "name": "not-pxe",
+               "test": "not member('pxe')"
+            }
+         ],
+         // ...
+      }
+   }
+
+Sin embargo, es muy importante tener presente que para que funcione la clase
+referida debe haberse definido antes.
+
+Un uso típico de las clases es asignarle algún *pool* específico. Por ejemplo:
+
+.. code-block:: json
+
+   {
+      // ...
+      "subnet4": [
+         {
+            "subnet": "192.168.255.0/24",
+            "id": 1,
+            "pools": [
+               {
+                  "pool": "192.168.255.32/27",
+                  "client-classes": [ "pxe" ]
+               },
+               {
+                  "pool": "192.168.255.64/26",
+                  "client-classes": [ "not-pxe" ]
+               }
+            ]
+         }
+      ]
+   }
+
+.. note:: Téngase presente que en este servidor no hay un equivalente al ``deny
+   members of`` del :ref:`ISC DHCP <isc-dhcp>`, por lo que emular este
+   comportamiento implica definir la clase complementaria como hemos hecho.
+
+Cuando se define una clase, también se pueden añadir características del
+servidor u opciones |DHCP| que sean aplicables a los miembros de la clase. Por
+ejemplo:
+
+.. code-block::
+
+   {
+      "Dhcp4": {
+         "client-classes": [
+            {
+               "name": "pxe",
+               "test": "substring(option[60].hex, 0, 9) == 'PXEClient'",
+               "max-valid-lifetime": 3600
+            }
+         ]
+         // ...
+      }
+   }
+
+.. warning:: Tenga presente la prioridad. En este caso, cualquier redefinición
+   de ese tiempo máximo de concesión dentro de una subred, por ejemplo,
+   sobreescribirá la definición en la clase. Sin embargo, esto puede cambiar si
+   se retrasa la evaluación, como se verá a continuación.
+
+.. caution:: Las clases se evalúan antes de la selección de la red y la
+   evaluación de las reservas, pero es posible alterar este comportamiento para
+   que se evalúen después:
+
+   .. code-block:: json
+      :emphasize-lines: 7, 17
+
+      {
+         "Dhcp4": {
+            "client-classes": [
+               {
+                  "name": "reservadas",
+                  "test": "member('KNOWN')",
+                  "only-in-additional-list": true,
+                  "option-data": [
+                     // Definición de algunas opciones.
+                  ] 
+               }
+            ],
+            "subnet4": [
+               {
+                  "subnet": "192.168.255.0/24",
+                  "id": 1,
+                  "evaluate-additional-classes": [ "reservadas" ],
+                  // ...
+               }
+            ]
+         }
+      }
+
+   En este caso, no es necesario indicarlo, porque las clases ``KNOWN`` y
+   ``UNKNOWN`` son especiales y *Kea* ya tiene en cuenta que debe definirlas
+   después de la reserva de máquinas. Sin embargo, posponer la evaluación de
+   la clase provoca que la evaluación (que podría ser mucho más complicada)
+   se haga ya seleccionada la red y sólo para la **1** con lo que si hubiera
+   más redes, nos ahorraríamos la evaluación para todas ellas lo que mejora
+   el rendimiento.
+
+   Téngase presente que al retrasar la evaluación de la clase, también se
+   altera la prioridad: las características del servicio y las opciones
+   |DHCP| definidas para la clase tomarán prioridad sobre las definidas para
+   la subred. E incluso sobre las definidas para el *pool* si la propiedad
+   ``evaluate-additional-classes`` se inncluye dentro de la declaración de un
+   *pool* y no dentro de la declaración de la subred.
+
+Otra posibilidad relacionada con las clases es añadir particularmente una
+reserva a una o varias clases ya definidas.
+
+.. code-block:: json
+
+   {
+      "Dhcp4": {
+         "client-classes": [
+            {
+               "name": "selecta"
+            }
+         ],
+         // ...
+         "subnet4": [
+            {
+               "subnet": "192.168.255.0/4",
+               "id": 1,
+               // ...
+               "reservations": [
+                  {
+                     "hw-address": "de:ad:be:ef:01:23",
+                     "client-classes": [ "selecta" ]
+                  }
+               ]
+            },
+            // ...
+         ]
+
+      }
+   }
+
+En este caso, hemos dejado la declaración de la clase sin establecer una
+condición con ``test``, porque nuestra intención es que pertenezcan a la clase
+exclusivamente las máquinas referenciadas que seleccionemos. Sin embargo, podría
+haberse incluido alguna condición y, en ese caso, la clase estaría constituida
+por todas los clientes que cumplieran con la condición más las reservas que
+hubiéramos explicitamente incluido, cumplan o no la condición.
 
 .. rubric:: Notas al pie
 
