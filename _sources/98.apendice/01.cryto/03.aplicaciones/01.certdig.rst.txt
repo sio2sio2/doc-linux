@@ -26,7 +26,7 @@ identificación.
 
 .. image:: files/certificado.png
 
-.. note:: En consecuencia, la función de un certificado digital es acreditar la
+.. note:: En consecuencia, la función de un *certificado digital* es acreditar la
    identidad del propietario de una clave pública; y esta es su aportación a los
    :ref:`fundamentos criptográficos que vimos en el apartado anterior
    <tecnicas-crypto>`. Así pues, cuando un proceso criptográfico requiera la
@@ -34,6 +34,14 @@ identificación.
    <firm-doc>`) habrá certificado; en cambio, cuando el proceso no requiere tal
    acreditación (p.e. un :ref:`transacción de criptomoneda <blockchain>`),
    bastará con la existencia de un par de claves pública y privada.
+
+.. note:: En puridad a lo que se llama *certificado digital* es exclusivamente a
+   la parte pública, que es precisamente lo que refleja el gráfico de arriba. La
+   clave privada no forma parte del término. Sin embargo, es muy común que
+   coloquialmente nos referimos con el término al conjunto completo. En
+   ocasiones, para salvar esta ambigüedad se habla de *certificado digital
+   público* (que es propiamente el *certificado digital*) y *certificado
+   digital privado* (que es todo, incluyendo la clave privada).
 
 Es importante tener presente que lo que hemos denominados *datos identificativos*
 en el esquema no son exclusivamente datos referentes a la identidad del
@@ -589,25 +597,47 @@ Observando la salida se distinguen dos partes:
 
 - Los datos en sí (:kbd:`Data`).
 - La firma de tales datos (:kbd:`Signature Algorithm`) para lo cual han usado 
-  como :ref:`función hash el algoritmo sha256 <hash>`.
+  como :ref:`función hash el algoritmo sha256 <hash>` y se ha cifrado el
+  resumen resultante :ref:`con el algoritmo RSA <asimetrico>`.
 
-Dentro de los datos podemos distinguir:
+Dentro de los datos podemos distinguir datos podemos agrupar en cuatro
+conjuntos distintos:
 
-* Datos propiamente identificativos como su número de serie o la identidad del
-  propietario del certificado (``Subject``).
-* Datos referentes al propio certificado como su validez o quién es el firmante
-  (``Issuer``)\ [#]_.
-* La clave pública del certificado (``Subject Public Key Info``).
+a. La identificación del propio propietario (``Subject``), que permite asegurar
+   la autenticidad.
+#. Datos referentes al propio certificado como un identificador, su validez o
+   quién es la |CA| firmante (``Issuer``)\ [#]_.
+#. La clave pública del certificado (``Subject Public Key Info``), que es una
+   clave pública |RSA|.
+#. La firma de la |CA| que certifica todos los anteriores datos.
 
-Uno de los campos (``X509v3 extensions``) contiene campos adicionales con
-información de cualquiera de los tres tipos anteriores. Algunos de estos campos
-ofrecen información interesante como:
+   .. note:: Obsérvese que podemos asegurar que el propietario del certificado tiene
+      una pareja de claves que usan el algoritmo |RSA|, mientras que por la
+      información que se nos da de la firma, podemos asegurar que la |CA| que validó
+      el certificado también usó una pareja de claves |RSA|.
 
-+ La |URL| en la que comprobar si el certificado está revocado (``Authority
-  Information Access``).
+Entre los datos se encuentran las fechas dentro de las que es válido el
+certificado. Esto, en principio, impide usar el certificado para firmar fuera de
+esas fechas. Sin embargo, la fecha depende del sistema local en que se esté
+firmado y, por tanto, para poder firmar con un certificado caducado nos bastaría
+con manipular la fecha del dispositivo. Para evitar esta trampa el *software* de
+firmado puede incorporar un :dfn:`sello de tiempo`, que es un token
+criptográfico que obtiene conectándose a un servidor |TSA| autorizado. Así pues,
+una firma digital asegura la integridad y la autenticidad, pero para que también
+se asegure fehacientemente cuándo se firmó, es necesario que la firma incorpore
+un campo con el *sello de tiempo* generado una |TSA| autorizada.
+
+Uno de los campos (``X509v3 extensions``) contiene campos adicionales. Algunos
+de estos campos ofrecen información interesante como:
+
 + Un identificador para el propio certificado (``X509v3 Subject Key Identifier``).
 + El identificador para el certificado con que la |CA| firmó (``X509v3 Authority
   Key Identifier``).
++ |URL|\ s que proporciona la |CA| firmante (``Authority Information Access``).
+  Este certificado ofrece dos:
+
+  - La |URL| donde se encuentra el certificado firmante (``CA Issuers``).
+  - La |URL| del servicio en el que comprobar si el certificado está revocado (``OCSP``).
 
 La opción ``-text`` de :command:`openssl` devuelve toda la información, pero
 podemos afinar (véase :manpage:`openssl-x509(1)`)::
@@ -1243,6 +1273,7 @@ bastante sencilla, con lo que se hace innecesario el uso de
 .. |PGP| replace:: :abbr:`PGP (Pretty Good Privacy)`
 .. |CRL| replace:: :abbr:`CRL (Certificate Revocation List)`
 .. |CERES| replace:: :abbr:`CERES (CERtificación Española)`
+.. |TSA| replace:: :abbr:`TSA (Time Stamping Authority)`
 
 .. _Digital Signature Trust: https://www.identrust.com/
 .. _Let's Encrypt: https://letsencrypt.org/
