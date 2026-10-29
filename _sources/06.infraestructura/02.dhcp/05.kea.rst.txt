@@ -138,10 +138,6 @@ Por último, es conveniente saber cómo consultarle al servidor las asignaciones
 que ha realizado. Sin necesidad de instalar servicios adicionales, se puede,
 simplemente consultar el |CSV| de asignaciones:
 
-.. code-block:: console
-
-   # column -ts, /var/lib/kea/kea-leases4.csv
-
 .. _kea-reservations:
 
 Reservas de máquinas
@@ -173,7 +169,7 @@ dentro de alguna de las subredes:
 En este caso hemos declarado dos máquinas identificadas por su dirección |MAC|,
 aunque no hemos definido qué opciones |DHCP| particulares tiene cada una de
 ellas. ¿Tiene algún sentido? Sí, porque el servidor predefine dos :ref:`clases
-de máquinas <kea-clases>` (``KNOWN`` y ``UNKNOW``), pero ya veremos cómo tratar
+de máquinas <kea-classes>` (``KNOWN`` y ``UNKNOW``), pero ya veremos cómo tratar
 esto. Por ahora, limitémonos a definir opciones particulares para estas
 másquinas identificadas:
 
@@ -504,6 +500,63 @@ exclusivamente las máquinas referenciadas que seleccionemos. Sin embargo, podr�
 haberse incluido alguna condición y, en ese caso, la clase estaría constituida
 por todas los clientes que cumplieran con la condición más las reservas que
 hubiéramos explicitamente incluido, cumplan o no la condición.
+
+Depuración
+==========
+Es importante saber cómo consultar qué está recibiendo el cliente y qué está
+recibiendo y enviando el servidor para saber si nuestra configuración funciona
+como creemos que debería funcionar.
+
+Las estrategias son las siguientes:
+
+a. Comprobar qué concesión recibe el cliente, lo cual dependerá de :ref:`cuál
+   sea el cliente concreto <DHCP-clients>`.
+
+#. Consultar las concesiones del servidor, que en el caso de que usemos la
+   predeterminada (*memfile*), consiste en consultar
+   el archivo |CSV|:
+
+   .. code-block:: console
+
+      # column -ts, /var/lib/kea/kea-leases4.csv
+
+#. Consultar qué paquetes envía y recibe el servidor. Para ello, debemos configurar
+   los registros que escribe el servidor, ya que por defecto sólo se registran
+   hasta el nivel *INFO*. Para variar este comportamiento, podemos añadir:
+
+   .. code-block:: json
+
+      {
+         "Dhcp4": {
+            // ...
+            "loggers": [
+               {
+                  "name": "kea-dhcp4.packets",
+                  "severity": "DEBUG",
+                  "debuglevel": 55,
+                  "output_options": [{"output": "syslog"}]
+               }
+            ]
+         }
+      }
+
+   que lo que hace es cambiar la configuración del componente que se encarga de
+   escribir los paquetes recibidos y enviados por :program:`Kea`, ya que el
+   nivel raíz (*kea-dhcp4*) no escribe mensajes de depuración. Además, pasamos
+   esos mensajes al demonio de *syslog* que en las versiones modernas de *Debian*
+   acaba gestionando :ref:`SystemD <systemd>`. Por tanto, para revisar al vuelo los
+   paquetes basta con hacer:
+
+   .. code-block:: console
+
+      # journalctl -u kea-dhcp4-server -n5 -f
+
+   y generar peticiones con el cliente.
+
+Redundacia
+==========
+
+.. todo:: Por escribir. El modo HA para tener servidores redundantes.
 
 .. rubric:: Notas al pie
 
