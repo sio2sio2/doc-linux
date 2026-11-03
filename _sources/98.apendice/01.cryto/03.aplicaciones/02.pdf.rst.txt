@@ -4,69 +4,10 @@
    https://pyhanko.readthedocs.io/en/latest/cli-guide/signing.html#some-background-on-pdf-signatures
    http://audentia-gestion.fr/ADOBE/DigitalSignaturesInPDF.pdf
    
-
 Firma de documentos
 *******************
-Para la firma de documentos digitales existen varios estándares:
-
-|CAdES|
-   Consiste en generar un archivo de firma en formato ``.p7s`` (:ref:`formato
-   PKCS #7 <cert-p7>`) que contiene la propia firma digital y, opcionalmente, el
-   certificado firmante e incluso el propio documento firmado. Lo habitual, no
-   obstante, es que no lo contenga y deban conservarse tanto el documento como
-   este archivo de firma.
-
-|XAdES|
-   Es otro estándar que extiende `XML-DSig
-   <https://es.wikipedia.org/wiki/Firma_XML>`_ y adopta el formato |XML| para
-   expresar la información sobre la firma. Hay tres variantes que se diferencian
-   por el modo en que se incluyen los datos firmados (en *Base64*) dentro del
-   propio archivo:
-
-   * *Detached*, que es la única variante que permite, si así se desea, no
-     incorporar los datos firmados.
-   * *Enveloped*.
-   * *Enveloping*, que sólo es apta para documentos |XML| ya que lo incluye
-     dentro del archivo sin codificarlo en *Base64*.
-
-|PAdES|
-   Es una extensión del estańdar |PDF| que permite incrustar la información de
-   firma en un objeto interno del propio documento |PDF|. Dicha información de
-   firma suele estar en formato |CAdES| o *Detached* |XAdES|.
-
-   .. note:: Aunque opcionalmente pueden generarse marcas visibles en el documento
-      que denoten quién ha firmado y cuándo lo ha hecho, la firma digital en sí
-      no deja huella visible en una impresión: se verifica utilizando una
-      herramienta de verificación sobre el archivo.
-
-   .. seealso:: Para conocer con mayor profundidad cómo se almacenan las firmas
-      dentro de un |PDF| puede leer `el extenso libro blanco sobre firmas
-      digitales <https://itextpdf.com/en/resources/books/digital-signatures-pdf>`_
-      de Bruno Lowagie.
-
-Al margen de la obviedad de que el último estándar sólo es válido para firmar
-documentos |PDF|, mientras que los dos primeros permiten firmar cualquier
-documento, hay otra gran diferencia entre ellos: el último estándar incrusta la
-firma en el propio |PDF| por lo que el archivo resultante sigue siendo
-directamente visualizable. En cambio los dos primeros estándares o incrustan el
-documento dentro del archivo de firma (con lo cual dejan de ser visualizables) o
-ni siquiera lo incluyen y obligan a conservar el documento original (`firma
-despegada <https://en.wikipedia.org/wiki/Detached_signature>`_).
-
-.. note:: Autofirma_ es una aplicación que permite firmar utilizando cualquiera
-   de estos estándares.
-
-Otro aspecto importante a tener en cuenta es el procedimiento que se sigue
-cuando son varios los que deben firmar un mismo documento. Hay dos estrategias:
-
-+ La :dfn:`cofirma` o :dfn:`firma en paralelo`, que ocurre cuando no hay
-  jerarquía alguna entre los firmantes y es irrelevante el orden en que se
-  realicen las firmas, ya que cada cual avala el contenido del documento y no
-  las firmas de los demás.
-+ La :dfn:`contrafirma` o :dfn:`firma en cascada`, que ocurre cuando sí hay
-  jerarquía y un firmante de mayor jerarquía también avala la firma del firmante
-  de menor jerarquía. En este caso, el orden sí es importante y las firmas deben
-  realizarse de menor a mayor rango.
+Una de las aplicaciones más evidentes de los certificados digitales es la firma
+digital de documentos en sustitución de la firma manuscrita.
 
 .. _firma-legal:
 
@@ -99,10 +40,188 @@ Como todos los países de la Unión tiene la obligación de remitir estas listas
 es posible la `consulta de todos los prestadores europeos
 <https://digital-strategy.ec.europa.eu/en/policies/eu-trusted-lists>`_.
 
+.. _cms-signeddata:
+
+El objeto |CMS|
+===============
+El objeto |CMS| permite representar la firma digital de un documento:
+
+.. code-block:: none
+
+   CMS SignedData
+       +---- certificates (certificados firmantes o cadenas de certificados)
+       +---- signerInfos (información de cada uno de los firmantes)
+                 +-- SignerInfo (primer firmante)
+                 |     +-- signedAttrs
+                 |     |       +-- contentType (el tipo del documento que se firma)
+                 |     |       +-- messageDigest (el hash de la información)
+                 |     |       +-- signingTime
+                 |     |       +-- ...
+                 |     +-- unsignedAttrs
+                 |     |       +-- counterSignature (si se refrenda una firma anterior)
+                 |     |       +-- ...
+                 |     +-- signatureAlgorithm
+                 |     +-- signature (el conjunto de los signedAttrs cifrados).
+                 +-- SignerInfo (segundo firmante)
+
+Básicamente, este objeto puede contener los certificados firmantes con o sin sus
+cadenas de confianza; y la información de cada uno de las firmas, aunque lo
+habitual, no obstante, es que sólo recoja un firmante\ [#]_. Es interesante
+describir cómo se constituyen los valores de cada atributo ``SignerInfo``, porque
+enseña cómo se realiza la firma en profundidad. En ``SignerInfo`` se recojen dos
+tipos de atributos: los firmados (``signedAttrs``) y los no firmados
+(``unsignedAttrs``). Dentro de los primeros se incluyen algunos cómo
+``contentType`` que declara ``contentType``, el tipo de documento (para que
+alguien malicioso no pueda manipular cómo debe interpretarse el documento),
+``messageDigest``, cuyo valor es el *hash* del documento que se desea firmar,
+``signingTime``, que recoge la hora a la que se firma, etc. Con todos estos
+valores (y según el algoritmo de firma que se incluye en
+``signatureAlgorithm``), se genera un *hash* que se cifra con la clave privada
+del firmante y se almacena en ``signature``. Por lo tanto, se generan dos
+resúmenes criptográficos: el del documento, y otro que incluye el *hash* anterior
+y otra serie de propiedades; y que es propiamente el que se usa en la firma.
+
+.. _crypto-timestamptoken:
+
+Conviene hacer una puntualización, llegados a este punto. Toda esta industria
+técnica, permite asegurar la integridad y la autenticidad de la firma, pero no
+la hora en la que se firma, porque ``signingTime``, aunque es un atributo
+cubierto por la fima, es una hora que se obtiene del sistema local y éste ha
+podido ser manipulado antes de firmar. Por ese motivo, las aplicaciones de firma
+permiten la adición de un :dfn:`sello de tiempo`
+(``id-aa-signatureTimeStampToken`` o similar) que se obtiene con la ayuda de un
+servidor externo dedicado a ello (|TSA|). Básicamente, cuando se pretende añadir
+este sello a la firma, el *software* reserva espacio puesto a ceros para poder
+incrustar el valor del *sello de tiempo* (recordemos que el tamaño de
+``/Contents`` no puede variar después de la firma) y, una vez generada la firma,
+manda un hash de ``signature`` al servicio |TSA|, el cual genera otro objeto
+|CMS| que certifica entre otras cosas, dicho *hash* y el instante de tiempo en
+el que se realiza la petición. El objeto se devuelve al solicitante y éste lo
+incluye como valor del *sello de tiempo*. 
+
+Estándares
+==========
+Para la firma de documentos digitales existen varios estándares:
+
+|CAdES|
+   Consiste en generar un archivo de firma en formato ``.p7s`` (:ref:`formato
+   PKCS #7 <cert-p7>`) que contiene la propia firma digital (:ref:`un objeto CMS
+   <cms-signeddata>`) y, opcionalmente, el certificado firmante e incluso el
+   propio documento firmado.  Lo habitual, no obstante, es que no lo contenga y
+   deban conservarse tanto el documento original como este archivo de firma.
+
+|XAdES|
+   Es otro estándar que extiende `XML-DSig
+   <https://es.wikipedia.org/wiki/Firma_XML>`_ y adopta el formato |XML| para
+   expresar la información sobre la firma. Hay tres variantes que se diferencian
+   por el modo en que se incluyen los datos firmados (en *Base64*) dentro del
+   propio archivo:
+
+   * *Detached*, que es la única variante que permite, si así se desea, no
+     incorporar los datos firmados.
+   * *Enveloped*.
+   * *Enveloping*, que sólo es apta para documentos |XML| ya que lo incluye
+     dentro del archivo sin codificarlo en *Base64*.
+
+|PAdES|
+   Es un conjunto de perfiles de firma electrónica para documentos |PDF|, que
+   permite incrustar la información de firma en un objeto interno del propio
+   documento |PDF|. Dicha información de firma contiene habitualmente el objeto
+   |CMS|, esto es, el mismo objeto que sirve de base para el estándar |CAdES|\
+   [#]_.
+
+   .. note:: Aunque opcionalmente pueden generarse marcas visibles en el documento
+      que denoten quién ha firmado y cuándo lo ha hecho, la firma digital en sí
+      no deja huella visible en una impresión: se verifica utilizando una
+      herramienta de verificación sobre el archivo.
+
+   La estrategia de este estándar es actualizar incrementalmente el |PDF| para
+   que se añadan al final del documento varios objetos relacionados con la
+   firma\ [#]_. Uno de esos objetos es el diccionario de firma del |PDF|. Este
+   diccionaro incluye distintos campos (``/M``, la fecha de la firma;
+   ``/Filter`` que identifica el *software* que se usó para firmar;
+   ``/SubFilter``, que especifica cómo se ha codificado la firma, etc.) y, entre
+   ellos, dos fundamentales:
+
+   ``/Contents``
+      que incluye la información de firma (habitualmente el objeto |CMS|).
+
+   ``/ByteRange``
+      que especifica que rangos de *bytes* del |PDF| quedan cubiertos por la
+      firma, esto es, qué partes del documento se han tomado para generar el
+      *hash* que servirá como base para la firma. Es obvio que del cálculo de
+      *hash* debe excluirse el valor de ``/Contents``, por lo que por lo general
+      este campo incluirá todo lo que hay antes de ``/Contents``, y todo lo que
+      hay después de él. Si estos rangos no cubrieran todo, podría sospecharse
+      que se ha añadido de forma espuria información adicional\ [#]_, por lo que
+      el *software* de verificación debería advertir de esta circunstancia.
+
+   Un aspecto importante (extensible a todos los estándares, pero que
+   explicaremos con este) es el procedimiento que se sigue cuando son varios los
+   que deben firmar un mismo documento. Hay dos necesidades distintas:
+
+   + La :dfn:`cofirma` o :dfn:`firma en paralelo`, que ocurre cuando no hay
+     jerarquía alguna entre los firmantes y es irrelevante el orden en que se
+     realicen las firmas, ya que cada cual avala el contenido del documento y no
+     las firmas de los demás.
+
+     En el caso particular de |PAdES|, después de haber firmado la primera
+     persona, se vuelve a hacer una actualiación del |PDF| para añadir los
+     objetos relacionados con la segunda firma, y se procede del mismo modo.
+     Esto supone, que la firma del segundo firmante cubre la del primero (aunque
+     la rafrenda), ya que sólo se excluye del ella el valor de su propio
+     ``/Contents``.
+
+   + La :dfn:`contrafirma` o :dfn:`firma en cascada`, que ocurre cuando sí hay
+     jerarquía y un firmante de mayor jerarquía también avala la firma del firmante
+     de menor jerarquía. En este caso, el orden sí es importante y las firmas deben
+     realizarse de menor a mayor rango.
+
+     En este caso, se procede del mismo modo, pero el :ref:`objeto CMS
+     <cms-signeddata>` de la segunda firma, debe añadir entre los atributos no
+     firmados un atributo ``CounterSignature``, que es básicamente un atributo
+     ``SignedInfo`` que no avala el PDF, sino solamente la firma del firmante
+     refrendado (es decir, su ``messageDigest`` es el *hash* del valor de
+     atributo ``signature`` del ``SignedInfo`` del firmante que refrenda).
+
+   Por tanto en ambos casos, procedimentalmente, se hace una firma en cascada,
+   y en la *contrafirma* se añade en el diccionario de firma un atributo de
+   refrente (``CounterSignature``) que no existe en el otro caso. ¿Por qué se
+   obra así si técnicamente un único objeto |CMS| permite la inclusión de varios
+   firmantes? La causa está en ``/ByteRange``: si se utilizara un único objeto
+   |CMS| al que se le van añadiendo firmantes, el campo ``/Contents`` variaría
+   de tamaño con cada adición, lo que alteraría los rangos que debe incluir
+   ``/ByteRange``. Pero para las firmas anteriores el *hash* cubría los rangos
+   y éstos ahora no valen. Podría haberse sido previsor y haber creado un
+   ``/Contents`` muy grande relleno con muchos ceros para admitir más firmas,
+   pero esto siempre tendría un límite. Obrar en cascada, sin embargo, es más
+   versátil.
+
+   .. seealso:: Para conocer con mayor profundidad cómo se almacenan las firmas
+      dentro de un |PDF| puede leer `el extenso libro blanco sobre firmas
+      digitales <https://itextpdf.com/en/resources/books/digital-signatures-pdf>`_
+      de Bruno Lowagie.
+
+Al margen de la obviedad de que el último estándar sólo es válido para firmar
+documentos |PDF|, mientras que los dos primeros permiten firmar cualquier
+documento, hay otra gran diferencia entre ellos: el último estándar incrusta la
+firma en el propio |PDF| por lo que el archivo resultante sigue siendo
+directamente visualizable. En cambio los dos primeros estándares o incrustan el
+documento dentro del archivo de firma (con lo cual dejan de ser visualizables) o
+ni siquiera lo incluyen y obligan a conservar el documento original (`firma
+despegada <https://en.wikipedia.org/wiki/Detached_signature>`_).
+
+.. note:: Autofirma_ es una aplicación que permite firmar utilizando cualquiera
+   de estos estándares.
+
+Aplicación práctica
+===================
+Completemos el epígrafe viendo cómo firmar en la práctica documentos.
+
 .. _pdfsig:
 
 |PAdES|
-=======
+-------
 Hay varias aplicaciones en Linux que permiten la firma y verificación de firmas
 de documentos |PDF|:
 
@@ -163,7 +282,7 @@ Nos centraremos en este apéndice práctico en el uso por línea de órdenes de
    # apt install poppler-utils
 
 Validación
-----------
+++++++++++
 La validez de la firma de un |PDF| se puede hacer del siguiente modo::
 
    $ pdfsig -nocert documento.pdf
@@ -177,12 +296,24 @@ comprobar la firma y cerciorarnos de la fiabilidad del certificado::
 
    $ pdfsig -nssdir ~/.pki/nssdb documento.pdf
 
+.. warning:: Esta comprobación certifica la integridad y la autenticidad, pero
+   no que haya podido haber una manipulación en las fechas para, por ejemplo,
+   poder firmar con un certificado caducado. Esta comprobación, requiere la
+   existencia de un :ref:`sello de tiempo <crypto-timestamptoken>` y hacer
+   comprobaciones sobre él.
+
+   Otro aspecto importante es que, :command:`pdfsig` no tiene en cuenta si el
+   certificado era válido en el momento de la firma, sino que comprueba si el
+   certificado es válido en el momento de comprobar la firma, por lo que
+   provocará que no se pase la comprobación si el certificado ya está caducado,
+   aunque no lo estuviera al firmar.
+
 .. seealso:: Consulte cómo crear, consultar y mantener un :ref:`catálogo NSS
    <cert-nss>`. En la orden de ejemplo se ha supuesto que se usa el catálogo
    creado por Chromium_.
 
 Firma
------
++++++
 .. warning:: Para poder firmar documentos es necesario utilizar al menos la
    versión **21.01** de :deb:`poppler-utils`, y preferentemente la **21.10** (o
    sea, al menos, *Bookworm*), que permite añadir un nuevo campo de firma.
@@ -192,14 +323,62 @@ de confianza::
 
    $ pdfsig -nssdir ~/.pki/nssdb -add-signature -nick 'CADENA-EN-NSSDB-DEL-CERT' doc.pdf doc_firmado.pdf
 
+Extracción
+++++++++++
+Con :program:`pdfsig` también podemos extraer la firma de un |PDF| (recordemos
+que el valor del campo `/Contents` es un objeto |CMS| en formato |DER|)::
+
+   $ pdfsig -dump doc.pdf
+   $ mv doc.pdf.sig0 firma.p7s
+
+La orden generará distintos archivos (:file:`doc.pdf.sig0`,
+:file:`doc.pdf.sig1`), uno por cada firma que contenga el documento. Estos
+archivos son el contenido de los correspondientes campos ``//Contents`` por lo
+que representan el objeto |CMS| en formato binario. Si quisiéramos su
+codificación a base64::
+
+$ openssl cms -inform DER -in firma.p7s -cmsout -outform PEM -out firma.pem
+
+Y si quisiéramos extraer los certificados que contiene::
+
+$ openssl pkcs7 -inform DER -in firma.p7s -print_certs -out certs.pem
+
+Sello de tiempo
++++++++++++++++
+Si queremos saber, simplemente, si la firma contiene un *sello de tiempo*, basta
+con::
+
+$ openssl cms -in firma.p7s -inform DER -cmsout -print | grep -i "StampToken"
+
+Comprobar el sello de tiempo requiere varias acciones:
+
+a. Extraer el valor de ``signature`` que es el *hash* que se proporciona a la
+   |TSA|.
+#. Extraer el sello de tiempo (un :ref:`objeto CMS <cms-signeddata>`).
+   Desgraciadamente estas dos operaciones son difíciles de hacer con :command:`openssl`,
+   porque la herramienta no tiene opciones específicas para ello. Sin embargo,
+   es fácil escribir un pequeño *script* con *Python* y su librería `asn1crypto
+   <https://www.freeipa.org/page/V4/Asn1crypto>`_ que lo haga por nosotros
+   (:download:`descárguelo de aquí <files/extrae_firma.py>`)::
+
+      $ extrae_firma.py firma.p7s
+
+#. Extraer el certificado de la |TSA| (y su cadena de confianza)::
+
+   $ openssl pkcs7 -inform DER -in firma.p7s-timestamp0 -print_certs -out tsa_cert.pem
+
+#. Hacer propiamente la comprobación con estos todos estos valores::
+
+   $ openssl ts -verify -token_in -in firma.p7s-timestamp0 -data firma.p7s-signature0 -CAfile tsa_cert.pem
+
 |CAdES|
-=======
+-------
 Otro modo de firmar (en especial si el documento original no es un |PDF|) es el
 estándar |CAdES|, que es básicamente el referido en el :rfc:`2315` y que ya
 hemos citado al tratar el :ref:`formato PKCS #7 <cert-p7>`. 
 
 Firma
------
++++++
 Partamos de que tenemos un documento (no necesariamente un |PDF|) y un
 certificado personal (:file:`key.pem` y :file:`cert.pem`) con el que queremos
 firmar tal documento::
@@ -222,7 +401,7 @@ la verificación). A partir de ahora tendríamos que almacenar tanto el archivo
 .. openssl pkcs7 -inform der -in firma.p7s -print_certs
 
 Validación
-----------
+++++++++++
 La verificación consiste en tomar el archivo de firma (:file:`fichero.p7s`), que
 suponemos que contiene el certificado firmante, y el archivo que se firmó
 (:file:`fichero.txt`)::
@@ -241,7 +420,7 @@ suponemos que contiene el certificado firmante, y el archivo que se firmó
 .. _como-firma-junta:
 
 Firma en las administraciones públicas\ [#]_
-============================================
+--------------------------------------------
 El |ENI| incluye como parte de la interoperabilidad entre las administraciones
 públicas españolas un sistema de firma digital que no es exactamente ninguno de
 los anteriormente explicados y que se aplica en la firma de solicitudes,
@@ -338,6 +517,12 @@ sus elementos::
    -----END PKCS7-----
    EOF
 
+.. note:: O casi más sencillo (si no nos importa obtener el archivo en formato |DER|):
+
+   .. code-block:: console
+
+      $ xmlstarlet sel -B -t -v '//enids:FirmaConCertificado' documentoENI.xml | base64 -d > firma.p7s
+
 Con ambos archivos podemos hacer la comprobación::
 
    $ openssl smime -verify -inform PEM -in firma.p7s -content original.pdf -purpose any -binary > /dev/null
@@ -345,7 +530,6 @@ Con ambos archivos podemos hacer la comprobación::
 
 .. note:: En las órdenes :file:`documentoENI.xml` es el |XML| descargado y
    :file:`original.pdf` el |PDF| original también descargado.
-
 
 .. rubric:: Notas al pie
 
@@ -358,6 +542,20 @@ Con ambos archivos podemos hacer la comprobación::
 .. [#] Puede hacerse una lectura del artículo `Terceros de confianza y
    certificación de prueba electrónica. Una nueva frontera en materia de
    probática <http://e-procesal.com/dterceros-de-confianza-y-certificacion-de-prueba-electronica-una-nueva-frontera-en-materia-de-probatica-2109>`_.
+
+.. [#] Véase más adelante qué ocurre cuando es necesario que un documento |PDF|
+   lo firmen varias personas.
+
+.. [#] sólo cuando se trata de preservar los ya obsoletos formularios |XFA|
+   incrustados, la información de firma se incorpora como *Detached* |XAdES|.
+   |XFA| es una tecnología propietaria (y ya obsoleta) de *Adobe* basada en
+   |XML| para incluir formularios interactivos dentro de un |PDF|.
+
+.. [#] Por ejemplo, se puede añadir un objeto ``/Widget`` que contiene la
+   representación visual de la firma (p.ej. una imagen de la firma manuscrita
+   del firmante).
+
+.. [#] O no, si se está firmando en cascada.
 
 .. [#] Aunque el soporte parece deficiente y no permitir la adición de un objeto
    de firma. La `escasa documentación
@@ -389,6 +587,9 @@ Con ambos archivos podemos hacer la comprobación::
 .. |CAdES| replace:: :abbr:`CAdES (CMS Advanced Electronic Signatures)`
 .. |XAdES| replace:: :abbr:`XAdES (XML Advanced Electronic Signatures)`
 .. |PAdES| replace:: :abbr:`PAdES (PDF Advanced Electronic Signatures)`
+.. |CMS| replace:: :abbr:`CMS (Cryptographic Message Syntax)`
+.. |XFA| replace:: :abbr:`XFA (XML Forms Architecture)`
+.. |TSA| replace:: :abbr:`TSA (Time Stamping Authority)`
 
 .. _LibreOffice: https://www.libreoffice.org
 .. _MuPDF: https://mupdf.com
