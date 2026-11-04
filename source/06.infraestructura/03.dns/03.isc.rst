@@ -531,39 +531,36 @@ La configuración de un esclavo tiene dos partes diferenciadas:
 
    así que hemos complido con ello.
 
-   .. note:: Existe una directiva :kbd:`also-notify` que podemos incluir en el bloque :kbd:`zone`
-      del archivo :file:`named.conf.local`, que nos permite referir una lista
-      de máquinas a las que notificar los cambios:
-
-      .. code-block::
-
-         zone "iescastillodeluna.es" {
-            type master;
-            file "db.iescastillodeluna.es";
-            also-notify { 10.10.10.10; 10.10.10.11; };
-         };
-
-      Sin embargo, si se encuentra la máquina referida a través del registro
-      :kbd:`NS` es redundante; y, si no lo está, tal servidor sería un servidor esclavo fantasma,
-      que no aparecería como servidor autoritario cuando un cliente hiciera la consulta::
-
-         $ host -tns iescastillodeluna.es
-
-      lo cual no parece muy recomendable.
-
    .. warning:: Al servidor esclavo le debe estar permitida la transferencia
       completa de la zona. Si la hemos prohibido de modo universal con
-      :code:`allow-transfer { none; };`, entonces tendremos que habilitarla expresamente para la zona:
+      :code:`allow-transfer { none; };`, entonces tendremos que habilitarla
+      expresamente para la zona:
 
       .. code-block::
+         :emphasize-lines: 4
 
          zone "iescastillodeluna.es" {
             type master;
             file "db.iescastillodeluna.es";
-            allow-transfer { 80.80.80.91; };  // Esta es la IP de ns2, el
-            esclavo.
+            allow-transfer { 80.80.80.91; };  // Esta es la IP de ns2, el esclavo.
          };
 
+      Si el servidor esclavo (aparte de poder transferir la zona), se
+      encuentra incluido en el registro ``NS`` de la zona, ya tenemos hecho todo,
+      puesto que cada vez que haya un cambio en la zona, el maestro le notificará
+      los cambios y se sincronizarán. Sin embargo, si no es así, tal
+      notificación no se enviará, y hay explícitamente indicarlo en este bloque :kbd:`zone`
+      del archivo :file:`named.conf.local`:
+
+      .. code-block::
+         :emphasize-lines: 4, 5
+
+         zone "iescastillodeluna.es" {
+            type master;
+            file "db.iescastillodeluna.es";
+            allow-transfer { 80.80.80.91; };  // Permite trasnferir la zona al esclavo
+            also-notify { 80.80.80.91; };     // Notifica al esclavo cualquier cambio
+         };
 
 **Servidor esclavo**
    La configuración del servidor esclavo ("ns2" en nuestro caso) es muy

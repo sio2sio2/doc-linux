@@ -283,6 +283,12 @@ registro puede ser cacheado por algún *servidor recursivo*, que haya consultado
 la resolución. Puede no especificarse y, en ese caso, el |TTL| del registro será
 el que se haya definido para la zona entera.
 
+.. tip:: Es principio estos tiempos se definan en segundos y así es si
+   no se especifica unidad. En bind, sin embargo, pueden añadirse sufijos (*s*, *m*,
+   *h*, *d*, *w*) para expresarlos, lo que facilita la lectura y escritura.
+   Estos sufijos, no sólo puede añadirse a los registros, sino a la directiva
+   ``$TTL`` o a los tiempos que se expresan en el registro ``SOA``.
+
 El nombre del registro y su valor dependen de cuál sea el tipo y, por último,
 éste puede ser:
 
@@ -317,7 +323,9 @@ El nombre del registro y su valor dependen de cuál sea el tipo y, por último,
    * El valor se compone de tres miembros:
 
      - El *nombre* de la máquina que contiene el archivo: "ns1" en este caso que
-       como no tiene punto se convierte en "ns1.iescastillodeluna.es".
+       como no tiene punto se convierte en "ns1.iescastillodeluna.es". Obsérvese
+       que, si es la máquina que contiene el archivo, entonces es el servidor
+       maestro para la zona\ [#]_.
      - El *correo electrónico* del encargado de mantener el archivo, aunque
        sustituida "@" por un punto. Por tanto, el correo sería
        "hostmaster@iescastillodeluna.es"
@@ -338,8 +346,16 @@ El nombre del registro y su valor dependen de cuál sea el tipo y, por último,
          sincronizarse con el maestro. Si este tiempo vence, el esclavo dejará
          de atender peticiones de clientes para la zona que no ha podido
          sincronizar.
-       + |TTL| de todos los registros definidos dentro de la zona para los que
-         expresamente no se haya definido uno.
+       + |TTL| mínimo de todas las peticiones para registros que no existen, es
+         decir, si algún resolutor le pide a nuestro servidor la resolución de
+         un nombre que no existe, el resolutor recordará que el nombre no existe
+         (y no volverá a preguntar) durante un tiempo que es el mínimo entre este
+         valor y el |TTL| del propio registro ``SOA``.
+
+       .. note:: Es conveniente incrementar la versión del archivo cuando hay un
+          cambio en la zona, ya que, por lo general, un servidor esclavo que quiere
+          sincronizar con el maestro, primero consulta el registro ``SOA`` y, sólo
+          si ve que ha habido cambio de versión, procede a transferir la zona.
 
    Es interesante que el registro |SOA| indique la máquina que contiene el
    registro y con él toda la definición de la zona de dominio. ¿Por qué?
@@ -378,6 +394,15 @@ El nombre del registro y su valor dependen de cuál sea el tipo y, por último,
    ¡Hecho! Hemos acertado a la segunda: "a.nic.es" es el servidor maestro y los
    otros tres son los esclavos.
 
+   .. caution:: Esta prueba, sin embargo, puede no siempre funcionar. El nombre
+      que aparece en el registro |SOA| no tiene efecto en la configuración, por
+      lo que se puede mentir y que sea un nombre ficticio. También podría
+      ocurrir que el servidor maestro sea un servidor interno de la
+      organización, inaccesible desde internet (pero no desde los servidores
+      esclavos), y que sólo se expongan servidores esclavos. En ese caso, el
+      registro ``NS`` (que veremos un poco más adelante) no publicará el nombre
+      del servidor maestro, sino sólo de los esclavos.
+
 **A**
    Define cuál es la dirección |IP|\ v4 que corresponde a un nombre. Por
    ejemplo, el registro:
@@ -405,7 +430,7 @@ El nombre del registro y su valor dependen de cuál sea el tipo y, por último,
    servidores |DNS| en los que se delega la gestión de los subdominios. En
    realidad, nunca hay un único servidor |DNS| para resolver una zona, sino
    varios (un maestro  y al menos un esclavo), por lo que en la zona "es" lo que
-   habrá más bien es esto\ [#]_:
+   habrá más bien es esto:
 
    .. code-block::
 
