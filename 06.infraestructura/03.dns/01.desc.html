@@ -313,6 +313,14 @@ como la de arriba, algunos son obligatorios y otros opcionales.</p>
 registro puede ser cacheado por algún <em>servidor recursivo</em>, que haya consultado
 la resolución. Puede no especificarse y, en ese caso, el <abbr title="Time To Live">TTL</abbr> del registro será
 el que se haya definido para la zona entera.</p>
+<div class="admonition tip">
+<p class="admonition-title">Truco</p>
+<p>Es principio estos tiempos se definan en segundos y así es si
+no se especifica unidad. En bind, sin embargo, pueden añadirse sufijos (<em>s</em>, <em>m</em>,
+<em>h</em>, <em>d</em>, <em>w</em>) para expresarlos, lo que facilita la lectura y escritura.
+Estos sufijos, no sólo puede añadirse a los registros, sino a la directiva
+<code class="docutils literal notranslate"><span class="pre">$TTL</span></code> o a los tiempos que se expresan en el registro <code class="docutils literal notranslate"><span class="pre">SOA</span></code>.</p>
+</div>
 <p>El nombre del registro y su valor dependen de cuál sea el tipo y, por último,
 éste puede ser:</p>
 <dl>
@@ -343,15 +351,17 @@ El punto indica que no queremos añadirlo. Por tanto, escribir
 </div>
 </li>
 <li><p>El valor se compone de tres miembros:</p>
-<ul class="simple">
+<ul>
 <li><p>El <em>nombre</em> de la máquina que contiene el archivo: «ns1» en este caso que
-como no tiene punto se convierte en «ns1.iescastillodeluna.es».</p></li>
+como no tiene punto se convierte en «ns1.iescastillodeluna.es». Obsérvese
+que, si es la máquina que contiene el archivo, entonces es el servidor
+maestro para la zona<a class="footnote-reference brackets" href="#id14" id="id5" role="doc-noteref"><span class="fn-bracket">[</span>5<span class="fn-bracket">]</span></a>.</p></li>
 <li><p>El <em>correo electrónico</em> del encargado de mantener el archivo, aunque
 sustituida «&#64;» por un punto. Por tanto, el correo sería
 «<a class="reference external" href="mailto:hostmaster&#37;&#52;&#48;iescastillodeluna&#46;es">hostmaster<span>&#64;</span>iescastillodeluna<span>&#46;</span>es</a>»</p></li>
 <li><p>Parámetros de configuración que se escriben entre paréntesis porque se
 han usado varias líneas por claridad:</p>
-<ul>
+<ul class="simple">
 <li><p>La <em>versión</em> del archivo. Algunos administradores gustan de utilizar como
 número la fecha de actualización del archivo (p.e. 20221002, si se
 actualizó el 2 de octubre de 2022).</p></li>
@@ -366,9 +376,19 @@ válida la información que proporciona un servidor esclavo que no puede
 sincronizarse con el maestro. Si este tiempo vence, el esclavo dejará
 de atender peticiones de clientes para la zona que no ha podido
 sincronizar.</p></li>
-<li><p><abbr title="Time To Live">TTL</abbr> de todos los registros definidos dentro de la zona para los que
-expresamente no se haya definido uno.</p></li>
+<li><p><abbr title="Time To Live">TTL</abbr> mínimo de todas las peticiones para registros que no existen, es
+decir, si algún resolutor le pide a nuestro servidor la resolución de
+un nombre que no existe, el resolutor recordará que el nombre no existe
+(y no volverá a preguntar) durante un tiempo que es el mínimo entre este
+valor y el <abbr title="Time To Live">TTL</abbr> del propio registro <code class="docutils literal notranslate"><span class="pre">SOA</span></code>.</p></li>
 </ul>
+<div class="admonition note">
+<p class="admonition-title">Nota</p>
+<p>Es conveniente incrementar la versión del archivo cuando hay un
+cambio en la zona, ya que, por lo general, un servidor esclavo que quiere
+sincronizar con el maestro, primero consulta el registro <code class="docutils literal notranslate"><span class="pre">SOA</span></code> y, sólo
+si ve que ha habido cambio de versión, procede a transferir la zona.</p>
+</div>
 </li>
 </ul>
 </li>
@@ -387,7 +407,7 @@ Observemos que si preguntamos por quiénes son los servidores que gestionan el <
 <p>Como ya se ha comentado debe existir redundancia. Sin embargo, sólo en uno de
 esos servidores está realmente definida la zona (el llamado <a class="reference internal" href="#dns-glosario"><span class="std std-ref">servidor
 maestro</span></a>). Los otros tres, lo que hacen es replicar las
-definiciones que hay en el primero sincronizándose cada cierto tiempo<a class="footnote-reference brackets" href="#id14" id="id5" role="doc-noteref"><span class="fn-bracket">[</span>5<span class="fn-bracket">]</span></a>
+definiciones que hay en el primero sincronizándose cada cierto tiempo<a class="footnote-reference brackets" href="#id15" id="id6" role="doc-noteref"><span class="fn-bracket">[</span>6<span class="fn-bracket">]</span></a>
 (los llamados <a class="reference internal" href="#dns-glosario"><span class="std std-ref">servidores esclavos</span></a>). Pues bien, ¿cuál de
 esos tres es el maestro? La clave está en el registro <abbr title="Start Of Authority">SOA</abbr>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>host<span class="w"> </span>-tsoa<span class="w"> </span>es
@@ -409,6 +429,17 @@ tenemos que hacer es resolver a la <abbr title="Internet Protocol">IP</abbr>:</p
 </div>
 <p>¡Hecho! Hemos acertado a la segunda: «a.nic.es» es el servidor maestro y los
 otros tres son los esclavos.</p>
+<div class="admonition caution">
+<p class="admonition-title">Prudencia</p>
+<p>Esta prueba, sin embargo, puede no siempre funcionar. El nombre
+que aparece en el registro <abbr title="Start Of Authority">SOA</abbr> no tiene efecto en la configuración, por
+lo que se puede mentir y que sea un nombre ficticio. También podría
+ocurrir que el servidor maestro sea un servidor interno de la
+organización, inaccesible desde internet (pero no desde los servidores
+esclavos), y que sólo se expongan servidores esclavos. En ese caso, el
+registro <code class="docutils literal notranslate"><span class="pre">NS</span></code> (que veremos un poco más adelante) no publicará el nombre
+del servidor maestro, sino sólo de los esclavos.</p>
+</div>
 </dd>
 <dt><strong>A</strong></dt><dd><p>Define cuál es la dirección <abbr title="Internet Protocol">IP</abbr>v4 que corresponde a un nombre. Por
 ejemplo, el registro:</p>
@@ -430,7 +461,7 @@ parecido a este:</p>
 servidores <abbr title="Domain Name Server">DNS</abbr> en los que se delega la gestión de los subdominios. En
 realidad, nunca hay un único servidor <abbr title="Domain Name Server">DNS</abbr> para resolver una zona, sino
 varios (un maestro  y al menos un esclavo), por lo que en la zona «es» lo que
-habrá más bien es esto<a class="footnote-reference brackets" href="#id15" id="id6" role="doc-noteref"><span class="fn-bracket">[</span>6<span class="fn-bracket">]</span></a>:</p>
+habrá más bien es esto:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">iescastillodeluna    IN    NS    ns1023.ui-dns.de.</span>
 <span class="go">                           NS    ns1037.ui-dns.org.</span>
 <span class="go">                           NS    ns1045.ui-dns.com.</span>
