@@ -42,9 +42,12 @@ es posible la `consulta de todos los prestadores europeos
 
 .. _cms-signeddata:
 
-El objeto |CMS|
-===============
-El objeto |CMS| permite representar la firma digital de un documento:
+La firma digital
+================
+La sintaxis para el objeto que representa una firma digital fue originariamente
+`PKCS #7 <https://en.wikipedia.org/wiki/PKCS_7>`_ (:rfc:`2315`). Posteriormente,
+el formato se amplía y estandariza danto lugar al actual |CMS| (:rfc:`5652`). La
+estructura sumplificada de un objeto |CMS| es la siguiente:
 
 .. code-block:: none
 
@@ -70,16 +73,17 @@ habitual, no obstante, es que sólo recoja un firmante\ [#]_. Es interesante
 describir cómo se constituyen los valores de cada atributo ``SignerInfo``, porque
 enseña cómo se realiza la firma en profundidad. En ``SignerInfo`` se recojen dos
 tipos de atributos: los firmados (``signedAttrs``) y los no firmados
-(``unsignedAttrs``). Dentro de los primeros se incluyen algunos cómo
-``contentType`` que declara ``contentType``, el tipo de documento (para que
+(``unsignedAttrs``). Dentro de los primeros se incluyen algunos como
+``contentType`` que declara el tipo de documento (para que
 alguien malicioso no pueda manipular cómo debe interpretarse el documento),
 ``messageDigest``, cuyo valor es el *hash* del documento que se desea firmar,
 ``signingTime``, que recoge la hora a la que se firma, etc. Con todos estos
 valores (y según el algoritmo de firma que se incluye en
 ``signatureAlgorithm``), se genera un *hash* que se cifra con la clave privada
 del firmante y se almacena en ``signature``. Por lo tanto, se generan dos
-resúmenes criptográficos: el del documento, y otro que incluye el *hash* anterior
-y otra serie de propiedades; y que es propiamente el que se usa en la firma.
+resúmenes criptográficos: el del documento (``messageDigest``), y otro que
+incluye el *hash* anterior y otra serie de propiedades; y que es propiamente el
+que constituye la firma al cifrarse (``signature``).
 
 .. _crypto-timestamptoken:
 
@@ -92,8 +96,7 @@ permiten la adición de un :dfn:`sello de tiempo`
 (``id-aa-signatureTimeStampToken`` o similar) que se obtiene con la ayuda de un
 servidor externo dedicado a ello (|TSA|). Básicamente, cuando se pretende añadir
 este sello a la firma, el *software* reserva espacio puesto a ceros para poder
-incrustar el valor del *sello de tiempo* (recordemos que el tamaño de
-``/Contents`` no puede variar después de la firma) y, una vez generada la firma,
+incrustar el valor del *sello de tiempo* y, una vez generada la firma,
 manda un hash de ``signature`` al servicio |TSA|, el cual genera otro objeto
 |CMS| que certifica entre otras cosas, dicho *hash* y el instante de tiempo en
 el que se realiza la petición. El objeto se devuelve al solicitante y éste lo
@@ -104,11 +107,16 @@ Estándares
 Para la firma de documentos digitales existen varios estándares:
 
 |CAdES|
-   Consiste en generar un archivo de firma en formato ``.p7s`` (:ref:`formato
-   PKCS #7 <cert-p7>`) que contiene la propia firma digital (:ref:`un objeto CMS
-   <cms-signeddata>`) y, opcionalmente, el certificado firmante e incluso el
-   propio documento firmado.  Lo habitual, no obstante, es que no lo contenga y
-   deban conservarse tanto el documento original como este archivo de firma.
+   Es un estándar que define qué atributos debe incluir una firma digital |CMS|
+   para garantizar su fiabilidad. El objeto |CMS| resultante se almacena:
+
+   + Como archivo ``.p7s`` (véase el :ref:`formato PKCS #7 <cert-p7>`) cuando la
+     firma es *separada* (*detached*) y el objeto |CMS| contiene firma y
+     certificados firmantes, pero no el documento firmado, lo que obliga a
+     conservar tanto este archivo como el documento original.
+
+   + Como archivo ``.p7m`` cuando la firma es adjunta (*attached*) y el objeto
+     |CMS| que constituye el archivo también incluye el documento original.
 
 |XAdES|
    Es otro estándar que extiende `XML-DSig
@@ -126,35 +134,50 @@ Para la firma de documentos digitales existen varios estándares:
 |PAdES|
    Es un conjunto de perfiles de firma electrónica para documentos |PDF|, que
    permite incrustar la información de firma en un objeto interno del propio
-   documento |PDF|. Dicha información de firma contiene habitualmente el objeto
-   |CMS|, esto es, el mismo objeto que sirve de base para el estándar |CAdES|\
-   [#]_.
+   documento |PDF|. Dicha información de firma contiene habitualmente :ref:`el
+   objeto CMS <cms-signeddata>`, esto es, el mismo objeto que sirve de base para
+   el estándar |CAdES|\ [#]_.
 
-   .. note:: Aunque opcionalmente pueden generarse marcas visibles en el documento
-      que denoten quién ha firmado y cuándo lo ha hecho, la firma digital en sí
-      no deja huella visible en una impresión: se verifica utilizando una
-      herramienta de verificación sobre el archivo.
+   La estrategia de este estándar para generar la firma es la siguiente:
 
-   La estrategia de este estándar es actualizar incrementalmente el |PDF| para
-   que se añadan al final del documento varios objetos relacionados con la
-   firma\ [#]_. Uno de esos objetos es el diccionario de firma del |PDF|. Este
-   diccionaro incluye distintos campos (``/M``, la fecha de la firma;
-   ``/Filter`` que identifica el *software* que se usó para firmar;
-   ``/SubFilter``, que especifica cómo se ha codificado la firma, etc.) y, entre
-   ellos, dos fundamentales:
+   * Se crea una actualización incremental del |PDF|\ [#]_.
+   * Esta actualización contiene un `AcroForm
+     <https://www.fillwizard.com/es/glossary/acroform>`_, esto es, un formulario
+     de |PDF| con un campo de formulario que es el campo de firma.
+   * Ese objeto *campo de firma* contiene distintos campos como:
 
-   ``/Contents``
-      que incluye la información de firma (habitualmente el objeto |CMS|).
+     + ``/FT``, cuyo valor es ``/Sig`` y que es precisamente lo que lo identifica como un
+       campo de formulario para contener una firma.
+     + ``/AP``, que sirve para definir una apariencia visible de la firma y que
+       es precisamente el que posibilita que al firmar digitalmente podamos
+       opcionalemente definir dónde queremos que aparezca una leyenda con la
+       frase "*Firmado por XXX el día YYY*" o que incrustemos una imagen con la
+       rúbrica escaneada del firmante.
+     + ``/V`` que referencia el *diccionario de firma*.
+   
+   * Se crea el objeto *diccionario de firma*, que incluye distintos campos
+     (``/M``, la fecha de la firma; ``/Filter`` que identifica el *software* que
+     se usó para firmar; ``/SubFilter``, que especifica cómo se ha codificado la
+     firma, etc.) y, entre ellos, dos fundamentales:
 
-   ``/ByteRange``
-      que especifica que rangos de *bytes* del |PDF| quedan cubiertos por la
-      firma, esto es, qué partes del documento se han tomado para generar el
-      *hash* que servirá como base para la firma. Es obvio que del cálculo de
-      *hash* debe excluirse el valor de ``/Contents``, por lo que por lo general
-      este campo incluirá todo lo que hay antes de ``/Contents``, y todo lo que
-      hay después de él. Si estos rangos no cubrieran todo, podría sospecharse
-      que se ha añadido de forma espuria información adicional\ [#]_, por lo que
-      el *software* de verificación debería advertir de esta circunstancia.
+     ``/Contents``
+         que incluye la información de firma (habitualmente el objeto |CMS|).
+
+     ``/ByteRange``
+         que especifica que rangos de *bytes* del |PDF| quedan cubiertos por la
+         firma, esto es, qué partes del documento se han tomado para generar el
+         *hash* que servirá como base para la firma. Es obvio que del cálculo de
+         *hash* debe excluirse el valor de ``/Contents``, por lo que por lo general
+         este campo incluirá todo lo que hay antes de ``/Contents``, y todo lo que
+         hay después de él. Si estos rangos no cubrieran todo, podría sospecharse
+         que se ha añadido de forma espuria información adicional\ [#]_, por lo que
+         el *software* de verificación debería advertir de esta circunstancia.
+
+   .. note:: Obsérvese que el que un documento esté firmado, viene determinado
+      por la existencia del diccionario de firma, que es el que contiene
+      propiamente el objeto |CMS|. La *firma visible* (o sea, el contenido del
+      campo ``/AP``) no es más que una mera marca visual que no tiene en realidad
+      ningún valor criptográfico, razón por la cual es opcional.
 
    Un aspecto importante (extensible a todos los estándares, pero que
    explicaremos con este) es el procedimiento que se sigue cuando son varios los
@@ -226,7 +249,10 @@ Hay varias aplicaciones en Linux que permiten la firma y verificación de firmas
 de documentos |PDF|:
 
 * LibreOffice_ (dentro del menú "Archivo").
-* MuPDF_\ [#]_.
+* MuPDF_, a través de su herramienta `mutool-sign
+  <https://mupdf.readthedocs.io/en/latest/tools/mutool-sign.html>`_, aunque no
+  puede añadir una firma, sino únicamente generar un diccionario de firma para
+  el que ya exista una entrada en el documento.
 * Poppler_ y todas las aplicaciones que lo tomen como base (Zathura_, Evince_)\ [#]_.
 * Las proporcionadas por el Gobierno de España:
 
@@ -380,25 +406,27 @@ hemos citado al tratar el :ref:`formato PKCS #7 <cert-p7>`.
 Firma
 +++++
 Partamos de que tenemos un documento (no necesariamente un |PDF|) y un
-certificado personal (:file:`key.pem` y :file:`cert.pem`) con el que queremos
-firmar tal documento::
+certificado personal con la clave privada asociada (:file:`cert.key` y
+:file:`cert.pem`) con el que queremos firmar tal documento::
 
-   $ openssl smime -sign -in fichero.txt -inkey key.pem -outform DER -binary -signer cert.pem -out fichero.p7s
+   $ openssl cms -sign -cades -in fichero.txt -inkey key.pem -outform DER -binary -signer cert.pem -out fichero.p7s
 
-Esto generará un archivo de firma (:file:`fichero.p7s` en formato |DER|) que
-contiene la firma en sí y también el propio certificado (lo que simplifica luego
-la verificación). A partir de ahora tendríamos que almacenar tanto el archivo
-(:file:`fichero.txt`) como la propia firma (:file:`fichero.p7s`).
+Esto generará un archivo de firma separada (:file:`fichero.p7s` en formato |DER|) que
+contiene la firma en sí y también el propio certificado personal (lo que simplifica luego
+la verificación). El archivo original, sin embargo, no está incluido por lo que
+deberá conservarse. Si se quiere incluir basta con añadir la opción ``-no-detach``.
 
-.. warning:: Al archivo de firma, además de la propia firma, sólo se añade el
-   certificado del firmante\ [#]_, aunque puedan existir otros certificados dentro de
-   :file:`cert.pem` que completen la cadena de confianza. Si se desea añadir
-   éstos también, deberán ponerse en archivo aparte y declararlo con la opción
-   :kbd:`-certfile`::
+.. note:: La orden incluirá en la firma exclusivamente el certificado firmante\
+   [#]_.
+   Si se quieren añadir los archivos intermedios puede proporcionársele esos
+   archivos adicionales mediante la opción ``-certfile untrusted.pem``.
 
-      $ openssl smime -sign -in fichero.txt -inkey key.pem -outform DER -binary -signer cert.pem -certfile chain.pem -out fichero.p7s
+.. note:: En las firmas de correo electrónico para el estándar S/|MIME| la orden
+   anterior necesita como corrección eliminar ``-cades`` (ya que las adiciones
+   de |CAdES| no aportan nada) y generar el formato imprimible eliminando
+   :code:`-outform DER`::
 
-.. openssl pkcs7 -inform der -in firma.p7s -print_certs
+      $ openssl cms -sign -in fichero.txt -inkey key.pem -binary -signer cert.pem -out fichero.p7s
 
 Validación
 ++++++++++
@@ -406,16 +434,30 @@ La verificación consiste en tomar el archivo de firma (:file:`fichero.p7s`), qu
 suponemos que contiene el certificado firmante, y el archivo que se firmó
 (:file:`fichero.txt`)::
 
-   $ openssl smime -verify -inform DER -in fichero.p7s -content fichero.txt -purpose any -binary > /dev/null
-   Verification successful
+   $ openssl cms -verify -cades -inform DER -in fichero.p7s -content fichero.txt -purpose any -binary > /dev/null
+   CAdES Verification successful
 
 .. warning:: La verificación exige que la cadena de confianza esté completa. Si
-   :file:`fichero.p7s` no contiene el certificado del firmante, habrá que
-   referirlo a través de :kbd:`-certfile` y, si existen autoridades intermedias,
-   deberemos incluir sus certificados mediante :kbd:`-CAfile`.
+   :file:`fichero.p7s` no contiene el certificado del firmante o sí, pero sin
+   los certificados de las |CA| intermedias, entonces habrá que colocarlos
+   en un archivo y proporcionarlos a través de :kbd:`-certfile untrusted.pem`.
+   El certificado de la |CA| raíz debería estar en el sistema. En caso
+   contrario, aún se puede verificar proporcionando este certificado con
+   :kbd:`-CAfile`.
 
-.. note:: El archivo `.p7s` es capaz de contener el archivo firmado. Si este
-   fuera el caso, bastaría con no usar la opción :kbd:`-content`.
+.. Firmas con smime (las firmas con cms no se han probado):
+
+   $ openssl smime -sign -in fichero.txt -inkey key.pem -outform DER -binary -signer cert.pem -out fichero.p7s
+
+   Añade la cadena de confianza (con -certfile):
+
+   $ openssl smime -sign -in fichero.txt -inkey key.pem -outform DER -binary -signer cert.pem -certfile chain.pem -out fichero.p7s
+
+   Validación suponiendo que la firma es separada (si es adjunta sobre -content)
+   y el archivo contiene el certificado firmanto (si no es así, se añade
+   -certfile o -certifile y -CAfile):
+
+   $ openssl smime -verify -inform DER -in fichero.p7s -content fichero.txt -purpose any -binary > /dev/null
 
 .. _como-firma-junta:
 
@@ -551,16 +593,13 @@ Con ambos archivos podemos hacer la comprobación::
    |XFA| es una tecnología propietaria (y ya obsoleta) de *Adobe* basada en
    |XML| para incluir formularios interactivos dentro de un |PDF|.
 
-.. [#] Por ejemplo, se puede añadir un objeto ``/Widget`` que contiene la
-   representación visual de la firma (p.ej. una imagen de la firma manuscrita
-   del firmante).
+.. [#] Un documento |PDF| acaba con una cadena ``%%EOF``. Cuando se desea alterar
+   por cualquier motivo hay dos posibilidades cambiar el documento o crear una
+   actualización incremental que enmienda o añade al contenido original. Esta
+   actualización consiste en añadir nuevos objetos al |PDF| y acabar esta
+   adición en una nueva cadena ``%%EOF`` sin alterar nada de lo que había antes.
 
 .. [#] O no, si se está firmando en cascada.
-
-.. [#] Aunque el soporte parece deficiente y no permitir la adición de un objeto
-   de firma. La `escasa documentación
-   <https://mupdf.readthedocs.io/en/latest/mutool-sign.html>`_ no contribuye a
-   aclararlo.
 
 .. [#] En realidad, :program:`Poppler` a través de :ref:`pdfsig <pdfsig>` lo
    permite, pero a fecha de redacción (abril de 2022) las aplicaciones

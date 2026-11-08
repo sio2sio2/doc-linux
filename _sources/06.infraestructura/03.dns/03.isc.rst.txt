@@ -171,8 +171,9 @@ que significa que sí se permite, pero sólo a la lista de clientes proporcionad
 por :kbd:`allow-recursion` que es la propia máquina local y las máquinas que
 pertenecen a las redes a las que directamente esté conectada el servidor.
 
-.. warning:: Por defecto, :program:`bind` permite a cualquier máquina la
-   transferencia completa de la zona. Puede hacer la prueba con::
+.. warning:: Antes de la versión **9.20** del servidor, :program:`bind` por
+   defecto permite a cualquier máquina la transferencia completa de la zona.
+   Puede hacer la prueba con::
 
       $ dig iescastillodeluna.es AXFR
 
@@ -184,7 +185,8 @@ pertenecen a las redes a las que directamente esté conectada el servidor.
       allow-transfer { none; };
 
    Pero téngase presente que los servidores esclavos deben poder recibir la
-   transferencia de zona. La sentencia anterior lo impide. 
+   transferencia de zona. La sentencia anterior lo impide. A partir de la
+   versión **9.20** la negación absoluta es el comportamiento predeterminado.
 
 Comprobación
 ============
@@ -372,7 +374,7 @@ explicarlos <dns-registros>`):
   a cuyo |NIC| hemos pagado a través de un agente para que lo haga, habrá estos
   registros:
 
-  .. code-block::
+  .. code-block:: zone
 
      iescastillodeluna.es.       IN       NS       ns1.iescastillodeluna.es.
      iescastillodeluna.es.       IN       NS       ns2.iescastillodeluna.es.
@@ -384,7 +386,7 @@ explicarlos <dns-registros>`):
   tener un nombre en un dominio distinto. Por ejemplo, en nuestro servidor la
   definición dentro de :file:`db.iescastillodeluna.es` podría haber sido ésta:
 
-  .. code-block::
+  .. code-block:: zone
 
      @                           IN       NS       dns1.example.org.
                                           NS       dns2.example.org.
@@ -407,7 +409,7 @@ explicarlos <dns-registros>`):
 
 * Hay un :dfn:`registro comodín`:
 
-  .. code-block::
+  .. code-block:: zone
 
      *      IN       CNAME    www
 
@@ -471,7 +473,7 @@ la definición del archivo de zona.
    * Incluir en el archivo de zona "iescastillodeluna.es" la delegación de la
      subzona añadiendo estas líneas:
 
-     .. code-block:: 
+     .. code-block::  zone
 
         ;
         ; Delegación de la zona sede1.iescastillodeluna.es
@@ -520,47 +522,45 @@ La configuración de un esclavo tiene dos partes diferenciadas:
 #. Configurarlo en sí el servidor *esclavo*.
 
 **Servidor maestro**
-   Para que un servidor maestro notifique cambios en la zona a un servidor
-   esclavo, basta con que éste este referido en un registro :kbd:`NS` en el archivo de zona.
-   En nuestro ejemplo, referimos una máquina "ns2":
+   Para que un servidor funcione como servidor esclavo necesita al menos:
 
-   .. code-block::
+   a. Tener permiso para transferir la zona completa.
+   #. Recibir notificaciones del maestro cada vez que se produce algún cambio
+      en los registros de la zona.
+
+   Explícitamente esto se logra así:
+
+   .. code-block:: none
+      :emphasize-lines: 5,6
+
+      // Zona para la que queremos un esclavo, cuya IP es 80.80.80.91.
+      zone "iescastillodeluna.es" {
+         type master;
+         file "db.iescastillodeluna.es";
+         allow-transfer { 80.80.80.91; };  // Puede pedir la zona completa.
+         also-notify { 80.80.80.91; };     // Recibe notificaciones de cambios.
+      };
+
+   No obstante, la obligación de escribir estas líneas depende de otras
+   configuraciones:
+
+   - La primera es necesaria dependiendo de cuál sea la configuración global. Si
+     no hemos cambiado la pretederminada es :code:`allow-transfer { none; };` a
+     partir de la versión **9.20** del servidor, con lo que tendremos que
+     habilitarla expresamente para la zona.
+
+   - La segunda será necesaria si no hacemos que el esclavo se publique como
+     servidor autoritario de la zona.
+
+   Además, lo habitual es que queramos que un servidor esclavo sea publicado
+   como servidor |DNS| autoritario de la zona, por lo que deberemos modificar
+   el registro ``NS`` del archivo de zona para incluirlo (supongamos que lo
+   hemos llamado así):
+
+   .. code-block:: zone
 
       @           IN          NS    ns1
                               NS    ns2
-
-   así que hemos complido con ello.
-
-   .. warning:: Al servidor esclavo le debe estar permitida la transferencia
-      completa de la zona. Si la hemos prohibido de modo universal con
-      :code:`allow-transfer { none; };`, entonces tendremos que habilitarla
-      expresamente para la zona:
-
-      .. code-block::
-         :emphasize-lines: 4
-
-         zone "iescastillodeluna.es" {
-            type master;
-            file "db.iescastillodeluna.es";
-            allow-transfer { 80.80.80.91; };  // Esta es la IP de ns2, el esclavo.
-         };
-
-      Si el servidor esclavo (aparte de poder transferir la zona), se
-      encuentra incluido en el registro ``NS`` de la zona, ya tenemos hecho todo,
-      puesto que cada vez que haya un cambio en la zona, el maestro le notificará
-      los cambios y se sincronizarán. Sin embargo, si no es así, tal
-      notificación no se enviará, y hay explícitamente indicarlo en este bloque :kbd:`zone`
-      del archivo :file:`named.conf.local`:
-
-      .. code-block::
-         :emphasize-lines: 4, 5
-
-         zone "iescastillodeluna.es" {
-            type master;
-            file "db.iescastillodeluna.es";
-            allow-transfer { 80.80.80.91; };  // Permite trasnferir la zona al esclavo
-            also-notify { 80.80.80.91; };     // Notifica al esclavo cualquier cambio
-         };
 
 **Servidor esclavo**
    La configuración del servidor esclavo ("ns2" en nuestro caso) es muy
@@ -737,7 +737,7 @@ dirección |IP| ``192.168.3.25`` se nota con el nombre
 puesta del revés y dentro del subdominio "in-addr.arpa". En consecuencia un
 registro :kbd:`PTR` tendrá este aspecto:
 
-.. code-block::
+.. code-block:: zone
 
    30.255.168.192.in-addr.arpa.       IN       PTR      sobremesa.red.local.
 
@@ -748,7 +748,7 @@ Además, si tomamos como referencia este archivo de resolución directa:
 
 el de resolución inversa quedará así:
 
-.. code-block:: none
+.. code-block:: zone
 
    @  IN SOA   ns1.iescastillodeluna.es. hostmaster.iescastillodeluna.es. (
                   1     ; Serial
