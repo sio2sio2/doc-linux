@@ -528,9 +528,13 @@ común en el *software* libre) al resto de formatos y viceversa\ [#]_:
 .. _cert-p7:
 
 |PKCS| #7
-   Formato estandarizado a través del :rfc:`2315` que sólo contiene el
-   certificado (no la clave privada). Suele usarse en sistemas *Windows* y
-   aplicaciones escritas en Java. Utiliza las extensiones:
+   Es un formato estandarizado a través del :rfc:`2315` que define una
+   estructura para almacenar datos que han sido sometidos a alguna operación
+   criptográfica como lo es la firma. Más adelante, al tratar las firmas
+   :ref:`profundizaremos en su evolución, el CMS <cms-signeddata>`, pero ahora
+   nos interesa porque permite almacenar certificados (que no claves privadas)
+   sin llegar a almacenar ninguna firma. Suele usarse en sistemas *Windows* y
+   aplicaciones escritas en Java.  Utiliza las extensiones:
 
    * ``.p7b`` cuando está codificado en Base64_. En este caso el archivo puede
      contener varios certificados públicos prologado y cerrado cada uno de ellos
@@ -573,6 +577,12 @@ común en el *software* libre) al resto de formatos y viceversa\ [#]_:
 
    * Usen el formato |PKCS|\ #7 para exportar e importar certificados de
      terceros (que, en consecuencia, no incluyen la clave privada).
+
+.. caution:: Podemos encontrar también el término |PKCS|\ #11. Este, sin
+   embargo, no refiere el nombre de un formato, sino una |API| para la
+   comunicación de un aplicación con un *token* criptográfico, como puede ser un
+   :ref:`almacen NSS <cert-nss>` o un |DNI| electrónico o una llave *hardware* de
+   seguridad.
 
 .. _info-cert:
 
@@ -1066,10 +1076,32 @@ de :file:`/usr/local/share/ca-certificates` y ejecutar::
 
 |NSS|
 +++++
-Hay aplicaciones que usan la librería |NSS|\ 3 para la gestión del almacén de
-certificados. Tal es el caso de navegadores como Chromium_, Firefox_ o la
+La carencia del catálogo general de :program:`OpenSSL` (y que no tiene el
+catálogo de *Windows*, por ejemplo) es que está pensado como catálogo central de
+servidor sin que los usuarios particulares puedan gestionar sus propios
+certificados individuales. Esto es un problema para aplicaciones personales como
+los navegadores, los cuales necesitan al menos que el usuario sea capaz de
+instalar su propio certificado a efectos de identificación y firma.
+
+Por ese motivo, muchas aplicaciones usan la librería |NSS|\ 3, que desarrolló
+originariamente el navegador Netscape_, para la gestión del almacén
+de certificados. Tal es el caso de navegadores como Chromium_, Firefox_ o la
 orden :ref:`pdfsig <pdfsig>` para el soporte de firma digital en documentos
-|PDF|. Este almacén tiene la forma de una base de datos (modernamente SQLite_).
+|PDF|.
+
+
+Este almacén tiene la forma de una base de datos (modernamente SQLite_) cuyas
+localizaciones predeterminadas suelen ser:
+
+* :file:`/etc/pki/nssdb` para un almacen central.
+* :file:`~/.pki/nssdb` para el almacen de usuario.
+
+.. caution:: La librería no define ninguna localización predeterminada, sino
+   que cada aplicación define las suyas. Por eso, la afirmación anterior hay
+   que tomarla con prudencia y no darla como verdad universal. De hecho, la
+   herramienta de gestión que trataremos a continuación (:command:`certutil`) no
+   parece definir ninguna.
+
 Para la gestión de estos catálogos podemos instalar el paquete::
 
    # apt install libnss3-tools
@@ -1164,13 +1196,14 @@ certificados personales). La gestión, a través de su interfaz gráfica, es
 bastante sencilla, con lo que se hace innecesario el uso de
 :command:`certutil`.  Presentan, no obstante, algunas diferencias:
 
-+ Firefox_ trae su propia lista de certificados raíz y no consulta los del
-  sistema. Por otra parte, cada perfil consulta un catálogo distinto que se
-  encuentra en el propio directorio del perfil.
++ Firefox_ trae su propia lista de certificados raíz y hasta su versión *120*,
+  no consultaba los del sistema. Por otra parte, cada perfil consulta un
+  catálogo distinto que se encuentra en el propio directorio del perfil.
 + Chromium_, en cambio, sí carga los certificados del sistema y a éstos añade
   los que se hayan instalado en su catálogo |NSS|. Además, todos los perfiles
   creados por un mismo usuario comparten el catálogo cuya ruta es
-  :file:`~/.pki/nssdb`.
+  :file:`~/.pki/nssdb` (y en versiones más modernas también
+  :file:`$XDG_DATA_HOME/pki/nssdb`\ [#]_).
 
 .. _seg-cat-chromium:
 
@@ -1260,6 +1293,8 @@ bastante sencilla, con lo que se hace innecesario el uso de
 .. [#] Chromium_ en *Windows* usa directamente el catálogo proporcionado por
    el sistema e instala y desinstala certificados en él.
 
+.. [#] Habitualmente, :file:`~/.local/share/pki/nssdb`.
+
 .. |CA| replace:: :abbr:`CA (Certification Authority)`
 .. |CSR| replace:: :abbr:`CSR (Certificate Signing Request)`
 .. |RA| replace:: :abbr:`RA (Registration Authority)`
@@ -1282,6 +1317,8 @@ bastante sencilla, con lo que se hace innecesario el uso de
 .. |CRL| replace:: :abbr:`CRL (Certificate Revocation List)`
 .. |CERES| replace:: :abbr:`CERES (CERtificación Española)`
 .. |TSA| replace:: :abbr:`TSA (Time Stamping Authority)`
+.. |API| replace:: :abbr:`API (Application Programing Interface)`
+.. |DNI| replace:: :abbr:`DNI (Documento Nacional de Identidad)`
 
 .. _Digital Signature Trust: https://www.identrust.com/
 .. _Let's Encrypt: https://letsencrypt.org/
