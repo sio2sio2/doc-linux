@@ -347,67 +347,116 @@ Para descargar el certificado asociado a un sitio web podemos usar el subcomando
 
          $ csplit -fcert -b%02d.pem -sz varioscertificados.pem '%^-----B%' '/^-----B/' '{*}'
 
+.. _cryto-format:
+
+Representación digital
+----------------------
+Los datos criptográficos se almacenan en estructuras de datos. |ASN.1| es una
+notación abstracta para representar estas estructuras de datos. Por ejemplo,
+esto podría ser una definición usando esta notación |ASN.1|:
+
+.. code-block:: asn1
+
+   Certificate ::= SEQUENCE {
+       tbsCertificate       TBSCertificate,
+       signatureAlgorithm   AlgorithmIdentifier,
+       signatureValue       BIT STRING
+   }
+
+que dice que un certificado es una secuencia de tres campos: uno de tipo
+``TBSCertificate``, otro de tipo ``AlgorithmIdentifier`` y un último de tipo
+``BIT STRING``. Como en esta definición hay dos tipos no primitivos, a su vez
+hay que añadir las definiciones de estos dos tipos, que a su vez podrán
+contener campos con tipos no primitivos. De este modo, la definición de qué es un
+certificado estará completa cuando se alcancen definiciones que sólo contengan
+campos con tipos primitivos.
+
 .. _X.509:
 
-Formatos
---------
-Los certificados digitales se presentan en distintos formatos de archivo que
-conviene conocer, porque en ocasiones para hacer una determinada operación o
-utilizarlo con cierta aplicación lo necesitaremos en uno concreto. Además, de la
-descripción de estos formatos incluimos, a modo de vademécum, las órdenes más
-comunes con :program:`openssl` para transformar del formato |PEM| (el estándar
-común en el *software* libre) al resto de formatos y viceversa\ [#]_:
+Un formato criptográfico define una estructura concreta |ASN.1| que permite
+representar un determinado tipo de dato criptográfico. Así, los certificados
+usan el formato ``X.509``, las claves privadas el formato |PKCS|\ #8, o las
+solicitudes de certificado (|CSR|) el formato |PKCS|\ #10.
 
-|PEM|
-   Es el estándar desarrollado por los :rfc:`1421`, :rfc:`1422`, :rfc:`1423` y
-   :rfc:`1424` y muy usado por aplicaciones de *software* libre (p.e. los
-   certificados de servidor de :ref:`nginx <n-ginx>` o :program:`apache` se
-   almacenan usando este estándar). Cuando se aseguran mediante cifrado
-   simétrico, sólo se cifra la clave privada. Los archivos |PEM| son, en realidad,
-   contenedores de certificados, de manera que a menudo contienen sólo la clave
-   privada, o sólo un certificado, o el certificado y la clave privada,
-   o el certificado, la clave privada y toda la cadena de certificados
-   de las |CA|\ s intermedias necesarias para la verificación.
+Una vez definida una de estas estructuras con un formato, es aún necesario
+codificar la estructura de datos en *bytes* para poder almacenarla en un
+archivo. |BER| y su subconjunto |DER| son estas codificaciones binarias. Por
+consiguiente, el archivo :file:`periquito.csr` que contiene el certificado
+público de Periquito es una estructura de datos ``X.509`` codificada con |DER|.
+Ahora bien, es muy habitual que las codificaciones binarias, a su vez, se
+codifiquen con |PEM| que no es más que un envoltorio con etiquetas de comienzo y
+fin que indican el formato (por ejemplo, ``-----BEGIN CERTIFICATE-----`` y
+``-----END CERTIFICATE-----`` en el caso de certificados ``X.509``) y dentro de
+ellas el certificado en sí codificado con Base64_\ [#]_. Además, |PEM| (:rfc:`1421`,
+:rfc:`1422`, :rfc:`1423` y :rfc:`1424`) tiene la posibilidad de apilar en un
+mismo archivo varios datos criptográficos distintos, puesto que al utilizar
+etiquetas para delimitarlos es posible saber fácilmente cuando acaba uno y otro.
+De este modo, en un mismo archivo ``.pem`` podemos almacenar el certificado de
+Periquito junto a su clave privada.
 
-   Este estándar genera archivos (normalmente imprimibles mediante codificación
-   Base64_) y suele presentarse bajo estas extensiones:
+Desglosemos cómo manipular los archivos criptográficos con :program:`openssl`\
+[#]_:
 
-   * ``.pem`` tanto cuando contienen sólo el certificado (y,
-     opcionalmente, también los de la autoridad de certificación) como cuando
-     contienen, además, la clave privada. Los certificados están codificados en Base64_.
-   * ``der`` cuando contienen sólo el certificado o la clave privada, pero se
-     encuentran codificados en |DER|.
-   * ``.key`` cuando el fichero contiene sólo la clave privada.
-   * ``.cer`` y ``.crt`` cuando contiene sólo el certificado.
+X.509/|PKCS|\ #8
+   Téngase presente que estos formatos podemos estar manipulándolos
+   diorectamente en formato binario o usando el envoltorio |PEM| en cuyo caso
+   los archivos pueden contener varios datos criptográficos distintos. Las
+   extensiones habituales son:
 
-   Los distintos certificados dentro del archivo son fácilmente distinguibles
-   porque su codificación Base64_ se prologa con la marca :kbd:`----BEGIN
-   CERTIFICATE----` y se cierra con :kbd:`-----END CERTIFICATE-----` y con una
-   leyenda similar también se prologa y cierra la clave privada. No obstante lo
-   anterior, en ocasiones el certificado no se presenta codificado en Base64_
-   sino codificado en forma binaria (formato |DER|). De hecho, la codificación
-   en Base64_ se obtiene a partir de la binaria añadiendo las leyendas de
-   prólogo y de cierre ya descritas\ [#]_.
+   * ``.pem``, cuando el archivo evidentemente usa envoltorio |PEM| y contiene
+     varios datos criptográficos como la cadena de confianza de un certificado
+     o el certificado con su clave privada o la cadena de confianza completa y
+     la clave privada.
+   * ``der``, cuando el archivo es binario y contiene un certificado o una clave
+     privada.
+   * ``.key`` cuando el archivo contiene una clave privada. Si contiene un
+     envoltorio |PEM| o la codificación binaria, a priori, no puede determinarse.
+   * ``.crt``, cuando el archivo contiene un único certificado, habitualmente en
+     formato |PEM|.
+   * ``.cer``, cuando el archivo contiene un solo certificado, habitualmente en
+     formato binario.
 
-   Cuando el certificado está en esta forma |DER|, el archivo sólo puede
-   contener o el certificado o la clave privada, ya que no hay marcas
-   :kbd:`BEGIN`/:kbd:`END` que puedan separar los distintos certificados.
-   :command:`openssl` presupone que la codificación es Base64_, así que cuando
-   se trabaja con este formato no hay que expresar que tiene esta codificación
-   ("*PEM*" como la llama el :command:`openssl`). En cambio, cuando utilicemos la
-   codificación |DER| necesitaremos indicarlo expresamente con :kbd:`-inform
-   der`, si es un archivo de entrada, o :kbd:`-outform der`, si es un archivo de
-   salida.
+   Antes de pasar a ver cómo tratar certificados y claves privadas |RSA| con
+   :command:`openssl` es conveniente tener presente dos cosas:
 
-   Algunas operaciones habituales con este tipo de certificado son:
+   + :program:`openssl` espera o geenra archivos con formato |PEM| por lo que
+     si el formato es binario deberemos indicarlo expresamente con
+     :kbd:`-inform der`, si es un archivo de entrada, o :kbd:`-outform der`,
+     si es un archivo de salida.
 
-   #. Ver los datos públicos del certificado::
+   + Cuando un archivo |PEM| apila varios datos criptográficos, :command:`openssl`
+     sólo leerá el primero.
+
+   Sabido esto, procedamos:
+
+   #. Ver los datos de un certificado::
 
          $ openssl x509 -in CERTIFICADO.pem -text -noout
+         $ openssl x509 -inform der CERTIFICADO.cer -text -noout
 
-      .. warning:: Si el archivo contiene varios certificados públicos, sólo
-         mostrará el primero presente en el archivo. Siga leyendo para saber
-         cómo ver el resto.
+   #. Ver los datos de una clave privada::
+
+         $ openssl pkey -in PRIVKEY.pem -text -noout
+         $ openssl pkey -inform der -in PRIVKEY.der -text -noout
+
+   #. Transformar un certificado de |PEM| a binario y viceversa::
+
+         $ openssl x509 -in CERTIFICADO.pem -outform der -out CERTIFICADO.cer
+         $ openssl x509 -inform der -in CERTIFICADO.cer -out CERTIFICADO.pem
+
+   #. Trasformar una clave privada de |PEM| a binario y viceversa::
+
+         $ openssl pkey -in CLAVEPRIVADA.pem -outform der -out CLAVEPRIVADA.der
+         $ openssl pkey -in CLAVEPRIVADA.der -inform der -aes256 -out CLAVEPRIVADA.pem
+
+      .. caution:: Cuando se pasa a binario, el archivo resultante contendrá la
+         clave desprotegida, ya que :command:`openssl` sólo permite especificar
+         cifrados de salida para formato binario.  Ahora bien, a partir de la
+         versión **4** sí es posible y podremos añadir ``-aes256`` también en la
+         primera orden.
+
+      .. note:: Consulte :manpage:`openssl-pkey(1)` para ver qué otros parámetros
+         cifran la clave con algoritmos distintos.
 
       .. _openssl-hash-subject:
 
@@ -423,27 +472,32 @@ común en el *software* libre) al resto de formatos y viceversa\ [#]_:
 
           $ openssl x509 -in CERTIFICADO.pem -issuer_hash -noout
 
-   #. Comprobar que una clave privada (en :file:`CERTIFICADO.key`) corresponde
+   #. Comprobar que una clave privada (en :file:`PRIVKEY.pem`) corresponde
       a un certificado (en :file:`CERTIFICADO.pem`)::
 
          $ openssl x509 -in CERTIFICADO.pem -modulus -noout | md5sum
          513830b5a6d44284ac84deb1566f34b6  -
-         $ openssl rsa -in CERTIFICADO.key -modulus -noout | md5sum
+         $ openssl rsa -in PRIVKEY.pem -modulus -noout | md5sum
          513830b5a6d44284ac84deb1566f34b6  -
 
       Si coinciden (como es el caso), entonces la clave privada es la
       correspondiente.
 
-   #. Generar un archivo ``.p12`` a partir de los archivos ``.pem`` y ``,key``::
+   #. Extraer todos los certificados apilados en un |PEM| y guardarlos una
+      :ref:`estructura PKCS#7 <cert-p7>`::
 
-         $ openssl pkcs12 -export -in CERTIFICADO.pem -inkey CERTIFICADO.key -out CERTIFICADO.p12
+         $ openssl crl2pkcs7 -nocrl -certfile CERTIFICADOS.pem -out CERTIFICADOS.p7b
 
-      supuesto que tengamos certificado y clave privada en distinto archivo. Si
-      están contenidas en el mismo |PEM| basta la opción :kbd:`-in`.
-      El archivo con el certificado puede contener también el certificado de
-      la(s) autoridad(es) de certificación. Si el certificado de la autoridad
-      está en archivo distinto, pero se quiere incluir dentro del resultado
-      puede referirse este tercer archivo mediante la opción :kbd:`-CAfile`.
+   #. Encapsular los certificados y la clave privada apilados en un |PEM| en un :ref:`contenedor PCKS#12 <cert-p12>`::
+
+         $ openssl pkcs12 -export -in CERTIFICADOS.pem -out CERTIFICADO.p12
+         $ openssl pkcs12 -export -in CERTIFICADOS.pem -inkey PRIVKEY.pem -out CERTIFICADO.p12
+
+      Esto se supone que tiene sentido cuando están apilados, además del
+      certificado de usuario, los certificados de la(s) autoridad(es) de
+      certificación. Si la cadena de confianza no está completa, aún pueden
+      incluirse los certificados faltantes incluidos en un tercer archivo
+      mediante la opción :kbd:`-CAfile`.
 
       .. note:: La orden requerirá interactivamente, en principio. dos
          claves: una para descifrar la clave privada contenida en el |PEM| y
@@ -452,57 +506,57 @@ común en el *software* libre) al resto de formatos y viceversa\ [#]_:
          utilice las opciones :kbd:`-passin` y :kbd:`-passout` y consulte la
          sección "Pass Phrase Options" de :manpage:`openssl(1)`.
 
-   #. Transformar el certificado |PEM| al formato |PKCS| #7::
+.. _cert-p7:
 
-         $ openssl crl2pkcs7 -nocrl -certfile CERTIFICADO.pem -out CERTIFICADO.p7b
+|PKCS| #7
+   Es un formato estandarizado a través del :rfc:`2315` que define una
+   estructura para almacenar datos que han sido sometidos a alguna operación
+   criptográfica como lo es la firma. Más adelante, al tratar las firmas
+   :ref:`profundizaremos en el CMS, su evolución <cms-signeddata>`.
 
-   #. Ver todos los certificados contenidos en el archivo |PEM|.  Esto se logra
-      traduciendo el certificado al formato |PKCS| #7 primero, porque para
-      este formato :command:`openssl` sí muestra la información sobre todos::
+   Lo interesante de esta estructura es que puede albergar un conjunto de
+   certificados ``X.509`` (no claves privadas) que en principio han sido
+   necesarios para la operación que también almacena; pero ser degenerada, es
+   decir, contener múltiples certificados sin llegar a incluir el resultado
+   de ninguna operación. Por ese motivo, el formato se usa para crear archivos
+   que almacenen varios certificados sin la necesidad de apilarlos con |PEM|.
+   Suele usarse en sistemas *Windows* y aplicaciones escritas en Java.
 
-        $  openssl crl2pkcs7 -nocrl -certfile CHAIN.pem | openssl pkcs7 -print_certs -text -noout
+   Los archivos construidos así tiene extensiones ``.p7b`` o ``.p7c``
+   indistintamente y pueden estar bien en formado binario |DER|, bien en formato
+   |PEM| que contiene una única estructura.
 
-   #. Transformar el certificado |PEM| en Base64_ a codificación |DER|::
+   Operaciones habituales:
 
-         $ openssl x509 -in CERTIFICADO.pem -outform der -out CERTIFICADO.crt
+   #. Consultar los datos de todos los certificados incluidos::
 
-   #. Trasformar la clave privada |PEM| en Base64_ a codificación |DER|::
+         $ openssl pkcs7 -in CERTIFICADO.p7b -print_certs -text -noout
+         $ openssl pkcs7 -inform der -in CERTIFICADO.p7c -print_certs -text -noout
 
-         $ openssl rsa -in CERTIFICADO.key -outform der -out CERTIFICADO.key.der
+   #. Extraer todos los certificados del |PKCS|\ #7 y apilarlos en un archivo |PEM|::
 
-      .. warning:: El formato resultante no estará cifrado y, por tanto, la
-         clave privada estará totalmente desprotegida.
+         $ openssl pkcs7 -in certificate.p7b -print_certs -out certificate.pem
 
-   #. Ver los datos del certificado (si usa codificación |DER|)::
-
-         $ openssl x509 -inform der -in CERTIFICADO.crt -text -noout
-
-   #. Trasformar un certificado público |DER| a Base64_::
-
-         $ openssl x509 -inform der -in CERTIFICADO.crt -outform pem -out CERTIFICADO.pem
-
-   #. Trasformar la clave privada en codificación |DER| a Base64_ protegiéndola
-      con un cifrado |AES|\ 256)::
-
-         $ openssl rsa -inform der -in CERTIFICADO.key.der -outform pem -aes256 -out CERTIFICADO.key
-
-      .. note:: Consulte :manpage:`openssl-rsa(1)` para ver qué otros parámetros
-         cifran la clave con algoritmos distintos.
+   .. note:: Estructuras PCKS#\ 7 no degeneradas también contienen los archivos
+      ``.p7s`` y ``.p7m``, que ya trataremos al hablar de la :ref:`firma de
+      documentos <firm-doc>` o el :ref:`estándar S/MIME <smime>`.
 
 .. _cert-p12:
 
 |PKCS| #12 (:kbd:`.p12` o, frecuentemente en *Windows*, :kbd:`.pfx`)
-   Formato originario de Microsoft_ que se acabó estandarizando mediante el
-   :rfc:`7292` y contiene tanto el certificado como la clave privada asociada.
-   También puede contener certificados de |CA| intermedias. En este formato toda
-   la información contenida esta cifrada con una clave simétrica (a diferencia
-   del |PEM| que sólo cifra la clave privada) y es el que suelen usar los
-   navegadores para exportar e importar los certificados personales de los
-   usuarios.
+   Formato contenedor originario de Microsoft_, que se acabó estandarizando
+   mediante el :rfc:`7292`, y está pensado para almacenar una identidad
+   completa, por lo que permite almacenar el certificado, su clave privada
+   asociada, y, adicionalmente, la cadena de certificados intermedios. En este
+   formato toda la información contenida suele esta cifrada con una clave
+   simétrica (aunque en teoría el cifrado de los certificados es opcional), y es
+   el que suelen usar los navegadores para exportar e importar los certificados
+   personales de los usuarios.
 
    Operaciones habituales:
 
-   #. Convertir el archivo :kbd:`.p12` al formato |PEM|\ [5]_ en un sólo archivo::
+   #. Apilar los certificados y clave privada contenidos en el :kbd:`.p12`
+      en un archivo |PEM|::
 
          $ openssl pkcs12 -in CERTIFICADO.p12 -out CERTIFICADO.pem
 
@@ -524,47 +578,6 @@ común en el *software* libre) al resto de formatos y viceversa\ [#]_:
       que traducir a |PEM| y obtener la información de la traducción)::
 
          $ openssl pkcs12 -in CERTIFICADO.p12 -clcerts -nokeys | openssl x509 -text -noout
-
-.. _cert-p7:
-
-|PKCS| #7
-   Es un formato estandarizado a través del :rfc:`2315` que define una
-   estructura para almacenar datos que han sido sometidos a alguna operación
-   criptográfica como lo es la firma. Más adelante, al tratar las firmas
-   :ref:`profundizaremos en su evolución, el CMS <cms-signeddata>`, pero ahora
-   nos interesa porque permite almacenar certificados (que no claves privadas)
-   sin llegar a almacenar ninguna firma. Suele usarse en sistemas *Windows* y
-   aplicaciones escritas en Java.  Utiliza las extensiones:
-
-   * ``.p7b`` cuando está codificado en Base64_. En este caso el archivo puede
-     contener varios certificados públicos prologado y cerrado cada uno de ellos
-     con una leyenda semejante a la que vimos para el caso del formato |PEM|.
-
-   * ``.p7c`` cuando contiene un único certificado público en codificación
-     |DER|. En este caso, debemos usar la opción :kbd:`-inform der` para
-     informar a :command:`openssl`.
-
-   Operaciones habituales:
-
-   #. Consultar los datos de los certificados incluidos::
-
-         $ openssl pkcs7 -in CERTIFICADO.p7b -print_certs -text -noout
-
-      .. note:: A diferencia de cuando se trata con el formato |PEM|, la
-         opción :kbd:`-print_certs` para este tipo de formato muestra la
-         información de todos los certificados incluidos en el archivo.
-
-   #. Consultar el dato del certificado codificado en |DER|::
-
-         $  openssl pkcs7 -inform der -in CERTIFICADO.p7c -print_certs -text -noout
-
-   #. Transformar el certificado |PKCS| #7 al formato |PEM|::
-
-         $ openssl pkcs7 -in certificate.p7b -print_certs -out certificate.pem
-
-.. note:: También propio de este estándar son los archivoc ``.p7s`` que
-   contienen la firma digital de un documento y se usan tanto para :ref:`firmar
-   documentos <firm-doc>` como en el :ref:`estándar S/MIME <smime>`.
 
 .. seealso:: Como referencia para este apartado se ha usado la `extensa
    respuesta a una pregunta formulada en serverfault
@@ -1234,26 +1247,27 @@ bastante sencilla, con lo que se hace innecesario el uso de
       subject=C = US, O = Let's Encrypt, CN = R3
       issuer=C = US, O = Internet Security Research Group, CN = ISRG Root X1
 
-.. [#] Las órdenes sólo exponen cómo hacer conversiones entre formatos y ver los
-       datos del certificado. Por supuesto, se hay otras operaciones interesantes
-       como crear certificados o verificar su validez.
 .. [#] Hasta el punto es así que, si tenemos un certificado en codificación
        binaria, podemos transformarlo manualmente a su forma en Base64_ así::
 
           $ { echo '-----BEGIN CERTIFICATE-----'
               base64 -w64 CERTIFICADO.cer
-              echo '-----END CERTIFICATE-----'; } > CERTFICADO.pem
+              echo '-----END CERTIFICATE-----'; } > CERTIFICADO.pem
 
        Échele un ojo a :ref:`lo comentado para este formato al hablar de las
        claves RSA <formato-pem>`.
 
+.. [#] Las órdenes sólo exponen cómo hacer conversiones entre formatos y ver los
+       datos del certificado. Por supuesto, se hay otras operaciones interesantes
+       como crear certificados o verificar su validez.
+
 .. [#] Si el firmante es un certificado raíz puede resultarnos útil calcular su
    *hash* para a través de él identificarlo en el sistema (véase el
    :ref:`catálogo general del sistema <cert-general>`).
-
 .. [#] Añadir la opción :kbd:`-nodes` deja la clave privada sin cifrar, pero
        posiblemente no sea una buena idea.
 .. [#] En un certificado autofirmado ``Subject`` e ``Issuer`` coincidirán.
+
 .. [#] Basta con hacer un :ref:`cat <cat>` y ver si hay uno o dos certificados
        en el archivo.
 .. [#] Es importante tal fecha porque el certificado fue válido hasta ese
@@ -1302,6 +1316,7 @@ bastante sencilla, con lo que se hace innecesario el uso de
 .. |RSA| replace:: :abbr:`RSA (Rivest, Shamir y Adleman)`
 .. |PKCS| replace:: :abbr:`PKCS (Public-Key Cryptography Standards)`
 .. |PEM| replace:: :abbr:`PEM (Private Enhanced Mail)`
+.. |BER| replace:: :abbr:`BER (Basic Enconding Rules)`
 .. |DER| replace:: :abbr:`DER (Distinguished Encoding Rules)`
 .. |OCSP| replace:: :abbr:`OCSP (Online Certificate Status Protocol)`
 .. |AES| replace:: :abbr:`AES (Advanced Encryption Standard)`
@@ -1319,6 +1334,7 @@ bastante sencilla, con lo que se hace innecesario el uso de
 .. |TSA| replace:: :abbr:`TSA (Time Stamping Authority)`
 .. |API| replace:: :abbr:`API (Application Programing Interface)`
 .. |DNI| replace:: :abbr:`DNI (Documento Nacional de Identidad)`
+.. |ASN.1| replace:: :abbr:`ASN.1 (Abstract Syntax Notation One)`
 
 .. _Digital Signature Trust: https://www.identrust.com/
 .. _Let's Encrypt: https://letsencrypt.org/
