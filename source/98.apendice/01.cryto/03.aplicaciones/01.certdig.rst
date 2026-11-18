@@ -518,16 +518,45 @@ X.509/|PKCS|\ #8
 |PKCS| #7
    Es un formato estandarizado a través del :rfc:`2315` que define una
    estructura para almacenar datos que han sido sometidos a alguna operación
-   criptográfica como lo es la firma. Más adelante, al tratar las firmas
-   :ref:`profundizaremos en el CMS, su evolución <cms-signeddata>`. Lo
-   interesante de esta estructura es que puede albergar un conjunto de
-   certificados ``X.509`` (no claves privadas) que en principio han sido
-   necesarios para la operación que también almacena; pero puede ser degenerada,
-   es decir, contener múltiples certificados sin llegar a incluir el resultado
-   de ninguna operación que se haya hecho con ellos. Por ese motivo, el formato
-   se usa para crear archivos que almacenen varios certificados en una misma
-   estructura sin la necesidad de apilarlar distintas estructuras ``X.509`` con
-   |PEM|. Suele usarse en sistemas *Windows* y aplicaciones escritas en Java.
+   criptográfica como lo es la firma. En realidad, actualmente se usa
+   su evolución llamada |CMS|, pero para la profundidad de lo que trataremos
+   aquí nos es indiferente hablar de uno u otro formato.
+
+   Es una estructura |ASN.1| muy versátil cuya definición del elemento raíz
+   es la siguiente:
+
+   .. code-block:: asn1
+
+      ContentInfo ::= SEQUENCE {
+         contentType    ContentType,
+         content        [0] EXPLICIT ANY DEFINED BY contentType OPTIONAL
+      }
+
+   Es decir, la estructura se define como una secuencia cuyos elementos están
+   constituidos por un tipo de contenido y un contenido cuya estructura depende
+   de cuál sea precisamente ese tipo de contenido. Los tipos posibles son:
+
+   + ``data``, para datos arbitrarios.
+   + ``signedData``, cuando el dato criptográfico es una firma.
+   + ``digestedData``, cuando el dato criptográfico es un resumen.
+   + ``encryptedData``, cuando el dato criptográfico es un criptograma
+     y la clave simétrica es gestionada al margen.
+   + ``envelopedData``, cuando el dato criptográfico es un criptograma
+     y la clave simétrica (cifrada también) se incluye, porque se trata
+     de un cifrado híbrido.
+
+   Salvo en el caso del primer tipo (cuyo contenido es, simplemente, una ristra
+   de *bytes*), el resto son estructuras definidas en el estándar. Más
+   adelante, al tratar las firmas :ref:`profundizaremos en signedData
+   <cms-signeddata>`. Esta
+   última estructura es interesante para lo que tratamos ahora, porque es la
+   única que el estándar permite que esté degenerada, esto es que no contenga
+   datos firmados, pero sí certificados ``X.509``\ [#]_ (que en principio se
+   incluyen por estar relacionados con los firmantes). Por ese motivo, el
+   formato se usa para crear archivos que almacenen varios certificados en una
+   misma estructura sin la necesidad de apilarlos en distintas estructuras
+   ``X.509`` con |PEM|.  Suele usarse en sistemas *Windows* y aplicaciones
+   escritas en Java.
 
    Los archivos construidos así tiene extensiones ``.p7b`` o ``.p7c``
    indistintamente y contienen una única estructura |PKCS|\ #7 en formato binario
@@ -563,7 +592,57 @@ X.509/|PKCS|\ #8
    .. note:: En realidad, un archivo ``.p12`` puede contener varias identidades,
       no una sola, pero lo habitual es que contenga una.
 
+   La estructura de este contenedor es la siguiente:
+
+   .. code-block:: asn1
+
+      PFX ::= SEQUENCE {
+         version     INTEGER{v3(3)},
+         authSafe    ContentInfo,
+         macData     MacData  OPTIONAL
+      }
+
+   O sea, una secuencia de elementos cuyo contenido es la versión (siempre 3),
+   los datos (``authSafe``) y opcionalmente un campo (``MacData``) que
+   conceptualmente sirve para asegurar la integridad de los datos. El valor de
+   ``authSafe`` al ser un ``ContentInfo`` es una estructura |PKCS|\ #7,
+   concretamente de tipo ``data`` cuando se protege con contraseña, que es lo
+   más habitual\ [#]_. Su contenido está definido en el estándar |PKCS|\ #12
+   como una secuencia de ``ContentInfo`` (o sea de estructuras |PKCS|\ #7):
+
+   .. code-block:: none
+
+      PFX
+       +--- version
+       +--- macData
+       +--- authSafe: ContentInfo
+               +--- contentType (data)
+               +--- content: OCTET STRING
+                       +--- AuthenticatedSafe: SEQUENCE OF ContentInfo
+                                 +--- ContentInfo #1
+                                 +--- ContentInfo #2
+   
+   Dentro de estas dos últimas estructuras |PKCS|\ #7 se encontrará la información.
+
    Operaciones habituales:
+
+   #. Consultar qué contiene el archivo::
+
+         $ openssl pkcs12 -in CERTIFICADO.p12 -noout
+         Enter Import Password:
+         MAC: sha1, Iteration 1024
+         MAC length: 20, salt length: 20
+         PKCS7 Data
+         Shrouded Keybag: pbeWithSHA1And3-KeyTripleDES-CBC, Iteration 1024
+         PKCS7 Encrypted data: pbeWithSHA1And3-KeyTripleDES-CBC, Iteration 1024
+         Certificate bag
+         Certificate bag
+         Certificate bag
+
+      La orden, precisamente, nos indica qué contienen las dos estructuras
+      con las que terminamos el esquema anterior:
+
+      a. La primera es de tipo ``data``... SEGUIR.
 
    #. Apilar los certificados y clave privada contenidos en el :kbd:`.p12`
       en un archivo |PEM|::
@@ -1281,6 +1360,9 @@ bastante sencilla, con lo que se hace innecesario el uso de
    :ref:`catálogo general del sistema <cert-general>`).
 .. [#] Añadir la opción :kbd:`-nodes` deja la clave privada sin cifrar, pero
        posiblemente no sea una buena idea.
+.. [#] Certificados, que no claves privadas.
+.. [#] También puede protegerse con clave pública y en ese caso es
+   ``signedData``.
 .. [#] En un certificado autofirmado ``Subject`` e ``Issuer`` coincidirán.
 
 .. [#] Basta con hacer un :ref:`cat <cat>` y ver si hay uno o dos certificados
@@ -1350,6 +1432,7 @@ bastante sencilla, con lo que se hace innecesario el uso de
 .. |API| replace:: :abbr:`API (Application Programing Interface)`
 .. |DNI| replace:: :abbr:`DNI (Documento Nacional de Identidad)`
 .. |ASN.1| replace:: :abbr:`ASN.1 (Abstract Syntax Notation One)`
+.. |CMS| replace:: :abbr:`CMS (Cryptographic Message Syntax)`
 
 .. _Digital Signature Trust: https://www.identrust.com/
 .. _Let's Encrypt: https://letsencrypt.org/
